@@ -1,20 +1,3 @@
-export interface IHotelInput {
-  name: string;
-  description?: string | null;
-  address: string;
-  city: string;
-  country: string;
-  phone?: string | null;
-  starRating?: number;
-  amenities: string[];
-  destinationId: number;
-  hotelPhoto?: string | null;
-}
-
-export interface IHotelUpdateInput extends Partial<IHotelInput> {
-  id: number;
-}
-
 export interface IHotelRoom {
   id: number;
   roomType: string;

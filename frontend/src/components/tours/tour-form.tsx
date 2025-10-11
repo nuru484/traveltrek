@@ -1,5 +1,6 @@
+// src/components/tours/tour-form.tsx
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -21,16 +22,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save } from "lucide-react";
-import { useRouter } from "next/navigation";
 import {
-  useCreateTourMutation,
-  useUpdateTourMutation,
-  ITourPayload,
-} from "@/redux/tourApi";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Save, Check, ChevronsUpDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCreateTourMutation, useUpdateTourMutation } from "@/redux/tourApi";
+import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
+import { ITourInput } from "@/types/tour.types";
 import toast from "react-hot-toast";
 import { ITour } from "@/types/tour.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { cn } from "@/lib/utils";
 
 const tourFormSchema = z.object({
   name: z.string().min(1, "Tour name is required"),
@@ -45,7 +57,7 @@ const tourFormSchema = z.object({
   maxGuests: z.number().min(1, "Max guests must be a positive number"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
-  location: z.string().min(1, "Location is required"),
+  destinationId: z.number().min(1, "Destination is required"),
 });
 
 type TourFormValues = z.infer<typeof tourFormSchema>;
@@ -68,6 +80,14 @@ export function TourForm({ tour, mode }: ITourFormProps) {
   const router = useRouter();
   const [createTour, { isLoading: isCreating }] = useCreateTourMutation();
   const [updateTour, { isLoading: isUpdating }] = useUpdateTourMutation();
+  const [destinationSearch, setDestinationSearch] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const { data: destinationsData, isLoading: isLoadingDestinations } =
+    useGetAllDestinationsQuery({
+      limit: 10,
+      search: destinationSearch,
+    });
 
   const form = useForm<TourFormValues>({
     resolver: zodResolver(tourFormSchema),
@@ -87,13 +107,13 @@ export function TourForm({ tour, mode }: ITourFormProps) {
           "T" +
           tour.endDate.split("T")[1].slice(0, 5)
         : "",
-      location: tour?.location || "",
+      destinationId: tour?.destination?.id || 0,
     },
   });
 
   const onSubmit = async (values: TourFormValues) => {
     try {
-      const tourData: ITourPayload = {
+      const tourData: ITourInput = {
         name: values.name,
         description: values.description || null,
         type: values.type,
@@ -101,7 +121,7 @@ export function TourForm({ tour, mode }: ITourFormProps) {
         maxGuests: values.maxGuests,
         startDate: new Date(values.startDate).toISOString(),
         endDate: new Date(values.endDate).toISOString(),
-        location: values.location,
+        destinationId: values.destinationId,
       };
 
       if (mode === "create") {
@@ -135,6 +155,7 @@ export function TourForm({ tour, mode }: ITourFormProps) {
   };
 
   const isLoading = isCreating || isUpdating;
+  const destinations = destinationsData?.data || [];
 
   return (
     <div className="space-y-6">
@@ -197,6 +218,86 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="destinationId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Destination</FormLabel>
+                    <Popover open={open} onOpenChange={setOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? destinations.find(
+                                  (destination) =>
+                                    destination.id === field.value
+                                )?.name ||
+                                tour?.destination?.name ||
+                                "Select destination"
+                              : "Select destination"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search destination..."
+                            value={destinationSearch}
+                            onValueChange={setDestinationSearch}
+                          />
+                          <CommandEmpty>
+                            {isLoadingDestinations
+                              ? "Loading destinations..."
+                              : "No destination found."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {destinations.map((destination) => (
+                              <CommandItem
+                                key={destination.id}
+                                value={destination.name}
+                                onSelect={() => {
+                                  field.onChange(destination.id);
+                                  setOpen(false);
+                                  setDestinationSearch("");
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    destination.id === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{destination.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {destination.city &&
+                                      `${destination.city}, `}
+                                    {destination.country}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -276,23 +377,6 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Serengeti, Tanzania"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <div className="flex gap-3 pt-4">
                 <Button

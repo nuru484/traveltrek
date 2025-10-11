@@ -165,6 +165,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Tour Booking */}
+            {/* Tour Booking */}
             {booking.type === "TOUR" && booking.tour && (
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -185,14 +186,37 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">
-                    Location
+                    Destination
                   </label>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">
-                      {booking.tour.location}
-                    </p>
-                  </div>
+                  {booking.tour.destination ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">
+                          {booking.tour.destination.name}
+                        </p>
+                      </div>
+                      <p className="text-sm text-muted-foreground ml-6">
+                        {booking.tour.destination.city &&
+                          `${booking.tour.destination.city}, `}
+                        {booking.tour.destination.country}
+                      </p>
+                      <Link
+                        href={`/dashboard/destinations/${booking.tour.destination.id}/detail`}
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
+                      >
+                        View Destination Details
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Unknown Destination
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

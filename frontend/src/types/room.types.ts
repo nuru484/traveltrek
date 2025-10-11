@@ -1,18 +1,4 @@
 // src/types/room.types.ts
-export interface IRoomInput {
-  hotelId: number;
-  roomType: string;
-  price: number;
-  capacity: number;
-  totalRooms: number;
-  description?: string;
-  amenities?: string[];
-  roomPhoto?: string;
-}
-
-export interface IRoomUpdateInput extends Partial<IRoomInput> {
-  id: number;
-}
 
 export interface IRoomHotel {
   id: number;

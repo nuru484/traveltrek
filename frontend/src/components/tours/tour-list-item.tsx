@@ -186,6 +186,16 @@ export function TourListItem({ tour }: ITourListItemProps) {
     );
   };
 
+  // Format destination display
+  const getDestinationDisplay = () => {
+    if (!tour.destination) return "Unknown";
+    const { name, city, country } = tour.destination;
+    if (city) {
+      return `${name}, ${city}, ${country}`;
+    }
+    return `${name}, ${country}`;
+  };
+
   return (
     <>
       <Card className="w-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group border border-border/50 hover:border-border overflow-hidden">
@@ -254,9 +264,12 @@ export function TourListItem({ tour }: ITourListItemProps) {
             <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
               <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Location</p>
-                <p className="font-medium text-sm capitalize truncate">
-                  {tour.location}
+                <p className="text-xs text-muted-foreground">Destination</p>
+                <p
+                  className="font-medium text-sm capitalize truncate"
+                  title={getDestinationDisplay()}
+                >
+                  {tour.destination?.name || "Unknown"}
                 </p>
               </div>
             </div>

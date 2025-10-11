@@ -26,7 +26,6 @@ export interface IDestinationsPaginatedResponse {
   };
 }
 
-// Query parameters for filtering and pagination
 export interface IDestinationQueryParams {
   page?: number;
   limit?: number;
@@ -35,20 +34,4 @@ export interface IDestinationQueryParams {
   city?: string;
   sortBy?: string | "createdAt";
   sortOrder?: string | "desc";
-}
-
-export interface IDestinationInput {
-  name: string;
-  description?: string;
-  country: string;
-  city?: string;
-  destinationPhoto?: File;
-}
-
-export interface IDestinationUpdateInput {
-  name?: string;
-  description?: string;
-  country?: string;
-  city?: string;
-  destinationPhoto?: File;
 }

@@ -3,20 +3,9 @@ import {
   ITourResponse,
   IToursPaginatedResponse,
   IToursQueryParams,
+  ITourInput,
 } from "../types/tour.types";
 import { IApiResponse } from "@/types/api";
-
-// Type for the tour creation/update payload
-export interface ITourPayload {
-  name: string;
-  description?: string | null;
-  type: "ADVENTURE" | "CULTURAL" | "BEACH" | "CITY" | "WILDLIFE" | "CRUISE";
-  price: number;
-  maxGuests: number;
-  startDate: string;
-  endDate: string;
-  location: string;
-}
 
 export const tourApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -54,7 +43,7 @@ export const tourApi = apiSlice.injectEndpoints({
       providesTags: (result, error, id) => [{ type: "Tour", id }],
     }),
 
-    createTour: builder.mutation<IApiResponse<ITourResponse>, ITourPayload>({
+    createTour: builder.mutation<IApiResponse<ITourResponse>, ITourInput>({
       query: (tourData) => ({
         url: "/tours",
         method: "POST",
@@ -68,7 +57,7 @@ export const tourApi = apiSlice.injectEndpoints({
 
     updateTour: builder.mutation<
       IApiResponse<ITourResponse>,
-      { id: number; tourData: ITourPayload }
+      { id: number; tourData: ITourInput }
     >({
       query: ({ id, tourData }) => ({
         url: `/tours/${id}`,

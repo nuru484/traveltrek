@@ -14,6 +14,13 @@ export enum TourStatus {
   CANCELLED = "CANCELLED",
 }
 
+export interface IDestinationSummary {
+  id: number;
+  name: string;
+  city: string | null;
+  country: string;
+}
+
 export interface ITour {
   id: number;
   name: string;
@@ -26,7 +33,7 @@ export interface ITour {
   guestsBooked: number;
   startDate: string;
   endDate: string;
-  location: string;
+  destination: IDestinationSummary;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,7 +43,6 @@ export interface ITourResponse {
   data: ITour;
 }
 
-// Add query params interface
 export interface IToursQueryParams {
   page?: number;
   limit?: number;
@@ -62,13 +68,12 @@ export interface IToursPaginatedResponse {
 export interface ITourInput {
   name: string;
   description?: string | null;
-  type: TourType;
-  duration: number;
+  type: "ADVENTURE" | "CULTURAL" | "BEACH" | "CITY" | "WILDLIFE" | "CRUISE";
   price: number;
   maxGuests: number;
   startDate: string;
   endDate: string;
-  location: string;
+  destinationId: number;
 }
 
 export interface IUpdateTourInput extends Partial<ITourInput> {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
+import Link from "next/link";
 import { RootState } from "@/redux/store";
 import { useDeleteTourMutation } from "@/redux/tourApi";
 import {
@@ -25,6 +26,7 @@ import {
   Bookmark,
   MoreHorizontal,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -84,6 +86,16 @@ export function TourDetail({ tour }: ITourDetailProps) {
     format(new Date(date), "EEEE, MMMM dd, yyyy HH:mm");
 
   const formatDuration = (days: number) => `${days} day${days > 1 ? "s" : ""}`;
+
+  // Format destination display
+  const getDestinationDisplay = () => {
+    if (!tour.destination) return "Unknown Destination";
+    const { name, city, country } = tour.destination;
+    if (city) {
+      return `${name}, ${city}, ${country}`;
+    }
+    return `${name}, ${country}`;
+  };
 
   const handleEdit = () => {
     router.push(`/dashboard/tours/${tour.id}/edit`);
@@ -304,16 +316,33 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
       {/* Details Section */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Location */}
+        {/* Destination */}
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-primary mt-1" />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground mb-2">Location</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {tour.location}
+                <p className="font-semibold text-foreground mb-2">
+                  Destination
                 </p>
+                {tour.destination ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {getDestinationDisplay()}
+                    </p>
+                    <Link
+                      href={`/dashboard/destinations/${tour.destination.id}/detail`}
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors"
+                    >
+                      View Destination Details
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Unknown Destination
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -397,9 +426,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
         open={showBookDialog}
         onOpenChange={setShowBookDialog}
         title="Confirm Booking"
-        description={`Are you sure you want to book tour "${truncatedTourName}" in ${
-          tour.location
-        } for ₵${tour.price.toLocaleString()}?`}
+        description={`Are you sure you want to book tour "${truncatedTourName}" to ${getDestinationDisplay()} for ₵${tour.price.toLocaleString()}?`}
         onConfirm={handleBook}
         confirmText="Book Now"
       />

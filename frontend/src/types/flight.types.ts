@@ -52,21 +52,3 @@ export interface IFlightsPaginatedResponse {
     totalPages: number;
   };
 }
-
-export interface IFlightInput {
-  flightNumber: string;
-  airline: string;
-  departure: string;
-  arrival: string;
-  originId: number;
-  destinationId: number;
-  price: number;
-  flightClass: IFlightClass;
-  stops?: number;
-  capacity: number;
-  flightPhoto?: string | File;
-}
-
-export interface IUpdateFlightInput extends Partial<IFlightInput> {
-  id: string;
-}
