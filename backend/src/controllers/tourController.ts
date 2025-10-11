@@ -17,9 +17,7 @@ import {
 import validationMiddleware from '../middlewares/validation';
 import logger from '../utils/logger';
 
-/**
- * Create a new tour
- */
+// CREATE TOUR
 const handleCreateTour = asyncHandler(
   async (
     req: Request<{}, {}, ITourInput>,
@@ -34,9 +32,16 @@ const handleCreateTour = asyncHandler(
       maxGuests,
       startDate,
       endDate,
-      location,
+      destinationId,
     } = req.body;
-    const user = req.user;
+
+    const destination = await prisma.destination.findUnique({
+      where: { id: destinationId },
+    });
+
+    if (!destination) {
+      throw new NotFoundError('Destination not found');
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -54,7 +59,17 @@ const handleCreateTour = asyncHandler(
         maxGuests,
         startDate: start,
         endDate: end,
-        location,
+        destinationId,
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            city: true,
+          },
+        },
       },
     });
 
@@ -70,7 +85,7 @@ const handleCreateTour = asyncHandler(
       guestsBooked: tour.guestsBooked,
       startDate: tour.startDate,
       endDate: tour.endDate,
-      location: tour.location,
+      destination: tour.destination,
       createdAt: tour.createdAt,
       updatedAt: tour.updatedAt,
     };
@@ -87,19 +102,31 @@ export const createTour: RequestHandler[] = [
   handleCreateTour,
 ];
 
-/**
- * Get a single tour by ID
- */
+// GET SINGLE TOUR
 const handleGetTour = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { id } = req.params;
 
     const tour = await prisma.tour.findUnique({
       where: { id: parseInt(id) },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            city: true,
+          },
+        },
+      },
     });
 
     if (!tour) {
       throw new NotFoundError('Tour not found');
+    }
+
+    if (!tour.destination) {
+      throw new NotFoundError('Tour destination not found');
     }
 
     const response: ITourResponse = {
@@ -114,7 +141,7 @@ const handleGetTour = asyncHandler(
       guestsBooked: tour.guestsBooked,
       startDate: tour.startDate,
       endDate: tour.endDate,
-      location: tour.location,
+      destination: tour.destination,
       createdAt: tour.createdAt,
       updatedAt: tour.updatedAt,
     };
@@ -134,9 +161,7 @@ export const getTour: RequestHandler[] = [
   handleGetTour,
 ];
 
-/**
- * Update a tour
- */
+// UPDATE TOUR
 const handleUpdateTour = asyncHandler(
   async (
     req: Request<{ id?: string }, {}, Partial<ITourInput>>,
@@ -152,7 +177,7 @@ const handleUpdateTour = asyncHandler(
       maxGuests,
       startDate,
       endDate,
-      location,
+      destinationId,
     } = req.body;
 
     if (!id) {
@@ -169,6 +194,9 @@ const handleUpdateTour = asyncHandler(
         where: { id: parsedId },
         include: {
           bookings: {
+            select: { id: true },
+          },
+          destination: {
             select: { id: true },
           },
         },
@@ -209,14 +237,21 @@ const handleUpdateTour = asyncHandler(
         throw new BadRequestError('End date must be after start date');
       }
 
-      if (
-        hasBookings &&
-        location !== undefined &&
-        location !== existingTour.location
-      ) {
-        throw new BadRequestError(
-          'Cannot change tour location when bookings exist. Please cancel all bookings first or create a new tour.',
-        );
+      if (destinationId !== undefined) {
+        const destination = await prisma.destination.findUnique({
+          where: { id: destinationId },
+        });
+
+        if (!destination) {
+          throw new NotFoundError('Destination not found');
+        }
+
+        const currentDestinationId = existingTour.destination?.id;
+        if (hasBookings && destinationId !== currentDestinationId) {
+          throw new BadRequestError(
+            'Cannot change tour destination when bookings exist. Please cancel all bookings first or create a new tour.',
+          );
+        }
       }
 
       if (maxGuests !== undefined) {
@@ -262,13 +297,23 @@ const handleUpdateTour = asyncHandler(
       if (endDate !== undefined) {
         updateData.endDate = newEndDate;
       }
-      if (location !== undefined) {
-        updateData.location = location;
+      if (destinationId !== undefined) {
+        updateData.destinationId = destinationId;
       }
 
       const updatedTour = await prisma.tour.update({
         where: { id: parsedId },
         data: updateData,
+        include: {
+          destination: {
+            select: {
+              id: true,
+              name: true,
+              country: true,
+              city: true,
+            },
+          },
+        },
       });
 
       const response: ITourResponse = {
@@ -283,7 +328,7 @@ const handleUpdateTour = asyncHandler(
         guestsBooked: updatedTour.guestsBooked,
         startDate: updatedTour.startDate,
         endDate: updatedTour.endDate,
-        location: updatedTour.location,
+        destination: updatedTour.destination,
         createdAt: updatedTour.createdAt,
         updatedAt: updatedTour.updatedAt,
       };
@@ -306,9 +351,7 @@ export const updateTour: RequestHandler[] = [
   handleUpdateTour,
 ];
 
-/**
- * Delete a tour
- */
+// DELETE SINGLE TOUR
 const handleDeleteTour = asyncHandler(
   async (
     req: Request<{ id?: string }>,
@@ -362,7 +405,6 @@ const handleDeleteTour = asyncHandler(
       throw new BadRequestError('Cannot delete tour with status "COMPLETED"');
     }
 
-    // Check for existing bookings
     if (tour.bookings.length > 0) {
       throw new BadRequestError(
         'Cannot delete tour with existing bookings. Please cancel or reassign bookings first.',
@@ -393,19 +435,18 @@ export const deleteTour: RequestHandler[] = [
   handleDeleteTour,
 ];
 
-/**
- * Get all tours with pagination
- */
+// GET ALL TOURS
 const handleGetAllTours = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Optional filters
     const type = req.query.type as string | undefined;
     const status = req.query.status as string | undefined;
-    const location = req.query.location as string | undefined;
+    const destinationId = req.query.destinationId as string | undefined;
+    const country = req.query.country as string | undefined;
+    const city = req.query.city as string | undefined;
     const minPrice = req.query.minPrice as string | undefined;
     const maxPrice = req.query.maxPrice as string | undefined;
     const minDuration = req.query.minDuration as string | undefined;
@@ -420,28 +461,38 @@ const handleGetAllTours = asyncHandler(
     const sortOrder =
       (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-    // Build where clause
     const whereClause: any = {};
 
-    // Filter by tour type
     if (type) {
       whereClause.type = type;
     }
 
-    // Filter by tour status
     if (status) {
       whereClause.status = status;
     }
 
-    // Filter by location (case-insensitive partial match)
-    if (location) {
-      whereClause.location = {
-        contains: location,
-        mode: 'insensitive',
-      };
+    if (destinationId || country || city) {
+      whereClause.destination = {};
+
+      if (destinationId) {
+        whereClause.destination.id = parseInt(destinationId);
+      }
+
+      if (country) {
+        whereClause.destination.country = {
+          contains: country,
+          mode: 'insensitive',
+        };
+      }
+
+      if (city) {
+        whereClause.destination.city = {
+          contains: city,
+          mode: 'insensitive',
+        };
+      }
     }
 
-    // Filter by price range
     if (minPrice || maxPrice) {
       whereClause.price = {};
       if (minPrice) {
@@ -458,7 +509,6 @@ const handleGetAllTours = asyncHandler(
       }
     }
 
-    // Filter by duration range
     if (minDuration || maxDuration) {
       whereClause.duration = {};
       if (minDuration) {
@@ -475,7 +525,6 @@ const handleGetAllTours = asyncHandler(
       }
     }
 
-    // Filter by available guests capacity
     if (minGuests || maxGuests) {
       const guestsFilter: any = {};
       if (minGuests) {
@@ -493,7 +542,6 @@ const handleGetAllTours = asyncHandler(
       whereClause.maxGuests = guestsFilter;
     }
 
-    // Filter by date range
     if (startDate || endDate) {
       if (startDate) {
         whereClause.startDate = {
@@ -507,23 +555,24 @@ const handleGetAllTours = asyncHandler(
       }
     }
 
-    // Filter to show only tours with available capacity
     if (availableOnly) {
       whereClause.guestsBooked = {
         lt: prisma.tour.fields.maxGuests,
       };
     }
 
-    // Search functionality (title, description, location)
     if (search) {
       whereClause.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
-        { location: { contains: search, mode: 'insensitive' } },
+        {
+          destination: {
+            name: { contains: search, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
-    // Build orderBy clause
     const orderByClause: any = {};
     const validSortFields = [
       'createdAt',
@@ -561,11 +610,12 @@ const handleGetAllTours = asyncHandler(
               rating: true,
             },
           },
-          destinations: {
+          destination: {
             select: {
               id: true,
               name: true,
               country: true,
+              city: true,
             },
           },
           _count: {
@@ -580,7 +630,6 @@ const handleGetAllTours = asyncHandler(
       prisma.tour.count({ where: whereClause }),
     ]);
 
-    // Calculate average rating for each tour
     const response: ITourResponse[] = tours.map((tour) => {
       const avgRating =
         tour.reviews.length > 0
@@ -603,8 +652,7 @@ const handleGetAllTours = asyncHandler(
         availableSeats,
         startDate: tour.startDate,
         endDate: tour.endDate,
-        location: tour.location,
-        destinations: tour.destinations,
+        destination: tour.destination,
         bookingCount: tour._count.bookings,
         reviewCount: tour._count.reviews,
         itineraryCount: tour._count.itinerary,
@@ -634,12 +682,9 @@ export const getAllTours: RequestHandler[] = [
   handleGetAllTours,
 ];
 
-/**
- * Delete all tours
- */
+// DELETE ALL TOURS
 export const deleteAllTours = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // First check if there are any tours at all
     const tourCount = await prisma.tour.count();
 
     if (tourCount === 0) {
@@ -671,12 +716,10 @@ export const deleteAllTours = asyncHandler(
     tours.forEach((tour) => {
       let canDelete = true;
 
-      // Check for active bookings
       const activeBookings = tour.bookings.filter((booking) =>
         ['PENDING', 'CONFIRMED'].includes(booking.status),
       );
 
-      // Check for paid bookings
       const paidBookings = tour.bookings.filter(
         (booking) =>
           booking.payment &&
@@ -702,7 +745,6 @@ export const deleteAllTours = asyncHandler(
       }
 
       if (tour.guestsBooked > 0 && activeBookings.length === 0) {
-        // Only flag if guests booked but no active bookings (data inconsistency)
         deletionResults.skippedReasons.hasGuestsBooked.push(tour.id);
         canDelete = false;
       }
@@ -758,7 +800,6 @@ export const deleteAllTours = asyncHandler(
       );
     }
 
-    // Delete tours in a transaction for data consistency
     await prisma.$transaction(async (tx) => {
       await tx.tour.deleteMany({
         where: {
@@ -767,7 +808,6 @@ export const deleteAllTours = asyncHandler(
       });
     });
 
-    // Build concise response message
     let message = `Deleted ${deletionResults.deletable.length} tour(s) successfully`;
 
     if (totalSkipped > 0) {

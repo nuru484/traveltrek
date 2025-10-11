@@ -1,3 +1,4 @@
+import { IDestinationSummary } from './destination.types';
 export interface ITourInput {
   name: string;
   description?: string | null;
@@ -6,7 +7,7 @@ export interface ITourInput {
   maxGuests: number;
   startDate: string | Date;
   endDate: string | Date;
-  location: string;
+  destinationId: number;
 }
 
 export interface ITourResponse {
@@ -21,7 +22,7 @@ export interface ITourResponse {
   guestsBooked: number;
   startDate: Date;
   endDate: Date;
-  location: string;
+  destination: IDestinationSummary;
   createdAt: Date;
   updatedAt: Date;
 }

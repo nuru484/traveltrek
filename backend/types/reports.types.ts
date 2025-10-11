@@ -1,4 +1,6 @@
 // types/reports.types.ts
+import { IDestinationSummary } from './destination.types';
+
 export interface IUserSummary {
   id: number;
   name: string;
@@ -48,7 +50,7 @@ export interface ITourTopStats {
     status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
     price: number;
     duration: number;
-    location: string;
+    destination: IDestinationSummary;
     startDate: Date;
     endDate: Date;
     maxGuests: number;
@@ -103,7 +105,7 @@ export interface IMonthlyBookingsResponse {
       };
     };
     monthlyBreakdown: Array<{
-      month: string; // YYYY-MM
+      month: string;
       bookingCount: number;
       revenue: number;
       averageValue: number;
@@ -112,7 +114,7 @@ export interface IMonthlyBookingsResponse {
       'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED',
       number
     >;
-    bookings: IBookingSummary[]; // ✅ typed booking list
+    bookings: IBookingSummary[];
   };
 }
 
@@ -142,11 +144,11 @@ export interface IPaymentsSummaryResponse {
       { count: number; amount: number }
     >;
     monthlyBreakdown: Array<{
-      month: string; // YYYY-MM
+      month: string;
       count: number;
       revenue: number;
     }>;
-    recentPayments: IPaymentSummary[]; // ✅ typed payment list
+    recentPayments: IPaymentSummary[];
   };
 }
 

@@ -18,8 +18,121 @@ import {
 import logger from '../utils/logger';
 
 /**
- * Create a new booking
+ * Shared include object for booking queries
  */
+const bookingInclude = {
+  user: {
+    select: { id: true, name: true, email: true },
+  },
+  tour: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      destination: {
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          country: true,
+        },
+      },
+    },
+  },
+  room: {
+    select: {
+      id: true,
+      roomType: true,
+      description: true,
+      hotel: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          city: true,
+          country: true,
+        },
+      },
+    },
+  },
+  flight: {
+    select: {
+      id: true,
+      flightNumber: true,
+      airline: true,
+      origin: {
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          country: true,
+        },
+      },
+      destination: {
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          country: true,
+        },
+      },
+    },
+  },
+  payment: {
+    select: {
+      id: true,
+      amount: true,
+      status: true,
+      paymentMethod: true,
+    },
+  },
+};
+
+/**
+ * Helper function to format booking response
+ */
+const formatBookingResponse = (booking: any): IBooking => {
+  const baseResponse = {
+    id: booking.id,
+    userId: booking.userId,
+    user: booking.user,
+    payment: booking.payment,
+    status: booking.status,
+    totalPrice: booking.totalPrice,
+    bookingDate: booking.bookingDate,
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
+  };
+
+  if (booking.tour) {
+    return {
+      ...baseResponse,
+      type: 'TOUR',
+      tour: booking.tour,
+      room: null,
+      flight: null,
+    };
+  } else if (booking.room) {
+    return {
+      ...baseResponse,
+      type: 'ROOM',
+      room: booking.room ?? null,
+      tour: null,
+      flight: null,
+    };
+  } else if (booking.flight) {
+    return {
+      ...baseResponse,
+      type: 'FLIGHT',
+      flight: booking.flight,
+      tour: null,
+      room: null,
+    };
+  }
+
+  throw new Error('Booking has no associated item (tour, room, or flight)');
+};
+
 const handleCreateBooking = asyncHandler(
   async (
     req: Request<{}, {}, IBookingInput>,
@@ -115,117 +228,11 @@ const handleCreateBooking = asyncHandler(
           totalPrice,
           status: 'PENDING',
         },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true },
-          },
-          tour: {
-            select: { id: true, name: true, description: true, location: true },
-          },
-          room: {
-            select: {
-              id: true,
-              roomType: true,
-              description: true,
-              hotel: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                  city: true,
-                  country: true,
-                },
-              },
-            },
-          },
-          flight: {
-            select: {
-              id: true,
-              flightNumber: true,
-              airline: true,
-              origin: {
-                select: {
-                  id: true,
-                  name: true,
-                  city: true,
-                  country: true,
-                },
-              },
-              destination: {
-                select: {
-                  id: true,
-                  name: true,
-                  city: true,
-                  country: true,
-                },
-              },
-            },
-          },
-          payment: {
-            select: {
-              id: true,
-              amount: true,
-              status: true,
-              paymentMethod: true,
-            },
-          },
-        },
+        include: bookingInclude,
       });
     });
 
-    let response: IBooking;
-
-    if (booking.tour) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'TOUR',
-        tour: booking.tour,
-        room: null,
-        flight: null,
-      };
-    } else if (booking.room) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'ROOM',
-        room: booking.room ?? null,
-        tour: null,
-        flight: null,
-      };
-    } else if (booking.flight) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'FLIGHT',
-        flight: booking.flight,
-        tour: null,
-        room: null,
-      };
-    } else {
-      throw new Error('Booking has no associated item (tour, room, or flight)');
-    }
+    const response = formatBookingResponse(booking);
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
       message: 'Booking created successfully',
@@ -234,7 +241,6 @@ const handleCreateBooking = asyncHandler(
   },
 );
 
-// Middleware arrays with validations
 export const createBooking: RequestHandler[] = [
   ...validationMiddleware.create(createBookingValidation),
   handleCreateBooking,
@@ -254,56 +260,7 @@ const handleGetBooking = asyncHandler(
 
     const booking = await prisma.booking.findUnique({
       where: { id: parseInt(id) },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true },
-        },
-        tour: {
-          select: { id: true, name: true, description: true, location: true },
-        },
-        room: {
-          select: {
-            id: true,
-            roomType: true,
-            description: true,
-            hotel: {
-              select: {
-                id: true,
-                name: true,
-                description: true,
-                city: true,
-                country: true,
-              },
-            },
-          },
-        },
-        flight: {
-          select: {
-            id: true,
-            flightNumber: true,
-            airline: true,
-            origin: {
-              select: {
-                id: true,
-                name: true,
-                city: true,
-                country: true,
-              },
-            },
-            destination: {
-              select: {
-                id: true,
-                name: true,
-                city: true,
-                country: true,
-              },
-            },
-          },
-        },
-        payment: {
-          select: { id: true, amount: true, status: true, paymentMethod: true },
-        },
-      },
+      include: bookingInclude,
     });
 
     if (!booking) {
@@ -314,59 +271,7 @@ const handleGetBooking = asyncHandler(
       throw new UnauthorizedError('You can only view your own bookings');
     }
 
-    let response: IBooking;
-
-    if (booking.tour) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'TOUR',
-        tour: booking.tour,
-        room: null,
-        flight: null,
-      };
-    } else if (booking.room) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'ROOM',
-        room: booking.room ?? null,
-        tour: null,
-        flight: null,
-      };
-    } else if (booking.flight) {
-      response = {
-        id: booking.id,
-        userId: booking.userId,
-        user: booking.user,
-        payment: booking.payment,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        bookingDate: booking.bookingDate,
-        createdAt: booking.createdAt,
-        updatedAt: booking.updatedAt,
-        type: 'FLIGHT',
-        flight: booking.flight,
-        tour: null,
-        room: null,
-      };
-    } else {
-      throw new Error('Booking has no associated item (tour, room, or flight)');
-    }
+    const response = formatBookingResponse(booking);
 
     res.status(HTTP_STATUS_CODES.OK).json({
       message: 'Booking retrieved successfully',
@@ -503,7 +408,6 @@ const handleUpdateBooking = asyncHandler(
           throw new BadRequestError('No rooms available of this type');
         }
 
-        // Update availabilities
         if (existingBooking.roomId) {
           await tx.room.update({
             where: { id: existingBooking.roomId },
@@ -516,7 +420,6 @@ const handleUpdateBooking = asyncHandler(
         });
       }
 
-      // Handle flight changes
       if (flightId && flightId !== existingBooking.flightId) {
         const flight = await tx.flight.findUnique({
           where: { id: flightId },
@@ -527,7 +430,6 @@ const handleUpdateBooking = asyncHandler(
           throw new BadRequestError('No seats available on this flight');
         }
 
-        // Update availabilities
         if (existingBooking.flightId) {
           await tx.flight.update({
             where: { id: existingBooking.flightId },
@@ -540,7 +442,6 @@ const handleUpdateBooking = asyncHandler(
         });
       }
 
-      // Update the booking
       return await tx.booking.update({
         where: { id: bookingId },
         data: {
@@ -551,105 +452,11 @@ const handleUpdateBooking = asyncHandler(
           totalPrice: totalPrice ?? existingBooking.totalPrice,
           status: status ?? existingBooking.status,
         },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true },
-          },
-          tour: {
-            select: { id: true, name: true, description: true, location: true },
-          },
-          room: {
-            select: {
-              id: true,
-              roomType: true,
-              description: true,
-              hotel: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                  city: true,
-                  country: true,
-                },
-              },
-            },
-          },
-          flight: {
-            select: {
-              id: true,
-              flightNumber: true,
-              airline: true,
-              origin: {
-                select: {
-                  id: true,
-                  name: true,
-                  city: true,
-                  country: true,
-                },
-              },
-              destination: {
-                select: {
-                  id: true,
-                  name: true,
-                  city: true,
-                  country: true,
-                },
-              },
-            },
-          },
-          payment: {
-            select: {
-              id: true,
-              amount: true,
-              status: true,
-              paymentMethod: true,
-            },
-          },
-        },
+        include: bookingInclude,
       });
     });
 
-    const baseResponse = {
-      id: updatedBooking.id,
-      userId: updatedBooking.userId,
-      user: updatedBooking.user,
-      payment: updatedBooking.payment,
-      status: updatedBooking.status,
-      totalPrice: updatedBooking.totalPrice,
-      bookingDate: updatedBooking.bookingDate,
-      createdAt: updatedBooking.createdAt,
-      updatedAt: updatedBooking.updatedAt,
-    };
-
-    let response: IBooking;
-
-    if (updatedBooking.tour) {
-      response = {
-        ...baseResponse,
-        type: 'TOUR',
-        tour: updatedBooking.tour,
-        room: null,
-        flight: null,
-      };
-    } else if (updatedBooking.room) {
-      response = {
-        ...baseResponse,
-        type: 'ROOM',
-        room: updatedBooking.room,
-        tour: null,
-        flight: null,
-      };
-    } else if (updatedBooking.flight) {
-      response = {
-        ...baseResponse,
-        type: 'FLIGHT',
-        flight: updatedBooking.flight,
-        tour: null,
-        room: null,
-      };
-    } else {
-      throw new Error('Booking has no associated item (tour, room, or flight)');
-    }
+    const response = formatBookingResponse(updatedBooking);
 
     res.status(HTTP_STATUS_CODES.OK).json({
       message: 'Booking updated successfully',
@@ -834,7 +641,6 @@ const handleGetUserBookings = asyncHandler(
       throw new UnauthorizedError('Unauthorized, no user provided');
     }
 
-    // Customers can only view their own bookings
     if (user.role === 'CUSTOMER' && user.id !== userId) {
       throw new UnauthorizedError('You can only view your own bookings');
     }
@@ -843,7 +649,6 @@ const handleGetUserBookings = asyncHandler(
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Optional filters
     const status = req.query.status as string | undefined;
     const bookingType = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
@@ -853,7 +658,6 @@ const handleGetUserBookings = asyncHandler(
     const fromDate = req.query.fromDate as string | undefined;
     const toDate = req.query.toDate as string | undefined;
 
-    // Build where clause
     const whereClause: any = {
       userId: parseInt(userId),
     };
@@ -889,7 +693,6 @@ const handleGetUserBookings = asyncHandler(
       };
     }
 
-    // Handle booking type filter
     if (bookingType === 'TOUR') {
       whereClause.tourId = { not: null };
     } else if (bookingType === 'ROOM') {
@@ -963,92 +766,12 @@ const handleGetUserBookings = asyncHandler(
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          tour: { select: { id: true, name: true, description: true } },
-          room: {
-            select: {
-              id: true,
-              roomType: true,
-              description: true,
-              hotel: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
-              },
-            },
-          },
-          flight: { select: { id: true, flightNumber: true, airline: true } },
-          payment: {
-            select: {
-              id: true,
-              amount: true,
-              status: true,
-              paymentMethod: true,
-            },
-          },
-        },
+        include: bookingInclude,
       }),
       prisma.booking.count({ where: whereClause }),
     ]);
 
-    const response: IBooking[] = bookings
-      .map((booking) => {
-        if (booking.tour) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'TOUR',
-            tour: booking.tour,
-            room: null,
-            flight: null,
-          };
-        } else if (booking.room) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'ROOM',
-            room: booking.room ? booking.room : null,
-            tour: null,
-            flight: null,
-          };
-        } else if (booking.flight) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'FLIGHT',
-            flight: booking.flight,
-            tour: null,
-            room: null,
-          };
-        }
-
-        return null;
-      })
-      .filter((b): b is IBooking => b !== null);
+    const response: IBooking[] = bookings.map(formatBookingResponse);
 
     res.status(HTTP_STATUS_CODES.OK).json({
       message: `Bookings for user ${userId} retrieved successfully`,
@@ -1085,7 +808,6 @@ const handleGetAllBookings = asyncHandler(
       throw new UnauthorizedError('Unauthorized, no user provided');
     }
 
-    // Optional filters
     const userId = req.query.userId as string | undefined;
     const status = req.query.status as string | undefined;
     const bookingType = req.query.type as string | undefined;
@@ -1096,15 +818,12 @@ const handleGetAllBookings = asyncHandler(
     const fromDate = req.query.fromDate as string | undefined;
     const toDate = req.query.toDate as string | undefined;
 
-    // Build where clause
     const whereClause: any = {};
 
-    // Base authorization filter
     if (user.role === 'CUSTOMER') {
       whereClause.userId = parseInt(user.id);
     }
 
-    // Additional filters
     if (userId && user.role !== 'CUSTOMER') {
       whereClause.userId = parseInt(userId);
     }
@@ -1140,7 +859,6 @@ const handleGetAllBookings = asyncHandler(
       };
     }
 
-    // Handle booking type filter
     if (bookingType === 'TOUR') {
       whereClause.tourId = { not: null };
     } else if (bookingType === 'ROOM') {
@@ -1149,7 +867,6 @@ const handleGetAllBookings = asyncHandler(
       whereClause.flightId = { not: null };
     }
 
-    // Handle search across related entities
     if (search) {
       whereClause.OR = [
         {
@@ -1215,98 +932,12 @@ const handleGetAllBookings = asyncHandler(
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true },
-          },
-          tour: {
-            select: { id: true, name: true, description: true },
-          },
-          room: {
-            select: {
-              id: true,
-              roomType: true,
-              description: true,
-              hotel: {
-                select: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
-              },
-            },
-          },
-          flight: {
-            select: { id: true, flightNumber: true, airline: true },
-          },
-          payment: {
-            select: {
-              id: true,
-              amount: true,
-              status: true,
-              paymentMethod: true,
-            },
-          },
-        },
+        include: bookingInclude,
       }),
       prisma.booking.count({ where: whereClause }),
     ]);
 
-    const response: IBooking[] = bookings
-      .map((booking) => {
-        if (booking.tour) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'TOUR',
-            tour: booking.tour,
-            room: null,
-            flight: null,
-          };
-        } else if (booking.room) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'ROOM',
-            room: booking.room ? booking.room : null,
-            tour: null,
-            flight: null,
-          };
-        } else if (booking.flight) {
-          return {
-            id: booking.id,
-            userId: booking.userId,
-            user: booking.user,
-            payment: booking.payment,
-            status: booking.status,
-            totalPrice: booking.totalPrice,
-            bookingDate: booking.bookingDate,
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-            type: 'FLIGHT',
-            flight: booking.flight,
-            tour: null,
-            room: null,
-          };
-        }
-
-        return null;
-      })
-      .filter((b): b is IBooking => b !== null);
+    const response: IBooking[] = bookings.map(formatBookingResponse);
 
     res.status(HTTP_STATUS_CODES.OK).json({
       message: 'Bookings retrieved successfully',
@@ -1349,11 +980,11 @@ const handleDeleteAllBookings = asyncHandler(
     const deletionResults = {
       deletable: [] as typeof bookings,
       skippedReasons: {
-        activeBookings: [] as number[], 
+        activeBookings: [] as number[],
         completedBookings: [] as number[],
         withPendingPayment: [] as number[],
         withCompletedPayment: [] as number[],
-        futureBookings: [] as number[], 
+        futureBookings: [] as number[],
       },
     };
 

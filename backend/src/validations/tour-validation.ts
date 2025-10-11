@@ -4,7 +4,6 @@ import { ValidationChain } from 'express-validator';
 import prisma from '../config/prismaClient';
 import { TourType, TourStatus } from '../../generated/prisma/client';
 
-// Validation for creating a new tour
 export const createTourValidation: ValidationChain[] = [
   validator.string('name', {
     required: true,
@@ -44,15 +43,12 @@ export const createTourValidation: ValidationChain[] = [
     compareDateOperation: 'after',
   }),
 
-  validator.string('location', {
+  validator.number('destinationId', {
     required: true,
-    minLength: 2,
-    maxLength: 255,
-    customMessage: 'Location must be between 2 and 255 characters',
+    min: 1,
   }),
 ];
 
-// Validation for updating a tour
 export const updateTourValidation: ValidationChain[] = [
   validator.string('name', {
     required: false,
@@ -108,15 +104,12 @@ export const updateTourValidation: ValidationChain[] = [
     { required: false },
   ),
 
-  validator.string('location', {
+  validator.number('destinationId', {
     required: false,
-    minLength: 2,
-    maxLength: 255,
-    customMessage: 'Location must be between 2 and 255 characters',
+    min: 1,
   }),
 ];
 
-// Validation for tour ID parameter
 export const tourIdParamValidation: ValidationChain[] = [
   validator.integer('id', {
     required: true,
@@ -124,7 +117,6 @@ export const tourIdParamValidation: ValidationChain[] = [
   }),
 ];
 
-// Validation for pagination query parameters
 export const paginationQueryValidation: ValidationChain[] = [
   validator.integer('page', {
     required: false,
@@ -138,7 +130,6 @@ export const paginationQueryValidation: ValidationChain[] = [
   }),
 ];
 
-// Validation for tour search and filter queries
 export const tourSearchValidation: ValidationChain[] = [
   validator.string('search', {
     required: false,
@@ -150,13 +141,6 @@ export const tourSearchValidation: ValidationChain[] = [
   validator.enum('type', Object.values(TourType), { required: false }),
 
   validator.enum('status', Object.values(TourStatus), { required: false }),
-
-  validator.string('location', {
-    required: false,
-    minLength: 1,
-    maxLength: 255,
-    customMessage: 'Location filter must be between 1 and 255 characters',
-  }),
 
   validator.number('minPrice', {
     required: false,
@@ -260,13 +244,11 @@ export const tourSearchValidation: ValidationChain[] = [
   }),
 ];
 
-// Combined validation for getAllTours
 export const getAllToursValidation: ValidationChain[] = [
   ...paginationQueryValidation,
   ...tourSearchValidation,
 ];
 
-// Validation for bulk tour operations
 export const bulkTourValidation: ValidationChain[] = [
   validator.array('tourIds', {
     required: true,
@@ -287,7 +269,6 @@ export const bulkTourValidation: ValidationChain[] = [
   ),
 ];
 
-// Validation for tour availability check
 export const tourAvailabilityValidation: ValidationChain[] = [
   validator.integer('tourId', {
     required: true,
@@ -336,7 +317,6 @@ export const tourAvailabilityValidation: ValidationChain[] = [
   ),
 ];
 
-// Validation for tour date range queries
 export const tourDateRangeValidation: ValidationChain[] = [
   validator.date('fromDate', {
     required: true,
@@ -349,7 +329,6 @@ export const tourDateRangeValidation: ValidationChain[] = [
   }),
 ];
 
-// Validation for tour status update
 export const updateTourStatusValidation: ValidationChain[] = [
   validator.enum('status', Object.values(TourStatus), { required: true }),
 ];

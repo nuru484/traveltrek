@@ -37,3 +37,10 @@ export interface IDestinationsPaginatedResponse {
     totalPages: number;
   };
 }
+
+export interface IDestinationSummary {
+  id: number;
+  name: string;
+  city: string | null;
+  country: string;
+}

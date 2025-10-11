@@ -20,43 +20,6 @@ enum Role {
   AGENT
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
-enum PaymentMethod {
-  CREDIT_CARD
-  DEBIT_CARD
-  MOBILE_MONEY
-  BANK_TRANSFER
-}
-
-enum TourType {
-  ADVENTURE
-  CULTURAL
-  BEACH
-  CITY
-  WILDLIFE
-  CRUISE
-}
-
-enum TourStatus {
-  UPCOMING
-  ONGOING
-  COMPLETED
-  CANCELLED
-}
-
 model User {
   id             Int      @id @default(autoincrement())
   name           String
@@ -77,6 +40,22 @@ model User {
   Notification Notification[]
 }
 
+enum TourType {
+  ADVENTURE
+  CULTURAL
+  BEACH
+  CITY
+  WILDLIFE
+  CRUISE
+}
+
+enum TourStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
 model Tour {
   id           Int        @id @default(autoincrement())
   name         String
@@ -89,22 +68,21 @@ model Tour {
   guestsBooked Int        @default(0)
   startDate    DateTime
   endDate      DateTime
-  location     String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  itinerary    Itinerary[]
-  bookings     Booking[]
-  reviews      Review[]
-  inclusions   TourInclusion[]
-  exclusions   TourExclusion[]
-  destinations Destination[]
-  Wishlist     Wishlist[]
+  itinerary     Itinerary[]
+  bookings      Booking[]
+  reviews       Review[]
+  inclusions    TourInclusion[]
+  exclusions    TourExclusion[]
+  destination   Destination     @relation(fields: [destinationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  destinationId Int
+  Wishlist      Wishlist[]
 
   @@index([name], name: "tour_name_idx")
   @@index([startDate, endDate], name: "tour_start_end_idx")
   @@index([type, status], name: "tour_type_status_idx")
-  @@index([location], name: "tour_location_idx")
   @@index([guestsBooked], name: "tour_guest_booked_idx")
 }
 
@@ -234,6 +212,13 @@ model Flight {
   @@index([seatsAvailable], name: "flight_seats_available_idx")
 }
 
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
 model Booking {
   id          Int           @id @default(autoincrement())
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -252,11 +237,24 @@ model Booking {
 
   payment Payment?
 
-  // Prevent duplicate bookings
   @@unique([userId, tourId])
   @@unique([userId, roomId])
   @@unique([userId, flightId])
   @@index([userId, tourId, roomId, flightId], name: "booking_user_tour_hotel_room_flight_idx")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  MOBILE_MONEY
+  BANK_TRANSFER
 }
 
 model Payment {

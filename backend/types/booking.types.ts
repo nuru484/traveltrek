@@ -1,3 +1,4 @@
+import { IDestinationSummary } from './destination.types';
 export interface IBookingInput {
   userId: number;
   tourId?: number | null;
@@ -30,7 +31,7 @@ export interface IBookingTour {
   id: number;
   name: string;
   description: string | null;
-  location: string;
+  destination: IDestinationSummary;
 }
 
 export interface IBookingFlight {
