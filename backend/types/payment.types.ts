@@ -111,12 +111,6 @@ export interface IDeleteAllPaymentsResponse {
   data: {
     deletedCount: number;
     bookingsAffected: number[];
-    filters: {
-      status?: string;
-      paymentMethod?: string;
-      userId?: number;
-      beforeDate?: string;
-    };
   };
 }
 

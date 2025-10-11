@@ -15,6 +15,7 @@ import {
   updateBookingValidation,
   getBookingsValidation,
 } from '../validations/bookingValidations';
+import logger from '../utils/logger';
 
 /**
  * Create a new booking
@@ -1330,56 +1331,214 @@ export const getAllBookings: RequestHandler[] = [
  */
 const handleDeleteAllBookings = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const bookingCount = await prisma.booking.count();
+
+    if (bookingCount === 0) {
+      throw new BadRequestError('No bookings found to delete.');
+    }
+
     const bookings = await prisma.booking.findMany({
-      include: { payment: true },
+      include: {
+        payment: true,
+        tour: true,
+        room: true,
+        flight: true,
+      },
     });
 
-    const deletableBookings = bookings.filter(
-      (booking) =>
-        booking.status !== 'COMPLETED' &&
-        (!booking.payment || booking.payment.status === 'REFUNDED'),
-    );
+    const deletionResults = {
+      deletable: [] as typeof bookings,
+      skippedReasons: {
+        activeBookings: [] as number[], 
+        completedBookings: [] as number[],
+        withPendingPayment: [] as number[],
+        withCompletedPayment: [] as number[],
+        futureBookings: [] as number[], 
+      },
+    };
 
-    if (deletableBookings.length === 0) {
+    const now = new Date();
+
+    bookings.forEach((booking) => {
+      let canDelete = true;
+
+      if (['PENDING', 'CONFIRMED'].includes(booking.status)) {
+        let isFutureBooking = false;
+
+        if (booking.tour && booking.tour.startDate > now) {
+          isFutureBooking = true;
+        } else if (booking.flight && booking.flight.departure > now) {
+          isFutureBooking = true;
+        } else if (booking.room) {
+          isFutureBooking = true;
+        }
+
+        if (booking.status === 'CONFIRMED' && isFutureBooking) {
+          deletionResults.skippedReasons.futureBookings.push(booking.id);
+          canDelete = false;
+        } else {
+          deletionResults.skippedReasons.activeBookings.push(booking.id);
+          canDelete = false;
+        }
+      }
+
+      if (booking.status === 'COMPLETED') {
+        deletionResults.skippedReasons.completedBookings.push(booking.id);
+        canDelete = false;
+      }
+
+      if (booking.payment) {
+        if (booking.payment.status === 'PENDING') {
+          deletionResults.skippedReasons.withPendingPayment.push(booking.id);
+          canDelete = false;
+        } else if (booking.payment.status === 'COMPLETED') {
+          deletionResults.skippedReasons.withCompletedPayment.push(booking.id);
+          canDelete = false;
+        }
+      }
+
+      if (canDelete) {
+        deletionResults.deletable.push(booking);
+      }
+    });
+
+    const totalSkipped =
+      deletionResults.skippedReasons.activeBookings.length +
+      deletionResults.skippedReasons.completedBookings.length +
+      deletionResults.skippedReasons.withPendingPayment.length +
+      deletionResults.skippedReasons.withCompletedPayment.length +
+      deletionResults.skippedReasons.futureBookings.length;
+
+    if (deletionResults.deletable.length === 0) {
+      const issues: string[] = [];
+
+      if (deletionResults.skippedReasons.activeBookings.length > 0) {
+        issues.push('active bookings');
+      }
+
+      if (deletionResults.skippedReasons.futureBookings.length > 0) {
+        issues.push('confirmed future bookings');
+      }
+
+      if (deletionResults.skippedReasons.completedBookings.length > 0) {
+        issues.push('completed bookings');
+      }
+
+      if (deletionResults.skippedReasons.withPendingPayment.length > 0) {
+        issues.push('pending payments');
+      }
+
+      if (deletionResults.skippedReasons.withCompletedPayment.length > 0) {
+        issues.push('completed payments');
+      }
+
       throw new BadRequestError(
-        'No bookings can be deleted. Completed or paid bookings must be refunded first.',
+        `Cannot delete bookings with ${issues.join(', ')}. Please cancel or refund these first.`,
+      );
+    }
+
+    if (totalSkipped > 0) {
+      logger.warn(
+        `Skipping ${totalSkipped} booking(s): ` +
+          `${deletionResults.skippedReasons.activeBookings.length} active, ` +
+          `${deletionResults.skippedReasons.futureBookings.length} future confirmed, ` +
+          `${deletionResults.skippedReasons.completedBookings.length} completed, ` +
+          `${deletionResults.skippedReasons.withPendingPayment.length} with pending payments, ` +
+          `${deletionResults.skippedReasons.withCompletedPayment.length} with completed payments.`,
       );
     }
 
     await prisma.$transaction(async (tx) => {
-      for (const booking of deletableBookings) {
-        if (booking.tourId) {
-          await tx.tour.update({
-            where: { id: booking.tourId },
-            data: { guestsBooked: { decrement: 1 } },
-          });
+      for (const booking of deletionResults.deletable) {
+        if (booking.tourId && booking.tour) {
+          if (booking.tour.guestsBooked > 0) {
+            await tx.tour.update({
+              where: { id: booking.tourId },
+              data: { guestsBooked: { decrement: 1 } },
+            });
+          }
         }
 
-        if (booking.roomId) {
-          await tx.room.update({
-            where: { id: booking.roomId },
-            data: { roomsAvailable: { increment: 1 } },
-          });
+        if (booking.roomId && booking.room) {
+          if (booking.room.roomsAvailable < booking.room.totalRooms) {
+            await tx.room.update({
+              where: { id: booking.roomId },
+              data: { roomsAvailable: { increment: 1 } },
+            });
+          }
         }
 
-        if (booking.flightId) {
-          await tx.flight.update({
-            where: { id: booking.flightId },
-            data: { seatsAvailable: { increment: 1 } },
-          });
+        if (booking.flightId && booking.flight) {
+          if (booking.flight.seatsAvailable < booking.flight.capacity) {
+            await tx.flight.update({
+              where: { id: booking.flightId },
+              data: { seatsAvailable: { increment: 1 } },
+            });
+          }
         }
       }
 
       await tx.booking.deleteMany({
         where: {
-          id: { in: deletableBookings.map((b) => b.id) },
+          id: { in: deletionResults.deletable.map((b) => b.id) },
         },
       });
     });
 
+    let message = `Deleted ${deletionResults.deletable.length} booking(s) successfully`;
+
+    if (totalSkipped > 0) {
+      const skippedReasons: string[] = [];
+
+      if (deletionResults.skippedReasons.activeBookings.length > 0) {
+        skippedReasons.push(
+          `${deletionResults.skippedReasons.activeBookings.length} active`,
+        );
+      }
+
+      if (deletionResults.skippedReasons.futureBookings.length > 0) {
+        skippedReasons.push(
+          `${deletionResults.skippedReasons.futureBookings.length} future confirmed`,
+        );
+      }
+
+      if (deletionResults.skippedReasons.completedBookings.length > 0) {
+        skippedReasons.push(
+          `${deletionResults.skippedReasons.completedBookings.length} completed`,
+        );
+      }
+
+      if (deletionResults.skippedReasons.withPendingPayment.length > 0) {
+        skippedReasons.push(
+          `${deletionResults.skippedReasons.withPendingPayment.length} pending payment`,
+        );
+      }
+
+      if (deletionResults.skippedReasons.withCompletedPayment.length > 0) {
+        skippedReasons.push(
+          `${deletionResults.skippedReasons.withCompletedPayment.length} paid`,
+        );
+      }
+
+      message += `. Skipped: ${skippedReasons.join(', ')}`;
+    }
+
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Deleted ${deletableBookings.length} booking(s) successfully`,
-      skipped: bookings.length - deletableBookings.length,
+      message,
+      deleted: deletionResults.deletable.length,
+      skipped: totalSkipped,
+      details: {
+        deletedIds: deletionResults.deletable.map((b) => b.id),
+        skippedActive: deletionResults.skippedReasons.activeBookings.length,
+        skippedFutureConfirmed:
+          deletionResults.skippedReasons.futureBookings.length,
+        skippedCompleted:
+          deletionResults.skippedReasons.completedBookings.length,
+        skippedPendingPayment:
+          deletionResults.skippedReasons.withPendingPayment.length,
+        skippedPaidBookings:
+          deletionResults.skippedReasons.withCompletedPayment.length,
+      },
     });
   },
 );
