@@ -166,6 +166,25 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
     return colors[type as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
 
+  const getStatusColor = (status: string) => {
+    const colors = {
+      UPCOMING: "bg-blue-100 text-blue-800",
+      ONGOING: "bg-green-100 text-green-800",
+      COMPLETED: "bg-gray-100 text-gray-800",
+      CANCELLED: "bg-red-100 text-red-800",
+    };
+    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
+  };
+
+  // Format destination location
+  const getLocationString = () => {
+    const { destination } = tour;
+    if (destination.city) {
+      return `${destination.city}, ${destination.country}`;
+    }
+    return destination.country;
+  };
+
   return (
     <Card>
       <CardContent className="p-6">
@@ -180,7 +199,9 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
                 <Badge className={getTourTypeColor(tour.type)}>
                   {tour.type}
                 </Badge>
-                <Badge>{tour.status}</Badge>
+                <Badge className={getStatusColor(tour.status)}>
+                  {tour.status}
+                </Badge>
               </div>
             </div>
           </div>
@@ -233,12 +254,13 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
             <Star className="h-4 w-4 text-yellow-500" />
             <div>
               <p className="text-sm font-medium">
-                {statistics.averageRating
+                {statistics.averageRating > 0
                   ? statistics.averageRating.toFixed(1)
                   : "N/A"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {statistics.reviewCount} reviews
+                {statistics.reviewCount} review
+                {statistics.reviewCount !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
@@ -247,7 +269,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center space-x-2">
             <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{tour.location}</span>
+            <span className="text-sm">{getLocationString()}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />

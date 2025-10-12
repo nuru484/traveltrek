@@ -22,7 +22,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload, X } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Loader2, Upload, X, Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   useCreateHotelMutation,
@@ -33,14 +45,12 @@ import toast from "react-hot-toast";
 import { IHotel } from "@/types/hotel.types";
 import Image from "next/image";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { IDestination } from "@/types/destination.types";
+import { cn } from "@/lib/utils";
 
 const hotelFormSchema = z.object({
   name: z.string().min(1, "Hotel name is required"),
   description: z.string().optional().nullable(),
   address: z.string().min(1, "Address is required"),
-  city: z.string().min(1, "City is required"),
-  country: z.string().min(1, "Country is required"),
   phone: z.string().optional().nullable(),
   starRating: z.number().min(1).max(5).optional(),
   amenities: z.array(z.string()).optional(),
@@ -59,16 +69,18 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
   const router = useRouter();
   const [createHotel, { isLoading: isCreating }] = useCreateHotelMutation();
   const [updateHotel, { isLoading: isUpdating }] = useUpdateHotelMutation();
-  const { data: destinationsData, isLoading: isDestinationsLoading } =
-    useGetAllDestinationsQuery({ limit: 100 });
+  const [destinationSearch, setDestinationSearch] = useState("");
+  const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     hotel?.photo || null
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const destinations: IDestination[] = React.useMemo(() => {
-    return destinationsData?.data || [];
-  }, [destinationsData]);
+  const { data: destinationsData, isLoading: isLoadingDestinations } =
+    useGetAllDestinationsQuery({
+      limit: 10,
+      search: destinationSearch,
+    });
 
   const form = useForm<HotelFormValues>({
     resolver: zodResolver(hotelFormSchema),
@@ -76,12 +88,10 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
       name: hotel?.name || "",
       description: hotel?.description || null,
       address: hotel?.address || "",
-      city: hotel?.city || "",
-      country: hotel?.country || "",
       phone: hotel?.phone || null,
       starRating: hotel?.starRating || 3,
       amenities: hotel?.amenities || [],
-      destinationId: hotel?.destination.id || 0,
+      destinationId: hotel?.destination?.id || 0,
       hotelPhoto: undefined,
     },
   });
@@ -146,8 +156,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
       if (values.description)
         formData.append("description", values.description);
       formData.append("address", values.address);
-      formData.append("city", values.city);
-      formData.append("country", values.country);
       if (values.phone) formData.append("phone", values.phone);
       if (values.starRating)
         formData.append("starRating", values.starRating.toString());
@@ -189,7 +197,8 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
     }
   };
 
-  const isLoading = isCreating || isUpdating || isDestinationsLoading;
+  const isLoading = isCreating || isUpdating;
+  const destinations = destinationsData?.data || [];
 
   return (
     <div className="space-y-6">
@@ -231,6 +240,86 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
 
               <FormField
                 control={form.control}
+                name="destinationId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Destination</FormLabel>
+                    <Popover open={open} onOpenChange={setOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value
+                              ? destinations.find(
+                                  (destination) =>
+                                    destination.id === field.value
+                                )?.name ||
+                                hotel?.destination?.name ||
+                                "Select destination"
+                              : "Select destination"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search destination..."
+                            value={destinationSearch}
+                            onValueChange={setDestinationSearch}
+                          />
+                          <CommandEmpty>
+                            {isLoadingDestinations
+                              ? "Loading destinations..."
+                              : "No destination found."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {destinations.map((destination) => (
+                              <CommandItem
+                                key={destination.id}
+                                value={destination.name}
+                                onSelect={() => {
+                                  field.onChange(destination.id);
+                                  setOpen(false);
+                                  setDestinationSearch("");
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    destination.id === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{destination.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {destination.city &&
+                                      `${destination.city}, `}
+                                    {destination.country}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="address"
                 render={({ field }) => (
                   <FormItem>
@@ -242,36 +331,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
                   </FormItem>
                 )}
               />
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Accra" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Country</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Ghana" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
 
               <FormField
                 control={form.control}
@@ -349,40 +408,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
 
               <FormField
                 control={form.control}
-                name="destinationId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Destination</FormLabel>
-                    <FormControl>
-                      <Select
-                        onValueChange={(value) =>
-                          field.onChange(parseInt(value))
-                        }
-                        defaultValue={field.value?.toString()}
-                        disabled={isDestinationsLoading}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select destination" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {destinations.map((dest) => (
-                            <SelectItem
-                              key={dest.id}
-                              value={dest.id.toString()}
-                            >
-                              {dest.name} ({dest.city}, {dest.country})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="hotelPhoto"
                 render={() => (
                   <FormItem>
@@ -451,14 +476,14 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
                   variant="outline"
                   onClick={() => router.push("/dashboard/hotels")}
                   disabled={isLoading}
-                  className="flex-1 cursor-pointer"
+                  className="flex-1 hover:cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 cursor-pointer"
+                  className="flex-1 hover:cursor-pointer"
                 >
                   {isLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

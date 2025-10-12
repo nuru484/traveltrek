@@ -248,13 +248,28 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                           {booking.room.hotel.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          {booking.room.hotel.city},{" "}
-                          {booking.room.hotel.country}
-                        </p>
-                      </div>
+                      {booking.room.hotel.destination && (
+                        <div className="space-y-2 mt-2">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm font-medium">
+                              {booking.room.hotel.destination.name}
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground ml-6">
+                            {booking.room.hotel.destination.city &&
+                              `${booking.room.hotel.destination.city}, `}
+                            {booking.room.hotel.destination.country}
+                          </p>
+                          <Link
+                            href={`/dashboard/destinations/${booking.room.hotel.destination.id}/detail`}
+                            className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
+                          >
+                            View Destination Details
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

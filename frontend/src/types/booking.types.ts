@@ -20,8 +20,12 @@ export interface IBookingRoom {
     id: number;
     name: string;
     description: string | null;
-    city: string;
-    country: string;
+    destination: {
+      id: number;
+      city: string;
+      country: string;
+      name: string;
+    };
   };
 }
 export interface IBookingFlight {

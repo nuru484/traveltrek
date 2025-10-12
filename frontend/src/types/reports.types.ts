@@ -1,4 +1,5 @@
-// src/types/reports.types.ts
+// types/reports.types.ts
+import { IDestinationSummary } from "./tour.types";
 export interface IUserSummary {
   id: number;
   name: string;
@@ -48,7 +49,7 @@ export interface ITourTopStats {
     status: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED";
     price: number;
     duration: number;
-    location: string;
+    destination: IDestinationSummary;
     startDate: Date;
     endDate: Date;
     maxGuests: number;
@@ -103,7 +104,7 @@ export interface IMonthlyBookingsResponse {
       };
     };
     monthlyBreakdown: Array<{
-      month: string; // YYYY-MM
+      month: string;
       bookingCount: number;
       revenue: number;
       averageValue: number;
@@ -142,11 +143,11 @@ export interface IPaymentsSummaryResponse {
       { count: number; amount: number }
     >;
     monthlyBreakdown: Array<{
-      month: string; // YYYY-MM
+      month: string;
       count: number;
       revenue: number;
     }>;
-    recentPayments: IPaymentSummary[]; 
+    recentPayments: IPaymentSummary[];
   };
 }
 

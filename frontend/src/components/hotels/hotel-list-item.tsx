@@ -71,6 +71,8 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     { skip: !user }
   );
 
+  console.log("Authenticated User: ", user);
+
   // Filter and search rooms
   const filteredRooms = useMemo(() => {
     if (!hotel.rooms?.length) return [];
