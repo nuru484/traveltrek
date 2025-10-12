@@ -105,6 +105,10 @@ const handleCreateFlight = asyncHandler(
         seatsAvailable: parsedCapacity,
         capacity: parsedCapacity,
       },
+      include: {
+        destination: true,
+        origin: true,
+      },
     });
 
     const response: IFlightResponse = {
@@ -113,8 +117,8 @@ const handleCreateFlight = asyncHandler(
       airline: flight.airline,
       departure: flight.departure,
       arrival: flight.arrival,
-      originId: flight.originId,
-      destinationId: flight.destinationId,
+      origin: flight.origin,
+      destination: flight.destination,
       price: flight.price,
       flightClass: flight.flightClass,
       duration: flight.duration,
@@ -401,6 +405,10 @@ const handleUpdateFlight = asyncHandler(
       const updatedFlight = await prisma.flight.update({
         where: { id: parsedId },
         data: updateData,
+        include: {
+          origin: true,
+          destination: true,
+        },
       });
 
       if (uploadedImageUrl && oldPhoto && oldPhoto !== uploadedImageUrl) {
@@ -417,8 +425,8 @@ const handleUpdateFlight = asyncHandler(
         airline: updatedFlight.airline,
         departure: updatedFlight.departure,
         arrival: updatedFlight.arrival,
-        originId: updatedFlight.originId,
-        destinationId: updatedFlight.destinationId,
+        origin: updatedFlight.origin,
+        destination: updatedFlight.destination,
         price: updatedFlight.price,
         flightClass: updatedFlight.flightClass,
         duration: updatedFlight.duration,
@@ -608,7 +616,6 @@ const handleGetAllFlights = asyncHandler(
       where.seatsAvailable = { gte: parseInt(minSeats as string) };
     }
 
-    // Build orderBy clause
     const orderBy: any = {};
     orderBy[sortBy as string] = sortOrder;
 

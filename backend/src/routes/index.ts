@@ -8,8 +8,6 @@ import flightRoutes from './flight';
 import bookingRoutes from './booking';
 import paymentRoutes from './payment';
 import roomRoutes from './room';
-import itineraryRoutes from './itinerary';
-import tourInclusionRoutes from './tourInclusion';
 import userRoutes from './user';
 import dashboardRoutes from './dashboard';
 import reportsRoutes from './reports';
@@ -42,11 +40,6 @@ routes.use(bookingRoutes);
 // Room routes
 routes.use(roomRoutes);
 
-// Itinerary routes
-routes.use(itineraryRoutes);
-
-// Tour Inclusion routes
-routes.use(tourInclusionRoutes);
 
 // User routes
 routes.use(userRoutes);

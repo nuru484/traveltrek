@@ -1,3 +1,4 @@
+import { IDestinationSummary } from './destination.types';
 export interface IFlightInput {
   flightNumber: string;
   airline: string;
@@ -18,8 +19,8 @@ export interface IFlightResponse {
   airline: string;
   departure: Date;
   arrival: Date;
-  originId: number;
-  destinationId: number;
+  origin: IDestinationSummary;
+  destination: IDestinationSummary;
   price: number;
   flightClass: string;
   duration: number;
