@@ -26,7 +26,6 @@ const refreshToken: (
   next: NextFunction,
 ) => Promise<void> = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // Get refresh token from cookies
     const currentRefreshToken = CookieManager.getRefreshToken(req);
 
     if (!currentRefreshToken) {
@@ -54,14 +53,12 @@ const refreshToken: (
       throw new CustomError(401, 'Invalid refresh token');
     }
 
-    // Generate new refresh token
     const newRefreshToken = jwt.sign(
       { id: decodedUser.id, role: decodedUser.role },
       assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
       { expiresIn: '7d' },
     );
 
-    // Generate new access token
     const newAccessToken = jwt.sign(
       {
         id: decodedUser.id,
@@ -76,7 +73,7 @@ const refreshToken: (
     CookieManager.setRefreshToken(res, newRefreshToken);
 
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(decodedUser.id, 10) },
+      where: { id: decodedUser.id },
     });
 
     if (!user) {
@@ -85,7 +82,6 @@ const refreshToken: (
 
     const { password: userPassWord, ...userWithoutPassword } = user;
 
-    // Send tokens in response
     res.status(200).json({
       message: 'Token refreshed successfully',
       data: userWithoutPassword,

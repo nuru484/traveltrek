@@ -16,6 +16,7 @@ import {
   getBookingsValidation,
 } from '../validations/bookingValidations';
 import logger from '../utils/logger';
+import { destination } from 'pino';
 
 /**
  * Shared include object for booking queries
@@ -49,8 +50,14 @@ const bookingInclude = {
           id: true,
           name: true,
           description: true,
-          city: true,
-          country: true,
+          destination: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              country: true,
+            },
+          },
         },
       },
     },
@@ -146,7 +153,7 @@ const handleCreateBooking = asyncHandler(
       throw new UnauthorizedError('Unauthorized, no user provided');
     }
 
-    if (user.role === 'CUSTOMER' && user.id !== userId.toString()) {
+    if (user.role === 'CUSTOMER' && user.id !== userId) {
       throw new UnauthorizedError('Customers can only book for themselves');
     }
 
@@ -267,7 +274,7 @@ const handleGetBooking = asyncHandler(
       throw new NotFoundError('Booking not found');
     }
 
-    if (user.role === 'CUSTOMER' && booking.userId !== parseInt(user.id)) {
+    if (user.role === 'CUSTOMER' && booking.userId !== user.id) {
       throw new UnauthorizedError('You can only view your own bookings');
     }
 
@@ -632,7 +639,7 @@ export const deleteBooking: RequestHandler[] = [
 /**
  * Get all bookings for a specific user
  */
-const handleGetUserBookings = asyncHandler(
+export const getUserBookings = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const { userId } = req.params;
     const user = req.user;
@@ -641,55 +648,116 @@ const handleGetUserBookings = asyncHandler(
       throw new UnauthorizedError('Unauthorized, no user provided');
     }
 
-    if (user.role === 'CUSTOMER' && user.id !== userId) {
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId) || parsedUserId <= 0) {
+      throw new BadRequestError('Invalid user ID');
+    }
+
+    if (user.role === 'CUSTOMER' && user.id !== parsedUserId) {
       throw new UnauthorizedError('You can only view your own bookings');
     }
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.max(
+      1,
+      Math.min(100, parseInt(req.query.limit as string, 10) || 10),
+    );
     const skip = (page - 1) * limit;
 
     const status = req.query.status as string | undefined;
+    if (
+      status &&
+      !['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(status)
+    ) {
+      throw new BadRequestError('Invalid booking status');
+    }
+
     const bookingType = req.query.type as string | undefined;
+    if (bookingType && !['TOUR', 'ROOM', 'FLIGHT'].includes(bookingType)) {
+      throw new BadRequestError('Invalid booking type');
+    }
+
     const search = req.query.search as string | undefined;
-    const tourId = req.query.tourId as string | undefined;
-    const roomId = req.query.roomId as string | undefined;
-    const flightId = req.query.flightId as string | undefined;
-    const fromDate = req.query.fromDate as string | undefined;
-    const toDate = req.query.toDate as string | undefined;
+    const sanitizedSearch = search?.trim().slice(0, 100);
+
+    let parsedTourId: number | undefined;
+    let parsedRoomId: number | undefined;
+    let parsedFlightId: number | undefined;
+
+    if (req.query.tourId) {
+      parsedTourId = parseInt(req.query.tourId as string, 10);
+      if (isNaN(parsedTourId) || parsedTourId <= 0) {
+        throw new BadRequestError('Invalid tour ID');
+      }
+    }
+
+    if (req.query.roomId) {
+      parsedRoomId = parseInt(req.query.roomId as string, 10);
+      if (isNaN(parsedRoomId) || parsedRoomId <= 0) {
+        throw new BadRequestError('Invalid room ID');
+      }
+    }
+
+    if (req.query.flightId) {
+      parsedFlightId = parseInt(req.query.flightId as string, 10);
+      if (isNaN(parsedFlightId) || parsedFlightId <= 0) {
+        throw new BadRequestError('Invalid flight ID');
+      }
+    }
+
+    let parsedFromDate: Date | undefined;
+    let parsedToDate: Date | undefined;
+
+    if (req.query.fromDate) {
+      parsedFromDate = new Date(req.query.fromDate as string);
+      if (isNaN(parsedFromDate.getTime())) {
+        throw new BadRequestError('Invalid fromDate format');
+      }
+    }
+
+    if (req.query.toDate) {
+      parsedToDate = new Date(req.query.toDate as string);
+      if (isNaN(parsedToDate.getTime())) {
+        throw new BadRequestError('Invalid toDate format');
+      }
+    }
+
+    if (parsedFromDate && parsedToDate && parsedFromDate > parsedToDate) {
+      throw new BadRequestError('fromDate cannot be after toDate');
+    }
 
     const whereClause: any = {
-      userId: parseInt(userId),
+      userId: parsedUserId,
     };
 
     if (status) {
       whereClause.status = status;
     }
 
-    if (tourId) {
-      whereClause.tourId = parseInt(tourId);
+    if (parsedTourId) {
+      whereClause.tourId = parsedTourId;
     }
 
-    if (roomId) {
-      whereClause.roomId = parseInt(roomId);
+    if (parsedRoomId) {
+      whereClause.roomId = parsedRoomId;
     }
 
-    if (flightId) {
-      whereClause.flightId = parseInt(flightId);
+    if (parsedFlightId) {
+      whereClause.flightId = parsedFlightId;
     }
 
-    if (fromDate && toDate) {
+    if (parsedFromDate && parsedToDate) {
       whereClause.bookingDate = {
-        gte: new Date(fromDate),
-        lte: new Date(toDate),
+        gte: parsedFromDate,
+        lte: parsedToDate,
       };
-    } else if (fromDate) {
+    } else if (parsedFromDate) {
       whereClause.bookingDate = {
-        gte: new Date(fromDate),
+        gte: parsedFromDate,
       };
-    } else if (toDate) {
+    } else if (parsedToDate) {
       whereClause.bookingDate = {
-        lte: new Date(toDate),
+        lte: parsedToDate,
       };
     }
 
@@ -701,60 +769,60 @@ const handleGetUserBookings = asyncHandler(
       whereClause.flightId = { not: null };
     }
 
-    if (search) {
+    if (sanitizedSearch) {
       whereClause.OR = [
         {
           tour: {
-            name: { contains: search, mode: 'insensitive' },
+            name: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           tour: {
-            description: { contains: search, mode: 'insensitive' },
+            description: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           room: {
-            roomType: { contains: search, mode: 'insensitive' },
+            roomType: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           room: {
-            description: { contains: search, mode: 'insensitive' },
+            description: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           room: {
             hotel: {
-              name: { contains: search, mode: 'insensitive' },
+              name: { contains: sanitizedSearch, mode: 'insensitive' },
             },
           },
         },
         {
           room: {
             hotel: {
-              description: { contains: search, mode: 'insensitive' },
+              description: { contains: sanitizedSearch, mode: 'insensitive' },
             },
           },
         },
         {
           flight: {
-            flightNumber: { contains: search, mode: 'insensitive' },
+            flightNumber: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           flight: {
-            airline: { contains: search, mode: 'insensitive' },
+            airline: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           user: {
-            name: { contains: search, mode: 'insensitive' },
+            name: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
         {
           user: {
-            email: { contains: search, mode: 'insensitive' },
+            email: { contains: sanitizedSearch, mode: 'insensitive' },
           },
         },
       ];
@@ -774,7 +842,7 @@ const handleGetUserBookings = asyncHandler(
     const response: IBooking[] = bookings.map(formatBookingResponse);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Bookings for user ${userId} retrieved successfully`,
+      message: `Bookings for user ${parsedUserId} retrieved successfully`,
       data: response,
       meta: {
         total,
@@ -785,14 +853,6 @@ const handleGetUserBookings = asyncHandler(
     });
   },
 );
-
-export const getUserBookings: RequestHandler[] = [
-  param('userId')
-    .isInt({ min: 1 })
-    .withMessage('User ID must be a positive integer'),
-  ...validationMiddleware.create([]),
-  handleGetUserBookings,
-];
 
 /**
  * Get all bookings with pagination
@@ -821,7 +881,7 @@ const handleGetAllBookings = asyncHandler(
     const whereClause: any = {};
 
     if (user.role === 'CUSTOMER') {
-      whereClause.userId = parseInt(user.id);
+      whereClause.userId = user.id;
     }
 
     if (userId && user.role !== 'CUSTOMER') {

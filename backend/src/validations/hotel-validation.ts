@@ -25,24 +25,6 @@ export const createHotelValidation: ValidationChain[] = [
     customMessage: 'Address must be between 5 and 255 characters',
   }),
 
-  validator.string('city', {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    customMessage:
-      'City must contain only letters, spaces, hyphens, and apostrophes',
-  }),
-
-  validator.string('country', {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    customMessage:
-      'Country must contain only letters, spaces, hyphens, and apostrophes',
-  }),
-
   validator.phone('phone', {
     required: false,
   }),
@@ -117,24 +99,6 @@ export const updateHotelValidation: ValidationChain[] = [
     minLength: 5,
     maxLength: 255,
     customMessage: 'Address must be between 5 and 255 characters',
-  }),
-
-  validator.string('city', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    customMessage:
-      'City must contain only letters, spaces, hyphens, and apostrophes',
-  }),
-
-  validator.string('country', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    customMessage:
-      'Country must contain only letters, spaces, hyphens, and apostrophes',
   }),
 
   validator.phone('phone', {
@@ -348,28 +312,4 @@ export const hotelPhotoValidation: ValidationChain[] = [
     'Photo size must not exceed 5MB',
     { required: false },
   ),
-];
-
-export const hotelAvailabilityValidation: ValidationChain[] = [
-  validator.integer('hotelId', {
-    required: true,
-    min: 1,
-  }),
-
-  validator.date('checkIn', {
-    required: true,
-    minDate: new Date(),
-  }),
-
-  validator.date('checkOut', {
-    required: true,
-    compareDateField: 'checkIn',
-    compareDateOperation: 'after',
-  }),
-
-  validator.integer('guests', {
-    required: false,
-    min: 1,
-    max: 20,
-  }),
 ];

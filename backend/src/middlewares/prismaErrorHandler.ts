@@ -47,15 +47,15 @@ export const isPrismaError = (error: any): boolean => {
  */
 const extractFieldNames = (meta: any): string[] => {
   if (!meta) return [];
-  
+
   if (meta.target && Array.isArray(meta.target)) {
     return meta.target;
   }
-  
+
   if (meta.field_name) {
     return [meta.field_name];
   }
-  
+
   return [];
 };
 
@@ -74,13 +74,13 @@ const formatFieldName = (field: string): string => {
  * Handle Prisma unique constraint errors (P2002)
  */
 const handleUniqueConstraintError = (
-  error: Prisma.PrismaClientKnownRequestError
+  error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
   const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
-  
+
   let message = 'A record with this information already exists';
-  
+
   if (fields.length > 0) {
     if (fields.includes('email')) {
       message = 'An account with this email already exists';
@@ -94,7 +94,7 @@ const handleUniqueConstraintError = (
       message = `A record with this ${formattedFields} already exists`;
     }
   }
-  
+
   return new CustomError(409, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
@@ -110,15 +110,16 @@ const handleUniqueConstraintError = (
  * Handle Prisma foreign key constraint errors (P2003)
  */
 const handleForeignKeyError = (
-  error: Prisma.PrismaClientKnownRequestError
+  error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
   const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
-  
-  const message = fields.length > 0
-    ? `The referenced ${formattedFields} does not exist`
-    : 'Referenced record not found';
-  
+
+  const message =
+    fields.length > 0
+      ? `The referenced ${formattedFields} does not exist`
+      : 'Referenced record not found';
+
   return new CustomError(400, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
@@ -134,10 +135,10 @@ const handleForeignKeyError = (
  * Handle Prisma record not found errors (P2025)
  */
 const handleRecordNotFoundError = (
-  error: Prisma.PrismaClientKnownRequestError
+  error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
   const message = 'The requested record was not found';
-  
+
   return new CustomError(404, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
@@ -153,15 +154,16 @@ const handleRecordNotFoundError = (
  * Handle Prisma null constraint errors (P2011)
  */
 const handleNullConstraintError = (
-  error: Prisma.PrismaClientKnownRequestError
+  error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
   const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
-  
-  const message = fields.length > 0
-    ? `The field '${formattedFields}' is required and cannot be empty`
-    : 'A required field is missing';
-  
+
+  const message =
+    fields.length > 0
+      ? `The field '${formattedFields}' is required and cannot be empty`
+      : 'A required field is missing';
+
   return new CustomError(400, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
@@ -177,15 +179,16 @@ const handleNullConstraintError = (
  * Handle Prisma value too long errors (P2000)
  */
 const handleValueTooLongError = (
-  error: Prisma.PrismaClientKnownRequestError
+  error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
   const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
-  
-  const message = fields.length > 0
-    ? `The value for '${formattedFields}' is too long`
-    : 'One or more values exceed the maximum length';
-  
+
+  const message =
+    fields.length > 0
+      ? `The value for '${formattedFields}' is too long`
+      : 'One or more values exceed the maximum length';
+
   return new CustomError(400, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
@@ -218,7 +221,8 @@ export const handlePrismaError = (error: unknown): CustomError => {
         return handleValueTooLongError(error);
       default:
         // Generic known error handler
-        const message = PRISMA_ERROR_MESSAGES[error.code] || 'Database operation failed';
+        const message =
+          PRISMA_ERROR_MESSAGES[error.code] || 'Database operation failed';
         return new CustomError(400, message, {
           layer: 'database',
           severity: ErrorSeverity.MEDIUM,
@@ -230,16 +234,17 @@ export const handlePrismaError = (error: unknown): CustomError => {
         });
     }
   }
-  
+
   // Handle validation errors
   if (error instanceof Prisma.PrismaClientValidationError) {
+    console.log(error);
     return new CustomError(400, 'Invalid data provided', {
       layer: 'database',
       severity: ErrorSeverity.LOW,
       code: 'VALIDATION_ERROR',
     });
   }
-  
+
   // Handle initialization errors
   if (error instanceof Prisma.PrismaClientInitializationError) {
     return new CustomError(503, 'Database connection failed', {
@@ -248,7 +253,7 @@ export const handlePrismaError = (error: unknown): CustomError => {
       code: 'DB_CONNECTION_ERROR',
     });
   }
-  
+
   // Handle Rust panic errors
   if (error instanceof Prisma.PrismaClientRustPanicError) {
     return new CustomError(500, 'A critical database error occurred', {
@@ -257,7 +262,7 @@ export const handlePrismaError = (error: unknown): CustomError => {
       code: 'DB_CRITICAL_ERROR',
     });
   }
-  
+
   // Fallback for unhandled Prisma errors - still return CustomError
   return new CustomError(500, 'An unexpected database error occurred', {
     layer: 'database',
@@ -271,7 +276,7 @@ export const handlePrismaError = (error: unknown): CustomError => {
  * (Optional - you can use this in controllers if you want explicit handling)
  */
 export const prismaErrorWrapper = async <T>(
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
 ): Promise<T> => {
   try {
     return await operation();

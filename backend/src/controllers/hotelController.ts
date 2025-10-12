@@ -39,8 +39,6 @@ const handleCreateHotel = asyncHandler(
       name,
       description,
       address,
-      city,
-      country,
       phone,
       starRating,
       amenities,
@@ -64,8 +62,6 @@ const handleCreateHotel = asyncHandler(
         name,
         description,
         address,
-        city,
-        country,
         phone,
         starRating: parsedStarRating,
         amenities: amenities || [],
@@ -102,8 +98,6 @@ const handleCreateHotel = asyncHandler(
         name: hotel.name,
         description: hotel.description,
         address: hotel.address,
-        city: hotel.city,
-        country: hotel.country,
         phone: hotel.phone,
         starRating: hotel.starRating,
         amenities: hotel.amenities,
@@ -114,6 +108,7 @@ const handleCreateHotel = asyncHandler(
           name: hotel.destination?.name,
           description: hotel.destination?.description,
           country: hotel.destination?.country,
+          city: hotel.destination?.city,
         },
         createdAt: hotel.createdAt,
         updatedAt: hotel.updatedAt,
@@ -176,8 +171,6 @@ const handleGetHotel = asyncHandler(
         name: hotel.name,
         description: hotel.description,
         address: hotel.address,
-        city: hotel.city,
-        country: hotel.country,
         phone: hotel.phone,
         starRating: hotel.starRating,
         amenities: hotel.amenities,
@@ -207,36 +200,20 @@ const handleUpdateHotel = asyncHandler(
       name,
       description,
       address,
-      city,
-      country,
       phone,
       starRating,
       amenities,
       destinationId,
     } = req.body;
 
-    console.log(
-      name,
-      description,
-      address,
-      city,
-      country,
-      phone,
-      starRating,
-      amenities,
-      destinationId,
-    );
-
     if (!id) {
       throw new NotFoundError('Hotel ID is required');
     }
 
-    // Track the uploaded image URL for cleanup if needed
     let uploadedImageUrl: string | undefined;
     let oldPhoto: string | null = null;
 
     try {
-      // First, get the current hotel to check for existing photo
       const existingHotel = await prisma.hotel.findUnique({
         where: { id: Number(id) },
         select: { photo: true },
@@ -248,7 +225,6 @@ const handleUpdateHotel = asyncHandler(
 
       oldPhoto = existingHotel.photo;
 
-      // Check if destination exists if provided
       if (destinationId) {
         const destination = await prisma.destination.findUnique({
           where: { id: Number(destinationId) },
@@ -258,22 +234,16 @@ const handleUpdateHotel = asyncHandler(
         }
       }
 
-      // Prepare update data
       const updateData: any = {};
 
-      // Only update fields that are provided
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
       if (address !== undefined) updateData.address = address;
-      if (city !== undefined) updateData.city = city;
-      if (country !== undefined) updateData.country = country;
       if (phone !== undefined) updateData.phone = phone;
 
-      // Handle starRating conversion - convert string to number
       if (starRating !== undefined) {
         const parsedStarRating = Number(starRating);
 
-        // Validate the star rating is within valid range (1-5)
         if (
           parsedStarRating < 1 ||
           parsedStarRating > 5 ||
@@ -285,20 +255,16 @@ const handleUpdateHotel = asyncHandler(
         updateData.starRating = parsedStarRating;
       }
 
-      // Handle amenities - convert object to array if needed
       if (amenities !== undefined) {
         let processedAmenities: string[];
 
         if (Array.isArray(amenities)) {
-          // Already an array
           processedAmenities = amenities;
         } else if (typeof amenities === 'object' && amenities !== null) {
-          // Convert object like {"0": "item1", "1": "item2"} to array
           processedAmenities = Object.values(amenities).filter(
             (item): item is string => typeof item === 'string',
           );
         } else if (typeof amenities === 'string') {
-          // Single string, convert to array
           processedAmenities = [amenities];
         } else {
           processedAmenities = [];
@@ -307,7 +273,6 @@ const handleUpdateHotel = asyncHandler(
         updateData.amenities = processedAmenities;
       }
 
-      // Handle destinationId - convert string to number
       if (destinationId !== undefined) {
         const parsedDestinationId = Number(destinationId);
 
@@ -363,8 +328,6 @@ const handleUpdateHotel = asyncHandler(
           name: updatedHotel.name,
           description: updatedHotel.description,
           address: updatedHotel.address,
-          city: updatedHotel.city,
-          country: updatedHotel.country,
           phone: updatedHotel.phone,
           starRating: updatedHotel.starRating,
           amenities: updatedHotel.amenities,
@@ -378,7 +341,6 @@ const handleUpdateHotel = asyncHandler(
 
       res.status(HTTP_STATUS_CODES.OK).json(response);
     } catch (error) {
-      // If Cloudinary upload succeeded but DB update failed, clean up uploaded image
       if (uploadedImageUrl) {
         try {
           await cloudinaryService.deleteImage(uploadedImageUrl);
@@ -428,7 +390,6 @@ const handleGetAllHotels = asyncHandler(
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause for filtering
     const where: any = {};
 
     if (search) {
@@ -436,8 +397,8 @@ const handleGetAllHotels = asyncHandler(
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
         { address: { contains: search, mode: 'insensitive' } },
-        { city: { contains: search, mode: 'insensitive' } },
-        { country: { contains: search, mode: 'insensitive' } },
+        { destination: { city: { contains: search, mode: 'insensitive' } } },
+        { destination: { country: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -446,11 +407,17 @@ const handleGetAllHotels = asyncHandler(
     }
 
     if (city) {
-      where.city = { contains: city, mode: 'insensitive' };
+      where.destination = {
+        ...where.destination,
+        city: { contains: city, mode: 'insensitive' },
+      };
     }
 
     if (country) {
-      where.country = { contains: country, mode: 'insensitive' };
+      where.destination = {
+        ...where.destination,
+        country: { contains: country, mode: 'insensitive' },
+      };
     }
 
     if (starRating) {
@@ -508,8 +475,6 @@ const handleGetAllHotels = asyncHandler(
       name: hotel.name,
       description: hotel.description,
       address: hotel.address,
-      city: hotel.city,
-      country: hotel.country,
       phone: hotel.phone,
       starRating: hotel.starRating,
       amenities: hotel.amenities,
@@ -534,6 +499,11 @@ const handleGetAllHotels = asyncHandler(
     res.status(HTTP_STATUS_CODES.OK).json(response);
   },
 );
+
+export const getAllHotels: RequestHandler[] = [
+  ...validationMiddleware.create(getHotelsValidation),
+  handleGetAllHotels,
+];
 
 /**
  * Get hotels by destination
@@ -590,8 +560,6 @@ const handleGetHotelsByDestination = asyncHandler(
       name: hotel.name,
       description: hotel.description,
       address: hotel.address,
-      city: hotel.city,
-      country: hotel.country,
       phone: hotel.phone,
       starRating: hotel.starRating,
       amenities: hotel.amenities,
@@ -674,16 +642,14 @@ const handleDeleteHotel = asyncHandler(
 /**
  * Delete all hotels with photo cleanup
  */
-const handleDeleteAllHotels = asyncHandler(
+export const deleteAllHotels = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // First check if there are any hotels at all
     const hotelCount = await prisma.hotel.count();
 
     if (hotelCount === 0) {
       throw new BadRequestError('No hotels found to delete.');
     }
 
-    // Fetch all hotels with their relationships
     const hotels = await prisma.hotel.findMany({
       include: {
         rooms: {
@@ -691,7 +657,7 @@ const handleDeleteAllHotels = asyncHandler(
             bookings: {
               where: {
                 status: {
-                  in: ['PENDING', 'CONFIRMED'], // Active bookings
+                  in: ['PENDING', 'CONFIRMED'],
                 },
               },
             },
@@ -701,13 +667,11 @@ const handleDeleteAllHotels = asyncHandler(
       },
     });
 
-    // Categorize hotels by why they can't be deleted
     const hotelsWithActiveBookings: number[] = [];
     const hotelsWithRooms: number[] = [];
     const deletableHotels: typeof hotels = [];
 
     hotels.forEach((hotel) => {
-      // Check if any room has active bookings
       const hasActiveBookings = hotel.rooms.some(
         (room) => room.bookings && room.bookings.length > 0,
       );
@@ -721,7 +685,6 @@ const handleDeleteAllHotels = asyncHandler(
       }
     });
 
-    // Build specific error message
     if (deletableHotels.length === 0) {
       const errorMessages: string[] = [];
 
@@ -742,7 +705,6 @@ const handleDeleteAllHotels = asyncHandler(
       );
     }
 
-    // Warn if some hotels will be skipped
     if (hotelsWithActiveBookings.length > 0 || hotelsWithRooms.length > 0) {
       console.warn(
         `Skipping ${hotelsWithActiveBookings.length + hotelsWithRooms.length} hotel(s): ` +
@@ -751,7 +713,6 @@ const handleDeleteAllHotels = asyncHandler(
       );
     }
 
-    // Delete hotels in a transaction for data consistency
     await prisma.$transaction(async (tx) => {
       await tx.hotel.deleteMany({
         where: {
@@ -760,7 +721,6 @@ const handleDeleteAllHotels = asyncHandler(
       });
     });
 
-    // Clean up photos from cloud storage
     const cleanupPromises = deletableHotels
       .filter((hotel) => hotel.photo)
       .map(async (hotel) => {
@@ -776,7 +736,6 @@ const handleDeleteAllHotels = asyncHandler(
 
     await Promise.allSettled(cleanupPromises);
 
-    // Build response message
     const responseMessage = [
       `Successfully deleted ${deletableHotels.length} hotel(s).`,
     ];
@@ -822,16 +781,9 @@ export const deleteHotel: RequestHandler[] = [
   handleDeleteHotel,
 ];
 
-export const getAllHotels: RequestHandler[] = [
-  ...validationMiddleware.create(getHotelsValidation),
-  handleGetAllHotels,
-];
-
 export const getHotelsByDestination: RequestHandler[] = [
   param('destinationId')
     .isInt({ min: 1 })
     .withMessage('Destination ID must be a positive integer'),
   handleGetHotelsByDestination,
 ];
-
-export const deleteAllHotels: RequestHandler[] = [handleDeleteAllHotels];

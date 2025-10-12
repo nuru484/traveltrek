@@ -87,7 +87,7 @@ export const createPayment = asyncHandler(
     }
 
     // Customers can only pay for their own bookings
-    if (user.role === 'CUSTOMER' && booking.userId !== parseInt(user.id)) {
+    if (user.role === 'CUSTOMER' && booking.userId !== user.id) {
       throw new UnauthorizedError('You can only pay for your own bookings');
     }
 
@@ -442,7 +442,7 @@ export const getPayment = asyncHandler(
     }
 
     // Customers can only view their own payments
-    if (user.role === 'CUSTOMER' && payment.userId !== parseInt(user.id)) {
+    if (user.role === 'CUSTOMER' && payment.userId !== user.id) {
       throw new UnauthorizedError('You can only view your own payments');
     }
 
@@ -503,8 +503,7 @@ export const getAllPayments = asyncHandler(
     }
 
     // Build where clause
-    const where: any =
-      user.role === 'CUSTOMER' ? { userId: parseInt(user.id) } : {};
+    const where: any = user.role === 'CUSTOMER' ? { userId: user.id } : {};
 
     if (status) {
       where.status = status;
@@ -624,7 +623,7 @@ export const getUserPayments = asyncHandler(
     const targetUserId = parseInt(userId);
 
     // Customers can only view their own payments
-    if (user.role === 'CUSTOMER' && parseInt(user.id) !== targetUserId) {
+    if (user.role === 'CUSTOMER' && user.id !== targetUserId) {
       throw new UnauthorizedError('You can only view your own payments');
     }
 

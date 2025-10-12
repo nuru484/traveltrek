@@ -53,13 +53,11 @@ const handleRegisterUser = async (
       userRole = UserRole.CUSTOMER;
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(
       userDetails.password,
       BCRYPT_SALT_ROUNDS,
     );
 
-    // Validate profilePicture
     const profilePicture = req.body.profilePicture;
     if (profilePicture && typeof profilePicture !== 'string') {
       throw new BadRequestError(
@@ -84,13 +82,13 @@ const handleRegisterUser = async (
 
     if (!isAdminCreatingUser) {
       const accessToken = jwt.sign(
-        { id: user.id.toString(), role: user.role } as ITokenPayload,
+        { id: user.id, role: user.role } as ITokenPayload,
         assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
         { expiresIn: '30m' },
       );
 
       const refreshToken = jwt.sign(
-        { id: user.id.toString(), role: user.role } as IRefreshTokenPayload,
+        { id: user.id, role: user.role } as IRefreshTokenPayload,
         assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
         {
           expiresIn: '7d',

@@ -59,13 +59,13 @@ const login = asyncHandler(
       }
 
       const accessToken = jwt.sign(
-        { id: user.id.toString(), role: user.role } as ITokenPayload,
+        { id: user.id, role: user.role } as ITokenPayload,
         assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
         { expiresIn: '30m' },
       );
 
       const refreshToken = jwt.sign(
-        { id: user.id.toString(), role: user.role } as IRefreshTokenPayload,
+        { id: user.id, role: user.role } as IRefreshTokenPayload,
         assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
         {
           expiresIn: '7d',

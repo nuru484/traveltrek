@@ -14,10 +14,10 @@ export interface IUserLoginInput {
 }
 
 export interface ITokenPayload {
-  id: string;
+  id: number;
   role: UserRole;
 }
 
 export interface IRefreshTokenPayload {
-  id: string;
+  id: number;
 }
