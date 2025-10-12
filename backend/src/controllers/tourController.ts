@@ -574,6 +574,7 @@ const handleGetAllTours = asyncHandler(
     }
 
     const orderByClause: any = {};
+
     const validSortFields = [
       'createdAt',
       'updatedAt',
@@ -599,17 +600,6 @@ const handleGetAllTours = asyncHandler(
         take: limit,
         orderBy: orderByClause,
         include: {
-          bookings: {
-            select: {
-              id: true,
-            },
-          },
-          reviews: {
-            select: {
-              id: true,
-              rating: true,
-            },
-          },
           destination: {
             select: {
               id: true,
@@ -618,27 +608,12 @@ const handleGetAllTours = asyncHandler(
               city: true,
             },
           },
-          _count: {
-            select: {
-              bookings: true,
-              reviews: true,
-              itinerary: true,
-            },
-          },
         },
       }),
       prisma.tour.count({ where: whereClause }),
     ]);
 
     const response: ITourResponse[] = tours.map((tour) => {
-      const avgRating =
-        tour.reviews.length > 0
-          ? tour.reviews.reduce((sum, review) => sum + review.rating, 0) /
-            tour.reviews.length
-          : 0;
-
-      const availableSeats = tour.maxGuests - tour.guestsBooked;
-
       return {
         id: tour.id,
         name: tour.name,
@@ -649,14 +624,9 @@ const handleGetAllTours = asyncHandler(
         price: tour.price,
         maxGuests: tour.maxGuests,
         guestsBooked: tour.guestsBooked,
-        availableSeats,
         startDate: tour.startDate,
         endDate: tour.endDate,
         destination: tour.destination,
-        bookingCount: tour._count.bookings,
-        reviewCount: tour._count.reviews,
-        itineraryCount: tour._count.itinerary,
-        averageRating: parseFloat(avgRating.toFixed(1)),
         createdAt: tour.createdAt,
         updatedAt: tour.updatedAt,
       };

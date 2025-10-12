@@ -430,12 +430,6 @@ const handleGetTopToursByBookings = asyncHandler(
             bookingDate: true,
           },
         },
-        reviews: {
-          select: {
-            id: true,
-            rating: true,
-          },
-        },
       },
     });
 
@@ -449,11 +443,6 @@ const handleGetTopToursByBookings = asyncHandler(
           (sum, booking) => sum + booking.totalPrice,
           0,
         );
-        const averageRating =
-          tour.reviews.length > 0
-            ? tour.reviews.reduce((sum, review) => sum + review.rating, 0) /
-              tour.reviews.length
-            : 0;
 
         return {
           tour: {
@@ -473,8 +462,6 @@ const handleGetTopToursByBookings = asyncHandler(
             totalBookings,
             confirmedBookings,
             totalRevenue,
-            averageRating: Math.round(averageRating * 10) / 10,
-            reviewCount: tour.reviews.length,
           },
         };
       })

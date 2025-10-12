@@ -59,8 +59,6 @@ export interface ITourTopStats {
     totalBookings: number;
     confirmedBookings: number;
     totalRevenue: number;
-    averageRating: number;
-    reviewCount: number;
   };
 }
 
