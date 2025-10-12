@@ -256,7 +256,8 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                               key={hotel.id}
                               value={hotel.id.toString()}
                             >
-                              {hotel.name} ({hotel.city}, {hotel.country})
+                              {hotel.name} ({hotel?.destination?.city},{" "}
+                              {hotel?.destination.country})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -264,8 +265,9 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                     </FormControl>
                     {selectedHotel && (
                       <p className="text-sm text-muted-foreground mt-1">
-                        Selected: {selectedHotel.name} ({selectedHotel.city},{" "}
-                        {selectedHotel.country})
+                        Selected: {selectedHotel.name} (
+                        {selectedHotel.destination.city},{" "}
+                        {selectedHotel.destination.country})
                       </p>
                     )}
                     <FormMessage />

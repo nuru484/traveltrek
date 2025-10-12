@@ -185,7 +185,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                     {hotel.name}
                   </h1>
                   <p className="text-sm sm:text-base lg:text-lg text-white/90">
-                    {hotel.city}, {hotel.country}
+                    {/* {hotel.destination?.city}, {hotel.destination?.country} */}
                   </p>
                 </div>
               </div>
@@ -193,7 +193,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
           )}
         </Card>
 
-        {/* Hotel Details - Horizontal Layout */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {/* Location Information */}
           <Card className="border-l-4 border-l-primary">
@@ -221,8 +220,9 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                       Destination
                     </p>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      {hotel.destination.name}
+                      {hotel.destination.name} | {hotel.destination?.country}
                     </p>
+
                     {hotel.destination.description && (
                       <p className="text-xs text-muted-foreground mt-1">
                         {hotel.destination.description}

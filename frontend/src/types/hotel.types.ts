@@ -11,6 +11,7 @@ export interface IHotelDestination {
   name: string;
   description: string | null;
   country: string;
+  city: string | null;
 }
 
 export interface IHotel {
@@ -18,8 +19,6 @@ export interface IHotel {
   name: string;
   description: string | null;
   address: string;
-  city: string;
-  country: string;
   rooms: IHotelRoom[] | null;
   phone: string | null;
   starRating: number;

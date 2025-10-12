@@ -64,10 +64,8 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Check if room is available based on roomsAvailable
   const isAvailable = room.roomsAvailable > 0;
 
-  // Fetch user's bookings to check if this room is already booked
   const {
     data: bookingsData,
     isLoading: isLoadingBookings,
@@ -76,11 +74,10 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
+      refetchOnMountOrArgChange: 30,
     }
   );
 
-  // Find user's booking for this room
   const userBooking = bookingsData?.data.find(
     (booking) =>
       booking?.room?.id === room.id &&
@@ -94,7 +91,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     bookingStatus !== "CANCELLED" &&
     bookingStatus !== "COMPLETED";
 
-  // Check if we're still loading booking data
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
 
   const handleEdit = () => {
@@ -164,7 +160,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   };
 
   const getBookingButtonText = () => {
-    // Show loading state while fetching booking data
     if (isBookingDataLoading) {
       return "Loading...";
     }
@@ -189,7 +184,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
 
   const isBookingButtonDisabled = () => {
     return (
-      isBookingDataLoading || // Disable while loading booking data
+      isBookingDataLoading ||
       isBooking ||
       isCancelling ||
       (!isAvailable && !isRoomBooked) ||
@@ -199,7 +194,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   };
 
   const handleBookingButtonClick = () => {
-    // Prevent action if still loading
     if (isBookingDataLoading) {
       return;
     }
@@ -209,7 +203,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     } else if (isBookingActive) {
       setShowCancelDialog(true);
     }
-    // Do nothing if booking is cancelled or completed
   };
 
   const truncatedRoomType =
@@ -259,7 +252,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
 
               {/* Action buttons - Admin and User */}
               <div className="absolute top-4 right-4 flex gap-2">
-                {/* Book Now Button for Users */}
                 {!isAdmin && (
                   <Button
                     variant={isBookingActive ? "secondary" : "default"}
@@ -348,7 +340,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                       <DollarSign className="h-3 w-3 mr-1" />
                       {formatPrice(room.price)}/night
                     </Badge>
-                    {/* Show loading skeleton or actual booking status */}
                     {isBookingDataLoading ? (
                       <div className="h-5 w-32 bg-white/70 animate-pulse rounded-full"></div>
                     ) : (
@@ -384,7 +375,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
           )}
 
           <CardContent className="space-y-6 sm:space-y-8">
-            {/* Hotel Information & Availability Status */}
             <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
               {room.hotel && (
                 <Card className="border-l-4 border-l-primary">

@@ -65,11 +65,10 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
+      refetchOnMountOrArgChange: 30,
     }
   );
 
-  // Find user's booking for this flight
   const userBooking = bookingsData?.data.find(
     (booking) =>
       booking.flight?.id === flight.id &&
@@ -83,7 +82,6 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     bookingStatus !== "CANCELLED" &&
     bookingStatus !== "COMPLETED";
 
-  // Check if we're still loading booking data
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
 
   useEffect(() => {
@@ -171,7 +169,6 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
   };
 
   const getBookingButtonText = () => {
-    // Show loading state while fetching booking data
     if (isBookingDataLoading) {
       return "Loading...";
     }

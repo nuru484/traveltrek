@@ -21,7 +21,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload, X } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Loader2, Upload, X, Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   useCreateFlightMutation,
@@ -34,6 +46,7 @@ import Image from "next/image";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IFlightClass } from "@/types/flight.types";
 import { IDestination } from "@/types/destination.types";
+import { cn } from "@/lib/utils";
 
 const flightFormSchema = z.object({
   flightNumber: z.string().min(1, "Flight number is required"),
@@ -61,24 +74,36 @@ interface IFlightFormProps {
 }
 
 const flightClasses = [
-   "First",
+  "First",
   "Economy",
   "Premium Economy",
   "Business",
- 
 ] as const;
 
 export function FlightForm({ flight, mode }: IFlightFormProps) {
   const router = useRouter();
   const [createFlight, { isLoading: isCreating }] = useCreateFlightMutation();
   const [updateFlight, { isLoading: isUpdating }] = useUpdateFlightMutation();
+
+  const [originSearch, setOriginSearch] = useState("");
+  const [destinationSearch, setDestinationSearch] = useState("");
+  const [originOpen, setOriginOpen] = useState(false);
+  const [destinationOpen, setDestinationOpen] = useState(false);
+
+  const { data: originsData, isLoading: isOriginsLoading } =
+    useGetAllDestinationsQuery({ limit: 10, search: originSearch });
+
   const { data: destinationsData, isLoading: isDestinationsLoading } =
-    useGetAllDestinationsQuery({ limit: 100 });
+    useGetAllDestinationsQuery({ limit: 10, search: destinationSearch });
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     flight?.photo || null
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const origins: IDestination[] = React.useMemo(() => {
+    return originsData?.data || [];
+  }, [originsData]);
 
   const destinations: IDestination[] = React.useMemo(() => {
     return destinationsData?.data || [];
@@ -111,7 +136,6 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
 
   const handleImageChange = (file: File | undefined) => {
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         form.setError("flightPhoto", {
           type: "manual",
@@ -120,7 +144,6 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         form.setError("flightPhoto", {
           type: "manual",
@@ -129,7 +152,6 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
         return;
       }
 
-      // Clean up old preview URL
       if (previewUrl && previewUrl !== flight?.photo) {
         URL.revokeObjectURL(previewUrl);
       }
@@ -209,7 +231,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
     }
   };
 
-  const isLoading = isCreating || isUpdating || isDestinationsLoading;
+  const isLoading = isCreating || isUpdating;
 
   return (
     <div className="space-y-6">
@@ -280,31 +302,73 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                   control={form.control}
                   name="originId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Origin</FormLabel>
-                      <FormControl>
-                        <Select
-                          onValueChange={(value) =>
-                            field.onChange(parseInt(value))
-                          }
-                          defaultValue={field.value?.toString()}
-                          disabled={isDestinationsLoading}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select origin" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {destinations.map((dest) => (
-                              <SelectItem
-                                key={dest.id}
-                                value={dest.id.toString()}
-                              >
-                                {dest.name} ({dest.city}, {dest.country})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
+                      <Popover open={originOpen} onOpenChange={setOriginOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={originOpen}
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value
+                                ? origins.find(
+                                    (origin) => origin.id === field.value
+                                  )?.name || "Select origin"
+                                : "Select origin"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search origin..."
+                              value={originSearch}
+                              onValueChange={setOriginSearch}
+                            />
+                            <CommandEmpty>
+                              {isOriginsLoading
+                                ? "Loading origins..."
+                                : "No origin found."}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {origins.map((origin) => (
+                                <CommandItem
+                                  key={origin.id}
+                                  value={origin.name}
+                                  onSelect={() => {
+                                    field.onChange(origin.id);
+                                    setOriginOpen(false);
+                                    setOriginSearch("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      origin.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{origin.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {origin.city && `${origin.city}, `}
+                                      {origin.country}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -314,31 +378,78 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                   control={form.control}
                   name="destinationId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Destination</FormLabel>
-                      <FormControl>
-                        <Select
-                          onValueChange={(value) =>
-                            field.onChange(parseInt(value))
-                          }
-                          defaultValue={field.value?.toString()}
-                          disabled={isDestinationsLoading}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select destination" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {destinations.map((dest) => (
-                              <SelectItem
-                                key={dest.id}
-                                value={dest.id.toString()}
-                              >
-                                {dest.name} ({dest.city}, {dest.country})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
+                      <Popover
+                        open={destinationOpen}
+                        onOpenChange={setDestinationOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={destinationOpen}
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value
+                                ? destinations.find(
+                                    (destination) =>
+                                      destination.id === field.value
+                                  )?.name || "Select destination"
+                                : "Select destination"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search destination..."
+                              value={destinationSearch}
+                              onValueChange={setDestinationSearch}
+                            />
+                            <CommandEmpty>
+                              {isDestinationsLoading
+                                ? "Loading destinations..."
+                                : "No destination found."}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {destinations.map((destination) => (
+                                <CommandItem
+                                  key={destination.id}
+                                  value={destination.name}
+                                  onSelect={() => {
+                                    field.onChange(destination.id);
+                                    setDestinationOpen(false);
+                                    setDestinationSearch("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      destination.id === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{destination.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {destination.city &&
+                                        `${destination.city}, `}
+                                      {destination.country}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}

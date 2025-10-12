@@ -1,6 +1,6 @@
 // src/app/dashboard/rooms/create/page.tsx
 "use client";
-import { RoomForm } from "@/components/rooms/room-fom";
+import { RoomForm } from "@/components/rooms/room-form";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, PlusCircle } from "lucide-react";

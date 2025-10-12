@@ -1,6 +1,6 @@
 // src/app/dashboard/rooms/[id]/edit/page.tsx
 "use client";
-import { RoomForm } from "@/components/rooms/room-fom";
+import { RoomForm } from "@/components/rooms/room-form";
 import { useGetRoomQuery } from "@/redux/roomApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";

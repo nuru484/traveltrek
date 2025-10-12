@@ -53,7 +53,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
     { userId: user.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
+      refetchOnMountOrArgChange: 30,
     }
   );
 
@@ -74,11 +74,9 @@ export function TourListItem({ tour }: ITourListItemProps) {
   const bookingStatus = userBooking?.status;
   const isTourBooked = !!userBooking;
 
-  // Check if tour is fully booked
   const isFullyBooked = tour.guestsBooked >= tour.maxGuests;
   const availableSpots = tour.maxGuests - tour.guestsBooked;
 
-  // Check if we're still loading booking data
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
 
   const handleView = () => {
@@ -138,7 +136,6 @@ export function TourListItem({ tour }: ITourListItemProps) {
   };
 
   const getBookingButtonText = () => {
-    // Show loading state while fetching booking data
     if (isBookingDataLoading) {
       return "Loading...";
     }
@@ -259,7 +256,6 @@ export function TourListItem({ tour }: ITourListItemProps) {
         </CardHeader>
 
         <CardContent className="pt-0">
-          {/* Tour Details Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
             <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
               <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -269,7 +265,8 @@ export function TourListItem({ tour }: ITourListItemProps) {
                   className="font-medium text-sm capitalize truncate"
                   title={getDestinationDisplay()}
                 >
-                  {tour.destination?.name || "Unknown"}
+                  {tour.destination?.name || "Unknown"} |{" "}
+                  {tour.destination?.country || "Unknown"}
                 </p>
               </div>
             </div>

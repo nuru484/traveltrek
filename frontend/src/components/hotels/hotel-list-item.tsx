@@ -71,9 +71,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     { skip: !user }
   );
 
-  console.log("Authenticated User: ", user);
-
-  // Filter and search rooms
   const filteredRooms = useMemo(() => {
     if (!hotel.rooms?.length) return [];
     return hotel.rooms.filter(
@@ -83,7 +80,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     );
   }, [hotel.rooms, roomSearch]);
 
-  // Displayed rooms (selected or filtered)
   const displayedRooms = useMemo(() => {
     if (selectedRoomId && selectedRoom) return [selectedRoom];
     return filteredRooms;
@@ -120,28 +116,23 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
       ? `${hotel.destination.name}, ${hotel.destination.country}`
       : "Unknown destination";
 
-  // Get booking for a specific room
   const getRoomBooking = (roomId: number) =>
     bookingsData?.data.find(
       (b) => b?.room?.id === roomId && b.userId === parseInt(user?.id || "0")
     );
 
-  // Check if room is booked
   const isRoomBooked = (roomId: number) => !!getRoomBooking(roomId);
 
-  // Get booking status for a room
   const getRoomBookingStatus = (roomId: number) => {
     const booking = getRoomBooking(roomId);
     return booking?.status;
   };
 
-  // Check if booking is active (can be cancelled)
   const isBookingActive = (roomId: number) => {
     const status = getRoomBookingStatus(roomId);
     return status && status !== "CANCELLED" && status !== "COMPLETED";
   };
 
-  // Handle cancel booking
   const handleCancelBooking = async () => {
     if (!selectedBookingId) return;
 
@@ -166,7 +157,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     }
   };
 
-  // Open cancel dialog
   const handleOpenCancelDialog = (roomId: number, roomType: string) => {
     const booking = getRoomBooking(roomId);
     if (booking) {
@@ -176,7 +166,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     }
   };
 
-  // Get button text based on booking status
   const getBookingButtonText = (roomId: number) => {
     const status = getRoomBookingStatus(roomId);
     if (!status) return "Book";
@@ -195,7 +184,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
     }
   };
 
-  // Get badge variant based on booking status
   const getBookingBadgeVariant = (roomId: number) => {
     const status = getRoomBookingStatus(roomId);
     switch (status) {
@@ -266,7 +254,7 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
                 <div className="text-center flex-1">
                   <p className="text-xs text-muted-foreground">Location</p>
                   <p className="font-semibold text-sm">
-                    {hotel.city}, {hotel.country}
+                    {hotel.destination?.city}, {hotel.destination?.country}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {getDestinationName()}
