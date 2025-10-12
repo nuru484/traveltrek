@@ -5,7 +5,6 @@ import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import { RootState } from "@/redux/store";
 import { useDeleteFlightMutation } from "@/redux/flightApi";
-import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import {
   useGetAllUserBookingsQuery,
   useUpdateBookingMutation,
@@ -49,13 +48,6 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const {
-    data: destinationsData,
-    isError: isDestinationsError,
-    error: destinationsError,
-  } = useGetAllDestinationsQuery({ limit: 100 });
-  const destinations = destinationsData?.data || [];
-
-  const {
     data: bookingsData,
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings,
@@ -83,14 +75,6 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     bookingStatus !== "COMPLETED";
 
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
-
-  useEffect(() => {
-    if (isDestinationsError) {
-      const { message } = extractApiErrorMessage(destinationsError);
-      console.error("Failed to fetch Destinations:", destinationsError);
-      toast.error(message || "Failed to load destinations");
-    }
-  }, [isDestinationsError, destinationsError]);
 
   useEffect(() => {
     if (isBookingsError) {
@@ -152,20 +136,12 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const getDestinationName = (id: number) => {
-    const destination = destinations.find((dest) => dest.id === id);
-    return destination ? `${destination.city}` : `ID: ${id}`;
-  };
-
-  const getDestinationCode = (id: number) => {
-    const destination = destinations.find((dest) => dest.id === id);
-    if (destination?.name) {
-      const words = destination.name.split(" ");
-      if (words.length >= 2) {
-        return words[0].substring(0, 3).toUpperCase();
-      }
+  const getDestinationCode = (name: string) => {
+    const words = name.split(" ");
+    if (words.length >= 2) {
+      return words[0].substring(0, 3).toUpperCase();
     }
-    return destination?.city?.substring(0, 3).toUpperCase() || "N/A";
+    return name.substring(0, 3).toUpperCase();
   };
 
   const getBookingButtonText = () => {
@@ -272,10 +248,10 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                 <div className="text-center flex-1">
                   <p className="text-xs text-muted-foreground">From</p>
                   <p className="font-semibold text-sm">
-                    {getDestinationCode(flight.originId)}
+                    {getDestinationCode(flight.origin.name)}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {getDestinationName(flight.originId)}
+                    {flight.origin.city || flight.origin.name}
                   </p>
                 </div>
 
@@ -294,10 +270,10 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                 <div className="text-center flex-1">
                   <p className="text-xs text-muted-foreground">To</p>
                   <p className="font-semibold text-sm">
-                    {getDestinationCode(flight.destinationId)}
+                    {getDestinationCode(flight.destination.name)}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {getDestinationName(flight.destinationId)}
+                    {flight.destination.city || flight.destination.name}
                   </p>
                 </div>
               </div>

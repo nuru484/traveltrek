@@ -1,6 +1,6 @@
 // src/components/flights/flight-detail.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
@@ -11,7 +11,6 @@ import {
   useCreateBookingMutation,
   useUpdateBookingMutation,
 } from "@/redux/bookingApi";
-import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import { IFlight } from "@/types/flight.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -67,13 +66,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  const {
-    data: destinationsData,
-    isError: isDestinationsError,
-    error: destinationsError,
-  } = useGetAllDestinationsQuery({ limit: 100 });
-  const destinations = destinationsData?.data || [];
-
   // Fetch user's bookings with loading states
   const {
     data: bookingsData,
@@ -117,20 +109,14 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const getDestinationName = (id: number) => {
-    const destination = destinations.find((dest) => dest.id === id);
-    return destination
-      ? `${destination.name} (${destination.city}, ${destination.country})`
-      : `Destination ID: ${id}`;
+  const getDestinationDisplayName = (destination: {
+    name: string;
+    city: string | null;
+    country: string;
+  }) => {
+    const cityPart = destination.city ? `${destination.city}, ` : "";
+    return `${destination.name} (${cityPart}${destination.country})`;
   };
-
-  useEffect(() => {
-    if (isDestinationsError) {
-      const { message } = extractApiErrorMessage(destinationsError);
-      console.error("Failed to fetch Destinations:", destinationsError);
-      toast.error(message || "Failed to load destinations");
-    }
-  }, [isDestinationsError, destinationsError]);
 
   const handleEdit = () => {
     router.push(`/dashboard/flights/${flight.id}/edit`);
@@ -483,7 +469,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground mb-2">Origin</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {getDestinationName(flight.originId)}
+                    {getDestinationDisplayName(flight.origin)}
                   </p>
                 </div>
               </div>
@@ -500,7 +486,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                     Destination
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {getDestinationName(flight.destinationId)}
+                    {getDestinationDisplayName(flight.destination)}
                   </p>
                 </div>
               </div>
@@ -769,10 +755,10 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           open={showBookDialog}
           onOpenChange={setShowBookDialog}
           title="Confirm Booking"
-          description={`Are you sure you want to book flight "${truncatedFlightNumber}" from ${getDestinationName(
-            flight.originId
-          )} to ${getDestinationName(
-            flight.destinationId
+          description={`Are you sure you want to book flight "${truncatedFlightNumber}" from ${getDestinationDisplayName(
+            flight.origin
+          )} to ${getDestinationDisplayName(
+            flight.destination
           )} for ₵${flight.price.toLocaleString()}?`}
           onConfirm={handleBook}
           confirmText="Book Now"

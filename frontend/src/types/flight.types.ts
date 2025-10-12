@@ -6,14 +6,21 @@ export enum IFlightClass {
   PREMIUM_ECONOMY = "Premium Economy",
 }
 
+export interface IDestinationSummary {
+  id: number;
+  name: string;
+  city: string | null;
+  country: string;
+}
+
 export interface IFlight {
   id: number;
   flightNumber: string;
   airline: string;
   departure: string;
   arrival: string;
-  originId: number;
-  destinationId: number;
+  origin: IDestinationSummary;
+  destination: IDestinationSummary;
   price: number;
   flightClass: IFlightClass;
   duration: number;

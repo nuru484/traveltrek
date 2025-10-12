@@ -182,7 +182,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
           formData,
         }).unwrap();
         toast.success("Room updated successfully");
-        router.push(`/dashboard/rooms/${values.hotelId}/detail`);
+        router.push(`/dashboard/rooms/${room.id}/detail`);
       }
     } catch (error) {
       console.error(`Failed to ${mode} room:`, error);

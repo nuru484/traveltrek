@@ -145,7 +145,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
       await deleteRoom(room.id).unwrap();
       toast.success("Room deleted successfully");
       setShowDeleteDialog(false);
-      router.push("/dashboard/rooms");
+      router.push("/dashboard/hotels");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       console.error("Failed to delete room:", error);
@@ -217,7 +217,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     }).format(price);
   };
 
-  // Calculate availability percentage
   const availabilityPercentage =
     room.totalRooms > 0 ? (room.roomsAvailable / room.totalRooms) * 100 : 0;
 
@@ -568,7 +567,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                           <Button
                             onClick={handleEdit}
                             variant="outline"
-                            className="flex-1"
+                            className="flex-1 cursor-pointer hover:text-foreground"
                             disabled={isDeleting}
                           >
                             <Edit className="h-4 w-4 mr-2" />
@@ -577,7 +576,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                           <Button
                             onClick={() => setShowDeleteDialog(true)}
                             variant="destructive"
-                            className="flex-1"
+                            className="flex-1 cursor-pointer"
                             disabled={isDeleting}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />

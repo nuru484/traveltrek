@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -47,26 +46,10 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IFlightClass } from "@/types/flight.types";
 import { IDestination } from "@/types/destination.types";
 import { cn } from "@/lib/utils";
-
-const flightFormSchema = z.object({
-  flightNumber: z.string().min(1, "Flight number is required"),
-  airline: z.string().min(1, "Airline is required"),
-  departure: z.string().min(1, "Departure date is required"),
-  arrival: z.string().min(1, "Arrival date is required"),
-  originId: z.number().min(1, "Origin is required"),
-  destinationId: z.number().min(1, "Destination is required"),
-  price: z.number().min(0, "Price must be a positive number"),
-  flightClass: z.enum(IFlightClass, {
-    message: "Flight class is required",
-  }),
-  stops: z.number().min(0, "Stops must be a non-negative number").optional(),
-  capacity: z
-    .number()
-    .min(0, "Capacity (Seats Available) must be a non-negative number"),
-  flightPhoto: z.any().optional(),
-});
-
-type FlightFormValues = z.infer<typeof flightFormSchema>;
+import {
+  flightFormSchema,
+  IFlightFormValues,
+} from "@/validation/flights-validation";
 
 interface IFlightFormProps {
   flight?: IFlight;
@@ -109,7 +92,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
     return destinationsData?.data || [];
   }, [destinationsData]);
 
-  const form = useForm<FlightFormValues>({
+  const form = useForm<IFlightFormValues>({
     resolver: zodResolver(flightFormSchema),
     defaultValues: {
       flightNumber: flight?.flightNumber || "",
@@ -124,8 +107,8 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
           "T" +
           flight.arrival.split("T")[1].slice(0, 5)
         : "",
-      originId: flight?.originId || 0,
-      destinationId: flight?.destinationId || 0,
+      originId: flight?.origin?.id || 0,
+      destinationId: flight?.destination?.id || 0,
       price: flight?.price || 0,
       flightClass: flight?.flightClass || IFlightClass.ECONOMY,
       stops: flight?.stops || 0,
@@ -184,7 +167,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
     };
   }, [previewUrl, flight?.photo]);
 
-  const onSubmit = async (values: FlightFormValues) => {
+  const onSubmit = async (values: IFlightFormValues) => {
     try {
       const formData = new FormData();
       formData.append("flightNumber", values.flightNumber);
@@ -220,7 +203,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
 
       if (hasFieldErrors && fieldErrors) {
         Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof FlightFormValues, {
+          form.setError(field as keyof IFlightFormValues, {
             message: errorMessage,
           });
         });
@@ -232,6 +215,34 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
   };
 
   const isLoading = isCreating || isUpdating;
+
+  // Get the display text for selected origin
+  const getOriginDisplayText = (originId: number) => {
+    if (!originId) return "Select origin";
+
+    // First check if it's in the flight data (for edit mode)
+    if (flight?.origin && flight.origin.id === originId) {
+      return flight.origin.name;
+    }
+
+    // Then check in the fetched origins list
+    const origin = origins.find((o) => o.id === originId);
+    return origin?.name || "Select origin";
+  };
+
+  // Get the display text for selected destination
+  const getDestinationDisplayText = (destinationId: number) => {
+    if (!destinationId) return "Select destination";
+
+    // First check if it's in the flight data (for edit mode)
+    if (flight?.destination && flight.destination.id === destinationId) {
+      return flight.destination.name;
+    }
+
+    // Then check in the fetched destinations list
+    const destination = destinations.find((d) => d.id === destinationId);
+    return destination?.name || "Select destination";
+  };
 
   return (
     <div className="space-y-6">
@@ -316,11 +327,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {field.value
-                                ? origins.find(
-                                    (origin) => origin.id === field.value
-                                  )?.name || "Select origin"
-                                : "Select origin"}
+                              {getOriginDisplayText(field.value)}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
@@ -395,12 +402,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {field.value
-                                ? destinations.find(
-                                    (destination) =>
-                                      destination.id === field.value
-                                  )?.name || "Select destination"
-                                : "Select destination"}
+                              {getDestinationDisplayText(field.value)}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
