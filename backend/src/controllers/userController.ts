@@ -43,7 +43,6 @@ const handleUpdateUserProfile = asyncHandler(
 
     const targetUserId = parseInt(userId);
 
-    // Authorization check
     if (
       targetUserId !== parseInt(currentUserId?.toString() || '0') &&
       currentUserRole !== UserRole.ADMIN &&
@@ -58,7 +57,6 @@ const handleUpdateUserProfile = asyncHandler(
     let oldProfilePicture: string | null = null;
 
     try {
-      // Fetch current user data
       const existingUser = await prisma.user.findUnique({
         where: { id: targetUserId },
         select: { profilePicture: true, email: true, phone: true },
@@ -70,7 +68,6 @@ const handleUpdateUserProfile = asyncHandler(
 
       oldProfilePicture = existingUser.profilePicture;
 
-      // === Duplicate checks ===
       if (userDetails.email && userDetails.email !== existingUser.email) {
         const existingUserByEmail = await prisma.user.findUnique({
           where: { email: userDetails.email },
@@ -97,7 +94,6 @@ const handleUpdateUserProfile = asyncHandler(
         }
       }
 
-      // Prepare update data
       const updateData: IUserUpdateData = {};
 
       if (userDetails.name !== undefined) updateData.name = userDetails.name;
@@ -106,7 +102,6 @@ const handleUpdateUserProfile = asyncHandler(
       if (userDetails.address !== undefined)
         updateData.address = userDetails.address;
 
-      // Password update
       if (userDetails.password) {
         updateData.password = await bcrypt.hash(
           userDetails.password,
@@ -114,7 +109,6 @@ const handleUpdateUserProfile = asyncHandler(
         );
       }
 
-      // Profile picture update
       if (
         req.body.profilePicture &&
         typeof req.body.profilePicture === 'string'
@@ -123,13 +117,11 @@ const handleUpdateUserProfile = asyncHandler(
         uploadedImageUrl = req.body.profilePicture;
       }
 
-      // Perform update
       const updatedUser = await prisma.user.update({
         where: { id: targetUserId },
         data: updateData,
       });
 
-      // Clean up old image if replaced
       if (
         uploadedImageUrl &&
         oldProfilePicture &&
@@ -149,7 +141,6 @@ const handleUpdateUserProfile = asyncHandler(
         data: userWithoutPassword as IUserResponseData,
       });
     } catch (error) {
-      // Cleanup newly uploaded image if operation failed
       if (uploadedImageUrl) {
         try {
           await cloudinaryService.deleteImage(uploadedImageUrl);
@@ -247,11 +238,9 @@ export const getAllUsers = asyncHandler(
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Optional filters
     const role = req.query.role as UserRole | undefined;
     const search = req.query.search as string | undefined;
 
-    // Build where clause for filtering
     const whereClause: any = {};
 
     if (role && Object.values(UserRole).includes(role)) {
@@ -323,7 +312,6 @@ export const changeUserRole = asyncHandler(
     const { role } = req.body;
     const currentUserId = req.user?.id;
 
-    // Validate input
     if (!userId || isNaN(parseInt(userId))) {
       throw new ValidationError('Valid user ID is required');
     }
@@ -332,12 +320,10 @@ export const changeUserRole = asyncHandler(
       throw new ValidationError('Valid role is required');
     }
 
-    // Prevent users from changing their own role
     if (parseInt(userId) === parseInt(currentUserId?.toString() || '0')) {
       throw new ForbiddenError('You cannot change your own role');
     }
 
-    // Check if user exists
     const existingUser = await prisma.user.findUnique({
       where: { id: parseInt(userId) },
       select: { id: true, name: true, email: true, role: true },
@@ -351,7 +337,6 @@ export const changeUserRole = asyncHandler(
       throw new BadRequestError(`User already has the role: ${role}`);
     }
 
-    // Update user role
     const updatedUser = await prisma.user.update({
       where: { id: parseInt(userId) },
       data: { role },
@@ -396,14 +381,12 @@ export const deleteUser = asyncHandler(
     const currentUserId = req.user?.id;
     const currentUserRole = req.user?.role;
 
-    // Validate input
     if (!userId || isNaN(parseInt(userId))) {
       throw new ValidationError('Valid user ID is required');
     }
 
     const targetUserId = parseInt(userId);
 
-    // Authorization checks
     if (targetUserId === parseInt(currentUserId?.toString() || '0')) {
       if (currentUserRole === UserRole.ADMIN) {
         throw new ForbiddenError('Admins cannot delete themselves');
@@ -424,13 +407,6 @@ export const deleteUser = asyncHandler(
         email: true,
         role: true,
         profilePicture: true,
-        _count: {
-          select: {
-            bookings: true,
-            reviews: true,
-            inquiries: true,
-          },
-        },
       },
     });
 
@@ -455,7 +431,6 @@ export const deleteUser = asyncHandler(
       );
     }
 
-    // Delete user (cascade deletes Wishlist and Notifications)
     await prisma.user.delete({
       where: { id: targetUserId },
     });
@@ -485,14 +460,12 @@ export const deleteAllUsers = asyncHandler(
     const currentUserId = req.user?.id;
     const confirmDelete = req.body.confirmDelete;
 
-    // Require explicit confirmation
     if (confirmDelete !== 'DELETE_ALL_USERS') {
       throw new BadRequestError(
         'This operation requires confirmation. Send { "confirmDelete": "DELETE_ALL_USERS" } in request body.',
       );
     }
 
-    // Get all users except the current admin
     const usersToDelete = await prisma.user.findMany({
       where: {
         id: { not: parseInt(currentUserId?.toString() || '0') },
@@ -513,7 +486,6 @@ export const deleteAllUsers = asyncHandler(
       return;
     }
 
-    // Find users with non-refunded payments
     const usersWithActivePayments = await prisma.payment.findMany({
       where: {
         userId: {
@@ -538,19 +510,16 @@ export const deleteAllUsers = asyncHandler(
       );
     }
 
-    // Collect profile pictures for cleanup
     const profilePicturesToDelete = usersToDelete
       .filter((user) => user.profilePicture)
       .map((user) => user.profilePicture!);
 
-    // Delete all users except current admin
     const deleteResult = await prisma.user.deleteMany({
       where: {
         id: { not: parseInt(currentUserId?.toString() || '0') },
       },
     });
 
-    // Clean up profile pictures from Cloudinary
     if (profilePicturesToDelete.length > 0) {
       const cleanupPromises = profilePicturesToDelete.map(
         async (profilePicture) => {
@@ -565,7 +534,6 @@ export const deleteAllUsers = asyncHandler(
         },
       );
 
-      // Execute cleanup concurrently but don't wait for completion
       Promise.allSettled(cleanupPromises).then((results) => {
         const failed = results.filter(
           (result) => result.status === 'rejected',
