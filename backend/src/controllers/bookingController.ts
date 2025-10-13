@@ -1,3 +1,4 @@
+// src/controllers/bookingController.ts
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { param } from 'express-validator';
 import prisma from '../config/prismaClient';
@@ -9,14 +10,20 @@ import {
   BadRequestError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
-import { IBookingInput, IBooking } from 'types/booking.types';
+import { IBookingInput, IBooking, IBookingRoom } from 'types/booking.types';
 import {
   createBookingValidation,
   updateBookingValidation,
   getBookingsValidation,
 } from '../validations/bookingValidations';
 import logger from '../utils/logger';
-import { destination } from 'pino';
+import {
+  calculatePaymentDeadline,
+  calculateNights,
+  calculateRoomBookingPrice,
+  validateBookingDates,
+  checkRoomAvailability,
+} from '../utils/bookingHelpers';
 
 /**
  * Shared include object for booking queries
@@ -104,6 +111,9 @@ const formatBookingResponse = (booking: any): IBooking => {
     userId: booking.userId,
     user: booking.user,
     payment: booking.payment,
+    numberOfGuests: booking.numberOfGuests,
+    specialRequests: booking.specialRequests,
+    paymentDeadline: booking.paymentDeadline,
     status: booking.status,
     totalPrice: booking.totalPrice,
     bookingDate: booking.bookingDate,
@@ -120,10 +130,21 @@ const formatBookingResponse = (booking: any): IBooking => {
       flight: null,
     };
   } else if (booking.room) {
+    const roomData: IBookingRoom = {
+      id: booking.room.id,
+      roomType: booking.room.roomType,
+      description: booking.room.description,
+      numberOfRooms: booking.numberOfRooms,
+      numberOfNights: booking.numberOfNights,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      hotel: booking.room.hotel,
+    };
+
     return {
       ...baseResponse,
       type: 'ROOM',
-      room: booking.room ?? null,
+      room: roomData,
       tour: null,
       flight: null,
     };
@@ -146,7 +167,19 @@ const handleCreateBooking = asyncHandler(
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
-    const { userId, tourId, roomId, flightId, totalPrice } = req.body;
+    const {
+      userId,
+      tourId,
+      roomId,
+      flightId,
+      totalPrice,
+      startDate,
+      endDate,
+      numberOfRooms,
+      numberOfGuests,
+      specialRequests,
+    } = req.body;
+
     const user = req.user;
 
     if (!user) {
@@ -167,13 +200,24 @@ const handleCreateBooking = asyncHandler(
     if (!targetUser) throw new NotFoundError('User not found');
 
     let tour = null;
+    let room = null;
+    let flight = null;
+    let calculatedTotalPrice = totalPrice;
+    let numberOfNights = 1;
+    let paymentDeadline: Date | null = null;
+    let requiresImmediatePayment = false;
+
     if (tourId) {
       tour = await prisma.tour.findUnique({ where: { id: tourId } });
       if (!tour) throw new NotFoundError('Tour not found');
 
       const availableSlots = tour.maxGuests - tour.guestsBooked;
-      if (availableSlots <= 0) {
-        throw new BadRequestError('No available slots for this tour');
+      const guestsToBook = numberOfGuests || 1;
+
+      if (availableSlots < guestsToBook) {
+        throw new BadRequestError(
+          `Only ${availableSlots} slot(s) available for this tour`,
+        );
       }
 
       if (tour.status === 'CANCELLED') {
@@ -182,47 +226,117 @@ const handleCreateBooking = asyncHandler(
       if (tour.status === 'COMPLETED') {
         throw new BadRequestError('This tour has already been completed');
       }
+
+      calculatedTotalPrice = tour.price * guestsToBook;
+
+      const deadlineInfo = calculatePaymentDeadline(tour.startDate);
+      paymentDeadline = deadlineInfo.deadline;
+      requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
     }
 
-    let room = null;
+    // Handle Room Booking
     if (roomId) {
+      if (!startDate || !endDate) {
+        throw new BadRequestError(
+          'startDate and endDate are required for room bookings',
+        );
+      }
+
+      const checkInDate = new Date(startDate);
+      const checkOutDate = new Date(endDate);
+
+      // Validate booking dates
+      const dateValidation = validateBookingDates(checkInDate, checkOutDate);
+
+      if (!dateValidation.valid) {
+        throw new BadRequestError(dateValidation.error!);
+      }
+
       room = await prisma.room.findUnique({ where: { id: roomId } });
       if (!room) throw new NotFoundError('Room not found');
 
-      if (room.roomsAvailable <= 0) {
-        throw new BadRequestError('No rooms available of this type');
+      const roomsNeeded = numberOfRooms || 1;
+      const guestsCount = numberOfGuests || 1;
+
+      // Check if guests exceed room capacity
+      const totalCapacity = room.capacity * roomsNeeded;
+      if (guestsCount > totalCapacity) {
+        const roomsRequired = Math.ceil(guestsCount / room.capacity);
+        throw new BadRequestError(
+          `This room has a capacity of ${room.capacity} guest(s). ` +
+            `For ${guestsCount} guest(s), you need to book at least ${roomsRequired} room(s). ` +
+            `Currently requesting ${roomsNeeded} room(s).`,
+        );
       }
+
+      // Check room availability
+      const availability = await checkRoomAvailability(
+        roomId,
+        checkInDate,
+        checkOutDate,
+        roomsNeeded,
+      );
+
+      if (!availability.available) {
+        throw new BadRequestError(
+          `Only ${availability.availableRooms} room(s) available for the selected dates. ` +
+            `You requested ${roomsNeeded} room(s).`,
+        );
+      }
+
+      // Calculate nights and total price
+      numberOfNights = calculateNights(checkInDate, checkOutDate);
+      calculatedTotalPrice = calculateRoomBookingPrice(
+        room.pricePerNight,
+        numberOfNights,
+        roomsNeeded,
+      );
+
+      // Calculate payment deadline
+      const deadlineInfo = calculatePaymentDeadline(checkInDate);
+      paymentDeadline = deadlineInfo.deadline;
+      requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
     }
 
-    let flight = null;
+    // Handle Flight Booking
     if (flightId) {
       flight = await prisma.flight.findUnique({ where: { id: flightId } });
       if (!flight) throw new NotFoundError('Flight not found');
 
-      if (flight.seatsAvailable <= 0) {
-        throw new BadRequestError('No seats available on this flight');
+      const seatsNeeded = numberOfGuests || 1;
+
+      if (flight.seatsAvailable < seatsNeeded) {
+        throw new BadRequestError(
+          `Only ${flight.seatsAvailable} seat(s) available on this flight. ` +
+            `You requested ${seatsNeeded} seat(s).`,
+        );
       }
+
+      if (flight.status === 'CANCELLED') {
+        throw new BadRequestError('This flight has been cancelled');
+      }
+
+      calculatedTotalPrice = flight.price * seatsNeeded;
+
+      const deadlineInfo = calculatePaymentDeadline(flight.departure);
+      paymentDeadline = deadlineInfo.deadline;
+      requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
     }
 
     const booking = await prisma.$transaction(async (tx) => {
       if (tourId && tour) {
+        const guestsToBook = numberOfGuests || 1;
         await tx.tour.update({
           where: { id: tourId },
-          data: { guestsBooked: { increment: 1 } },
-        });
-      }
-
-      if (roomId && room) {
-        await tx.room.update({
-          where: { id: roomId },
-          data: { roomsAvailable: { decrement: 1 } },
+          data: { guestsBooked: { increment: guestsToBook } },
         });
       }
 
       if (flightId && flight) {
+        const seatsNeeded = numberOfGuests || 1;
         await tx.flight.update({
           where: { id: flightId },
-          data: { seatsAvailable: { decrement: 1 } },
+          data: { seatsAvailable: { decrement: seatsNeeded } },
         });
       }
 
@@ -232,18 +346,38 @@ const handleCreateBooking = asyncHandler(
           tour: tourId ? { connect: { id: tourId } } : undefined,
           room: roomId ? { connect: { id: roomId } } : undefined,
           flight: flightId ? { connect: { id: flightId } } : undefined,
-          totalPrice,
+          totalPrice: calculatedTotalPrice,
           status: 'PENDING',
+          numberOfGuests: numberOfGuests || 1,
+          specialRequests: specialRequests || null,
+
+          startDate: roomId ? new Date(startDate!) : null,
+          endDate: roomId ? new Date(endDate!) : null,
+          numberOfRooms: roomId ? numberOfRooms || 1 : 1,
+          numberOfNights: roomId ? numberOfNights : 1,
+          paymentDeadline: paymentDeadline,
+          requiresImmediatePayment: requiresImmediatePayment,
         },
         include: bookingInclude,
       });
     });
 
+    // Use the helper function to format the response
     const response = formatBookingResponse(booking);
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
       message: 'Booking created successfully',
-      data: response,
+      data: {
+        ...response,
+        bookingDetails: {
+          paymentDeadline,
+          requiresImmediatePayment,
+          calculatedPrice: calculatedTotalPrice,
+          ...(roomId && { numberOfNights }),
+          ...(tourId && { tourStartDate: tour!.startDate }),
+          ...(flightId && { flightDeparture: flight!.departure }),
+        },
+      },
     });
   },
 );
@@ -305,7 +439,19 @@ const handleUpdateBooking = asyncHandler(
     next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
-    const { userId, tourId, roomId, flightId, totalPrice, status } = req.body;
+    const {
+      userId,
+      tourId,
+      roomId,
+      flightId,
+      totalPrice,
+      status,
+      startDate,
+      endDate,
+      numberOfRooms,
+      numberOfGuests,
+      specialRequests,
+    } = req.body;
 
     if (!id) {
       throw new BadRequestError('Booking ID is required');
@@ -320,6 +466,9 @@ const handleUpdateBooking = asyncHandler(
       where: { id: bookingId },
       include: {
         payment: true,
+        room: true,
+        tour: true,
+        flight: true,
       },
     });
 
@@ -327,6 +476,7 @@ const handleUpdateBooking = asyncHandler(
       throw new NotFoundError('Booking not found');
     }
 
+    // Validate status transitions
     if (
       status === 'PENDING' &&
       existingBooking.payment?.status === 'COMPLETED'
@@ -341,7 +491,7 @@ const handleUpdateBooking = asyncHandler(
       existingBooking.payment?.status === 'COMPLETED'
     ) {
       throw new BadRequestError(
-        'Cannot change booking status to CANCELLED when payment is completed',
+        'Cannot cancel booking when payment is completed. Please request a refund instead.',
       );
     }
 
@@ -361,15 +511,21 @@ const handleUpdateBooking = asyncHandler(
       }
     }
 
+    // Prevent modification of completed or cancelled bookings
     if (
       (existingBooking.status === 'COMPLETED' ||
         existingBooking.status === 'CANCELLED') &&
-      (tourId || roomId || flightId || userId)
+      (tourId || roomId || flightId || userId || numberOfGuests)
     ) {
       throw new BadRequestError(
         `Cannot modify ${existingBooking.status.toLowerCase()} bookings`,
       );
     }
+
+    let calculatedTotalPrice = totalPrice;
+    let numberOfNights = existingBooking.numberOfNights;
+    let paymentDeadline = existingBooking.paymentDeadline;
+    let requiresImmediatePayment = existingBooking.requiresImmediatePayment;
 
     const updatedBooking = await prisma.$transaction(async (tx) => {
       if (userId) {
@@ -379,13 +535,26 @@ const handleUpdateBooking = asyncHandler(
         if (!targetUser) throw new NotFoundError('User not found');
       }
 
-      if (tourId && tourId !== existingBooking.tourId) {
+      // Handle Tour Updates
+      if (
+        tourId &&
+        (tourId !== existingBooking.tourId || numberOfGuests !== undefined)
+      ) {
         const tour = await tx.tour.findUnique({ where: { id: tourId } });
         if (!tour) throw new NotFoundError('Tour not found');
 
-        const availableSlots = tour.maxGuests - tour.guestsBooked;
-        if (availableSlots <= 0) {
-          throw new BadRequestError('No available slots for this tour');
+        const guestsToBook = numberOfGuests ?? existingBooking.numberOfGuests;
+        let availableSlots = tour.maxGuests - tour.guestsBooked;
+
+        // If updating the same tour, add back the current booking's guests
+        if (tourId === existingBooking.tourId) {
+          availableSlots += existingBooking.numberOfGuests;
+        }
+
+        if (availableSlots < guestsToBook) {
+          throw new BadRequestError(
+            `Only ${availableSlots} slot(s) available for this tour`,
+          );
         }
 
         if (tour.status === 'CANCELLED') {
@@ -395,58 +564,266 @@ const handleUpdateBooking = asyncHandler(
           throw new BadRequestError('This tour has already been completed');
         }
 
-        if (existingBooking.tourId) {
+        // Restore previous tour guests if changing tours
+        if (existingBooking.tourId && tourId !== existingBooking.tourId) {
           await tx.tour.update({
             where: { id: existingBooking.tourId },
-            data: { guestsBooked: { decrement: 1 } },
+            data: {
+              guestsBooked: { decrement: existingBooking.numberOfGuests },
+            },
           });
         }
-        await tx.tour.update({
-          where: { id: tourId },
-          data: { guestsBooked: { increment: 1 } },
-        });
+
+        // Update guest count for the tour
+        if (tourId === existingBooking.tourId) {
+          // Same tour, adjust the difference
+          const guestDifference = guestsToBook - existingBooking.numberOfGuests;
+          if (guestDifference !== 0) {
+            await tx.tour.update({
+              where: { id: tourId },
+              data: {
+                guestsBooked:
+                  guestDifference > 0
+                    ? { increment: guestDifference }
+                    : { decrement: Math.abs(guestDifference) },
+              },
+            });
+          }
+        } else {
+          // Different tour, add new guests
+          await tx.tour.update({
+            where: { id: tourId },
+            data: { guestsBooked: { increment: guestsToBook } },
+          });
+        }
+
+        // Recalculate price for tour
+        calculatedTotalPrice = tour.price * guestsToBook;
+
+        // Recalculate payment deadline
+        const deadlineInfo = calculatePaymentDeadline(tour.startDate);
+        paymentDeadline = deadlineInfo.deadline;
+        requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
+      } else if (
+        numberOfGuests !== undefined &&
+        existingBooking.tourId &&
+        !tourId
+      ) {
+        // Only updating guest count for existing tour
+        const tour = existingBooking.tour;
+        if (!tour) throw new NotFoundError('Tour not found');
+
+        const guestsToBook = numberOfGuests;
+        const availableSlots =
+          tour.maxGuests - tour.guestsBooked + existingBooking.numberOfGuests;
+
+        if (availableSlots < guestsToBook) {
+          throw new BadRequestError(
+            `Only ${availableSlots} slot(s) available for this tour`,
+          );
+        }
+
+        // Update guest count
+        const guestDifference = guestsToBook - existingBooking.numberOfGuests;
+        if (guestDifference !== 0) {
+          await tx.tour.update({
+            where: { id: existingBooking.tourId },
+            data: {
+              guestsBooked:
+                guestDifference > 0
+                  ? { increment: guestDifference }
+                  : { decrement: Math.abs(guestDifference) },
+            },
+          });
+        }
+
+        // Recalculate price
+        calculatedTotalPrice = tour.price * guestsToBook;
       }
 
-      if (roomId && roomId !== existingBooking.roomId) {
+      // Handle Room Updates
+      if (
+        roomId &&
+        (roomId !== existingBooking.roomId ||
+          startDate ||
+          endDate ||
+          numberOfRooms !== undefined)
+      ) {
         const room = await tx.room.findUnique({ where: { id: roomId } });
         if (!room) throw new NotFoundError('Room not found');
 
-        if (room.roomsAvailable <= 0) {
-          throw new BadRequestError('No rooms available of this type');
+        const checkInDate = startDate
+          ? new Date(startDate)
+          : existingBooking.startDate!;
+        const checkOutDate = endDate
+          ? new Date(endDate)
+          : existingBooking.endDate!;
+
+        if (!checkInDate || !checkOutDate) {
+          throw new BadRequestError(
+            'Room bookings require start and end dates',
+          );
         }
 
-        if (existingBooking.roomId) {
-          await tx.room.update({
-            where: { id: existingBooking.roomId },
-            data: { roomsAvailable: { increment: 1 } },
-          });
+        // Validate booking dates
+        const dateValidation = validateBookingDates(checkInDate, checkOutDate);
+        if (!dateValidation.valid) {
+          throw new BadRequestError(dateValidation.error!);
         }
-        await tx.room.update({
-          where: { id: roomId },
-          data: { roomsAvailable: { decrement: 1 } },
-        });
+
+        const roomsNeeded = numberOfRooms ?? existingBooking.numberOfRooms;
+        const guestsCount = numberOfGuests ?? existingBooking.numberOfGuests;
+
+        // Check capacity
+        const totalCapacity = room.capacity * roomsNeeded;
+        if (guestsCount > totalCapacity) {
+          const roomsRequired = Math.ceil(guestsCount / room.capacity);
+          throw new BadRequestError(
+            `This room has a capacity of ${room.capacity} guest(s). ` +
+              `For ${guestsCount} guest(s), you need to book at least ${roomsRequired} room(s). ` +
+              `Currently requesting ${roomsNeeded} room(s).`,
+          );
+        }
+
+        // Check availability (exclude current booking from check)
+        const availability = await checkRoomAvailability(
+          roomId,
+          checkInDate,
+          checkOutDate,
+          roomsNeeded,
+        );
+
+        // Adjust for current booking if it's the same room
+        let adjustedAvailableRooms = availability.availableRooms;
+        if (roomId === existingBooking.roomId) {
+          adjustedAvailableRooms += existingBooking.numberOfRooms;
+        }
+
+        if (adjustedAvailableRooms < roomsNeeded) {
+          throw new BadRequestError(
+            `Only ${adjustedAvailableRooms} room(s) available for the selected dates. ` +
+              `You requested ${roomsNeeded} room(s).`,
+          );
+        }
+
+        // Recalculate price and nights
+        numberOfNights = calculateNights(checkInDate, checkOutDate);
+        calculatedTotalPrice = calculateRoomBookingPrice(
+          room.pricePerNight,
+          numberOfNights,
+          roomsNeeded,
+        );
+
+        // Recalculate payment deadline
+        const deadlineInfo = calculatePaymentDeadline(checkInDate);
+        paymentDeadline = deadlineInfo.deadline;
+        requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
       }
 
-      if (flightId && flightId !== existingBooking.flightId) {
+      // Handle Flight Updates
+      if (
+        flightId &&
+        (flightId !== existingBooking.flightId || numberOfGuests !== undefined)
+      ) {
         const flight = await tx.flight.findUnique({
           where: { id: flightId },
         });
         if (!flight) throw new NotFoundError('Flight not found');
 
-        if (flight.seatsAvailable <= 0) {
-          throw new BadRequestError('No seats available on this flight');
+        const seatsNeeded = numberOfGuests ?? existingBooking.numberOfGuests;
+
+        // Adjust for current booking if it's the same flight
+        let adjustedAvailableSeats = flight.seatsAvailable;
+        if (flightId === existingBooking.flightId) {
+          adjustedAvailableSeats += existingBooking.numberOfGuests;
         }
 
-        if (existingBooking.flightId) {
+        if (adjustedAvailableSeats < seatsNeeded) {
+          throw new BadRequestError(
+            `Only ${adjustedAvailableSeats} seat(s) available on this flight. ` +
+              `You requested ${seatsNeeded} seat(s).`,
+          );
+        }
+
+        if (flight.status === 'CANCELLED') {
+          throw new BadRequestError('This flight has been cancelled');
+        }
+
+        // Restore previous flight seats if changing flights
+        if (existingBooking.flightId && flightId !== existingBooking.flightId) {
           await tx.flight.update({
             where: { id: existingBooking.flightId },
-            data: { seatsAvailable: { increment: 1 } },
+            data: {
+              seatsAvailable: { increment: existingBooking.numberOfGuests },
+            },
           });
         }
-        await tx.flight.update({
-          where: { id: flightId },
-          data: { seatsAvailable: { decrement: 1 } },
-        });
+
+        // Update seat count for the flight
+        if (flightId === existingBooking.flightId) {
+          // Same flight, adjust the difference
+          const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
+          if (seatDifference !== 0) {
+            await tx.flight.update({
+              where: { id: flightId },
+              data: {
+                seatsAvailable:
+                  seatDifference > 0
+                    ? { decrement: seatDifference }
+                    : { increment: Math.abs(seatDifference) },
+              },
+            });
+          }
+        } else {
+          // Different flight, reduce new seats
+          await tx.flight.update({
+            where: { id: flightId },
+            data: { seatsAvailable: { decrement: seatsNeeded } },
+          });
+        }
+
+        // Recalculate price for flight
+        calculatedTotalPrice = flight.price * seatsNeeded;
+
+        // Recalculate payment deadline
+        const deadlineInfo = calculatePaymentDeadline(flight.departure);
+        paymentDeadline = deadlineInfo.deadline;
+        requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
+      } else if (
+        numberOfGuests !== undefined &&
+        existingBooking.flightId &&
+        !flightId
+      ) {
+        // Only updating guest count for existing flight
+        const flight = existingBooking.flight;
+        if (!flight) throw new NotFoundError('Flight not found');
+
+        const seatsNeeded = numberOfGuests;
+        const availableSeats =
+          flight.seatsAvailable + existingBooking.numberOfGuests;
+
+        if (availableSeats < seatsNeeded) {
+          throw new BadRequestError(
+            `Only ${availableSeats} seat(s) available on this flight`,
+          );
+        }
+
+        // Update seat count
+        const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
+        if (seatDifference !== 0) {
+          await tx.flight.update({
+            where: { id: existingBooking.flightId },
+            data: {
+              seatsAvailable:
+                seatDifference > 0
+                  ? { decrement: seatDifference }
+                  : { increment: Math.abs(seatDifference) },
+            },
+          });
+        }
+
+        // Recalculate price
+        calculatedTotalPrice = flight.price * seatsNeeded;
       }
 
       return await tx.booking.update({
@@ -456,8 +833,21 @@ const handleUpdateBooking = asyncHandler(
           tour: tourId ? { connect: { id: tourId } } : undefined,
           room: roomId ? { connect: { id: roomId } } : undefined,
           flight: flightId ? { connect: { id: flightId } } : undefined,
-          totalPrice: totalPrice ?? existingBooking.totalPrice,
+          totalPrice: calculatedTotalPrice ?? existingBooking.totalPrice,
           status: status ?? existingBooking.status,
+          numberOfGuests: numberOfGuests ?? existingBooking.numberOfGuests,
+          specialRequests:
+            specialRequests !== undefined
+              ? specialRequests
+              : existingBooking.specialRequests,
+          startDate: startDate
+            ? new Date(startDate)
+            : existingBooking.startDate,
+          endDate: endDate ? new Date(endDate) : existingBooking.endDate,
+          numberOfRooms: numberOfRooms ?? existingBooking.numberOfRooms,
+          numberOfNights: numberOfNights,
+          paymentDeadline: paymentDeadline,
+          requiresImmediatePayment: requiresImmediatePayment,
         },
         include: bookingInclude,
       });
@@ -483,7 +873,7 @@ export const updateBooking: RequestHandler[] = [
 /**
  * Delete a booking
  */
-const handleDeleteBooking = asyncHandler(
+export const deleteBooking = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
@@ -566,23 +956,10 @@ const handleDeleteBooking = asyncHandler(
           where: { id: booking.tourId },
         });
 
-        if (tour) {
+        if (tour && tour.guestsBooked > 0) {
           await tx.tour.update({
             where: { id: booking.tourId },
-            data: { guestsBooked: { decrement: 1 } },
-          });
-        }
-      }
-
-      if (booking.roomId) {
-        const room = await tx.room.findUnique({
-          where: { id: booking.roomId },
-        });
-
-        if (room) {
-          await tx.room.update({
-            where: { id: booking.roomId },
-            data: { roomsAvailable: { increment: 1 } },
+            data: { guestsBooked: { decrement: booking.numberOfGuests } },
           });
         }
       }
@@ -592,10 +969,10 @@ const handleDeleteBooking = asyncHandler(
           where: { id: booking.flightId },
         });
 
-        if (flight) {
+        if (flight && flight.seatsAvailable < flight.capacity) {
           await tx.flight.update({
             where: { id: booking.flightId },
-            data: { seatsAvailable: { increment: 1 } },
+            data: { seatsAvailable: { increment: booking.numberOfGuests } },
           });
         }
       }
@@ -609,6 +986,7 @@ const handleDeleteBooking = asyncHandler(
         });
       }
 
+      // Delete the booking
       await tx.booking.delete({
         where: { id: bookingId },
       });
@@ -620,21 +998,17 @@ const handleDeleteBooking = asyncHandler(
         deletedBookingId: bookingId,
         restoredAvailability: {
           tour: booking.tourId ? true : false,
-          room: booking.roomId ? true : false,
+          room: booking.roomId ? 'date-based' : false,
           flight: booking.flightId ? true : false,
+        },
+        restoredQuantities: {
+          tourGuests: booking.tourId ? booking.numberOfGuests : 0,
+          flightSeats: booking.flightId ? booking.numberOfGuests : 0,
         },
       },
     });
   },
 );
-
-export const deleteBooking: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Booking ID must be a positive integer'),
-  ...validationMiddleware.create([]),
-  handleDeleteBooking,
-];
 
 /**
  * Get all bookings for a specific user
@@ -1020,7 +1394,7 @@ export const getAllBookings: RequestHandler[] = [
 /**
  * Delete all bookings
  */
-const handleDeleteAllBookings = asyncHandler(
+export const deleteAllBookings = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const bookingCount = await prisma.booking.count();
 
@@ -1060,7 +1434,11 @@ const handleDeleteAllBookings = asyncHandler(
           isFutureBooking = true;
         } else if (booking.flight && booking.flight.departure > now) {
           isFutureBooking = true;
-        } else if (booking.room) {
+        } else if (
+          booking.room &&
+          booking.startDate &&
+          booking.startDate > now
+        ) {
           isFutureBooking = true;
         }
 
@@ -1139,32 +1517,35 @@ const handleDeleteAllBookings = asyncHandler(
       );
     }
 
+    let totalRestoredGuests = 0;
+    let totalRestoredSeats = 0;
+
     await prisma.$transaction(async (tx) => {
       for (const booking of deletionResults.deletable) {
+        // Restore tour guests
         if (booking.tourId && booking.tour) {
-          if (booking.tour.guestsBooked > 0) {
+          const guestsToRestore = booking.numberOfGuests || 1;
+          if (booking.tour.guestsBooked >= guestsToRestore) {
             await tx.tour.update({
               where: { id: booking.tourId },
-              data: { guestsBooked: { decrement: 1 } },
+              data: { guestsBooked: { decrement: guestsToRestore } },
             });
+            totalRestoredGuests += guestsToRestore;
           }
         }
 
-        if (booking.roomId && booking.room) {
-          if (booking.room.roomsAvailable < booking.room.totalRooms) {
-            await tx.room.update({
-              where: { id: booking.roomId },
-              data: { roomsAvailable: { increment: 1 } },
-            });
-          }
-        }
-
+        // Restore flight seats
         if (booking.flightId && booking.flight) {
-          if (booking.flight.seatsAvailable < booking.flight.capacity) {
+          const seatsToRestore = booking.numberOfGuests || 1;
+          if (
+            booking.flight.seatsAvailable + seatsToRestore <=
+            booking.flight.capacity
+          ) {
             await tx.flight.update({
               where: { id: booking.flightId },
-              data: { seatsAvailable: { increment: 1 } },
+              data: { seatsAvailable: { increment: seatsToRestore } },
             });
+            totalRestoredSeats += seatsToRestore;
           }
         }
       }
@@ -1229,9 +1610,12 @@ const handleDeleteAllBookings = asyncHandler(
           deletionResults.skippedReasons.withPendingPayment.length,
         skippedPaidBookings:
           deletionResults.skippedReasons.withCompletedPayment.length,
+        restoredQuantities: {
+          tourGuests: totalRestoredGuests,
+          flightSeats: totalRestoredSeats,
+          roomNote: 'Room availability is date-based',
+        },
       },
     });
   },
 );
-
-export const deleteAllBookings: RequestHandler[] = [handleDeleteAllBookings];

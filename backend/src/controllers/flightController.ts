@@ -10,7 +10,7 @@ import {
   BadRequestError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
-import { IFlightInput, IFlightResponse } from 'types/flight.types';
+import { IFlightInput, IFlight, IFlightUpdateInput } from 'types/flight.types';
 import multerUpload from '../config/multer';
 import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
 import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
@@ -22,6 +22,7 @@ import {
   flightPhotoValidation,
 } from '../validations/flight-validation';
 import logger from '../utils/logger';
+import { FlightStatus } from '../../generated/prisma';
 
 /**
  * Create a new flight
@@ -44,7 +45,6 @@ const handleCreateFlight = asyncHandler(
       stops,
       capacity,
     } = req.body;
-    const user = req.user;
 
     const parsedOriginId = parseInt(String(originId), 10);
     const parsedDestinationId = parseInt(String(destinationId), 10);
@@ -111,7 +111,7 @@ const handleCreateFlight = asyncHandler(
       },
     });
 
-    const response: IFlightResponse = {
+    const response: IFlight = {
       id: flight.id,
       flightNumber: flight.flightNumber,
       airline: flight.airline,
@@ -123,6 +123,7 @@ const handleCreateFlight = asyncHandler(
       flightClass: flight.flightClass,
       duration: flight.duration,
       stops: flight.stops,
+      status: flight.status,
       photo: flight.photo,
       seatsAvailable: flight.seatsAvailable,
       capacity: flight.capacity,
@@ -193,6 +194,7 @@ const handleGetFlight = asyncHandler(
       price: flight.price,
       flightClass: flight.flightClass,
       duration: flight.duration,
+      status: flight.status,
       stops: flight.stops,
       photo: flight.photo,
       seatsAvailable: flight.seatsAvailable,
@@ -220,7 +222,7 @@ export const getFlight: RequestHandler[] = [
  */
 const handleUpdateFlight = asyncHandler(
   async (
-    req: Request<{ id?: string }, {}, Partial<IFlightInput>>,
+    req: Request<{ id?: string }, {}, Partial<IFlightUpdateInput>>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
@@ -236,6 +238,7 @@ const handleUpdateFlight = asyncHandler(
       flightClass,
       stops,
       capacity,
+      status,
     } = req.body;
 
     const parsedId = parseInt(id!, 10);
@@ -279,13 +282,23 @@ const handleUpdateFlight = asyncHandler(
       throw new BadRequestError('Invalid stops value');
     }
 
+    // ✅ Validate status if provided
+    if (status !== undefined) {
+      const allowedStatuses: FlightStatus[] = ['DELAYED', 'CANCELLED'];
+      if (!allowedStatuses.includes(status)) {
+        throw new BadRequestError(
+          'Admin can only update status to DELAYED or CANCELLED. Other statuses are managed automatically.',
+        );
+      }
+    }
+
     let uploadedImageUrl: string | undefined;
     let oldPhoto: string | null = null;
 
     try {
       const existingFlight = await prisma.flight.findUnique({
         where: { id: parsedId },
-        include: { bookings: { select: { id: true } } },
+        include: { bookings: { select: { id: true, status: true } } },
       });
 
       if (!existingFlight) {
@@ -293,34 +306,62 @@ const handleUpdateFlight = asyncHandler(
       }
 
       oldPhoto = existingFlight.photo;
-      const now = new Date();
       const bookedSeats =
         existingFlight.capacity - existingFlight.seatsAvailable;
       const hasBookings = existingFlight.bookings.length > 0;
+      const hasActiveBookings = existingFlight.bookings.some(
+        (b) => b.status === 'CONFIRMED' || b.status === 'PENDING',
+      );
 
-      if (existingFlight.departure <= now) {
+      const nonEditableStatuses: FlightStatus[] = ['DEPARTED', 'LANDED'];
+
+      if (nonEditableStatuses.includes(existingFlight.status)) {
         throw new BadRequestError(
-          'Cannot update flight that has already departed',
+          `Cannot update flight with status ${existingFlight.status}. Flight has already departed or landed.`,
         );
       }
 
-      if (existingFlight.arrival <= now) {
-        throw new BadRequestError(
-          'Cannot update flight that has already arrived',
+      if (existingFlight.status === 'DELAYED') {
+        const allowedUpdatesForDelayed = ['status', 'departure', 'arrival'];
+        const attemptedUpdates = Object.keys(req.body).filter(
+          (key) => key !== 'flightPhoto',
         );
+        const invalidUpdates = attemptedUpdates.filter(
+          (key) => !allowedUpdatesForDelayed.includes(key),
+        );
+
+        if (invalidUpdates.length > 0) {
+          throw new BadRequestError(
+            `Flight is DELAYED. Only status and time updates are allowed. Cannot update: ${invalidUpdates.join(', ')}`,
+          );
+        }
       }
 
+      if (status === 'CANCELLED') {
+        if (hasActiveBookings) {
+          logger.warn(
+            `Cancelling flight ${existingFlight.flightNumber} with ${existingFlight.bookings.length} active booking(s). Bookings should be handled separately.`,
+          );
+          throw new BadRequestError(
+            `Cannot cancel flight with ${existingFlight.bookings.length} active booking(s). Please cancel all bookings first.`,
+          );
+        }
+      }
+
+      const now = new Date();
       const newDeparture = departure
         ? new Date(departure)
         : existingFlight.departure;
       const newArrival = arrival ? new Date(arrival) : existingFlight.arrival;
 
-      if (departure && newDeparture <= now) {
-        throw new BadRequestError('Departure time must be in the future');
-      }
-
-      if (arrival && newArrival <= now) {
-        throw new BadRequestError('Arrival time must be in the future');
+      if (
+        departure &&
+        newDeparture <= now &&
+        existingFlight.status === 'SCHEDULED'
+      ) {
+        throw new BadRequestError(
+          'Departure time must be in the future for scheduled flights',
+        );
       }
 
       if (newArrival <= newDeparture) {
@@ -332,8 +373,10 @@ const handleUpdateFlight = asyncHandler(
         (parsedOriginId !== undefined || parsedDestinationId !== undefined)
       ) {
         if (
-          parsedOriginId !== existingFlight.originId ||
-          parsedDestinationId !== existingFlight.destinationId
+          (parsedOriginId !== undefined &&
+            parsedOriginId !== existingFlight.originId) ||
+          (parsedDestinationId !== undefined &&
+            parsedDestinationId !== existingFlight.destinationId)
         ) {
           throw new BadRequestError(
             'Cannot change flight route (origin/destination) when bookings exist. Please cancel all bookings first or create a new flight.',
@@ -397,6 +440,14 @@ const handleUpdateFlight = asyncHandler(
         updateData.seatsAvailable = parsedCapacity - bookedSeats;
       }
 
+      if (status !== undefined) {
+        updateData.status = status;
+
+        logger.info(
+          `Flight ${existingFlight.flightNumber} status changed from ${existingFlight.status} to ${status}`,
+        );
+      }
+
       if (req.body.flightPhoto && typeof req.body.flightPhoto === 'string') {
         updateData.photo = req.body.flightPhoto;
         uploadedImageUrl = req.body.flightPhoto;
@@ -415,11 +466,11 @@ const handleUpdateFlight = asyncHandler(
         try {
           await cloudinaryService.deleteImage(oldPhoto);
         } catch (cleanupError) {
-          console.warn('Failed to clean up old flight photo:', cleanupError);
+          logger.warn('Failed to clean up old flight photo:', cleanupError);
         }
       }
 
-      const response: IFlightResponse = {
+      const response: IFlight = {
         id: updatedFlight.id,
         flightNumber: updatedFlight.flightNumber,
         airline: updatedFlight.airline,
@@ -430,6 +481,7 @@ const handleUpdateFlight = asyncHandler(
         price: updatedFlight.price,
         flightClass: updatedFlight.flightClass,
         duration: updatedFlight.duration,
+        status: updatedFlight.status,
         stops: updatedFlight.stops,
         photo: updatedFlight.photo,
         seatsAvailable: updatedFlight.seatsAvailable,
@@ -447,7 +499,7 @@ const handleUpdateFlight = asyncHandler(
         try {
           await cloudinaryService.deleteImage(uploadedImageUrl);
         } catch (cleanupError) {
-          console.error('Failed to clean up Cloudinary image:', cleanupError);
+          logger.error('Failed to clean up Cloudinary image:', cleanupError);
         }
       }
       next(error);
@@ -467,71 +519,6 @@ export const updateFlight: RequestHandler[] = [
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'flightPhoto'),
   handleUpdateFlight,
 ];
-
-/**
- * Delete a flight with photo cleanup
- */
-const handleDeleteFlight = asyncHandler(
-  async (
-    req: Request<{ id?: string }>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    const { id } = req.params;
-    const user = req.user;
-
-    if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
-    }
-
-    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
-      throw new UnauthorizedError('Only admins and agents can delete flights');
-    }
-
-    if (!id) {
-      throw new NotFoundError('Flight ID is required');
-    }
-
-    const flightId = parseInt(id);
-
-    const flight = await prisma.flight.findUnique({
-      where: { id: flightId },
-      include: { bookings: true },
-    });
-
-    if (!flight) {
-      throw new NotFoundError('Flight not found');
-    }
-
-    // Check if flight has bookings
-    if (flight.bookings.length > 0) {
-      throw new BadRequestError(
-        `This flight cannot be deleted because it has ${flight.bookings.length} associated booking(s). Please cancel or reassign those bookings first.`,
-      );
-    }
-
-    // Delete from database
-    await prisma.flight.delete({
-      where: { id: flightId },
-    });
-
-    // Clean up photo from Cloudinary if it exists
-    if (flight.photo) {
-      try {
-        await cloudinaryService.deleteImage(flight.photo);
-      } catch (cleanupError) {
-        console.warn(
-          'Failed to clean up flight photo from Cloudinary:',
-          cleanupError,
-        );
-      }
-    }
-
-    res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flight deleted successfully',
-    });
-  },
-);
 
 /**
  * Get all flights with advanced filtering and search
@@ -658,6 +645,7 @@ const handleGetAllFlights = asyncHandler(
       origin: flight.origin,
       destination: flight.destination,
       price: flight.price,
+      status: flight.status,
       flightClass: flight.flightClass,
       duration: flight.duration,
       stops: flight.stops,
@@ -701,10 +689,158 @@ const handleGetAllFlights = asyncHandler(
   },
 );
 
+export const getAllFlights: RequestHandler[] = [
+  ...validationMiddleware.create(getFlightsValidation),
+  handleGetAllFlights,
+];
+
+export const deleteFlight = asyncHandler(
+  async (
+    req: Request<{ id?: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    const { id } = req.params;
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized, no user provided');
+    }
+
+    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
+      throw new UnauthorizedError('Only admins and agents can delete flights');
+    }
+
+    if (!id) {
+      throw new NotFoundError('Flight ID is required');
+    }
+
+    const flightId = parseInt(id);
+
+    if (isNaN(flightId)) {
+      throw new BadRequestError('Invalid flight ID');
+    }
+
+    const flight = await prisma.flight.findUnique({
+      where: { id: flightId },
+      include: {
+        bookings: {
+          select: {
+            id: true,
+            status: true,
+            payment: {
+              select: {
+                id: true,
+                status: true,
+                amount: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!flight) {
+      throw new NotFoundError('Flight not found');
+    }
+
+    const nonDeletableStatuses: FlightStatus[] = [
+      'DEPARTED',
+      'LANDED',
+      'DELAYED',
+    ];
+
+    if (nonDeletableStatuses.includes(flight.status)) {
+      throw new BadRequestError(
+        `Cannot delete flight with status ${flight.status}. Only SCHEDULED or CANCELLED flights can be deleted.`,
+      );
+    }
+
+    const activeBookings = flight.bookings.filter(
+      (booking) =>
+        booking.status === 'CONFIRMED' || booking.status === 'PENDING',
+    );
+
+    if (activeBookings.length > 0) {
+      throw new BadRequestError(
+        `Cannot delete flight with ${activeBookings.length} active booking(s). Please cancel all bookings first.`,
+      );
+    }
+
+    const bookingsWithPayments = flight.bookings.filter(
+      (booking) =>
+        booking.payment &&
+        (booking.payment.status === 'COMPLETED' ||
+          booking.payment.status === 'PENDING'),
+    );
+
+    if (bookingsWithPayments.length > 0) {
+      const totalAmount = bookingsWithPayments.reduce(
+        (sum, booking) => sum + (booking.payment?.amount || 0),
+        0,
+      );
+
+      throw new BadRequestError(
+        `Cannot delete flight with ${bookingsWithPayments.length} booking(s) that have payment records ` +
+          `(${bookingsWithPayments.filter((b) => b.payment?.status === 'COMPLETED').length} completed, ` +
+          `${bookingsWithPayments.filter((b) => b.payment?.status === 'PENDING').length} pending). ` +
+          `Total amount: ${totalAmount.toFixed(2)}. ` +
+          `Please process refunds for all payments before deleting this flight.`,
+      );
+    }
+
+    const historicalBookings = flight.bookings.filter(
+      (booking) =>
+        (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') &&
+        (!booking.payment ||
+          booking.payment.status === 'REFUNDED' ||
+          booking.payment.status === 'FAILED'),
+    );
+
+    if (historicalBookings.length > 0) {
+      logger.warn(
+        `Deleting flight ${flight.flightNumber} (ID: ${flightId}) with ${historicalBookings.length} historical booking(s). Bookings will be orphaned.`,
+      );
+    }
+
+    await prisma.flight.delete({
+      where: { id: flightId },
+    });
+
+    if (flight.photo) {
+      try {
+        await cloudinaryService.deleteImage(flight.photo);
+        logger.info(
+          `Successfully deleted photo for flight ${flight.flightNumber}`,
+        );
+      } catch (cleanupError) {
+        logger.warn(
+          `Failed to clean up flight photo from Cloudinary for flight ${flight.flightNumber}:`,
+          cleanupError,
+        );
+      }
+    }
+
+    logger.info(
+      `Flight deleted successfully - ID: ${flightId}, Number: ${flight.flightNumber}, Status: ${flight.status}`,
+    );
+
+    res.status(HTTP_STATUS_CODES.OK).json({
+      message: 'Flight deleted successfully',
+      data: {
+        id: flight.id,
+        flightNumber: flight.flightNumber,
+        status: flight.status,
+        deletedAt: new Date().toISOString(),
+      },
+    });
+  },
+);
+
 /**
  * Delete all flights with photo cleanup
  */
-const handleDeleteAllFlights = asyncHandler(
+export const deleteAllFlights = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const user = req.user;
 
@@ -716,14 +852,12 @@ const handleDeleteAllFlights = asyncHandler(
       throw new UnauthorizedError('Only admins can delete all flights');
     }
 
-    // First check if there are any flights at all
     const flightCount = await prisma.flight.count();
 
     if (flightCount === 0) {
       throw new BadRequestError('No flights found to delete.');
     }
 
-    // Fetch all flights with their bookings
     const flights = await prisma.flight.findMany({
       include: {
         bookings: {
@@ -734,7 +868,12 @@ const handleDeleteAllFlights = asyncHandler(
       },
     });
 
-    // Categorize flights by deletion eligibility
+    const flightsWithNonDeletableStatus: Array<{
+      id: number;
+      flightNumber: string;
+      status: FlightStatus;
+    }> = [];
+
     const flightsWithActiveBookings: Array<{
       id: number;
       flightNumber: string;
@@ -758,8 +897,22 @@ const handleDeleteAllFlights = asyncHandler(
     const deletableFlights: typeof flights = [];
 
     const now = new Date();
+    const nonDeletableStatuses: FlightStatus[] = [
+      'DEPARTED',
+      'LANDED',
+      'DELAYED',
+    ];
 
     flights.forEach((flight) => {
+      if (nonDeletableStatuses.includes(flight.status)) {
+        flightsWithNonDeletableStatus.push({
+          id: flight.id,
+          flightNumber: flight.flightNumber,
+          status: flight.status,
+        });
+        return;
+      }
+
       if (flight.bookings.length === 0) {
         deletableFlights.push(flight);
         return;
@@ -816,6 +969,24 @@ const handleDeleteAllFlights = asyncHandler(
     if (deletableFlights.length === 0) {
       const errorMessages: string[] = [];
 
+      if (flightsWithNonDeletableStatus.length > 0) {
+        const statusBreakdown = flightsWithNonDeletableStatus.reduce(
+          (acc, f) => {
+            acc[f.status] = (acc[f.status] || 0) + 1;
+            return acc;
+          },
+          {} as Record<FlightStatus, number>,
+        );
+
+        const statusSummary = Object.entries(statusBreakdown)
+          .map(([status, count]) => `${count} ${status}`)
+          .join(', ');
+
+        errorMessages.push(
+          `${flightsWithNonDeletableStatus.length} flight(s) have non-deletable status (${statusSummary}).`,
+        );
+      }
+
       if (flightsWithActiveBookings.length > 0) {
         const totalActive = flightsWithActiveBookings.reduce(
           (sum, f) => sum + f.bookingCount,
@@ -854,30 +1025,30 @@ const handleDeleteAllFlights = asyncHandler(
 
       throw new BadRequestError(
         `Cannot delete any flights. ${errorMessages.join(' ')} ` +
-          `Please cancel active bookings, process refunds, and resolve payment records first.`,
+          `Only SCHEDULED or CANCELLED flights without active bookings or payment records can be deleted.`,
       );
     }
 
     const totalSkipped =
+      flightsWithNonDeletableStatus.length +
       flightsWithActiveBookings.length +
       flightsWithPaidBookings.length +
       flightsWithCompletedBookings.length;
 
     if (totalSkipped > 0) {
-      console.warn(
+      logger.warn(
         `Skipping ${totalSkipped} flight(s): ` +
+          `${flightsWithNonDeletableStatus.length} with non-deletable status, ` +
           `${flightsWithActiveBookings.length} with active bookings, ` +
           `${flightsWithPaidBookings.length} with payment records, ` +
           `${flightsWithCompletedBookings.length} with completed bookings.`,
       );
     }
 
-    // Collect photos for cleanup
     const photos = deletableFlights
       .map((flight) => flight.photo)
       .filter((photo): photo is string => Boolean(photo));
 
-    // Delete flights in a transaction for data consistency
     await prisma.$transaction(async (tx) => {
       await tx.flight.deleteMany({
         where: {
@@ -886,7 +1057,6 @@ const handleDeleteAllFlights = asyncHandler(
       });
     });
 
-    // Clean up photos from cloud storage
     const cleanupPromises = photos.map(async (photo) => {
       try {
         await cloudinaryService.deleteImage(photo);
@@ -900,6 +1070,24 @@ const handleDeleteAllFlights = asyncHandler(
     const responseMessage = [
       `Successfully deleted ${deletableFlights.length} flight(s).`,
     ];
+
+    if (flightsWithNonDeletableStatus.length > 0) {
+      const statusBreakdown = flightsWithNonDeletableStatus.reduce(
+        (acc, f) => {
+          acc[f.status] = (acc[f.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<FlightStatus, number>,
+      );
+
+      const statusSummary = Object.entries(statusBreakdown)
+        .map(([status, count]) => `${count} ${status}`)
+        .join(', ');
+
+      responseMessage.push(
+        `Skipped ${flightsWithNonDeletableStatus.length} flight(s) with non-deletable status (${statusSummary}).`,
+      );
+    }
 
     if (flightsWithActiveBookings.length > 0) {
       responseMessage.push(
@@ -924,12 +1112,20 @@ const handleDeleteAllFlights = asyncHandler(
       deleted: deletableFlights.length,
       skipped: {
         total: totalSkipped,
+        withNonDeletableStatus: flightsWithNonDeletableStatus.length,
         withActiveBookings: flightsWithActiveBookings.length,
         withPaidBookings: flightsWithPaidBookings.length,
         withCompletedBookings: flightsWithCompletedBookings.length,
       },
       deletedFlightIds: deletableFlights.map((f) => f.id),
       deletedFlightNumbers: deletableFlights.map((f) => f.flightNumber),
+      statusBreakdown: flightsWithNonDeletableStatus.reduce(
+        (acc, f) => {
+          acc[f.status] = (acc[f.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<FlightStatus, number>,
+      ),
     });
   },
 );
@@ -937,7 +1133,7 @@ const handleDeleteAllFlights = asyncHandler(
 /**
  * Get flight statistics (for admin dashboard)
  */
-const getFlightStats = asyncHandler(
+export const getFlightStats = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const user = req.user;
 
@@ -951,29 +1147,55 @@ const getFlightStats = asyncHandler(
       );
     }
 
+    const now = new Date();
+
     const [
       totalFlights,
       totalSeats,
+      totalBookedSeats,
       averagePrice,
       flightsByClass,
       flightsByAirline,
+      flightsByStatus, 
+      scheduledFlights,
+      departedFlights,
+      landedFlights,
+      delayedFlights,
+      cancelledFlights,
       upcomingFlights,
+      totalRevenue,
+      flightsWithBookings,
     ] = await Promise.all([
       prisma.flight.count(),
+
       prisma.flight.aggregate({
         _sum: {
           seatsAvailable: true,
         },
       }),
+
+      prisma.flight.aggregate({
+        _sum: {
+          capacity: true,
+        },
+      }),
+
       prisma.flight.aggregate({
         _avg: {
           price: true,
         },
       }),
+
       prisma.flight.groupBy({
         by: ['flightClass'],
         _count: true,
+        orderBy: {
+          _count: {
+            flightClass: 'desc',
+          },
+        },
       }),
+
       prisma.flight.groupBy({
         by: ['airline'],
         _count: true,
@@ -984,28 +1206,155 @@ const getFlightStats = asyncHandler(
         },
         take: 10,
       }),
+
+      prisma.flight.groupBy({
+        by: ['status'],
+        _count: true,
+        _sum: {
+          seatsAvailable: true,
+          capacity: true,
+        },
+      }),
+
+      prisma.flight.count({
+        where: { status: 'SCHEDULED' },
+      }),
+
+      prisma.flight.count({
+        where: { status: 'DEPARTED' },
+      }),
+
+      prisma.flight.count({
+        where: { status: 'LANDED' },
+      }),
+
+      prisma.flight.count({
+        where: { status: 'DELAYED' },
+      }),
+
+      prisma.flight.count({
+        where: { status: 'CANCELLED' },
+      }),
+
       prisma.flight.count({
         where: {
+          status: 'SCHEDULED',
           departure: {
-            gte: new Date(),
+            gte: now,
+          },
+        },
+      }),
+
+      prisma.booking.aggregate({
+        where: {
+          flightId: { not: null },
+          status: { in: ['CONFIRMED', 'COMPLETED'] },
+          payment: {
+            status: 'COMPLETED',
+          },
+        },
+        _sum: {
+          totalPrice: true,
+        },
+      }),
+
+      prisma.flight.count({
+        where: {
+          bookings: {
+            some: {
+              status: { in: ['PENDING', 'CONFIRMED'] },
+            },
           },
         },
       }),
     ]);
 
+    const totalCapacity = totalBookedSeats._sum.capacity || 0;
+    const totalAvailable = totalSeats._sum.seatsAvailable || 0;
+    const totalBooked = totalCapacity - totalAvailable;
+    const occupancyRate =
+      totalCapacity > 0 ? ((totalBooked / totalCapacity) * 100).toFixed(2) : '0.00';
+
+    const statusBreakdown = flightsByStatus.map((item) => {
+      const capacity = item._sum.capacity || 0;
+      const available = item._sum.seatsAvailable || 0;
+      const booked = capacity - available;
+      const rate = capacity > 0 ? ((booked / capacity) * 100).toFixed(2) : '0.00';
+
+      return {
+        status: item.status,
+        count: item._count,
+        totalCapacity: capacity,
+        seatsBooked: booked,
+        seatsAvailable: available,
+        occupancyRate: `${rate}%`,
+      };
+    });
+
     const stats = {
-      totalFlights,
-      totalSeats: totalSeats._sum.seatsAvailable || 0,
-      averagePrice: Math.round((averagePrice._avg.price || 0) * 100) / 100,
-      upcomingFlights,
-      flightsByClass: flightsByClass.map((item) => ({
+      overview: {
+        totalFlights,
+        totalCapacity,
+        totalSeatsBooked: totalBooked,
+        totalSeatsAvailable: totalAvailable,
+        occupancyRate: `${occupancyRate}%`,
+        averagePrice: Math.round((averagePrice._avg.price || 0) * 100) / 100,
+        totalRevenue: Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
+        flightsWithBookings,
+      },
+
+      byStatus: {
+        scheduled: scheduledFlights,
+        departed: departedFlights,
+        landed: landedFlights,
+        delayed: delayedFlights,
+        cancelled: cancelledFlights,
+        upcoming: upcomingFlights, 
+        detailed: statusBreakdown,
+      },
+
+      byClass: flightsByClass.map((item) => ({
         class: item.flightClass,
         count: item._count,
       })),
+
       topAirlines: flightsByAirline.map((item) => ({
         airline: item.airline,
         count: item._count,
       })),
+
+      operationalMetrics: {
+        onTimeFlights: scheduledFlights + departedFlights,
+        delayedFlights,
+        cancelledFlights,
+        completedFlights: landedFlights,
+        delayRate:
+          totalFlights > 0
+            ? ((delayedFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+        cancellationRate:
+          totalFlights > 0
+            ? ((cancelledFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+        completionRate:
+          totalFlights > 0
+            ? ((landedFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+      },
+
+      financialMetrics: {
+        totalRevenue: Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
+        averageBookingValue:
+          flightsWithBookings > 0
+            ? Math.round(
+                ((totalRevenue._sum.totalPrice || 0) / flightsWithBookings) * 100,
+              ) / 100
+            : 0,
+        revenuePerSeat:
+          totalBooked > 0
+            ? Math.round(((totalRevenue._sum.totalPrice || 0) / totalBooked) * 100) / 100
+            : 0,
+      },
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
@@ -1014,20 +1363,3 @@ const getFlightStats = asyncHandler(
     });
   },
 );
-
-export const deleteFlight: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Flight ID must be a positive integer'),
-  ...validationMiddleware.create([]),
-  handleDeleteFlight,
-];
-
-export const getAllFlights: RequestHandler[] = [
-  ...validationMiddleware.create(getFlightsValidation),
-  handleGetAllFlights,
-];
-
-export const deleteAllFlights: RequestHandler[] = [handleDeleteAllFlights];
-
-export const getFlightStatistics: RequestHandler[] = [getFlightStats];

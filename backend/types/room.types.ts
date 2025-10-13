@@ -1,7 +1,7 @@
 export interface IRoomInput {
   hotelId: number;
   roomType: string;
-  price: number;
+  pricePerNight: number;
   capacity: number;
   totalRooms: number;
   description?: string;
@@ -22,13 +22,14 @@ export interface IRoomHotel {
 export interface IRoom {
   id: number;
   roomType: string;
-  price: number;
+  pricePerNight: number;
   capacity: number;
   description: string | null;
   amenities: string[];
   photo: string | null;
   totalRooms: number;
   roomsAvailable: number;
+  roomsBooked: number;
   hotel: IRoomHotel | null;
   createdAt: Date;
   updatedAt: Date;
@@ -55,7 +56,6 @@ export interface IRoomQueryParams {
   limit?: number;
   hotelId?: number;
   roomType?: string;
-  available?: boolean;
   minPrice?: number;
   maxPrice?: number;
   minCapacity?: number;
@@ -63,4 +63,15 @@ export interface IRoomQueryParams {
   amenities?: string | string[];
   sortBy?: string | 'createdAt';
   sortOrder?: string | 'desc';
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface IRoomAvailability {
+  roomId: number;
+  totalRooms: number;
+  bookedRooms: number;
+  availableRooms: number;
+  startDate: Date;
+  endDate: Date;
 }

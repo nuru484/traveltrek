@@ -1,3 +1,5 @@
+// schema.prisma
+
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -117,10 +119,9 @@ model Room {
   hotel          Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   hotelId        Int
   roomType       String
-  price          Float
+  pricePerNight  Float    
   capacity       Int
   totalRooms     Int
-  roomsAvailable Int      @default(0)
   photo          String?
   description    String?
   amenities      String[]
@@ -130,39 +131,45 @@ model Room {
   bookings Booking[]
 
   @@index([hotelId, roomType], name: "room_hotel_type_idx")
-  @@index([price], name: "room_price_idx")
+  @@index([pricePerNight], name: "room_price_idx") 
   @@index([capacity], name: "room_capacity_idx")
-  @@index([roomsAvailable], name: "room_availability_idx")
+}
+
+enum FlightStatus {
+  SCHEDULED
+  DEPARTED
+  LANDED
+  CANCELLED
+  DELAYED
 }
 
 model Flight {
-  id             Int         @id @default(autoincrement())
-  flightNumber   String      @unique
+  id             Int          @id @default(autoincrement())
+  flightNumber   String       @unique
   airline        String
   departure      DateTime
   arrival        DateTime
-  origin         Destination @relation("FlightOrigin", fields: [originId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  origin         Destination  @relation("FlightOrigin", fields: [originId], references: [id], onDelete: Cascade)
   originId       Int
-  destination    Destination @relation("FlightDestination", fields: [destinationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  destination    Destination  @relation("FlightDestination", fields: [destinationId], references: [id], onDelete: Cascade)
   destinationId  Int
   price          Float
   photo          String?
   flightClass    String
+  status         FlightStatus @default(SCHEDULED)
   duration       Int
-  stops          Int         @default(0)
+  stops          Int          @default(0)
   capacity       Int
-  seatsAvailable Int         @default(0)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  seatsAvailable Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   bookings Booking[]
 
-  @@index([originId, destinationId], name: "flight_origin_destination_idx")
-  @@index([departure, arrival], name: "flight_departure_arrival_idx")
-  @@index([flightNumber], name: "flight_number_idx")
-  @@index([airline], name: "flight_airline_idx")
-  @@index([price], name: "flight_price_idx")
-  @@index([seatsAvailable], name: "flight_seats_available_idx")
+  @@index([originId, destinationId])
+  @@index([departure, arrival])
+  @@index([status])
+  @@index([seatsAvailable])
 }
 
 enum BookingStatus {
@@ -173,27 +180,47 @@ enum BookingStatus {
 }
 
 model Booking {
-  id          Int           @id @default(autoincrement())
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  userId      Int
-  tour        Tour?         @relation(fields: [tourId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  tourId      Int?
-  room        Room?         @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  roomId      Int?
-  flight      Flight?       @relation(fields: [flightId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  flightId    Int?
-  status      BookingStatus @default(PENDING)
+  id     Int  @id @default(autoincrement())
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId Int
+
+  tour   Tour? @relation(fields: [tourId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tourId Int?
+
+  room   Room? @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roomId Int?
+
+  flight   Flight? @relation(fields: [flightId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  flightId Int?
+
+  status BookingStatus @default(PENDING)
+
+  numberOfGuests  Int     @default(1)
+  specialRequests String?
+
+  // NEW: Room-specific fields
+  startDate          DateTime? // Check-in date for rooms
+  endDate            DateTime? // Check-out date for rooms
+  numberOfRooms      Int       @default(1) // How many rooms booked
+  numberOfNights     Int       @default(1) // Auto-calculated nights
+  
+  paymentDeadline    DateTime? // When payment must be completed
+  requiresImmediatePayment Boolean @default(false) // Flag for same-day bookings
+
   totalPrice  Float
-  bookingDate DateTime      @default(now())
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  bookingDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   payment Payment?
 
   @@unique([userId, tourId])
-  @@unique([userId, roomId])
+  @@unique([userId, roomId, startDate, endDate]) 
   @@unique([userId, flightId])
   @@index([userId, tourId, roomId, flightId], name: "booking_user_tour_hotel_room_flight_idx")
+  @@index([status])
+  @@index([paymentDeadline]) 
+  @@index([startDate, endDate]) 
 }
 
 enum PaymentStatus {
@@ -227,4 +254,5 @@ model Payment {
 
   @@index([userId], name: "payment_user_idx")
   @@index([transactionReference], name: "payment_transaction_ref_idx")
+  @@index([status]) 
 }

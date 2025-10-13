@@ -48,7 +48,6 @@ const handleCreateDestination = asyncHandler(
       );
     }
 
-    // Get photo URL from middleware processing (should be a string after Cloudinary upload)
     const photoUrl = req.body.destinationPhoto;
 
     const destination = await prisma.destination.create({
