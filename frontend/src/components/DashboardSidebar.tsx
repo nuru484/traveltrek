@@ -24,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "./ui/sidebar";
 
 // Navigation items for admins and customers
@@ -113,9 +114,19 @@ export default function DashboardSidebar() {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
 
+  // Add these hooks
+  const { isMobile, setOpenMobile } = useSidebar();
+
   const navigationItems = isAdmin
     ? adminNavigationItems
     : customerNavigationItems;
+
+  // Handler to close sidebar on mobile
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <Sidebar
@@ -123,7 +134,7 @@ export default function DashboardSidebar() {
       className="border-r border-sidebar-border/20 shadow-sm"
     >
       <SidebarHeader className="flex items-center py-5 border-b border-sidebar-border/20">
-        <SidebarMenuButton className="flex h-10  cursor-pointer items-center gap-3 text-sidebar-foreground">
+        <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground">
           <Image
             src="/logo.png"
             alt="Travel Trek Logo"
@@ -152,7 +163,11 @@ export default function DashboardSidebar() {
                       : "text-sidebar-foreground/90"
                   }`}
                 >
-                  <Link href={item.path} className="flex items-center w-full">
+                  <Link
+                    href={item.path}
+                    className="flex items-center w-full"
+                    onClick={handleLinkClick} // Add this handler
+                  >
                     <item.icon
                       className={`h-6 w-6 ${
                         isActive ? "text-sidebar-primary" : ""
