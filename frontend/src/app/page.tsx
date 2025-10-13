@@ -3,7 +3,6 @@ import PopularDestinations from "@/components/index/PopularDestinations";
 import ServicesSection from "@/components/index/ServicesSection";
 import TestimonialsSection from "@/components/index/TestimonialsSection";
 import FeaturedTours from "@/components/index/FeaturedTours";
-import NewsletterSection from "@/components/index/NewsletterSection";
 import Footer from "@/components/index/Footer";
 import Header from "@/components/index/Header";
 
@@ -17,7 +16,6 @@ const page = () => {
         <ServicesSection />
         <TestimonialsSection />
         <FeaturedTours />
-        <NewsletterSection />
         <Footer />
       </div>
     </div>

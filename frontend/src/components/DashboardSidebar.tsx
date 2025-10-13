@@ -114,14 +114,12 @@ export default function DashboardSidebar() {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
 
-  // Add these hooks
   const { isMobile, setOpenMobile } = useSidebar();
 
   const navigationItems = isAdmin
     ? adminNavigationItems
     : customerNavigationItems;
 
-  // Handler to close sidebar on mobile
   const handleLinkClick = () => {
     if (isMobile) {
       setOpenMobile(false);
