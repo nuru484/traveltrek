@@ -24,6 +24,7 @@ interface IENV {
   ADMIN_PASSWORD: string;
   ADMIN_NAME: string;
   ADMIN_PHONE: string;
+  REDIS_URL: string;
 }
 
 const ENV: IENV = {
@@ -57,6 +58,7 @@ const ENV: IENV = {
   ADMIN_PASSWORD: assertEnv(process.env.ADMIN_PASSWORD, 'ADMIN_PASSWORD'),
   ADMIN_NAME: assertEnv(process.env.ADMIN_NAME, 'ADMIN_NAME'),
   ADMIN_PHONE: assertEnv(process.env.ADMIN_PHONE, 'ADMIN_PHONE'),
+  REDIS_URL: assertEnv(process.env.REDIS_URL, 'REDIS_URL'),
 };
 
 export default ENV;
