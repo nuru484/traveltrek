@@ -3,7 +3,7 @@ export interface IHotelRoom {
   roomType: string;
   description: string | null;
   photo: string | null;
-  price: number;
+  pricePerNight: number;
 }
 
 export interface IHotelDestination {

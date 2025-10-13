@@ -52,7 +52,7 @@ export const tourApi = apiSlice.injectEndpoints({
           "Content-Type": "application/json",
         },
       }),
-      invalidatesTags: ["Tour"],
+      invalidatesTags: ["Tour", "Tours"],
     }),
 
     updateTour: builder.mutation<

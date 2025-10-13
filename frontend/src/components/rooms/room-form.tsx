@@ -35,7 +35,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 const roomFormSchema = z.object({
   hotelId: z.number().min(1, "Hotel is required"),
   roomType: z.string().min(1, "Room type is required"),
-  price: z.number().min(0, "Price must be a positive number"),
+  pricePerNight: z.number().min(0, "Price must be a positive number"),
   capacity: z.number().min(1, "Capacity must be at least 1"),
   totalRooms: z.number().min(1, "Total rooms must be at least 1"),
   description: z.string().optional().nullable(),
@@ -84,7 +84,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
     defaultValues: {
       hotelId: getDefaultHotelId(),
       roomType: room?.roomType || "",
-      price: room?.price || 0,
+      pricePerNight: room?.pricePerNight || 0,
       capacity: room?.capacity || 1,
       totalRooms: room?.totalRooms || 1,
       description: room?.description || null,
@@ -160,7 +160,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       const formData = new FormData();
       formData.append("hotelId", values.hotelId.toString());
       formData.append("roomType", values.roomType);
-      formData.append("price", values.price.toString());
+      formData.append("pricePerNight", values.pricePerNight.toString());
       formData.append("capacity", values.capacity.toString());
       formData.append("totalRooms", values.totalRooms.toString());
       if (values.description)
@@ -306,7 +306,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
               <div className="grid gap-6 md:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="price"
+                  name="pricePerNight"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Price per Night</FormLabel>

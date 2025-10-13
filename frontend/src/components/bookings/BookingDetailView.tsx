@@ -15,8 +15,15 @@ import {
   Building2,
   Bed,
   ArrowRight,
+  Users,
+  MessageSquare,
+  Clock,
+  AlertCircle,
+  Hotel,
+  Moon,
 } from "lucide-react";
 import { IBooking } from "@/types/booking.types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface BookingDetailViewProps {
   booking: IBooking;
@@ -83,11 +90,26 @@ const formatDate = (dateString: string) => {
   }).format(new Date(dateString));
 };
 
+const formatDateOnly = (dateString: string) => {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(dateString));
+};
+
+const isPaymentDeadlinePassed = (deadline: string) => {
+  return new Date(deadline) < new Date();
+};
+
 const BookingDetailView: React.FC<BookingDetailViewProps> = ({
   booking,
   userRole = "USER",
 }) => {
   const isAdmin = userRole === "ADMIN" || userRole === "MANAGER";
+  const deadlinePassed = booking.paymentDeadline
+    ? isPaymentDeadlinePassed(booking.paymentDeadline)
+    : false;
 
   return (
     <div className="space-y-6">
@@ -116,6 +138,29 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
           </div>
         </CardHeader>
       </Card>
+
+      {/* Payment Deadline Alert */}
+      {booking.paymentDeadline && booking.status === "PENDING" && (
+        <Alert
+          variant={deadlinePassed ? "destructive" : "default"}
+          className={!deadlinePassed ? "border-amber-200 bg-amber-50" : ""}
+        >
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {deadlinePassed ? (
+              <span className="font-medium">
+                Payment deadline has passed (
+                {formatDate(booking.paymentDeadline)})
+              </span>
+            ) : (
+              <span>
+                <span className="font-medium">Payment Due:</span>{" "}
+                {formatDate(booking.paymentDeadline)}
+              </span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Customer Information */}
@@ -155,225 +200,122 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
           </CardContent>
         </Card>
 
-        {/* Booking Details */}
+        {/* Booking Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {getBookingTypeIcon(booking.type)}
-              Booking Details
+              <Calendar className="h-5 w-5 text-primary" />
+              Booking Summary
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Tour Booking */}
-            {/* Tour Booking */}
-            {booking.type === "TOUR" && booking.tour && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Tour
-                  </label>
-                  <div>
-                    <p className="font-semibold text-base">
-                      {booking.tour.name}
-                    </p>
-                    {booking.tour.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {booking.tour.description}
-                      </p>
-                    )}
-                  </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Number of Guests
+                  </span>
                 </div>
+                <span className="text-sm font-semibold">
+                  {booking.numberOfGuests}{" "}
+                  {booking.numberOfGuests === 1 ? "Guest" : "Guests"}
+                </span>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Destination
-                  </label>
-                  {booking.tour.destination ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">
-                          {booking.tour.destination.name}
-                        </p>
-                      </div>
-                      <p className="text-sm text-muted-foreground ml-6">
-                        {booking.tour.destination.city &&
-                          `${booking.tour.destination.city}, `}
-                        {booking.tour.destination.country}
-                      </p>
-                      <Link
-                        href={`/dashboard/destinations/${booking.tour.destination.id}/detail`}
-                        className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
-                      >
-                        View Destination Details
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  ) : (
+              {/* Room-specific details */}
+              {booking.type === "ROOM" && booking.room && (
+                <>
+                  <Separator />
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Unknown Destination
-                      </p>
+                      <Hotel className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Number of Rooms
+                      </span>
                     </div>
-                  )}
-                </div>
+                    <span className="text-sm font-semibold">
+                      {booking.room.numberOfRooms}{" "}
+                      {booking.room.numberOfRooms === 1 ? "Room" : "Rooms"}
+                    </span>
+                  </div>
 
-                <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Number of Nights
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold">
+                      {booking.room.numberOfNights}{" "}
+                      {booking.room.numberOfNights === 1 ? "Night" : "Nights"}
+                    </span>
+                  </div>
 
-                <Link
-                  href={`/dashboard/tours/${booking.tour.id}/detail`}
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                >
-                  View Tour Details
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-            )}
+                  <Separator />
 
-            {/* Room Booking */}
-            {booking.type === "ROOM" && booking.room && (
-              <div className="space-y-3">
-                {booking.room.hotel && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Hotel
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
+                      <Calendar className="h-4 w-4" />
+                      Check-in Date
                     </label>
-                    <div>
-                      <p className="font-semibold text-base">
-                        {booking.room.hotel.name}
-                      </p>
-                      {booking.room.hotel.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {booking.room.hotel.description}
-                        </p>
+                    <p className="text-sm font-medium ml-6">
+                      {formatDateOnly(booking.room.startDate)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
+                      <Calendar className="h-4 w-4" />
+                      Check-out Date
+                    </label>
+                    <p className="text-sm font-medium ml-6">
+                      {formatDateOnly(booking.room.endDate)}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Special Requests */}
+              {booking.specialRequests && (
+                <>
+                  <Separator />
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Special Requests
+                    </label>
+                    <p className="text-sm bg-muted/50 p-3 rounded-md border">
+                      {booking.specialRequests}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Payment Deadline */}
+              {booking.paymentDeadline && (
+                <>
+                  <Separator />
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4" />
+                      Payment Deadline
+                    </label>
+                    <p
+                      className={`text-sm font-medium ml-6 ${
+                        deadlinePassed ? "text-red-600" : ""
+                      }`}
+                    >
+                      {formatDate(booking.paymentDeadline)}
+                      {deadlinePassed && (
+                        <span className="ml-2 text-xs">(Overdue)</span>
                       )}
-                      {booking.room.hotel.destination && (
-                        <div className="space-y-2 mt-2">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm font-medium">
-                              {booking.room.hotel.destination.name}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground ml-6">
-                            {booking.room.hotel.destination.city &&
-                              `${booking.room.hotel.destination.city}, `}
-                            {booking.room.hotel.destination.country}
-                          </p>
-                          <Link
-                            href={`/dashboard/destinations/${booking.room.hotel.destination.id}/detail`}
-                            className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
-                          >
-                            View Destination Details
-                            <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        </div>
-                      )}
-                    </div>
+                    </p>
                   </div>
-                )}
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Room Type
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Bed className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{booking.room.roomType}</p>
-                      {booking.room.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {booking.room.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <Link
-                  href={`/dashboard/rooms/${booking.room.id}/detail`}
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                >
-                  View Room Details
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-            )}
-
-            {/* Flight Booking */}
-            {booking.type === "FLIGHT" && booking.flight && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Flight
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Plane className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold text-base">
-                        {booking.flight.airline}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Flight {booking.flight.flightNumber}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Origin
-                      </label>
-                      <p className="font-semibold">
-                        {booking.flight.origin.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {booking.flight.origin.city &&
-                          `${booking.flight.origin.city}, `}
-                        {booking.flight.origin.country}
-                      </p>
-                    </div>
-
-                    <div className="pt-6">
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-
-                    <div className="flex-1 space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Destination
-                      </label>
-                      <p className="font-semibold">
-                        {booking.flight.destination.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {booking.flight.destination.city &&
-                          `${booking.flight.destination.city}, `}
-                        {booking.flight.destination.country}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <Link
-                  href={`/dashboard/flights/${booking.flight.id}/detail`}
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-                >
-                  View Flight Details
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-            )}
+                </>
+              )}
+            </div>
 
             <Separator />
 
@@ -391,6 +333,227 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Booking Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {getBookingTypeIcon(booking.type)}
+            {booking.type === "TOUR" && "Tour Details"}
+            {booking.type === "ROOM" && "Room Details"}
+            {booking.type === "FLIGHT" && "Flight Details"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Tour Booking */}
+          {booking.type === "TOUR" && booking.tour && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Tour
+                </label>
+                <div>
+                  <p className="font-semibold text-base">{booking.tour.name}</p>
+                  {booking.tour.description && (
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      {booking.tour.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Destination
+                </label>
+                {booking.tour.destination ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">
+                        {booking.tour.destination.name}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground ml-6">
+                      {booking.tour.destination.city &&
+                        `${booking.tour.destination.city}, `}
+                      {booking.tour.destination.country}
+                    </p>
+                    <Link
+                      href={`/dashboard/destinations/${booking.tour.destination.id}/detail`}
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
+                    >
+                      View Destination Details
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Unknown Destination
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <Link
+                href={`/dashboard/tours/${booking.tour.id}/detail`}
+                className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                View Tour Details
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+
+          {/* Room Booking */}
+          {booking.type === "ROOM" && booking.room && (
+            <div className="space-y-3">
+              {booking.room.hotel && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Hotel
+                  </label>
+                  <div>
+                    <p className="font-semibold text-base">
+                      {booking.room.hotel.name}
+                    </p>
+                    {booking.room.hotel.description && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {booking.room.hotel.description}
+                      </p>
+                    )}
+                    {booking.room.hotel.destination && (
+                      <div className="space-y-2 mt-2">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-sm font-medium">
+                            {booking.room.hotel.destination.name}
+                          </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground ml-6">
+                          {booking.room.hotel.destination.city &&
+                            `${booking.room.hotel.destination.city}, `}
+                          {booking.room.hotel.destination.country}
+                        </p>
+                        <Link
+                          href={`/dashboard/destinations/${booking.room.hotel.destination.id}/detail`}
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors ml-6"
+                        >
+                          View Destination Details
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Room Type
+                </label>
+                <div className="flex items-center gap-2">
+                  <Bed className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">{booking.room.roomType}</p>
+                    {booking.room.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {booking.room.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <Link
+                href={`/dashboard/rooms/${booking.room.id}/detail`}
+                className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                View Room Details
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+
+          {/* Flight Booking */}
+          {booking.type === "FLIGHT" && booking.flight && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Flight
+                </label>
+                <div className="flex items-center gap-2">
+                  <Plane className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-semibold text-base">
+                      {booking.flight.airline}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Flight {booking.flight.flightNumber}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Origin
+                    </label>
+                    <p className="font-semibold">
+                      {booking.flight.origin.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.flight.origin.city &&
+                        `${booking.flight.origin.city}, `}
+                      {booking.flight.origin.country}
+                    </p>
+                  </div>
+
+                  <div className="pt-6">
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Destination
+                    </label>
+                    <p className="font-semibold">
+                      {booking.flight.destination.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.flight.destination.city &&
+                        `${booking.flight.destination.city}, `}
+                      {booking.flight.destination.country}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <Link
+                href={`/dashboard/flights/${booking.flight.id}/detail`}
+                className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                View Flight Details
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Payment Information */}
       {booking.payment && (

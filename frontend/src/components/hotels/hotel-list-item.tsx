@@ -242,7 +242,10 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
                 {hotel.rooms?.length ? (
                   <div className="text-right flex-shrink-0 ml-4">
                     <p className="text-lg sm:text-xl font-bold text-primary">
-                      From ${Math.min(...hotel.rooms.map((r) => r.price || 0))}
+                      From $
+                      {Math.min(
+                        ...hotel.rooms.map((r) => r.pricePerNight || 0)
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground">per night</p>
                   </div>
@@ -395,9 +398,9 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
                               <h4 className="font-medium text-sm truncate">
                                 {room.roomType}
                               </h4>
-                              {room.price && (
+                              {room.pricePerNight && (
                                 <Badge variant="outline" className="text-xs">
-                                  ${room.price}
+                                  ${room.pricePerNight}
                                 </Badge>
                               )}
                               {roomBooked && (
@@ -428,10 +431,9 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
 
                             {/* Booking buttons based on user role and booking status */}
                             {isAdmin ? (
-                              // Admin booking - no userId passed, opens dialog for user selection
                               <BookingButton
                                 roomId={room.id}
-                                price={room.price || 100}
+                                price={room.pricePerNight || 100}
                                 variant="outline"
                                 size="sm"
                                 className="cursor-pointer"
@@ -460,7 +462,6 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
                                           : "Cancel"}
                                       </Button>
                                     ) : (
-                                      // Cancelled or Completed booking - show status
                                       <Button
                                         size="sm"
                                         variant="secondary"
@@ -476,7 +477,7 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
                                   // Not booked - show book button
                                   <BookingButton
                                     roomId={room.id}
-                                    price={room.price || 100}
+                                    price={room.pricePerNight || 100}
                                     userId={parseInt(user?.id || "0")}
                                     variant="default"
                                     size="sm"

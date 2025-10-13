@@ -42,6 +42,9 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  AlertCircle,
+  PlaneTakeoff,
+  PlaneLanding,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -66,7 +69,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Fetch user's bookings with loading states
   const {
     data: bookingsData,
     isLoading: isLoadingBookings,
@@ -75,11 +77,10 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30, // Refetch if data is older than 30 seconds
+      refetchOnMountOrArgChange: 30,
     }
   );
 
-  // Find user's booking for this flight
   const userBooking = bookingsData?.data.find(
     (booking) =>
       booking.flight?.id === flight.id &&
@@ -93,11 +94,52 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     bookingStatus !== "CANCELLED" &&
     bookingStatus !== "COMPLETED";
 
-  // Check if we're still loading booking data
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
-
-  // Check if flight is available
   const isAvailable = flight.seatsAvailable > 0;
+
+  const getFlightStatusConfig = (status: string) => {
+    switch (status) {
+      case "SCHEDULED":
+        return {
+          variant: "secondary" as const,
+          icon: Clock,
+          label: "Scheduled",
+        };
+      case "DEPARTED":
+        return {
+          variant: "default" as const,
+          icon: PlaneTakeoff,
+          label: "Departed",
+        };
+      case "LANDED":
+        return {
+          variant: "outline" as const,
+          icon: PlaneLanding,
+          label: "Landed",
+        };
+      case "CANCELLED":
+        return {
+          variant: "destructive" as const,
+          icon: XCircle,
+          label: "Cancelled",
+        };
+      case "DELAYED":
+        return {
+          variant: "secondary" as const,
+          icon: AlertCircle,
+          label: "Delayed",
+        };
+      default:
+        return {
+          variant: "secondary" as const,
+          icon: Clock,
+          label: status,
+        };
+    }
+  };
+
+  const flightStatusConfig = getFlightStatusConfig(flight.status);
+  const StatusIcon = flightStatusConfig.icon;
 
   const formatDate = (date: string | Date) => {
     return format(new Date(date), "EEEE, MMMM dd, yyyy HH:mm");
@@ -180,7 +222,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   };
 
   const getBookingButtonText = () => {
-    // Show loading state while fetching booking data
     if (isBookingDataLoading) {
       return "Loading...";
     }
@@ -205,17 +246,18 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
   const isBookingButtonDisabled = () => {
     return (
-      isBookingDataLoading || // Disable while loading booking data
+      isBookingDataLoading ||
       isBooking ||
       isCancelling ||
       (flight.seatsAvailable <= 0 && !isFlightBooked) ||
       bookingStatus === "CANCELLED" ||
-      bookingStatus === "COMPLETED"
+      bookingStatus === "COMPLETED" ||
+      flight.status === "CANCELLED" ||
+      flight.status === "LANDED"
     );
   };
 
   const handleBookingButtonClick = () => {
-    // Prevent action if still loading
     if (isBookingDataLoading) {
       return;
     }
@@ -225,7 +267,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     } else if (isBookingActive) {
       setShowCancelDialog(true);
     }
-    // Do nothing if booking is cancelled or completed
   };
 
   const truncatedFlightNumber =
@@ -331,7 +372,14 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                     >
                       {flight.flightClass}
                     </Badge>
-                    {/* Show loading skeleton or actual booking status */}
+                    {/* Flight Status Badge */}
+                    <Badge
+                      variant={flightStatusConfig.variant}
+                      className="bg-white/90 text-black"
+                    >
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {flightStatusConfig.label}
+                    </Badge>
                     {isBookingDataLoading ? (
                       <div className="h-5 w-32 bg-white/70 animate-pulse rounded-full"></div>
                     ) : (
@@ -371,7 +419,11 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{flight.flightClass}</Badge>
-                    {/* Show loading skeleton or actual booking status */}
+                    {/* Flight Status Badge */}
+                    <Badge variant={flightStatusConfig.variant}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {flightStatusConfig.label}
+                    </Badge>
                     {isBookingDataLoading ? (
                       <div className="h-5 w-32 bg-gray-200 animate-pulse rounded-full"></div>
                     ) : (
@@ -569,6 +621,19 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 Flight Schedule
               </h3>
               <div className="space-y-4">
+                {/* Flight Status */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <p className="font-medium text-foreground mb-2">
+                    Flight Status
+                  </p>
+                  <Badge
+                    variant={flightStatusConfig.variant}
+                    className="text-sm"
+                  >
+                    <StatusIcon className="h-4 w-4 mr-2" />
+                    {flightStatusConfig.label}
+                  </Badge>
+                </div>
                 <div className="bg-muted/30 rounded-lg p-4">
                   <p className="font-medium text-foreground mb-1">Departure</p>
                   <p className="text-sm text-muted-foreground">
@@ -640,10 +705,24 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                   ) : (
                     <p
                       className={`text-sm flex items-center gap-2 ${
-                        isAvailable ? "text-green-600" : "text-destructive"
+                        isAvailable &&
+                        flight.status !== "CANCELLED" &&
+                        flight.status !== "LANDED"
+                          ? "text-green-600"
+                          : "text-destructive"
                       }`}
                     >
-                      {isAvailable ? (
+                      {flight.status === "CANCELLED" ? (
+                        <>
+                          <XCircle className="h-4 w-4" />
+                          Flight cancelled
+                        </>
+                      ) : flight.status === "LANDED" ? (
+                        <>
+                          <XCircle className="h-4 w-4" />
+                          Flight has landed
+                        </>
+                      ) : isAvailable ? (
                         <>
                           <CheckCircle className="h-4 w-4" />
                           {isFlightBooked && isBookingActive
@@ -690,6 +769,16 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       >
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Loading...
+                      </Button>
+                    ) : flight.status === "CANCELLED" ? (
+                      <Button disabled className="w-full" size="lg">
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Flight Cancelled
+                      </Button>
+                    ) : flight.status === "LANDED" ? (
+                      <Button disabled className="w-full" size="lg">
+                        <PlaneLanding className="h-4 w-4 mr-2" />
+                        Flight Has Landed
                       </Button>
                     ) : !isAvailable && !isFlightBooked ? (
                       <Button disabled className="w-full" size="lg">

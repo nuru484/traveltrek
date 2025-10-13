@@ -13,6 +13,13 @@ export interface IDestinationSummary {
   country: string;
 }
 
+export type IFlightStatus =
+  | "SCHEDULED"
+  | "DEPARTED"
+  | "LANDED"
+  | "CANCELLED"
+  | "DELAYED";
+
 export interface IFlight {
   id: number;
   flightNumber: string;
@@ -22,6 +29,7 @@ export interface IFlight {
   origin: IDestinationSummary;
   destination: IDestinationSummary;
   price: number;
+  status: IFlightStatus;
   flightClass: IFlightClass;
   duration: number;
   stops: number;

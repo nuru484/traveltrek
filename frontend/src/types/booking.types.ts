@@ -1,4 +1,4 @@
-import { IDestinationSummary } from "./tour.types";
+import { IDestinationSummary } from "./flight.types";
 export interface IBookingUser {
   id: number;
   name: string;
@@ -16,6 +16,10 @@ export interface IBookingRoom {
   id: number;
   roomType: string;
   description: string | null;
+  numberOfRooms: number;
+  numberOfNights: number;
+  startDate: string;
+  endDate: string;
   hotel: {
     id: number;
     name: string;
@@ -28,6 +32,7 @@ export interface IBookingRoom {
     };
   };
 }
+
 export interface IBookingFlight {
   id: number;
   flightNumber: string;
@@ -63,6 +68,9 @@ export interface IBookingBase {
   id: number;
   userId: number;
   user: IBookingUser;
+  numberOfGuests: number;
+  specialRequests: string | null;
+  paymentDeadline: string;
   payment: IBookingPayment | null;
   status: BookingStatus;
   totalPrice: number;
@@ -71,7 +79,6 @@ export interface IBookingBase {
   updatedAt: string;
 }
 
-// Discriminated union based on `type`
 export interface ITourBooking extends IBookingBase {
   type: "TOUR";
   tour: IBookingTour;
@@ -97,7 +104,16 @@ export type IBooking = ITourBooking | IRoomBooking | IFlightBooking;
 
 export interface IBookingResponse {
   message: string;
-  data: IBooking;
+  data: IBooking & {
+    bookingDetails?: {
+      paymentDeadline: string;
+      requiresImmediatePayment: boolean;
+      calculatedPrice: number;
+      numberOfNights?: number;
+      tourStartDate?: string;
+      flightDeparture?: string;
+    };
+  };
 }
 
 export interface IBookingsPaginatedResponse {
@@ -118,6 +134,15 @@ export interface IBookingInput {
   flightId?: number | null;
   totalPrice: number;
   status?: BookingStatus;
+
+  // Room-specific fields
+  startDate?: string; // ISO date string, required for room bookings
+  endDate?: string; // ISO date string, required for room bookings
+  numberOfRooms?: number; // Optional, defaults to 1
+
+  // Common fields
+  numberOfGuests?: number; // Optional for all booking types, defaults to 1
+  specialRequests?: string | null; // Optional for all booking types
 }
 
 export type IUpdateBookingInput = Partial<IBookingInput>;

@@ -393,7 +393,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
 
                               <div className="text-right flex-shrink-0 ml-4">
                                 <p className="text-lg font-bold text-primary">
-                                  ₵{room.price.toLocaleString()}
+                                  ₵{room.pricePerNight.toLocaleString()}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   per night
@@ -417,7 +417,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                               {isAdmin ? (
                                 <BookingButton
                                   roomId={room.id}
-                                  price={room.price}
+                                  price={room.pricePerNight}
                                   variant="outline"
                                   size="sm"
                                   className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"
@@ -439,7 +439,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                   ) : (
                                     <BookingButton
                                       roomId={room.id}
-                                      price={room.price}
+                                      price={room.pricePerNight}
                                       userId={parseInt(user?.id || "0")}
                                       variant="default"
                                       size="sm"

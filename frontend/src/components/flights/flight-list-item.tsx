@@ -25,6 +25,9 @@ import {
   Bookmark,
   X,
   Loader2,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -144,6 +147,49 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     return name.substring(0, 3).toUpperCase();
   };
 
+  const getFlightStatusConfig = () => {
+    const status = flight.status ?? "SCHEDULED";
+
+    switch (status) {
+      case "SCHEDULED":
+        return {
+          variant: "secondary" as const,
+          icon: Clock,
+          label: "Scheduled",
+        };
+      case "DEPARTED":
+        return {
+          variant: "default" as const,
+          icon: Plane,
+          label: "Departed",
+        };
+      case "LANDED":
+        return {
+          variant: "default" as const,
+          icon: CheckCircle,
+          label: "Landed",
+        };
+      case "CANCELLED":
+        return {
+          variant: "destructive" as const,
+          icon: XCircle,
+          label: "Cancelled",
+        };
+      case "DELAYED":
+        return {
+          variant: "outline" as const,
+          icon: AlertCircle,
+          label: "Delayed",
+        };
+      default:
+        return {
+          variant: "secondary" as const,
+          icon: Clock,
+          label: "Scheduled",
+        };
+    }
+  };
+
   const getBookingButtonText = () => {
     if (isBookingDataLoading) {
       return "Loading...";
@@ -181,6 +227,9 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     }
   };
 
+  const flightStatusConfig = getFlightStatusConfig();
+  const FlightStatusIcon = flightStatusConfig.icon;
+
   return (
     <>
       <Card className="w-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group overflow-hidden">
@@ -215,6 +264,14 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                     </h3>
                     <Badge variant="secondary" className="text-xs">
                       {flight.flightClass}
+                    </Badge>
+                    {/* Flight Status Badge */}
+                    <Badge
+                      variant={flightStatusConfig.variant}
+                      className="text-xs flex items-center gap-1"
+                    >
+                      <FlightStatusIcon className="h-3 w-3" />
+                      {flightStatusConfig.label}
                     </Badge>
                     {/* Show loading skeleton or actual booking status */}
                     {isBookingDataLoading ? (
