@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
+import { format } from "date-fns";
 import { RootState } from "@/redux/store";
 import { useDeleteHotelMutation } from "@/redux/hotelApi";
 import { useGetAllUserBookingsQuery } from "@/redux/bookingApi";
@@ -10,6 +11,7 @@ import { IHotel } from "@/types/hotel.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -35,6 +37,10 @@ import {
   Eye,
   Bookmark,
   DoorOpen,
+  ImageOff,
+  FileText,
+  Calendar,
+  Building2,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -108,6 +114,14 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
     );
   };
 
+  const formatDate = (date: string | Date) => {
+    return format(new Date(date), "MMM dd, yyyy");
+  };
+
+  const formatDateLong = (date: string | Date) => {
+    return format(new Date(date), "EEEE, MMMM dd, yyyy 'at' h:mm a");
+  };
+
   const truncatedHotelName =
     hotel.name.length > 50 ? `${hotel.name.slice(0, 47)}...` : hotel.name;
 
@@ -115,11 +129,11 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div className="container mx-auto space-y-6">
         {/* Hero Section with Hotel Image */}
-        <Card className="overflow-hidden shadow-sm">
-          {hotel.photo && (
-            <div className="relative w-full h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96">
+        <Card className="overflow-hidden border-0 shadow-md">
+          {hotel.photo ? (
+            <div className="relative w-full h-[300px] md:h-[400px]">
               <Image
                 src={hotel.photo}
                 alt={hotel.name}
@@ -127,29 +141,29 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
               {isAdmin && (
-                <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+                <div className="absolute top-4 right-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="secondary"
-                        size="sm"
-                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        size="icon"
+                        className="bg-white/95 hover:bg-white text-black shadow-lg cursor-pointer h-9 w-9"
                         disabled={isDeleting}
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem
                         onClick={handleEdit}
                         disabled={isDeleting}
                         className="cursor-pointer"
                       >
                         <Edit className="mr-2 h-4 w-4" />
-                        Edit Hotel
+                        Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setShowDeleteDialog(true)}
@@ -157,174 +171,286 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                         className="text-destructive focus:text-destructive cursor-pointer"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Hotel
+                        Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               )}
 
-              <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/90 text-black"
-                    >
-                      {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/90 text-black"
-                    >
-                      {availableRooms} Room{availableRooms !== 1 ? "s" : ""}{" "}
-                      Available
-                    </Badge>
+              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <Badge
+                        variant="secondary"
+                        className="bg-white/95 text-black"
+                      >
+                        <Star className="h-3 w-3 mr-1" />
+                        {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
+                      </Badge>
+                      <Badge
+                        variant="secondary"
+                        className="bg-white/95 text-black"
+                      >
+                        <Bed className="h-3 w-3 mr-1" />
+                        {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
+                      </Badge>
+                    </div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                      {hotel.name}
+                    </h1>
+                    {hotel.destination && (
+                      <div className="flex items-center gap-2 text-white/90">
+                        <MapPin className="h-4 w-4" />
+                        <span className="text-base md:text-lg">
+                          {hotel.destination.city
+                            ? `${hotel.destination.city}, `
+                            : ""}
+                          {hotel.destination.country}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white line-clamp-2">
-                    {hotel.name}
-                  </h1>
-                  <p className="text-sm sm:text-base lg:text-lg text-white/90">
-                    {/* {hotel.destination?.city}, {hotel.destination?.country} */}
-                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Fallback for no image
+            <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ImageOff className="h-16 w-16 text-muted-foreground/30" />
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <Badge variant="outline">
+                        <Star className="h-3 w-3 mr-1" />
+                        {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
+                      </Badge>
+                      <Badge variant="outline">
+                        <Bed className="h-3 w-3 mr-1" />
+                        {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
+                      </Badge>
+                    </div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+                      {hotel.name}
+                    </h1>
+                    {hotel.destination && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span className="text-base md:text-lg">
+                          {hotel.destination.city
+                            ? `${hotel.destination.city}, `
+                            : ""}
+                          {hotel.destination.country}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="cursor-pointer h-9 w-9"
+                          disabled={isDeleting}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem
+                          onClick={handleEdit}
+                          disabled={isDeleting}
+                          className="cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setShowDeleteDialog(true)}
+                          disabled={isDeleting}
+                          className="text-destructive focus:text-destructive cursor-pointer"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             </div>
           )}
         </Card>
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Location Information */}
-          <Card className="border-l-4 border-l-primary">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground mb-2">Address</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {hotel.address}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Destination */}
-          {hotel.destination && (
-            <Card className="border-l-4 border-l-secondary">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-secondary-foreground mt-1 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground mb-2">
-                      Destination
+        {/* Content Section */}
+        <Card className="shadow-sm">
+          <CardContent className="p-6 md:p-8">
+            <div className="space-y-6">
+              {/* Description Section */}
+              {hotel.description && (
+                <>
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <h2 className="text-lg font-semibold text-foreground">
+                        About
+                      </h2>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {hotel.description}
                     </p>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {hotel.destination.name} | {hotel.destination?.country}
-                    </p>
+                  </div>
 
-                    {hotel.destination.description && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {hotel.destination.description}
-                      </p>
-                    )}
+                  <Separator />
+                </>
+              )}
+
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
+                      Address
+                    </p>
+                    <p className="text-base font-semibold text-foreground">
+                      {hotel.address}
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Star Rating & Contact */}
-          <Card className="border-l-4 border-l-accent">
-            <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Star className="h-5 w-5 text-accent-foreground mt-1 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground mb-1">
-                      Star Rating
+                {hotel.destination && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                    <Building2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                        Destination
+                      </p>
+                      <p className="text-base font-semibold text-foreground truncate">
+                        {hotel.destination.name}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <Star className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
+                      Rating
                     </p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <p className="text-base font-semibold text-foreground">
                       {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
                     </p>
                   </div>
                 </div>
 
                 {hotel.phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="h-4 w-4 text-muted-foreground mt-1 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground text-sm">
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                    <Phone className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
                         Contact
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-base font-semibold text-foreground truncate">
                         {hotel.phone}
                       </p>
                     </div>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Description & Amenities */}
-          <Card className="border-l-4 border-l-muted sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start gap-3">
-                <Home className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  {hotel.description && (
-                    <div className="mb-4">
-                      <p className="font-semibold text-foreground mb-2">
-                        Description
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <Bed className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
+                      Available Rooms
+                    </p>
+                    <p className="text-base font-semibold text-foreground">
+                      {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                {hotel.createdAt && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                    <Calendar className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                        Added
                       </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                        {hotel.description}
+                      <p className="text-base font-semibold text-foreground truncate">
+                        {formatDate(hotel.createdAt)}
                       </p>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
 
+              {/* Amenities Section */}
+              {hotel.amenities && hotel.amenities.length > 0 && (
+                <>
+                  <Separator />
                   <div>
-                    <p className="font-semibold text-foreground mb-2">
-                      Amenities
-                    </p>
-                    {hotel.amenities.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {hotel.amenities.slice(0, 3).map((amenity, index) => (
-                          <Badge
-                            key={index}
-                            variant="outline"
-                            className="text-xs"
-                          >
-                            {amenity}
-                          </Badge>
-                        ))}
-                        {hotel.amenities.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{hotel.amenities.length - 3} more
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No amenities listed
-                      </p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Home className="h-5 w-5 text-primary" />
+                      <h2 className="text-lg font-semibold text-foreground">
+                        Amenities
+                      </h2>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {hotel.amenities.map((amenity, index) => (
+                        <Badge
+                          key={index}
+                          variant="outline"
+                          className="text-sm py-1 px-3"
+                        >
+                          {amenity}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Metadata Footer */}
+              {hotel.createdAt && (
+                <div className="pt-4 border-t">
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium">Created:</span>
+                      <span>{formatDateLong(hotel.createdAt)}</span>
+                    </div>
+                    {hotel.updatedAt && hotel.createdAt !== hotel.updatedAt && (
+                      <>
+                        <span>•</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">Last updated:</span>
+                          <span>{formatDateLong(hotel.updatedAt)}</span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Available Rooms Section */}
-        <Card>
-          <CardContent className="p-4 sm:p-6">
+        <Card className="shadow-sm">
+          <CardContent className="p-6 md:p-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
-                <Bed className="h-5 w-5" />
-                Available Rooms ({availableRooms})
-              </h3>
+              <div className="flex items-center gap-2">
+                <Bed className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">
+                  Available Rooms ({availableRooms})
+                </h2>
+              </div>
               {isAdmin && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -458,7 +584,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 sm:py-12">
+              <div className="text-center py-12">
                 <Bed className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">
                   No rooms currently available
@@ -484,7 +610,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
           title="Delete Hotel"
-          description={`Are you sure you want to delete hotel "${truncatedHotelName}"? This action cannot be undone.`}
+          description={`Are you sure you want to delete "${truncatedHotelName}"? This action cannot be undone.`}
           onConfirm={handleDelete}
           confirmText="Delete"
           isDestructive
