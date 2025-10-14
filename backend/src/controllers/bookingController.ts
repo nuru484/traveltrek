@@ -8,6 +8,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   BadRequestError,
+  CustomError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
 import { IBookingInput, IBooking, IBookingRoom } from 'types/booking.types';
@@ -158,7 +159,9 @@ const formatBookingResponse = (booking: any): IBooking => {
     };
   }
 
-  throw new Error('Booking has no associated item (tour, room, or flight)');
+  throw new BadRequestError(
+    'Booking has no associated item (tour, room, or flight)',
+  );
 };
 
 const handleCreateBooking = asyncHandler(
@@ -1396,10 +1399,20 @@ export const getAllBookings: RequestHandler[] = [
  */
 export const deleteAllBookings = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized access');
+    }
+
+    if (user.role !== 'ADMIN') {
+      throw new UnauthorizedError('Admin privileges required');
+    }
+
     const bookingCount = await prisma.booking.count();
 
     if (bookingCount === 0) {
-      throw new BadRequestError('No bookings found to delete.');
+      throw new BadRequestError('No bookings to delete');
     }
 
     const bookings = await prisma.booking.findMany({
@@ -1411,22 +1424,38 @@ export const deleteAllBookings = asyncHandler(
       },
     });
 
-    const deletionResults = {
-      deletable: [] as typeof bookings,
-      skippedReasons: {
-        activeBookings: [] as number[],
-        completedBookings: [] as number[],
-        withPendingPayment: [] as number[],
-        withCompletedPayment: [] as number[],
-        futureBookings: [] as number[],
-      },
-    };
+    // Validation arrays
+    const completedBookings: number[] = [];
+    const confirmedBookings: number[] = [];
+    const bookingsWithCompletedPayment: number[] = [];
+    const bookingsWithPendingPayment: number[] = [];
+    const futureActiveBookings: number[] = [];
 
     const now = new Date();
 
+    // Check each booking for blocking conditions
     bookings.forEach((booking) => {
-      let canDelete = true;
+      // Check for completed bookings
+      if (booking.status === 'COMPLETED') {
+        completedBookings.push(booking.id);
+      }
 
+      // Check for confirmed bookings
+      if (booking.status === 'CONFIRMED') {
+        confirmedBookings.push(booking.id);
+      }
+
+      // Check for bookings with completed payments
+      if (booking.payment && booking.payment.status === 'COMPLETED') {
+        bookingsWithCompletedPayment.push(booking.id);
+      }
+
+      // Check for bookings with pending payments
+      if (booking.payment && booking.payment.status === 'PENDING') {
+        bookingsWithPendingPayment.push(booking.id);
+      }
+
+      // Check for future active bookings (PENDING or CONFIRMED with future dates)
       if (['PENDING', 'CONFIRMED'].includes(booking.status)) {
         let isFutureBooking = false;
 
@@ -1442,86 +1471,60 @@ export const deleteAllBookings = asyncHandler(
           isFutureBooking = true;
         }
 
-        if (booking.status === 'CONFIRMED' && isFutureBooking) {
-          deletionResults.skippedReasons.futureBookings.push(booking.id);
-          canDelete = false;
-        } else {
-          deletionResults.skippedReasons.activeBookings.push(booking.id);
-          canDelete = false;
+        if (isFutureBooking) {
+          futureActiveBookings.push(booking.id);
         }
-      }
-
-      if (booking.status === 'COMPLETED') {
-        deletionResults.skippedReasons.completedBookings.push(booking.id);
-        canDelete = false;
-      }
-
-      if (booking.payment) {
-        if (booking.payment.status === 'PENDING') {
-          deletionResults.skippedReasons.withPendingPayment.push(booking.id);
-          canDelete = false;
-        } else if (booking.payment.status === 'COMPLETED') {
-          deletionResults.skippedReasons.withCompletedPayment.push(booking.id);
-          canDelete = false;
-        }
-      }
-
-      if (canDelete) {
-        deletionResults.deletable.push(booking);
       }
     });
 
-    const totalSkipped =
-      deletionResults.skippedReasons.activeBookings.length +
-      deletionResults.skippedReasons.completedBookings.length +
-      deletionResults.skippedReasons.withPendingPayment.length +
-      deletionResults.skippedReasons.withCompletedPayment.length +
-      deletionResults.skippedReasons.futureBookings.length;
+    // Build error message for blocking conditions
+    const blockingIssues: string[] = [];
 
-    if (deletionResults.deletable.length === 0) {
-      const issues: string[] = [];
-
-      if (deletionResults.skippedReasons.activeBookings.length > 0) {
-        issues.push('active bookings');
-      }
-
-      if (deletionResults.skippedReasons.futureBookings.length > 0) {
-        issues.push('confirmed future bookings');
-      }
-
-      if (deletionResults.skippedReasons.completedBookings.length > 0) {
-        issues.push('completed bookings');
-      }
-
-      if (deletionResults.skippedReasons.withPendingPayment.length > 0) {
-        issues.push('pending payments');
-      }
-
-      if (deletionResults.skippedReasons.withCompletedPayment.length > 0) {
-        issues.push('completed payments');
-      }
-
-      throw new BadRequestError(
-        `Cannot delete bookings with ${issues.join(', ')}. Please cancel or refund these first.`,
+    if (completedBookings.length > 0) {
+      blockingIssues.push(
+        `${completedBookings.length} completed booking${completedBookings.length > 1 ? 's' : ''}`,
       );
     }
 
-    if (totalSkipped > 0) {
-      logger.warn(
-        `Skipping ${totalSkipped} booking(s): ` +
-          `${deletionResults.skippedReasons.activeBookings.length} active, ` +
-          `${deletionResults.skippedReasons.futureBookings.length} future confirmed, ` +
-          `${deletionResults.skippedReasons.completedBookings.length} completed, ` +
-          `${deletionResults.skippedReasons.withPendingPayment.length} with pending payments, ` +
-          `${deletionResults.skippedReasons.withCompletedPayment.length} with completed payments.`,
+    if (confirmedBookings.length > 0) {
+      blockingIssues.push(
+        `${confirmedBookings.length} confirmed booking${confirmedBookings.length > 1 ? 's' : ''}`,
       );
     }
 
+    if (bookingsWithCompletedPayment.length > 0) {
+      blockingIssues.push(
+        `${bookingsWithCompletedPayment.length} paid booking${bookingsWithCompletedPayment.length > 1 ? 's' : ''}`,
+      );
+    }
+
+    if (bookingsWithPendingPayment.length > 0) {
+      blockingIssues.push(
+        `${bookingsWithPendingPayment.length} booking${bookingsWithPendingPayment.length > 1 ? 's' : ''} with pending payment${bookingsWithPendingPayment.length > 1 ? 's' : ''}`,
+      );
+    }
+
+    if (futureActiveBookings.length > 0) {
+      blockingIssues.push(
+        `${futureActiveBookings.length} future active booking${futureActiveBookings.length > 1 ? 's' : ''}`,
+      );
+    }
+
+    // If any blocking issues exist, throw error
+    if (blockingIssues.length > 0) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        `Cannot delete bookings: ${blockingIssues.join(', ')} must be cancelled or refunded first`,
+      );
+    }
+
+    // Calculate restoration quantities before deletion
     let totalRestoredGuests = 0;
     let totalRestoredSeats = 0;
 
+    // All bookings can be deleted - proceed with transaction
     await prisma.$transaction(async (tx) => {
-      for (const booking of deletionResults.deletable) {
+      for (const booking of bookings) {
         // Restore tour guests
         if (booking.tourId && booking.tour) {
           const guestsToRestore = booking.numberOfGuests || 1;
@@ -1550,71 +1553,16 @@ export const deleteAllBookings = asyncHandler(
         }
       }
 
-      await tx.booking.deleteMany({
-        where: {
-          id: { in: deletionResults.deletable.map((b) => b.id) },
-        },
-      });
+      // Delete all bookings
+      await tx.booking.deleteMany({});
     });
 
-    let message = `Deleted ${deletionResults.deletable.length} booking(s) successfully`;
-
-    if (totalSkipped > 0) {
-      const skippedReasons: string[] = [];
-
-      if (deletionResults.skippedReasons.activeBookings.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.activeBookings.length} active`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.futureBookings.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.futureBookings.length} future confirmed`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.completedBookings.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.completedBookings.length} completed`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.withPendingPayment.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.withPendingPayment.length} pending payment`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.withCompletedPayment.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.withCompletedPayment.length} paid`,
-        );
-      }
-
-      message += `. Skipped: ${skippedReasons.join(', ')}`;
-    }
-
     res.status(HTTP_STATUS_CODES.OK).json({
-      message,
-      deleted: deletionResults.deletable.length,
-      skipped: totalSkipped,
-      details: {
-        deletedIds: deletionResults.deletable.map((b) => b.id),
-        skippedActive: deletionResults.skippedReasons.activeBookings.length,
-        skippedFutureConfirmed:
-          deletionResults.skippedReasons.futureBookings.length,
-        skippedCompleted:
-          deletionResults.skippedReasons.completedBookings.length,
-        skippedPendingPayment:
-          deletionResults.skippedReasons.withPendingPayment.length,
-        skippedPaidBookings:
-          deletionResults.skippedReasons.withCompletedPayment.length,
-        restoredQuantities: {
-          tourGuests: totalRestoredGuests,
-          flightSeats: totalRestoredSeats,
-          roomNote: 'Room availability is date-based',
-        },
+      message: `Successfully deleted ${bookings.length} booking${bookings.length > 1 ? 's' : ''}`,
+      data: {
+        deletedCount: bookings.length,
+        restoredGuests: totalRestoredGuests,
+        restoredSeats: totalRestoredSeats,
       },
     });
   },

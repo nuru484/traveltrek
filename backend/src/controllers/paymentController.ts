@@ -59,7 +59,7 @@ export const createPayment = asyncHandler(
     const user = req.user;
 
     if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
+      throw new UnauthorizedError('Unauthorized access');
     }
 
     // Validate booking with updated relations
@@ -79,6 +79,7 @@ export const createPayment = asyncHandler(
             destination: true,
           },
         },
+        payment: true, // Include existing payment
       },
     });
 
@@ -91,9 +92,21 @@ export const createPayment = asyncHandler(
       throw new UnauthorizedError('You can only pay for your own bookings');
     }
 
-    // Only PENDING bookings can be paid for
+    // Check booking status - only PENDING bookings can be paid for
+    if (booking.status === 'CANCELLED') {
+      throw new BadRequestError('Cannot pay for cancelled booking');
+    }
+
+    if (booking.status === 'COMPLETED') {
+      throw new BadRequestError('Booking already completed');
+    }
+
+    if (booking.status === 'CONFIRMED') {
+      throw new BadRequestError('Booking already paid for');
+    }
+
     if (booking.status !== 'PENDING') {
-      throw new Error('Only PENDING bookings can be paid for');
+      throw new BadRequestError('Payment not available for this booking');
     }
 
     // Validate payment method
@@ -102,7 +115,56 @@ export const createPayment = asyncHandler(
         paymentMethod,
       )
     ) {
-      throw new Error('Invalid payment method');
+      throw new BadRequestError('Invalid payment method');
+    }
+
+    // Check if payment already exists for this booking
+    if (booking.payment) {
+      if (booking.payment.status === 'COMPLETED') {
+        throw new BadRequestError('Payment already completed');
+      }
+
+      if (booking.payment.status === 'PENDING') {
+        // Re-initialize Paystack for existing pending payment
+        const paystackResponse = await axios.post(
+          `${PAYSTACK_API_BASE_URL}/transaction/initialize`,
+          {
+            email: booking.user.email,
+            amount: booking.totalPrice * 100,
+            currency: 'GHS',
+            reference: booking.payment.transactionReference,
+            channels: [getPaystackChannel(paymentMethod)],
+            callback_url:
+              process.env.PAYSTACK_CALLBACK_URL ||
+              'http://localhost:3000/dashboard/payments/callback',
+            metadata: { bookingId },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+
+        const { authorization_url } = paystackResponse.data.data;
+
+        res.status(HTTP_STATUS_CODES.OK).json({
+          message: 'Payment session resumed',
+          data: {
+            authorization_url,
+            paymentId: booking.payment.id,
+            transactionReference: booking.payment.transactionReference!,
+          },
+        });
+        return;
+      }
+
+      if (booking.payment.status === 'FAILED') {
+        throw new BadRequestError(
+          'Previous payment failed. Please contact support',
+        );
+      }
     }
 
     // Initialize Paystack transaction
@@ -128,26 +190,6 @@ export const createPayment = asyncHandler(
     );
 
     const { authorization_url, reference } = paystackResponse.data.data;
-
-    // Check if payment already exists for this booking
-    const existingPayment = await prisma.payment.findFirst({
-      where: { bookingId: bookingId },
-    });
-
-    if (existingPayment && existingPayment.status === 'PENDING') {
-      // Return the existing pending payment
-      res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Payment already initialized',
-        data: {
-          authorization_url,
-          paymentId: existingPayment.id,
-          transactionReference: existingPayment.transactionReference!,
-        },
-      });
-      return;
-    } else if (existingPayment) {
-      throw new Error('A payment already exists for this booking');
-    }
 
     // Create payment record in PENDING state
     const payment = await prisma.payment.create({
