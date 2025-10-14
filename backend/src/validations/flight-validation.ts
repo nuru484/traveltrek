@@ -2,6 +2,7 @@
 import { validator } from './validation-factory';
 import { ValidationChain } from 'express-validator';
 import prisma from '../config/prismaClient';
+import { FlightStatus } from '../../generated/prisma';
 
 export const createFlightValidation: ValidationChain[] = [
   validator.string('flightNumber', {
@@ -412,4 +413,18 @@ export const flightPhotoValidation: ValidationChain[] = [
     'Flight photo size must not exceed 5MB',
     { required: false },
   ),
+];
+
+export const updateFlightStatusValidation: ValidationChain[] = [
+  validator.enum('status', Object.values(FlightStatus), {
+    required: true,
+  }),
+
+  validator.date('departure', {
+    required: false,
+  }),
+
+  validator.date('arrival', {
+    required: false,
+  }),
 ];

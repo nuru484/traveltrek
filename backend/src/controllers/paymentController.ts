@@ -874,9 +874,6 @@ export const deletePayment = asyncHandler(
   },
 );
 
-/**
- * Delete all payments (with optional filters)
- */
 export const deleteAllPayments = asyncHandler(
   async (
     req: Request<{}, IDeleteAllPaymentsResponse>,
@@ -886,19 +883,17 @@ export const deleteAllPayments = asyncHandler(
     const user = req.user;
 
     if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
+      throw new UnauthorizedError('Unauthorized access');
     }
 
     if (user.role !== 'ADMIN') {
-      throw new UnauthorizedError(
-        'Only administrators can delete all payments',
-      );
+      throw new UnauthorizedError('Admin privileges required');
     }
 
     const paymentCount = await prisma.payment.count();
 
     if (paymentCount === 0) {
-      throw new BadRequestError('No payments found to delete.');
+      throw new BadRequestError('No payments to delete');
     }
 
     const payments = await prisma.payment.findMany({
@@ -910,10 +905,9 @@ export const deleteAllPayments = asyncHandler(
     const completedPayments = payments.filter((p) => p.status === 'COMPLETED');
 
     if (completedPayments.length > 0) {
-      const completedIds = completedPayments.map((p) => p.id).join(', ');
       throw new CustomError(
         HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete ${completedPayments.length} completed payment(s) with ID(s): ${completedIds}. Completed payments cannot be deleted. Please refund them instead.`,
+        `Cannot delete payments: ${completedPayments.length} completed payment${completedPayments.length > 1 ? 's' : ''} must be refunded first`,
       );
     }
 
@@ -933,10 +927,10 @@ export const deleteAllPayments = asyncHandler(
     });
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${payments.length} payment(s)`,
+      message: `Successfully deleted ${payments.length} payment${payments.length > 1 ? 's' : ''}`,
       data: {
         deletedCount: payments.length,
-        bookingsAffected: bookingIds,
+        bookingsAffected: bookingIds.length,
       },
     });
   },

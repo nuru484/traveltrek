@@ -20,6 +20,7 @@ import {
   updateFlightValidation,
   getFlightsValidation,
   flightPhotoValidation,
+  updateFlightStatusValidation,
 } from '../validations/flight-validation';
 import logger from '../utils/logger';
 import { FlightStatus } from '../../generated/prisma';
@@ -1156,7 +1157,7 @@ export const getFlightStats = asyncHandler(
       averagePrice,
       flightsByClass,
       flightsByAirline,
-      flightsByStatus, 
+      flightsByStatus,
       scheduledFlights,
       departedFlights,
       landedFlights,
@@ -1273,13 +1274,16 @@ export const getFlightStats = asyncHandler(
     const totalAvailable = totalSeats._sum.seatsAvailable || 0;
     const totalBooked = totalCapacity - totalAvailable;
     const occupancyRate =
-      totalCapacity > 0 ? ((totalBooked / totalCapacity) * 100).toFixed(2) : '0.00';
+      totalCapacity > 0
+        ? ((totalBooked / totalCapacity) * 100).toFixed(2)
+        : '0.00';
 
     const statusBreakdown = flightsByStatus.map((item) => {
       const capacity = item._sum.capacity || 0;
       const available = item._sum.seatsAvailable || 0;
       const booked = capacity - available;
-      const rate = capacity > 0 ? ((booked / capacity) * 100).toFixed(2) : '0.00';
+      const rate =
+        capacity > 0 ? ((booked / capacity) * 100).toFixed(2) : '0.00';
 
       return {
         status: item.status,
@@ -1299,7 +1303,8 @@ export const getFlightStats = asyncHandler(
         totalSeatsAvailable: totalAvailable,
         occupancyRate: `${occupancyRate}%`,
         averagePrice: Math.round((averagePrice._avg.price || 0) * 100) / 100,
-        totalRevenue: Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
+        totalRevenue:
+          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
         flightsWithBookings,
       },
 
@@ -1309,7 +1314,7 @@ export const getFlightStats = asyncHandler(
         landed: landedFlights,
         delayed: delayedFlights,
         cancelled: cancelledFlights,
-        upcoming: upcomingFlights, 
+        upcoming: upcomingFlights,
         detailed: statusBreakdown,
       },
 
@@ -1343,16 +1348,20 @@ export const getFlightStats = asyncHandler(
       },
 
       financialMetrics: {
-        totalRevenue: Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
+        totalRevenue:
+          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
         averageBookingValue:
           flightsWithBookings > 0
             ? Math.round(
-                ((totalRevenue._sum.totalPrice || 0) / flightsWithBookings) * 100,
+                ((totalRevenue._sum.totalPrice || 0) / flightsWithBookings) *
+                  100,
               ) / 100
             : 0,
         revenuePerSeat:
           totalBooked > 0
-            ? Math.round(((totalRevenue._sum.totalPrice || 0) / totalBooked) * 100) / 100
+            ? Math.round(
+                ((totalRevenue._sum.totalPrice || 0) / totalBooked) * 100,
+              ) / 100
             : 0,
       },
     };
@@ -1363,3 +1372,311 @@ export const getFlightStats = asyncHandler(
     });
   },
 );
+
+/**
+ * Update flight status with optional time adjustments for delayed flights
+ */
+const handleUpdateFlightStatus = asyncHandler(
+  async (
+    req: Request<
+      { id?: string },
+      {},
+      { status: FlightStatus; departure?: string; arrival?: string }
+    >,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    const { id } = req.params;
+    const { status, departure, arrival } = req.body;
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized, no user provided');
+    }
+
+    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
+      throw new UnauthorizedError(
+        'Only admins and agents can update flight status',
+      );
+    }
+
+    const parsedId = parseInt(id!, 10);
+
+    if (isNaN(parsedId)) {
+      throw new BadRequestError('Invalid flight ID');
+    }
+
+    const existingFlight = await prisma.flight.findUnique({
+      where: { id: parsedId },
+      include: {
+        bookings: {
+          include: {
+            payment: true,
+          },
+        },
+      },
+    });
+
+    if (!existingFlight) {
+      throw new NotFoundError('Flight not found');
+    }
+
+    const currentStatus = existingFlight.status;
+    const newStatus = status;
+
+    if (newStatus === currentStatus) {
+      throw new BadRequestError('New status is the same as current status');
+    }
+
+    const now = new Date();
+    const originalDeparture = new Date(existingFlight.departure);
+    const originalArrival = new Date(existingFlight.arrival);
+
+    let isValidTransition = false;
+    let setDepartureToNow = false;
+    let setArrivalToNow = false;
+
+    if (currentStatus === 'SCHEDULED') {
+      if (newStatus === 'DEPARTED') {
+        if (originalDeparture > now) {
+          throw new BadRequestError(
+            `Cannot mark flight as DEPARTED. The scheduled departure time is ${originalDeparture} which is still in the future.`,
+          );
+        }
+        isValidTransition = true;
+        setDepartureToNow = true;
+      } else if (newStatus === 'DELAYED') {
+        isValidTransition = true;
+      } else if (newStatus === 'CANCELLED') {
+        isValidTransition = true;
+      }
+    } else if (currentStatus === 'DELAYED') {
+      if (newStatus === 'DEPARTED') {
+        if (originalDeparture > now) {
+          throw new BadRequestError(
+            `Cannot mark flight as DEPARTED. The delayed departure time is ${originalDeparture} which is still in the future.`,
+          );
+        }
+        isValidTransition = true;
+        setDepartureToNow = true;
+      } else if (newStatus === 'CANCELLED') {
+        isValidTransition = true;
+      } else if (newStatus === 'SCHEDULED') {
+        isValidTransition = true;
+      }
+    } else if (currentStatus === 'DEPARTED') {
+      if (newStatus === 'LANDED') {
+        if (originalArrival > now) {
+          throw new BadRequestError(
+            `Cannot mark flight as LANDED. The scheduled arrival time is ${originalArrival} which is still in the future.`,
+          );
+        }
+        isValidTransition = true;
+        setArrivalToNow = true;
+      }
+    } else if (currentStatus === 'CANCELLED') {
+      if (newStatus === 'SCHEDULED') {
+        if (originalDeparture < now) {
+          throw new BadRequestError(
+            `Cannot reschedule cancelled flight. The original departure time of ${originalDeparture} has already passed. Please create a new flight instead.`,
+          );
+        }
+        isValidTransition = true;
+      }
+    } else if (currentStatus === 'LANDED') {
+      throw new BadRequestError(
+        'Cannot change status of a flight that has already landed.',
+      );
+    }
+
+    if (!isValidTransition) {
+      throw new BadRequestError(
+        `Invalid status transition from ${currentStatus} to ${newStatus}. Please follow proper flight status workflow.`,
+      );
+    }
+
+    if (newStatus === 'CANCELLED') {
+      const hasCompletedPayments = existingFlight.bookings.some(
+        (b) => b.payment?.status === 'COMPLETED',
+      );
+
+      if (hasCompletedPayments) {
+        throw new BadRequestError(
+          'Cannot cancel flight with completed payments. Please process refunds first.',
+        );
+      }
+
+      const hasConfirmedBookings = existingFlight.bookings.some(
+        (b) => b.status === 'CONFIRMED',
+      );
+
+      if (hasConfirmedBookings) {
+        throw new BadRequestError(
+          'Cannot cancel flight with confirmed bookings. Please cancel all confirmed bookings first.',
+        );
+      }
+
+      const hasAnyBookings = existingFlight.bookings.length > 0;
+
+      if (hasAnyBookings) {
+        throw new BadRequestError(
+          'Cannot cancel flight with existing bookings. Please cancel all bookings first.',
+        );
+      }
+    }
+
+    if (newStatus !== 'DELAYED' && (departure || arrival)) {
+      throw new BadRequestError(
+        'Time updates are only allowed when setting status to DELAYED.',
+      );
+    }
+
+    let newDeparture = existingFlight.departure;
+    let newArrival = existingFlight.arrival;
+    let calculatedDuration = existingFlight.duration;
+
+    if (newStatus === 'DELAYED') {
+      if (!departure || !arrival) {
+        throw new BadRequestError(
+          'For DELAYED status, both updated departure and arrival times are required.',
+        );
+      }
+
+      newDeparture = new Date(departure);
+      newArrival = new Date(arrival);
+
+      if (isNaN(newDeparture.getTime()) || isNaN(newArrival.getTime())) {
+        throw new BadRequestError(
+          'Invalid date format for departure or arrival time.',
+        );
+      }
+
+      if (newDeparture <= now) {
+        throw new BadRequestError(
+          'Delayed departure time must be in the future.',
+        );
+      }
+
+      if (newArrival <= newDeparture) {
+        throw new BadRequestError('Arrival time must be after departure time.');
+      }
+
+      if (newDeparture <= originalDeparture) {
+        throw new BadRequestError(
+          'Delayed departure time must be later than the original scheduled departure.',
+        );
+      }
+
+      calculatedDuration = Math.round(
+        (newArrival.getTime() - newDeparture.getTime()) / (1000 * 60),
+      );
+
+      if (calculatedDuration < 10) {
+        throw new BadRequestError(
+          'Flight duration cannot be less than 10 minutes.',
+        );
+      }
+
+      if (calculatedDuration > 1440) {
+        throw new BadRequestError('Flight duration cannot exceed 24 hours.');
+      }
+    } else {
+      if (setDepartureToNow) {
+        newDeparture = now;
+      }
+      if (setArrivalToNow) {
+        newArrival = now;
+      }
+
+      if (setDepartureToNow || setArrivalToNow) {
+        if (newArrival <= newDeparture) {
+          throw new BadRequestError(
+            'Arrival time must be after departure time.',
+          );
+        }
+
+        calculatedDuration = Math.round(
+          (newArrival.getTime() - newDeparture.getTime()) / (1000 * 60),
+        );
+      }
+    }
+
+    const updateData: any = {
+      status: newStatus,
+    };
+
+    if (newDeparture.getTime() !== existingFlight.departure.getTime()) {
+      updateData.departure = newDeparture;
+    }
+    if (newArrival.getTime() !== existingFlight.arrival.getTime()) {
+      updateData.arrival = newArrival;
+    }
+    if (calculatedDuration !== existingFlight.duration) {
+      updateData.duration = calculatedDuration;
+    }
+
+    const updatedFlight = await prisma.flight.update({
+      where: { id: parsedId },
+      data: updateData,
+      include: {
+        origin: true,
+        destination: true,
+      },
+    });
+
+    logger.info(
+      `Flight ${existingFlight.flightNumber} status changed from ${currentStatus} to ${newStatus} by ${user.role} user ${user.id}`,
+    );
+
+    if (newStatus === 'CANCELLED') {
+      await prisma.booking.updateMany({
+        where: {
+          flightId: parsedId,
+          status: {
+            in: ['PENDING', 'CONFIRMED'],
+          },
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      logger.info(
+        `Auto-cancelled all active bookings for flight ${existingFlight.flightNumber}`,
+      );
+    }
+
+    const response: IFlight = {
+      id: updatedFlight.id,
+      flightNumber: updatedFlight.flightNumber,
+      airline: updatedFlight.airline,
+      departure: updatedFlight.departure,
+      arrival: updatedFlight.arrival,
+      origin: updatedFlight.origin,
+      destination: updatedFlight.destination,
+      price: updatedFlight.price,
+      flightClass: updatedFlight.flightClass,
+      duration: updatedFlight.duration,
+      status: updatedFlight.status,
+      stops: updatedFlight.stops,
+      photo: updatedFlight.photo,
+      seatsAvailable: updatedFlight.seatsAvailable,
+      capacity: updatedFlight.capacity,
+      createdAt: updatedFlight.createdAt,
+      updatedAt: updatedFlight.updatedAt,
+    };
+
+    res.status(HTTP_STATUS_CODES.OK).json({
+      message: 'Flight status updated successfully',
+      data: response,
+    });
+  },
+);
+
+export const updateFlightStatus: RequestHandler[] = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Flight ID must be a positive integer'),
+  ...validationMiddleware.create(updateFlightStatusValidation),
+  handleUpdateFlightStatus,
+];

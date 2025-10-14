@@ -76,7 +76,6 @@ export interface IPaymentVerificationResponse {
   };
 }
 
-// New interfaces for update, delete, and refund operations
 export interface IUpdatePaymentStatusInput {
   status: IPaymentStatus;
 }
@@ -110,7 +109,7 @@ export interface IDeleteAllPaymentsResponse {
   message: string;
   data: {
     deletedCount: number;
-    bookingsAffected: number[];
+    bookingsAffected: number;
   };
 }
 

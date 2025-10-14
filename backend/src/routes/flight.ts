@@ -6,6 +6,7 @@ import {
   deleteFlight,
   getAllFlights,
   deleteAllFlights,
+  updateFlightStatus,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
 import { UserRole } from '../../types/user-profile.types';
@@ -17,6 +18,8 @@ flightRoutes.post('/flights', createFlight);
 
 // Get a single flight by ID
 flightRoutes.get('/flights/:id', getFlight);
+
+flightRoutes.patch('/flights/:id/status', updateFlightStatus);
 
 // Update a flight by ID
 flightRoutes.put('/flights/:id', updateFlight);
