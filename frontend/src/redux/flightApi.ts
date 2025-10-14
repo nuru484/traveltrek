@@ -69,6 +69,34 @@ export const flightApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    updateFlightStatus: builder.mutation<
+      IApiResponse<IFlightResponse>,
+      {
+        id: number;
+        status: string;
+        departure?: string;
+        arrival?: string;
+      }
+    >({
+      query: ({ id, status, departure, arrival }) => ({
+        url: `/flights/${id}/status`,
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          ...(departure && { departure }),
+          ...(arrival && { arrival }),
+        }),
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Flight", id },
+        "Flight",
+        "Flights",
+      ],
+    }),
+
     deleteFlight: builder.mutation<void, number>({
       query: (id) => ({
         url: `/flights/${id}`,
@@ -92,6 +120,7 @@ export const {
   useGetFlightQuery,
   useCreateFlightMutation,
   useUpdateFlightMutation,
+  useUpdateFlightStatusMutation,
   useDeleteFlightMutation,
   useDeleteAllFlightsMutation,
 } = flightApi;

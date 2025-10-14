@@ -4,8 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
+import { isBefore } from "date-fns";
 import { RootState } from "@/redux/store";
-import { useDeleteFlightMutation } from "@/redux/flightApi";
+import {
+  useDeleteFlightMutation,
+  useUpdateFlightStatusMutation,
+} from "@/redux/flightApi";
 import {
   useGetAllUserBookingsQuery,
   useCreateBookingMutation,
@@ -26,7 +30,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Calendar,
   Clock,
@@ -45,6 +58,7 @@ import {
   AlertCircle,
   PlaneTakeoff,
   PlaneLanding,
+  ChevronDown,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -55,12 +69,69 @@ interface IFlightDetailProps {
   flight: IFlight;
 }
 
+const getAvailableStatusTransitions = (currentStatus: string) => {
+  const transitions: Record<string, string[]> = {
+    SCHEDULED: ["DELAYED", "CANCELLED", "DEPARTED"],
+    DELAYED: ["SCHEDULED", "CANCELLED", "DEPARTED"],
+    DEPARTED: ["LANDED"],
+    CANCELLED: ["SCHEDULED"],
+    LANDED: [],
+  };
+
+  return transitions[currentStatus] || [];
+};
+
+// Simple DateTimePicker component
+const DateTimePicker = ({
+  date,
+  onChange,
+  label,
+  minDate,
+}: {
+  date: Date | undefined;
+  onChange: (date: Date | undefined) => void;
+  label: string;
+  minDate?: Date;
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) {
+      onChange(undefined);
+      return;
+    }
+
+    const newDate = new Date(value);
+    if (minDate && isBefore(newDate, minDate)) {
+      toast.error(`Date must be after ${minDate.toLocaleString()}`);
+      return;
+    }
+    onChange(newDate);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-foreground">{label}</label>
+      <input
+        type="datetime-local"
+        value={date ? format(date, "yyyy-MM-dd'T'HH:mm") : ""}
+        onChange={handleChange}
+        className="flex h-10 w-full rounded-md border border-input px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        min={minDate ? format(minDate, "yyyy-MM-dd'T'HH:mm") : undefined}
+      />
+    </div>
+  );
+};
+
 export function FlightDetail({ flight }: IFlightDetailProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
+  const canUpdateStatus = isAdmin || isAgent;
 
   const [deleteFlight, { isLoading: isDeleting }] = useDeleteFlightMutation();
+  const [updateFlightStatus, { isLoading: isUpdatingStatus }] =
+    useUpdateFlightStatusMutation();
   const [createBooking, { isLoading: isBooking }] = useCreateBookingMutation();
   const [updateBooking, { isLoading: isCancelling }] =
     useUpdateBookingMutation();
@@ -68,6 +139,14 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBookDialog, setShowBookDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  // Delayed status modal state
+  const [showDelayedModal, setShowDelayedModal] = useState(false);
+  const [newDeparture, setNewDeparture] = useState<Date | undefined>();
+  const [newArrival, setNewArrival] = useState<Date | undefined>();
+  const [isUpdatingDelayed, setIsUpdatingDelayed] = useState(false);
+  const [selectedDelayedStatus, setSelectedDelayedStatus] =
+    useState<string>("");
 
   const {
     data: bookingsData,
@@ -140,6 +219,92 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
   const flightStatusConfig = getFlightStatusConfig(flight.status);
   const StatusIcon = flightStatusConfig.icon;
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === "DELAYED") {
+      setSelectedDelayedStatus(newStatus);
+      setNewDeparture(undefined);
+      setNewArrival(undefined);
+      setShowDelayedModal(true);
+      return;
+    }
+
+    const toastId = toast.loading(`Updating flight status to ${newStatus}...`);
+
+    try {
+      await updateFlightStatus({
+        id: flight.id,
+        status: newStatus,
+      }).unwrap();
+
+      toast.dismiss(toastId);
+      toast.success(`Flight status updated to ${newStatus} successfully`);
+    } catch (error) {
+      const { message } = extractApiErrorMessage(error);
+      toast.dismiss(toastId);
+      toast.error(message || "Failed to update flight status");
+    }
+  };
+
+  const handleDelayedStatusUpdate = async () => {
+    if (!newDeparture || !newArrival) {
+      toast.error("Please select both departure and arrival times");
+      return;
+    }
+
+    if (isBefore(newArrival, newDeparture)) {
+      toast.error("Arrival time must be after departure time");
+      return;
+    }
+
+    const now = new Date();
+    if (isBefore(newDeparture, now)) {
+      toast.error("Departure time must be in the future");
+      return;
+    }
+
+    const originalDeparture = new Date(flight.departure);
+    if (isBefore(newDeparture, originalDeparture)) {
+      toast.error("Delayed departure must be later than original departure");
+      return;
+    }
+
+    const duration = Math.round(
+      (newArrival.getTime() - newDeparture.getTime()) / (1000 * 60)
+    );
+    if (duration < 10) {
+      toast.error("Flight duration cannot be less than 10 minutes");
+      return;
+    }
+    if (duration > 1440) {
+      toast.error("Flight duration cannot exceed 24 hours");
+      return;
+    }
+
+    setIsUpdatingDelayed(true);
+    const toastId = toast.loading("Updating flight with new schedule...");
+
+    try {
+      await updateFlightStatus({
+        id: flight.id,
+        status: selectedDelayedStatus,
+        departure: newDeparture.toISOString(),
+        arrival: newArrival.toISOString(),
+      }).unwrap();
+
+      toast.dismiss(toastId);
+      toast.success("Flight delayed status updated successfully");
+      setShowDelayedModal(false);
+      setNewDeparture(undefined);
+      setNewArrival(undefined);
+      setIsUpdatingDelayed(false);
+    } catch (error) {
+      const { message } = extractApiErrorMessage(error);
+      toast.dismiss(toastId);
+      toast.error(message || "Failed to update delayed status");
+      setIsUpdatingDelayed(false);
+    }
+  };
 
   const formatDate = (date: string | Date) => {
     return format(new Date(date), "EEEE, MMMM dd, yyyy HH:mm");
@@ -274,7 +439,16 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
       ? `${flight.flightNumber.slice(0, 47)}...`
       : flight.flightNumber;
 
-  const isLoading = isDeleting || isBooking || isCancelling;
+  const isLoading =
+    isDeleting ||
+    isBooking ||
+    isCancelling ||
+    isUpdatingStatus ||
+    isUpdatingDelayed;
+
+  const availableStatusTransitions = getAvailableStatusTransitions(
+    flight.status
+  );
 
   return (
     <TooltipProvider>
@@ -294,7 +468,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
               {/* Actions Dropdown */}
               <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2">
-                {!isAdmin && (
+                {!isAdmin && !isAgent && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -326,6 +500,49 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       </p>
                     </TooltipContent>
                   </Tooltip>
+                )}
+
+                {canUpdateStatus && availableStatusTransitions.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        disabled={isLoading}
+                      >
+                        <Badge
+                          variant={flightStatusConfig.variant}
+                          className="mr-2"
+                        >
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {flightStatusConfig.label}
+                        </Badge>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <div className="px-2 py-1.5 text-sm font-semibold">
+                        Update Status
+                      </div>
+                      <DropdownMenuSeparator />
+                      {availableStatusTransitions.map((status) => {
+                        const statusConfig = getFlightStatusConfig(status);
+                        const StatusIcon = statusConfig.icon;
+                        return (
+                          <DropdownMenuItem
+                            key={status}
+                            onClick={() => handleStatusChange(status)}
+                            disabled={isLoading}
+                            className="cursor-pointer"
+                          >
+                            <StatusIcon className="mr-2 h-4 w-4" />
+                            {statusConfig.label}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
 
                 {isAdmin && (
@@ -372,7 +589,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                     >
                       {flight.flightClass}
                     </Badge>
-                    {/* Flight Status Badge */}
                     <Badge
                       variant={flightStatusConfig.variant}
                       className="bg-white/90 text-black"
@@ -419,7 +635,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{flight.flightClass}</Badge>
-                    {/* Flight Status Badge */}
                     <Badge variant={flightStatusConfig.variant}>
                       <StatusIcon className="h-3 w-3 mr-1" />
                       {flightStatusConfig.label}
@@ -454,7 +669,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
                 {/* Actions for no image state */}
                 <div className="flex gap-2">
-                  {!isAdmin && (
+                  {!isAdmin && !isAgent && (
                     <Button
                       variant={isBookingActive ? "secondary" : "default"}
                       size="sm"
@@ -471,6 +686,49 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                         {getBookingButtonText()}
                       </span>
                     </Button>
+                  )}
+
+                  {canUpdateStatus && availableStatusTransitions.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer"
+                          disabled={isLoading}
+                        >
+                          <Badge
+                            variant={flightStatusConfig.variant}
+                            className="mr-2"
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {flightStatusConfig.label}
+                          </Badge>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <div className="px-2 py-1.5 text-sm font-semibold">
+                          Update Status
+                        </div>
+                        <DropdownMenuSeparator />
+                        {availableStatusTransitions.map((status) => {
+                          const statusConfig = getFlightStatusConfig(status);
+                          const StatusIcon = statusConfig.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleStatusChange(status)}
+                              disabled={isLoading}
+                              className="cursor-pointer"
+                            >
+                              <StatusIcon className="mr-2 h-4 w-4" />
+                              {statusConfig.label}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
 
                   {isAdmin && (
@@ -511,7 +769,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           )}
         </Card>
 
-        {/* Flight Details - Horizontal Layout */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {/* Origin */}
           <Card className="border-l-4 border-l-primary">
@@ -621,18 +878,58 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 Flight Schedule
               </h3>
               <div className="space-y-4">
-                {/* Flight Status */}
+                {/* Flight Status with Dropdown for Admin/Agent */}
                 <div className="bg-muted/30 rounded-lg p-4">
                   <p className="font-medium text-foreground mb-2">
                     Flight Status
                   </p>
-                  <Badge
-                    variant={flightStatusConfig.variant}
-                    className="text-sm"
-                  >
-                    <StatusIcon className="h-4 w-4 mr-2" />
-                    {flightStatusConfig.label}
-                  </Badge>
+                  {canUpdateStatus && availableStatusTransitions.length > 0 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer w-full justify-between"
+                          disabled={isLoading}
+                        >
+                          <div className="flex items-center">
+                            <StatusIcon className="h-4 w-4 mr-2" />
+                            {flightStatusConfig.label}
+                          </div>
+                          <ChevronDown className="h-4 w-4 ml-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        <div className="px-2 py-1.5 text-sm font-semibold">
+                          Update Status
+                        </div>
+                        <DropdownMenuSeparator />
+                        {availableStatusTransitions.map((status) => {
+                          const statusConfig = getFlightStatusConfig(status);
+                          const StatusIcon = statusConfig.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleStatusChange(status)}
+                              disabled={isLoading}
+                              className="cursor-pointer"
+                            >
+                              <StatusIcon className="mr-2 h-4 w-4" />
+                              {statusConfig.label}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <Badge
+                      variant={flightStatusConfig.variant}
+                      className="text-sm"
+                    >
+                      <StatusIcon className="h-4 w-4 mr-2" />
+                      {flightStatusConfig.label}
+                    </Badge>
+                  )}
                 </div>
                 <div className="bg-muted/30 rounded-lg p-4">
                   <p className="font-medium text-foreground mb-1">Departure</p>
@@ -699,7 +996,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                     </Badge>
                   </div>
 
-                  {/* Booking Status */}
                   {isBookingDataLoading ? (
                     <div className="h-5 w-40 bg-gray-200 animate-pulse rounded mt-2"></div>
                   ) : (
@@ -757,8 +1053,8 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                   </div>
                 </div>
 
-                {/* Action Button for Users */}
-                {!isAdmin && (
+                {/* Action Button for Users (non-admin/agent) */}
+                {!isAdmin && !isAgent && (
                   <div className="pt-2">
                     {isBookingDataLoading ? (
                       <Button
@@ -828,6 +1124,77 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
             </CardContent>
           </Card>
         </div>
+
+        {/* Delayed Status Update Modal */}
+        <Dialog open={showDelayedModal} onOpenChange={setShowDelayedModal}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Update Flight Delay</DialogTitle>
+              <DialogDescription>
+                Please enter the new departure and arrival times for the delayed
+                flight. The new departure must be after the original scheduled
+                time of {formatDate(flight.departure)}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <DateTimePicker
+                date={newDeparture}
+                onChange={setNewDeparture}
+                label="New Departure Time"
+                minDate={new Date()}
+              />
+              <DateTimePicker
+                date={newArrival}
+                onChange={setNewArrival}
+                label="New Arrival Time"
+                minDate={newDeparture || new Date()}
+              />
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>
+                  <strong>Original Departure:</strong>{" "}
+                  {formatDate(flight.departure)}
+                </p>
+                {newDeparture && newArrival && (
+                  <p>
+                    <strong>Preview Duration:</strong>{" "}
+                    {formatDuration(
+                      Math.round(
+                        (newArrival.getTime() - newDeparture.getTime()) /
+                          (1000 * 60)
+                      )
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDelayedModal(false);
+                  setNewDeparture(undefined);
+                  setNewArrival(undefined);
+                }}
+                disabled={isUpdatingDelayed}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDelayedStatusUpdate}
+                disabled={!newDeparture || !newArrival || isUpdatingDelayed}
+              >
+                {isUpdatingDelayed ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Delay"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Confirmation Dialogs */}
         <ConfirmationDialog
