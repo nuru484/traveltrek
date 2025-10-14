@@ -1,6 +1,5 @@
-// src/components/payments/PaymentButton.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCreatePaymentMutation } from "@/redux/paymentApi";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, Smartphone, DollarSign } from "lucide-react";
+import { CreditCard, Smartphone, DollarSign, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 
 const paymentMethods = [
   {
@@ -61,6 +61,7 @@ interface IPaymentButtonProps {
     | "link";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
+  label?: string;
 }
 
 export function PaymentButton({
@@ -71,14 +72,20 @@ export function PaymentButton({
   variant = "default",
   size = "default",
   className = "",
+  label,
 }: IPaymentButtonProps) {
   const [createPayment, { isLoading }] = useCreatePaymentMutation();
 
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
     PaymentMethod | ""
   >("");
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setSelectedPaymentMethod("");
+    }
+  }, [isDialogOpen]);
 
   const handlePayment = async () => {
     if (!selectedPaymentMethod) {
@@ -101,8 +108,9 @@ export function PaymentButton({
       setIsDialogOpen(false);
       setSelectedPaymentMethod("");
     } catch (error) {
+      const { message } = extractApiErrorMessage(error);
       console.error("Payment failed:", error);
-      toast.error("Payment initialization failed");
+      toast.error(message || "Payment initialization failed");
     }
   };
 
@@ -120,7 +128,7 @@ export function PaymentButton({
           className={className}
         >
           <DollarSign className="mr-2 h-4 w-4" />
-          Pay Now
+          {label || "Pay Now"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -132,7 +140,6 @@ export function PaymentButton({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Payment Amount */}
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
@@ -146,7 +153,6 @@ export function PaymentButton({
             </CardContent>
           </Card>
 
-          {/* Payment Method Selection */}
           <div className="space-y-2">
             <Label htmlFor="payment-method">Payment Method</Label>
             <Select
@@ -189,9 +195,14 @@ export function PaymentButton({
             onClick={handlePayment}
             disabled={!selectedPaymentMethod || isLoading}
           >
-            {isLoading
-              ? "Processing..."
-              : `Pay ${currency} ${amount.toLocaleString()}`}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Pay ${currency} ${amount.toLocaleString()}`
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,3 @@
-// src/components/bookings/table/BookingActionsDropdown.tsx
 "use client";
 import * as React from "react";
 import Link from "next/link";
@@ -115,7 +114,6 @@ export function BookingActionsDropdown({
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* View Booking */}
           <DropdownMenuItem asChild>
             <Link
               href={`/dashboard/bookings/${booking.id}`}
@@ -126,7 +124,6 @@ export function BookingActionsDropdown({
             </Link>
           </DropdownMenuItem>
 
-          {/* Update Status - Only Admin */}
           {userRole === "ADMIN" && (
             <>
               <DropdownMenuSeparator />
@@ -157,25 +154,22 @@ export function BookingActionsDropdown({
             </>
           )}
 
-          {/* Payment - Customers/Agents */}
-          {needsPayment &&
-            (userRole === "CUSTOMER" || userRole === "AGENT") && (
-              <>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1">
-                  <PaymentButton
-                    bookingId={booking.id}
-                    amount={booking.totalPrice}
-                    currency={"GHS"}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-8 px-2 hover:cursor-pointer"
-                  />
-                </div>
-              </>
-            )}
+          {needsPayment && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1">
+                <PaymentButton
+                  bookingId={booking.id}
+                  amount={booking.totalPrice}
+                  currency="GHS"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 px-2 hover:cursor-pointer"
+                />
+              </div>
+            </>
+          )}
 
-          {/* Delete Booking - Admin only */}
           {userRole === "ADMIN" && (
             <>
               <DropdownMenuSeparator />
@@ -191,7 +185,6 @@ export function BookingActionsDropdown({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
