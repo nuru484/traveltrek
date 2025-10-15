@@ -321,35 +321,40 @@ export function TourDetail({ tour }: ITourDetailProps) {
   return (
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
-        {/* Hero Section with Tour Image */}
-        {/* Hero Section with Tour Image */}
         <Card className="overflow-hidden border-0 shadow-md">
-          <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+          <div className="relative w-full h-[200px] sm:h-[220px] md:h-[240px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
             <div className="absolute inset-0 flex items-center justify-center">
-              <ImageOff className="h-16 w-16 text-muted-foreground/30" />
+              <ImageOff className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
-              <div className="flex items-start justify-between gap-2 sm:gap-4">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      <Tag className="h-3 w-3 mr-1" />
+            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 lg:p-8 bg-gradient-to-t from-background/90 via-background/80 to-transparent">
+              <div className="flex items-start justify-between gap-2 sm:gap-3 md:gap-4">
+                <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 overflow-hidden">
+                  {/* Badges Container with Scroll on Small Screens */}
+                  <div className="flex flex-wrap gap-1 sm:gap-1.5 md:gap-2 mb-1.5 sm:mb-2 max-w-full overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
+                    >
+                      <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                       {tour.type}
                     </Badge>
                     <Badge
                       variant={tourStatusConfig.variant}
-                      className="text-xs"
+                      className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
                     >
-                      <StatusIcon className="h-3 w-3 mr-1" />
+                      <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                       {tourStatusConfig.label}
                     </Badge>
                     {isFullyBooked && (
-                      <Badge variant="destructive" className="text-xs">
+                      <Badge
+                        variant="destructive"
+                        className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
+                      >
                         Fully Booked
                       </Badge>
                     )}
                     {isBookingDataLoading ? (
-                      <div className="h-5 w-24 sm:w-32 bg-white/70 animate-pulse rounded-full"></div>
+                      <div className="h-4 sm:h-5 w-20 sm:w-24 md:w-32 bg-white/70 animate-pulse rounded-full flex-shrink-0"></div>
                     ) : (
                       isTourBooked && (
                         <Badge
@@ -362,32 +367,39 @@ export function TourDetail({ tour }: ITourDetailProps) {
                               ? "outline"
                               : "secondary"
                           }
-                          className="text-xs"
+                          className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
                         >
                           Booking: {bookingStatus}
                         </Badge>
                       )
                     )}
-                    <Badge variant="outline" className="text-xs">
-                      <Clock className="h-3 w-3 mr-1" />
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
+                    >
+                      <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                       {formatDuration(tour.duration)}
                     </Badge>
                   </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight break-words">
+
+                  {/* Tour Name - Multi-line with Proper Wrapping */}
+                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
                     {tour.name}
                   </h1>
+
+                  {/* Destination with Proper Wrapping */}
                   {tour.destination && (
-                    <div className="flex items-start gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm sm:text-base md:text-lg break-words">
+                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground max-w-full">
+                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
+                      <span className="text-xs sm:text-sm md:text-base break-words line-clamp-2 overflow-hidden leading-snug">
                         {getDestinationDisplay()}
                       </span>
                     </div>
                   )}
                 </div>
 
-                {/* Actions Dropdown */}
-                <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+                {/* Actions Dropdown - Always Visible */}
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-1.5 md:gap-2 flex-shrink-0">
                   {!isAdmin && !isAgent && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -396,20 +408,20 @@ export function TourDetail({ tour }: ITourDetailProps) {
                           size="sm"
                           onClick={handleBookingButtonClick}
                           disabled={isBookingButtonDisabled()}
-                          className="cursor-pointer h-8 sm:h-9 px-2 sm:px-3"
+                          className="cursor-pointer h-7 sm:h-8 md:h-9 px-2 sm:px-2.5 md:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap"
                         >
                           {isBookingDataLoading ? (
-                            <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+                            <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1.5 md:mr-2 animate-spin" />
                           ) : (
-                            <Bookmark className="h-4 w-4 sm:mr-2" />
+                            <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1.5 md:mr-2" />
                           )}
-                          <span className="hidden sm:inline text-xs sm:text-sm">
+                          <span className="hidden sm:inline">
                             {getBookingButtonText()}
                           </span>
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
+                      <TooltipContent side="left" className="max-w-[200px]">
+                        <p className="text-xs">
                           {isBookingDataLoading
                             ? "Loading booking status..."
                             : isBookingActive
@@ -428,23 +440,23 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="cursor-pointer h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                          className="cursor-pointer h-7 sm:h-8 md:h-9 px-1.5 sm:px-2 md:px-3 text-[10px] sm:text-xs md:text-sm"
                           disabled={isLoading}
                         >
                           <Badge
                             variant={tourStatusConfig.variant}
-                            className="mr-1 sm:mr-2 text-xs"
+                            className="mr-1 text-[10px] sm:text-xs"
                           >
-                            <StatusIcon className="h-3 w-3 sm:mr-1" />
-                            <span className="hidden sm:inline">
+                            <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 sm:mr-1" />
+                            <span className="hidden md:inline">
                               {tourStatusConfig.label}
                             </span>
                           </Badge>
-                          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <div className="px-2 py-1.5 text-sm font-semibold">
+                      <DropdownMenuContent align="end" className="w-44 sm:w-48">
+                        <div className="px-2 py-1.5 text-xs sm:text-sm font-semibold">
                           Update Status
                         </div>
                         <DropdownMenuSeparator />
@@ -456,9 +468,9 @@ export function TourDetail({ tour }: ITourDetailProps) {
                               key={status}
                               onClick={() => handleStatusChange(status)}
                               disabled={isLoading}
-                              className="cursor-pointer"
+                              className="cursor-pointer text-xs sm:text-sm"
                             >
-                              <StatusIcon className="mr-2 h-4 w-4" />
+                              <StatusIcon className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               {statusConfig.label}
                             </DropdownMenuItem>
                           );
@@ -473,27 +485,27 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="cursor-pointer h-8 w-8 sm:h-9 sm:w-9"
+                          className="cursor-pointer h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9"
                           disabled={isLoading}
                         >
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuContent align="end" className="w-40 sm:w-44">
                         <DropdownMenuItem
                           onClick={handleEdit}
                           disabled={isLoading}
-                          className="cursor-pointer"
+                          className="cursor-pointer text-xs sm:text-sm"
                         >
-                          <Edit className="mr-2 h-4 w-4" />
+                          <Edit className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setShowDeleteDialog(true)}
                           disabled={isLoading}
-                          className="text-destructive focus:text-destructive cursor-pointer"
+                          className="text-destructive focus:text-destructive cursor-pointer text-xs sm:text-sm"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
