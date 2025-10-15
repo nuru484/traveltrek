@@ -237,23 +237,25 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                             role="combobox"
                             aria-expanded={open}
                             className={cn(
-                              "w-full justify-between",
+                              "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value
-                              ? destinations.find(
-                                  (destination) =>
-                                    destination.id === field.value
-                                )?.name ||
-                                tour?.destination?.name ||
-                                "Select destination"
-                              : "Select destination"}
+                            <span className="break-words">
+                              {field.value
+                                ? destinations.find(
+                                    (destination) =>
+                                      destination.id === field.value
+                                  )?.name ||
+                                  tour?.destination?.name ||
+                                  "Select destination"
+                                : "Select destination"}
+                            </span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                         <Command>
                           <CommandInput
                             placeholder="Search destination..."
@@ -275,18 +277,21 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                                   setOpen(false);
                                   setDestinationSearch("");
                                 }}
+                                className="items-start"
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "mr-2 h-4 w-4 shrink-0 mt-0.5",
                                     destination.id === field.value
                                       ? "opacity-100"
                                       : "opacity-0"
                                   )}
                                 />
-                                <div className="flex flex-col">
-                                  <span>{destination.name}</span>
-                                  <span className="text-xs text-muted-foreground">
+                                <div className="flex flex-col overflow-hidden w-full">
+                                  <span className="break-words">
+                                    {destination.name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground break-words">
                                     {destination.city &&
                                       `${destination.city}, `}
                                     {destination.country}
@@ -302,7 +307,6 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                   </FormItem>
                 )}
               />
-
               <div className="grid gap-6 md:grid-cols-2">
                 <FormField
                   control={form.control}
