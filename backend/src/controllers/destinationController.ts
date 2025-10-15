@@ -443,7 +443,7 @@ const handleDeleteAllDestinations = asyncHandler(
 
     if (blocked.length > 0) {
       throw new BadRequestError(
-        `Cannot delete destinations. ${blocked.length} destination${blocked.length > 1 ? 's have' : ' has'} associated dependencies (Hotels, Tours, or Flights). Please remove these dependencies first.`,
+        `Cannot delete all destinations. ${blocked.length} destination${blocked.length > 1 ? 's have' : ' has'} associated dependencies (Hotels, Tours, or Flights). Please remove these dependencies first.`,
       );
     }
 

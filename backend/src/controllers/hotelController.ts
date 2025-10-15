@@ -7,6 +7,8 @@ import {
   asyncHandler,
   NotFoundError,
   BadRequestError,
+  CustomError,
+  UnauthorizedError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
 import {
@@ -128,63 +130,6 @@ export const createHotel: RequestHandler[] = [
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'hotelPhoto'),
   handleCreateHotel,
 ];
-
-/**
- * Get a single hotel by ID
- */
-const handleGetHotel = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { id } = req.params;
-
-    const hotel = await prisma.hotel.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        destination: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            country: true,
-            city: true,
-          },
-        },
-        rooms: {
-          select: {
-            id: true,
-            roomType: true,
-            description: true,
-            photo: true,
-            pricePerNight: true,
-          },
-        },
-      },
-    });
-
-    if (!hotel) {
-      throw new NotFoundError('Hotel not found');
-    }
-
-    const response: IHotelResponse = {
-      message: 'Hotel retrieved successfully',
-      data: {
-        id: hotel.id,
-        name: hotel.name,
-        description: hotel.description,
-        address: hotel.address,
-        phone: hotel.phone,
-        starRating: hotel.starRating,
-        amenities: hotel.amenities,
-        photo: hotel.photo,
-        rooms: hotel.rooms,
-        destination: hotel.destination,
-        createdAt: hotel.createdAt,
-        updatedAt: hotel.updatedAt,
-      },
-    };
-
-    res.status(HTTP_STATUS_CODES.OK).json(response);
-  },
-);
 
 /**
  * Update a hotel with photo handling
@@ -364,6 +309,71 @@ export const updateHotel: RequestHandler[] = [
   ]),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'hotelPhoto'),
   handleUpdateHotel,
+];
+
+/**
+ * Get a single hotel by ID
+ */
+const handleGetHotel = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+
+    const hotel = await prisma.hotel.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            country: true,
+            city: true,
+          },
+        },
+        rooms: {
+          select: {
+            id: true,
+            roomType: true,
+            description: true,
+            photo: true,
+            pricePerNight: true,
+          },
+        },
+      },
+    });
+
+    if (!hotel) {
+      throw new NotFoundError('Hotel not found');
+    }
+
+    const response: IHotelResponse = {
+      message: 'Hotel retrieved successfully',
+      data: {
+        id: hotel.id,
+        name: hotel.name,
+        description: hotel.description,
+        address: hotel.address,
+        phone: hotel.phone,
+        starRating: hotel.starRating,
+        amenities: hotel.amenities,
+        photo: hotel.photo,
+        rooms: hotel.rooms,
+        destination: hotel.destination,
+        createdAt: hotel.createdAt,
+        updatedAt: hotel.updatedAt,
+      },
+    };
+
+    res.status(HTTP_STATUS_CODES.OK).json(response);
+  },
+);
+
+export const getHotel: RequestHandler[] = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Hotel ID must be a positive integer'),
+  ...validationMiddleware.create([]),
+  handleGetHotel,
 ];
 
 /**
@@ -639,15 +649,33 @@ const handleDeleteHotel = asyncHandler(
   },
 );
 
+export const deleteHotel: RequestHandler[] = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Hotel ID must be a positive integer'),
+  ...validationMiddleware.create([]),
+  handleDeleteHotel,
+];
+
 /**
  * Delete all hotels with photo cleanup
  */
 export const deleteAllHotels = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized access');
+    }
+
+    if (user.role !== 'ADMIN') {
+      throw new UnauthorizedError('Admin privileges required');
+    }
+
     const hotelCount = await prisma.hotel.count();
 
     if (hotelCount === 0) {
-      throw new BadRequestError('No hotels found to delete.');
+      throw new BadRequestError('No hotels to delete');
     }
 
     const hotels = await prisma.hotel.findMany({
@@ -669,7 +697,6 @@ export const deleteAllHotels = asyncHandler(
 
     const hotelsWithActiveBookings: number[] = [];
     const hotelsWithRooms: number[] = [];
-    const deletableHotels: typeof hotels = [];
 
     hotels.forEach((hotel) => {
       const hasActiveBookings = hotel.rooms.some(
@@ -678,50 +705,33 @@ export const deleteAllHotels = asyncHandler(
 
       if (hasActiveBookings) {
         hotelsWithActiveBookings.push(hotel.id);
-      } else if (hotel.rooms.length > 0) {
+      }
+
+      if (hotel.rooms.length > 0) {
         hotelsWithRooms.push(hotel.id);
-      } else {
-        deletableHotels.push(hotel);
       }
     });
 
-    if (deletableHotels.length === 0) {
-      const errorMessages: string[] = [];
+    const blockingIssues: string[] = [];
 
-      if (hotelsWithActiveBookings.length > 0) {
-        errorMessages.push(
-          `${hotelsWithActiveBookings.length} hotel(s) have rooms with active bookings (PENDING or CONFIRMED) and cannot be deleted.`,
-        );
-      }
-
-      if (hotelsWithRooms.length > 0) {
-        errorMessages.push(
-          `${hotelsWithRooms.length} hotel(s) have rooms that must be deleted first.`,
-        );
-      }
-
-      throw new BadRequestError(
-        `No hotels can be deleted. ${errorMessages.join(' ')}`,
+    if (hotelsWithRooms.length > 0) {
+      blockingIssues.push(
+        `${hotelsWithRooms.length} hotel${hotelsWithRooms.length > 1 ? 's' : ''}`,
       );
     }
 
-    if (hotelsWithActiveBookings.length > 0 || hotelsWithRooms.length > 0) {
-      console.warn(
-        `Skipping ${hotelsWithActiveBookings.length + hotelsWithRooms.length} hotel(s): ` +
-          `${hotelsWithActiveBookings.length} with active bookings, ` +
-          `${hotelsWithRooms.length} with rooms.`,
+    if (blockingIssues.length > 0) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        `Cannot delete all hotels: ${blockingIssues.join(', ')} have rooms in it, it must be removed first`,
       );
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.hotel.deleteMany({
-        where: {
-          id: { in: deletableHotels.map((h) => h.id) },
-        },
-      });
+      await tx.hotel.deleteMany({});
     });
 
-    const cleanupPromises = deletableHotels
+    const cleanupPromises = hotels
       .filter((hotel) => hotel.photo)
       .map(async (hotel) => {
         try {
@@ -736,50 +746,14 @@ export const deleteAllHotels = asyncHandler(
 
     await Promise.allSettled(cleanupPromises);
 
-    const responseMessage = [
-      `Successfully deleted ${deletableHotels.length} hotel(s).`,
-    ];
-
-    if (hotelsWithActiveBookings.length > 0) {
-      responseMessage.push(
-        `Skipped ${hotelsWithActiveBookings.length} hotel(s) with active bookings.`,
-      );
-    }
-
-    if (hotelsWithRooms.length > 0) {
-      responseMessage.push(
-        `Skipped ${hotelsWithRooms.length} hotel(s) with rooms.`,
-      );
-    }
-
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: responseMessage.join(' '),
-      deleted: deletableHotels.length,
-      skipped: {
-        total: hotels.length - deletableHotels.length,
-        withActiveBookings: hotelsWithActiveBookings.length,
-        withRooms: hotelsWithRooms.length,
+      message: `Successfully deleted ${hotels.length} hotel${hotels.length > 1 ? 's' : ''}`,
+      data: {
+        deletedCount: hotels.length,
       },
-      deletedHotelIds: deletableHotels.map((h) => h.id),
     });
   },
 );
-
-export const getHotel: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Hotel ID must be a positive integer'),
-  ...validationMiddleware.create([]),
-  handleGetHotel,
-];
-
-export const deleteHotel: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Hotel ID must be a positive integer'),
-  ...validationMiddleware.create([]),
-  handleDeleteHotel,
-];
 
 export const getHotelsByDestination: RequestHandler[] = [
   param('destinationId')

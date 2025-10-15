@@ -8,6 +8,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   BadRequestError,
+  CustomError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
 import { IFlightInput, IFlight, IFlightUpdateInput } from 'types/flight.types';
@@ -846,17 +847,17 @@ export const deleteAllFlights = asyncHandler(
     const user = req.user;
 
     if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
+      throw new UnauthorizedError('Unauthorized access');
     }
 
     if (user.role !== 'ADMIN') {
-      throw new UnauthorizedError('Only admins can delete all flights');
+      throw new UnauthorizedError('Admin privileges required');
     }
 
     const flightCount = await prisma.flight.count();
 
     if (flightCount === 0) {
-      throw new BadRequestError('No flights found to delete.');
+      throw new BadRequestError('No flights to delete');
     }
 
     const flights = await prisma.flight.findMany({
@@ -869,33 +870,11 @@ export const deleteAllFlights = asyncHandler(
       },
     });
 
-    const flightsWithNonDeletableStatus: Array<{
-      id: number;
-      flightNumber: string;
-      status: FlightStatus;
-    }> = [];
-
-    const flightsWithActiveBookings: Array<{
-      id: number;
-      flightNumber: string;
-      bookingCount: number;
-      pendingCount: number;
-      confirmedCount: number;
-    }> = [];
-
-    const flightsWithCompletedBookings: Array<{
-      id: number;
-      flightNumber: string;
-      bookingCount: number;
-    }> = [];
-
-    const flightsWithPaidBookings: Array<{
-      id: number;
-      flightNumber: string;
-      paidBookingCount: number;
-    }> = [];
-
-    const deletableFlights: typeof flights = [];
+    const flightsWithNonDeletableStatus: number[] = [];
+    const flightsWithPendingBookings: number[] = [];
+    const flightsWithConfirmedBookings: number[] = [];
+    const flightsWithCompletedPayments: number[] = [];
+    const flightsWithPendingPayments: number[] = [];
 
     const now = new Date();
     const nonDeletableStatuses: FlightStatus[] = [
@@ -906,158 +885,91 @@ export const deleteAllFlights = asyncHandler(
 
     flights.forEach((flight) => {
       if (nonDeletableStatuses.includes(flight.status)) {
-        flightsWithNonDeletableStatus.push({
-          id: flight.id,
-          flightNumber: flight.flightNumber,
-          status: flight.status,
-        });
-        return;
+        flightsWithNonDeletableStatus.push(flight.id);
       }
 
-      if (flight.bookings.length === 0) {
-        deletableFlights.push(flight);
-        return;
+      const hasPendingBookings = flight.bookings.some(
+        (booking) => booking.status === 'PENDING',
+      );
+
+      if (hasPendingBookings) {
+        flightsWithPendingBookings.push(flight.id);
       }
 
-      const activeBookings = flight.bookings.filter((booking) =>
-        ['PENDING', 'CONFIRMED'].includes(booking.status),
+      const hasConfirmedBookings = flight.bookings.some(
+        (booking) => booking.status === 'CONFIRMED',
       );
 
-      const completedBookings = flight.bookings.filter(
-        (booking) => booking.status === 'COMPLETED',
+      if (hasConfirmedBookings) {
+        flightsWithConfirmedBookings.push(flight.id);
+      }
+
+      const hasCompletedPayments = flight.bookings.some(
+        (booking) => booking.payment && booking.payment.status === 'COMPLETED',
       );
 
-      const paidBookings = flight.bookings.filter(
-        (booking) =>
-          booking.payment &&
-          ['COMPLETED', 'PENDING'].includes(booking.payment.status),
+      if (hasCompletedPayments) {
+        flightsWithCompletedPayments.push(flight.id);
+      }
+
+      const hasPendingPayments = flight.bookings.some(
+        (booking) => booking.payment && booking.payment.status === 'PENDING',
       );
 
-      const isUpcomingFlight = flight.departure > now;
-
-      if (activeBookings.length > 0) {
-        const pendingCount = activeBookings.filter(
-          (b) => b.status === 'PENDING',
-        ).length;
-        const confirmedCount = activeBookings.filter(
-          (b) => b.status === 'CONFIRMED',
-        ).length;
-
-        flightsWithActiveBookings.push({
-          id: flight.id,
-          flightNumber: flight.flightNumber,
-          bookingCount: activeBookings.length,
-          pendingCount,
-          confirmedCount,
-        });
-      } else if (paidBookings.length > 0) {
-        flightsWithPaidBookings.push({
-          id: flight.id,
-          flightNumber: flight.flightNumber,
-          paidBookingCount: paidBookings.length,
-        });
-      } else if (completedBookings.length > 0 && isUpcomingFlight) {
-        flightsWithCompletedBookings.push({
-          id: flight.id,
-          flightNumber: flight.flightNumber,
-          bookingCount: completedBookings.length,
-        });
-      } else {
-        deletableFlights.push(flight);
+      if (hasPendingPayments) {
+        flightsWithPendingPayments.push(flight.id);
       }
     });
 
-    if (deletableFlights.length === 0) {
-      const errorMessages: string[] = [];
+    // Build error message for blocking conditions
+    const blockingIssues: string[] = [];
 
-      if (flightsWithNonDeletableStatus.length > 0) {
-        const statusBreakdown = flightsWithNonDeletableStatus.reduce(
-          (acc, f) => {
-            acc[f.status] = (acc[f.status] || 0) + 1;
-            return acc;
-          },
-          {} as Record<FlightStatus, number>,
-        );
-
-        const statusSummary = Object.entries(statusBreakdown)
-          .map(([status, count]) => `${count} ${status}`)
-          .join(', ');
-
-        errorMessages.push(
-          `${flightsWithNonDeletableStatus.length} flight(s) have non-deletable status (${statusSummary}).`,
-        );
-      }
-
-      if (flightsWithActiveBookings.length > 0) {
-        const totalActive = flightsWithActiveBookings.reduce(
-          (sum, f) => sum + f.bookingCount,
-          0,
-        );
-        const totalPending = flightsWithActiveBookings.reduce(
-          (sum, f) => sum + f.pendingCount,
-          0,
-        );
-        const totalConfirmed = flightsWithActiveBookings.reduce(
-          (sum, f) => sum + f.confirmedCount,
-          0,
-        );
-
-        errorMessages.push(
-          `${flightsWithActiveBookings.length} flight(s) have ${totalActive} active booking(s) ` +
-            `(${totalPending} pending, ${totalConfirmed} confirmed).`,
-        );
-      }
-
-      if (flightsWithPaidBookings.length > 0) {
-        const totalPaid = flightsWithPaidBookings.reduce(
-          (sum, f) => sum + f.paidBookingCount,
-          0,
-        );
-        errorMessages.push(
-          `${flightsWithPaidBookings.length} flight(s) have ${totalPaid} booking(s) with payment records.`,
-        );
-      }
-
-      if (flightsWithCompletedBookings.length > 0) {
-        errorMessages.push(
-          `${flightsWithCompletedBookings.length} upcoming flight(s) have completed bookings (data integrity concern).`,
-        );
-      }
-
-      throw new BadRequestError(
-        `Cannot delete any flights. ${errorMessages.join(' ')} ` +
-          `Only SCHEDULED or CANCELLED flights without active bookings or payment records can be deleted.`,
+    if (flightsWithNonDeletableStatus.length > 0) {
+      blockingIssues.push(
+        `${flightsWithNonDeletableStatus.length} flight${flightsWithNonDeletableStatus.length > 1 ? 's' : ''} with non-deletable status (DEPARTED, LANDED, or DELAYED)`,
       );
     }
 
-    const totalSkipped =
-      flightsWithNonDeletableStatus.length +
-      flightsWithActiveBookings.length +
-      flightsWithPaidBookings.length +
-      flightsWithCompletedBookings.length;
-
-    if (totalSkipped > 0) {
-      logger.warn(
-        `Skipping ${totalSkipped} flight(s): ` +
-          `${flightsWithNonDeletableStatus.length} with non-deletable status, ` +
-          `${flightsWithActiveBookings.length} with active bookings, ` +
-          `${flightsWithPaidBookings.length} with payment records, ` +
-          `${flightsWithCompletedBookings.length} with completed bookings.`,
+    if (flightsWithPendingBookings.length > 0) {
+      blockingIssues.push(
+        `${flightsWithPendingBookings.length} flight${flightsWithPendingBookings.length > 1 ? 's' : ''} with pending bookings`,
       );
     }
 
-    const photos = deletableFlights
+    if (flightsWithConfirmedBookings.length > 0) {
+      blockingIssues.push(
+        `${flightsWithConfirmedBookings.length} flight${flightsWithConfirmedBookings.length > 1 ? 's' : ''} with confirmed bookings`,
+      );
+    }
+
+    if (flightsWithCompletedPayments.length > 0) {
+      blockingIssues.push(
+        `${flightsWithCompletedPayments.length} flight${flightsWithCompletedPayments.length > 1 ? 's' : ''} with completed payments`,
+      );
+    }
+
+    if (flightsWithPendingPayments.length > 0) {
+      blockingIssues.push(
+        `${flightsWithPendingPayments.length} flight${flightsWithPendingPayments.length > 1 ? 's' : ''} with pending payments`,
+      );
+    }
+
+    if (blockingIssues.length > 0) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        `Cannot delete flights: ${blockingIssues.join(', ')} must be cancelled or resolved first`,
+      );
+    }
+
+    const photos = flights
       .map((flight) => flight.photo)
       .filter((photo): photo is string => Boolean(photo));
 
     await prisma.$transaction(async (tx) => {
-      await tx.flight.deleteMany({
-        where: {
-          id: { in: deletableFlights.map((f) => f.id) },
-        },
-      });
+      await tx.flight.deleteMany({});
     });
 
+    // Clean up photos from Cloudinary after successful deletion
     const cleanupPromises = photos.map(async (photo) => {
       try {
         await cloudinaryService.deleteImage(photo);
@@ -1068,65 +980,11 @@ export const deleteAllFlights = asyncHandler(
 
     await Promise.allSettled(cleanupPromises);
 
-    const responseMessage = [
-      `Successfully deleted ${deletableFlights.length} flight(s).`,
-    ];
-
-    if (flightsWithNonDeletableStatus.length > 0) {
-      const statusBreakdown = flightsWithNonDeletableStatus.reduce(
-        (acc, f) => {
-          acc[f.status] = (acc[f.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<FlightStatus, number>,
-      );
-
-      const statusSummary = Object.entries(statusBreakdown)
-        .map(([status, count]) => `${count} ${status}`)
-        .join(', ');
-
-      responseMessage.push(
-        `Skipped ${flightsWithNonDeletableStatus.length} flight(s) with non-deletable status (${statusSummary}).`,
-      );
-    }
-
-    if (flightsWithActiveBookings.length > 0) {
-      responseMessage.push(
-        `Skipped ${flightsWithActiveBookings.length} flight(s) with active bookings.`,
-      );
-    }
-
-    if (flightsWithPaidBookings.length > 0) {
-      responseMessage.push(
-        `Skipped ${flightsWithPaidBookings.length} flight(s) with payment records.`,
-      );
-    }
-
-    if (flightsWithCompletedBookings.length > 0) {
-      responseMessage.push(
-        `Skipped ${flightsWithCompletedBookings.length} flight(s) with historical booking data.`,
-      );
-    }
-
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: responseMessage.join(' '),
-      deleted: deletableFlights.length,
-      skipped: {
-        total: totalSkipped,
-        withNonDeletableStatus: flightsWithNonDeletableStatus.length,
-        withActiveBookings: flightsWithActiveBookings.length,
-        withPaidBookings: flightsWithPaidBookings.length,
-        withCompletedBookings: flightsWithCompletedBookings.length,
+      message: `Successfully deleted ${flights.length} flight${flights.length > 1 ? 's' : ''}`,
+      data: {
+        deletedCount: flights.length,
       },
-      deletedFlightIds: deletableFlights.map((f) => f.id),
-      deletedFlightNumbers: deletableFlights.map((f) => f.flightNumber),
-      statusBreakdown: flightsWithNonDeletableStatus.reduce(
-        (acc, f) => {
-          acc[f.status] = (acc[f.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<FlightStatus, number>,
-      ),
     });
   },
 );

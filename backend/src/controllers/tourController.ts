@@ -6,6 +6,7 @@ import {
   NotFoundError,
   BadRequestError,
   UnauthorizedError,
+  CustomError,
 } from '../middlewares/error-handler';
 import { HTTP_STATUS_CODES } from '../config/constants';
 import { ITourInput, ITourResponse } from 'types/tour.types';
@@ -19,7 +20,6 @@ import logger from '../utils/logger';
 import { TourStatus } from '../../generated/prisma';
 import { body } from 'express-validator';
 
-// CREATE TOUR
 const handleCreateTour = asyncHandler(
   async (
     req: Request<{}, {}, ITourInput>,
@@ -654,13 +654,22 @@ export const getAllTours: RequestHandler[] = [
   handleGetAllTours,
 ];
 
-// DELETE ALL TOURS
 export const deleteAllTours = asyncHandler(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedError('Unauthorized access');
+    }
+
+    if (user.role !== 'ADMIN') {
+      throw new UnauthorizedError('Admin privileges required');
+    }
+
     const tourCount = await prisma.tour.count();
 
     if (tourCount === 0) {
-      throw new BadRequestError('No tours found to delete.');
+      throw new BadRequestError('No tours to delete');
     }
 
     const tours = await prisma.tour.findMany({
@@ -673,167 +682,83 @@ export const deleteAllTours = asyncHandler(
       },
     });
 
+    const toursWithConfirmedBookings: number[] = [];
+    const toursWithCompletedPayments: number[] = [];
+    const ongoingTours: number[] = [];
+    const toursAlreadyStarted: number[] = [];
+
     const now = new Date();
-    const deletionResults = {
-      deletable: [] as number[],
-      skippedReasons: {
-        hasActiveBookings: [] as number[],
-        hasPaidBookings: [] as number[],
-        alreadyStarted: [] as number[],
-        statusOngoingOrCompleted: [] as number[],
-        hasGuestsBooked: [] as number[],
-      },
-    };
 
     tours.forEach((tour) => {
-      let canDelete = true;
-
-      const activeBookings = tour.bookings.filter((booking) =>
-        ['PENDING', 'CONFIRMED'].includes(booking.status),
+      const hasConfirmedBookings = tour.bookings.some(
+        (booking) => booking.status === 'CONFIRMED',
       );
 
-      const paidBookings = tour.bookings.filter(
-        (booking) =>
-          booking.payment &&
-          ['COMPLETED', 'PENDING'].includes(booking.payment.status),
+      if (hasConfirmedBookings) {
+        toursWithConfirmedBookings.push(tour.id);
+      }
+
+      const hasCompletedPayments = tour.bookings.some(
+        (booking) => booking.payment && booking.payment.status === 'COMPLETED',
       );
 
-      if (activeBookings.length > 0) {
-        deletionResults.skippedReasons.hasActiveBookings.push(tour.id);
-        canDelete = false;
-      } else if (paidBookings.length > 0) {
-        deletionResults.skippedReasons.hasPaidBookings.push(tour.id);
-        canDelete = false;
+      if (hasCompletedPayments) {
+        toursWithCompletedPayments.push(tour.id);
       }
 
-      if (tour.startDate <= now) {
-        deletionResults.skippedReasons.alreadyStarted.push(tour.id);
-        canDelete = false;
+      if (tour.status === 'ONGOING') {
+        ongoingTours.push(tour.id);
       }
 
-      if (['ONGOING', 'COMPLETED'].includes(tour.status)) {
-        deletionResults.skippedReasons.statusOngoingOrCompleted.push(tour.id);
-        canDelete = false;
-      }
-
-      if (tour.guestsBooked > 0 && activeBookings.length === 0) {
-        deletionResults.skippedReasons.hasGuestsBooked.push(tour.id);
-        canDelete = false;
-      }
-
-      if (canDelete) {
-        deletionResults.deletable.push(tour.id);
+      if (tour.startDate <= now && tour.endDate >= now) {
+        ongoingTours.push(tour.id);
+      } else if (tour.startDate <= now) {
+        toursAlreadyStarted.push(tour.id);
       }
     });
 
-    const totalSkipped =
-      deletionResults.skippedReasons.hasActiveBookings.length +
-      deletionResults.skippedReasons.hasPaidBookings.length +
-      deletionResults.skippedReasons.alreadyStarted.length +
-      deletionResults.skippedReasons.statusOngoingOrCompleted.length +
-      deletionResults.skippedReasons.hasGuestsBooked.length;
+    const blockingIssues: string[] = [];
 
-    if (deletionResults.deletable.length === 0) {
-      const issues: string[] = [];
-
-      if (deletionResults.skippedReasons.hasActiveBookings.length > 0) {
-        issues.push('active bookings');
-      }
-
-      if (deletionResults.skippedReasons.hasPaidBookings.length > 0) {
-        issues.push('payment records');
-      }
-
-      if (deletionResults.skippedReasons.alreadyStarted.length > 0) {
-        issues.push('already started');
-      }
-
-      if (deletionResults.skippedReasons.statusOngoingOrCompleted.length > 0) {
-        issues.push('ongoing/completed status');
-      }
-
-      if (deletionResults.skippedReasons.hasGuestsBooked.length > 0) {
-        issues.push('guest records');
-      }
-
-      throw new BadRequestError(
-        `Cannot delete tours with ${issues.join(', ')}. Please resolve these first.`,
+    if (toursWithConfirmedBookings.length > 0) {
+      blockingIssues.push(
+        `${toursWithConfirmedBookings.length} tour${toursWithConfirmedBookings.length > 1 ? 's' : ''} with confirmed bookings`,
       );
     }
 
-    if (totalSkipped > 0) {
-      logger.warn(
-        `Skipping ${totalSkipped} tour(s): ` +
-          `${deletionResults.skippedReasons.hasActiveBookings.length} with active bookings, ` +
-          `${deletionResults.skippedReasons.hasPaidBookings.length} with payments, ` +
-          `${deletionResults.skippedReasons.alreadyStarted.length} already started, ` +
-          `${deletionResults.skippedReasons.statusOngoingOrCompleted.length} ongoing/completed, ` +
-          `${deletionResults.skippedReasons.hasGuestsBooked.length} with guest records.`,
+    if (toursWithCompletedPayments.length > 0) {
+      blockingIssues.push(
+        `${toursWithCompletedPayments.length} tour${toursWithCompletedPayments.length > 1 ? 's' : ''} with completed payments`,
+      );
+    }
+
+    if (ongoingTours.length > 0) {
+      blockingIssues.push(
+        `${ongoingTours.length} ongoing tour${ongoingTours.length > 1 ? 's' : ''}`,
+      );
+    }
+
+    if (toursAlreadyStarted.length > 0) {
+      blockingIssues.push(
+        `${toursAlreadyStarted.length} tour${toursAlreadyStarted.length > 1 ? 's' : ''} already started`,
+      );
+    }
+
+    // If any blocking issues exist, throw error
+    if (blockingIssues.length > 0) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        `Cannot delete tours: ${blockingIssues.join(', ')} must be cancelled or resolved first`,
       );
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.tour.deleteMany({
-        where: {
-          id: { in: deletionResults.deletable },
-        },
-      });
+      await tx.tour.deleteMany({});
     });
 
-    let message = `Deleted ${deletionResults.deletable.length} tour(s) successfully`;
-
-    if (totalSkipped > 0) {
-      const skippedReasons: string[] = [];
-
-      if (deletionResults.skippedReasons.hasActiveBookings.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.hasActiveBookings.length} with bookings`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.hasPaidBookings.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.hasPaidBookings.length} with payments`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.alreadyStarted.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.alreadyStarted.length} started`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.statusOngoingOrCompleted.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.statusOngoingOrCompleted.length} ongoing/completed`,
-        );
-      }
-
-      if (deletionResults.skippedReasons.hasGuestsBooked.length > 0) {
-        skippedReasons.push(
-          `${deletionResults.skippedReasons.hasGuestsBooked.length} with guests`,
-        );
-      }
-
-      message += `. Skipped: ${skippedReasons.join(', ')}`;
-    }
-
     res.status(HTTP_STATUS_CODES.OK).json({
-      message,
-      deleted: deletionResults.deletable.length,
-      skipped: totalSkipped,
-      details: {
-        deletedIds: deletionResults.deletable,
-        skippedWithActiveBookings:
-          deletionResults.skippedReasons.hasActiveBookings.length,
-        skippedWithPayments:
-          deletionResults.skippedReasons.hasPaidBookings.length,
-        skippedAlreadyStarted:
-          deletionResults.skippedReasons.alreadyStarted.length,
-        skippedOngoingOrCompleted:
-          deletionResults.skippedReasons.statusOngoingOrCompleted.length,
-        skippedWithGuests:
-          deletionResults.skippedReasons.hasGuestsBooked.length,
+      message: `Successfully deleted ${tours.length} tour${tours.length > 1 ? 's' : ''}`,
+      data: {
+        deletedCount: tours.length,
       },
     });
   },
