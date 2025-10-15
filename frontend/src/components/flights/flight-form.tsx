@@ -323,16 +323,18 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                               role="combobox"
                               aria-expanded={originOpen}
                               className={cn(
-                                "w-full justify-between",
+                                "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {getOriginDisplayText(field.value)}
+                              <span className="break-words">
+                                {getOriginDisplayText(field.value)}
+                              </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                           <Command>
                             <CommandInput
                               placeholder="Search origin..."
@@ -354,18 +356,21 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                                     setOriginOpen(false);
                                     setOriginSearch("");
                                   }}
+                                  className="items-start"
                                 >
                                   <Check
                                     className={cn(
-                                      "mr-2 h-4 w-4",
+                                      "mr-2 h-4 w-4 shrink-0 mt-0.5",
                                       origin.id === field.value
                                         ? "opacity-100"
                                         : "opacity-0"
                                     )}
                                   />
-                                  <div className="flex flex-col">
-                                    <span>{origin.name}</span>
-                                    <span className="text-xs text-muted-foreground">
+                                  <div className="flex flex-col overflow-hidden w-full">
+                                    <span className="break-words">
+                                      {origin.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground break-words">
                                       {origin.city && `${origin.city}, `}
                                       {origin.country}
                                     </span>
@@ -398,16 +403,18 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                               role="combobox"
                               aria-expanded={destinationOpen}
                               className={cn(
-                                "w-full justify-between",
+                                "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {getDestinationDisplayText(field.value)}
+                              <span className="break-words">
+                                {getDestinationDisplayText(field.value)}
+                              </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                           <Command>
                             <CommandInput
                               placeholder="Search destination..."
@@ -429,18 +436,21 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                                     setDestinationOpen(false);
                                     setDestinationSearch("");
                                   }}
+                                  className="items-start"
                                 >
                                   <Check
                                     className={cn(
-                                      "mr-2 h-4 w-4",
+                                      "mr-2 h-4 w-4 shrink-0 mt-0.5",
                                       destination.id === field.value
                                         ? "opacity-100"
                                         : "opacity-0"
                                     )}
                                   />
-                                  <div className="flex flex-col">
-                                    <span>{destination.name}</span>
-                                    <span className="text-xs text-muted-foreground">
+                                  <div className="flex flex-col overflow-hidden w-full">
+                                    <span className="break-words">
+                                      {destination.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground break-words">
                                       {destination.city &&
                                         `${destination.city}, `}
                                       {destination.country}
