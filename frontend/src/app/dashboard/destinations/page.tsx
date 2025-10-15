@@ -93,7 +93,7 @@ export default function DestinationsPage() {
   };
 
   const handleDeleteAllDestinations = async () => {
-    const toastId = toast.loading("Deleting Flights...");
+    const toastId = toast.loading("Deleting Destinations...");
 
     try {
       await deleteAllDestinations().unwrap();
