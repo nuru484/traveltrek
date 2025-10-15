@@ -180,7 +180,7 @@ export function DashboardOverview() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight break-all">
                 Welcome back, {user?.name}!
               </h1>
               <Sparkles className="h-6 w-6 text-primary animate-pulse" />
@@ -194,7 +194,7 @@ export function DashboardOverview() {
             size="default"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="gap-2 shadow-sm hover:shadow-md transition-all"
+            className="gap-2 hover:text-foreground hover:cursor-pointer shadow-sm hover:shadow-md transition-all"
           >
             <RefreshCw
               className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
