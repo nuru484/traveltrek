@@ -82,6 +82,9 @@ export function BookingButton({
   const [endDate, setEndDate] = useState<string>("");
   const [numberOfRooms, setNumberOfRooms] = useState<number>(1);
 
+  // Calculate total price based on number of guests
+  const calculatedTotalPrice = price * numberOfGuests;
+
   // Handle search errors
   useEffect(() => {
     if (isSearchError && searchError) {
@@ -116,7 +119,7 @@ export function BookingButton({
 
       const payload: IBookingInput = {
         userId: finalUserId,
-        totalPrice: price,
+        totalPrice: calculatedTotalPrice, // Updated to use calculated price
         numberOfGuests,
         specialRequests: specialRequests.trim() || null,
       };
@@ -220,6 +223,9 @@ export function BookingButton({
                   }
                   placeholder="Enter number of guests"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Price per guest: ${price.toFixed(2)}
+                </p>
               </div>
 
               {/* Room-specific fields */}
@@ -298,15 +304,30 @@ export function BookingButton({
                 </p>
               </div>
 
-              {/* Price Display */}
+              {/* Price Display - Updated */}
               <div className="rounded-lg bg-muted/50 p-4 border border-border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Total Price
-                  </span>
-                  <span className="text-lg font-semibold text-foreground">
-                    ${price.toFixed(2)}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Base Price (per guest)
+                    </span>
+                    <span className="font-medium">${price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Number of Guests
+                    </span>
+                    <span className="font-medium">× {numberOfGuests}</span>
+                  </div>
+                  <div className="h-px bg-border" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Total Price
+                    </span>
+                    <span className="text-lg font-semibold text-foreground">
+                      ${calculatedTotalPrice.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -440,6 +461,9 @@ export function BookingButton({
                     )
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Price per guest: ${price.toFixed(2)}
+                </p>
               </div>
 
               {/* Room-specific fields */}
@@ -514,15 +538,30 @@ export function BookingButton({
                 />
               </div>
 
-              {/* Price Display */}
+              {/* Price Display - Updated */}
               <div className="rounded-lg bg-muted/50 p-4 border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Total Price
-                  </span>
-                  <span className="text-lg font-semibold">
-                    ${price.toFixed(2)}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Base Price (per guest)
+                    </span>
+                    <span className="font-medium">${price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Number of Guests
+                    </span>
+                    <span className="font-medium">× {numberOfGuests}</span>
+                  </div>
+                  <div className="h-px bg-border" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Total Price
+                    </span>
+                    <span className="text-lg font-semibold">
+                      ${calculatedTotalPrice.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
