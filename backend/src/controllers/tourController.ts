@@ -16,6 +16,8 @@ import {
 } from '../validations/tour-validation';
 import validationMiddleware from '../middlewares/validation';
 import logger from '../utils/logger';
+import { TourStatus } from '../../generated/prisma';
+import { body } from 'express-validator';
 
 // CREATE TOUR
 const handleCreateTour = asyncHandler(
@@ -836,3 +838,135 @@ export const deleteAllTours = asyncHandler(
     });
   },
 );
+
+const handleUpdateTourStatus = asyncHandler(
+  async (
+    req: Request<{ id?: string }, {}, { status: TourStatus }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    const { id } = req.params;
+    const { status: newStatus } = req.body;
+    const user = req.user!;
+
+    if (!['ADMIN', 'AGENT'].includes(user.role)) {
+      throw new UnauthorizedError('Only ADMIN or AGENT can update tour status');
+    }
+
+    const tourId = parseInt(id!, 10);
+    if (isNaN(tourId)) throw new BadRequestError('Invalid tour ID');
+
+    const tour = await prisma.tour.findUnique({
+      where: { id: tourId },
+      include: {
+        bookings: {
+          include: { payment: true },
+        },
+      },
+    });
+    if (!tour) throw new NotFoundError('Tour not found');
+
+    const current = tour.status;
+    if (newStatus === current) {
+      throw new BadRequestError('New status is identical to current status');
+    }
+
+    const now = new Date();
+
+    let allow = false;
+    let updateData: any = { status: newStatus };
+
+    if (current === 'UPCOMING') {
+      if (newStatus === 'ONGOING') {
+        if (tour.startDate > now)
+          throw new BadRequestError('Cannot start tour before its start date');
+        const pendingPayments = tour.bookings.some(
+          (b) => b.payment?.status === 'PENDING',
+        );
+        if (pendingPayments)
+          throw new BadRequestError('Cannot start tour with pending payments');
+        allow = true;
+      } else if (newStatus === 'CANCELLED') {
+        const paidBookings = tour.bookings.some(
+          (b) => b.payment?.status === 'COMPLETED',
+        );
+        if (paidBookings)
+          throw new BadRequestError(
+            'Cannot cancel tour with completed payments',
+          );
+        allow = true;
+      }
+    } else if (current === 'ONGOING') {
+      if (newStatus === 'COMPLETED') {
+        if (tour.endDate > now)
+          throw new BadRequestError('Cannot complete tour before its end date');
+        updateData.endDate = now;
+        allow = true;
+      } else if (newStatus === 'CANCELLED') {
+        throw new BadRequestError('Cannot cancel an ongoing tour');
+      }
+    } else if (current === 'COMPLETED') {
+      if (newStatus === 'CANCELLED') {
+        throw new BadRequestError('Cannot cancel a completed tour');
+      }
+    } else if (current === 'CANCELLED') {
+      if (newStatus === 'UPCOMING') {
+        if (tour.startDate <= now)
+          throw new BadRequestError(
+            'Cannot reactivate tour - start date has passed',
+          );
+        allow = true;
+      }
+    }
+
+    if (!allow)
+      throw new BadRequestError(
+        `Invalid status transition from ${current} to ${newStatus}`,
+      );
+
+    const updated = await prisma.tour.update({
+      where: { id: tourId },
+      data: updateData,
+      include: {
+        destination: {
+          select: { id: true, name: true, country: true, city: true },
+        },
+      },
+    });
+
+    if (newStatus === 'CANCELLED') {
+      await prisma.booking.updateMany({
+        where: { tourId, status: { in: ['PENDING', 'CONFIRMED'] } },
+        data: { status: 'CANCELLED' },
+      });
+    }
+
+    logger.info(
+      `Tour ${tour.name} (${tourId}) status changed from ${current} to ${newStatus} by ${user.role} ${user.id}`,
+    );
+
+    res.status(HTTP_STATUS_CODES.OK).json({
+      message: 'Tour status updated successfully',
+      data: {
+        id: updated.id,
+        name: updated.name,
+        status: updated.status,
+        startDate: updated.startDate,
+        endDate: updated.endDate,
+        destination: updated.destination,
+      },
+    });
+  },
+);
+
+export const updateTourStatus: RequestHandler[] = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Tour ID must be a positive integer'),
+  ...validationMiddleware.create([
+    body('status')
+      .isIn(['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED'])
+      .withMessage('Invalid tour status'),
+  ]),
+  handleUpdateTourStatus,
+];

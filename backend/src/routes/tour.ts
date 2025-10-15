@@ -6,6 +6,7 @@ import {
   deleteTour,
   getAllTours,
   deleteAllTours,
+  updateTourStatus,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
 import { UserRole } from '../../types/user-profile.types';
@@ -20,6 +21,13 @@ tourRoutes.get(
   '/tours/:id',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   ...getTour,
+);
+
+// Update a tour status
+tourRoutes.patch(
+  '/tours/:id/status',
+  authorizeRole([UserRole.ADMIN]),
+  ...updateTourStatus,
 );
 
 // Update a tour by ID
