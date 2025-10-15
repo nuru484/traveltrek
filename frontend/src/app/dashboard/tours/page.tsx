@@ -142,6 +142,7 @@ export default function AdminToursPage() {
         description="Are you sure you want to delete all tours? This action cannot be undone."
         onConfirm={handleDeleteAllTours}
         confirmText="Delete"
+        requireExactMatch="Delete All Tours"
         isDestructive
       />
     </div>

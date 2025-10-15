@@ -148,6 +148,7 @@ export default function HotelsPage() {
         description="Are you sure you want to delete all hotels? This action cannot be undone."
         onConfirm={handleDeleteAllHotels}
         confirmText="Delete"
+        requireExactMatch="Delete All Hotels"
         isDestructive
       />
     </div>

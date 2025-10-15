@@ -150,6 +150,7 @@ export default function FlightsPage() {
         description="Are you sure you want to delete all flights? This action cannot be undone."
         onConfirm={handleDeleteAllFlights}
         confirmText="Delete"
+        requireExactMatch="Delete All Flights"
         isDestructive
       />
     </div>

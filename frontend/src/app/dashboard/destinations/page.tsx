@@ -161,6 +161,7 @@ export default function DestinationsPage() {
         description="Are you sure you want to delete all destinations? This will delete all hotels and flights to these destinations and cannot be undone."
         onConfirm={handleDeleteAllDestinations}
         confirmText="Delete"
+        requireExactMatch="Delete All Destinations"
         isDestructive
       />
     </div>

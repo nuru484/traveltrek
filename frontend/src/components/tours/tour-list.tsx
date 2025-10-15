@@ -1,3 +1,4 @@
+// src/components/tours/tour-list.tsx
 "use client";
 import { TourListItem } from "./tour-list-item";
 import { ITour, IToursQueryParams } from "@/types/tour.types";
