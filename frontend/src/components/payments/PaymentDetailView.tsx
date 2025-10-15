@@ -136,7 +136,9 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
                 <label className="text-sm font-medium text-muted-foreground">
                   Name
                 </label>
-                <p className="text-sm font-medium">{payment.user.name}</p>
+                <p className="text-sm font-medium break-all">
+                  {payment.user.name}
+                </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
@@ -144,7 +146,7 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
                 </label>
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm">{payment.user.email}</p>
+                  <p className="text-sm break-all">{payment.user.email}</p>
                 </div>
               </div>
             </div>
@@ -252,7 +254,7 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
             <label className="text-sm font-medium text-muted-foreground">
               Name
             </label>
-            <p className="font-medium">{payment.bookedItem.name}</p>
+            <p className="font-medium break-all">{payment.bookedItem.name}</p>
           </div>
 
           {payment.bookedItem.description && (
@@ -260,7 +262,7 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
               <label className="text-sm font-medium text-muted-foreground">
                 Description
               </label>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground break-all">
                 {payment.bookedItem.description}
               </p>
             </div>

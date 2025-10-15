@@ -177,7 +177,9 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                 <label className="text-sm font-medium text-muted-foreground">
                   Name
                 </label>
-                <p className="text-sm font-medium">{booking.user.name}</p>
+                <p className="text-sm font-medium break-all">
+                  {booking.user.name}
+                </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
@@ -185,7 +187,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                 </label>
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm">{booking.user.email}</p>
+                  <p className="text-sm break-all">{booking.user.email}</p>
                 </div>
               </div>
             </div>
@@ -286,7 +288,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                       <MessageSquare className="h-4 w-4" />
                       Special Requests
                     </label>
-                    <p className="text-sm bg-muted/50 p-3 rounded-md border">
+                    <p className="text-sm bg-muted/50 p-3 rounded-md border break-all">
                       {booking.specialRequests}
                     </p>
                   </div>
@@ -355,7 +357,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                 <div>
                   <p className="font-semibold text-base">{booking.tour.name}</p>
                   {booking.tour.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-all">
                       {booking.tour.description}
                     </p>
                   )}
@@ -422,14 +424,14 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                       {booking.room.hotel.name}
                     </p>
                     {booking.room.hotel.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-all">
                         {booking.room.hotel.description}
                       </p>
                     )}
                     {booking.room.hotel.destination && (
                       <div className="space-y-2 mt-2">
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <MapPin className="h-4 w-4 text-muted-foreground break-all" />
                           <p className="text-sm font-medium">
                             {booking.room.hotel.destination.name}
                           </p>
