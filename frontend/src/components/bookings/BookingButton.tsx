@@ -195,10 +195,12 @@ export function BookingButton({
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="max-w-[95vw] sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Confirm Booking</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg sm:text-xl">
+                Confirm Booking
+              </DialogTitle>
+              <DialogDescription className="text-sm">
                 Please provide additional details for your booking.
               </DialogDescription>
             </DialogHeader>
@@ -206,9 +208,12 @@ export function BookingButton({
             <div className="space-y-4 py-4">
               {/* Number of Guests */}
               <div className="space-y-2">
-                <Label htmlFor="guests" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Number of Guests
+                <Label
+                  htmlFor="guests"
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <Users className="h-4 w-4 flex-shrink-0" />
+                  <span className="break-words">Number of Guests</span>
                 </Label>
                 <Input
                   id="guests"
@@ -222,8 +227,9 @@ export function BookingButton({
                     )
                   }
                   placeholder="Enter number of guests"
+                  className="w-full"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground break-words">
                   Price per guest: ${price.toFixed(2)}
                 </p>
               </div>
@@ -234,10 +240,10 @@ export function BookingButton({
                   <div className="space-y-2">
                     <Label
                       htmlFor="check-in"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 text-sm"
                     >
-                      <Calendar className="h-4 w-4" />
-                      Check-in Date
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span className="break-words">Check-in Date</span>
                     </Label>
                     <Input
                       id="check-in"
@@ -246,16 +252,17 @@ export function BookingButton({
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       required
+                      className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label
                       htmlFor="check-out"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 text-sm"
                     >
-                      <Calendar className="h-4 w-4" />
-                      Check-out Date
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span className="break-words">Check-out Date</span>
                     </Label>
                     <Input
                       id="check-out"
@@ -264,11 +271,14 @@ export function BookingButton({
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       required
+                      className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="num-rooms">Number of Rooms</Label>
+                    <Label htmlFor="num-rooms" className="text-sm break-words">
+                      Number of Rooms
+                    </Label>
                     <Input
                       id="num-rooms"
                       type="number"
@@ -281,6 +291,7 @@ export function BookingButton({
                         )
                       }
                       placeholder="Enter number of rooms"
+                      className="w-full"
                     />
                   </div>
                 </>
@@ -288,7 +299,10 @@ export function BookingButton({
 
               {/* Special Requests */}
               <div className="space-y-2">
-                <Label htmlFor="special-requests">
+                <Label
+                  htmlFor="special-requests"
+                  className="text-sm break-words"
+                >
                   Special Requests (Optional)
                 </Label>
                 <Textarea
@@ -298,6 +312,7 @@ export function BookingButton({
                   placeholder="Any special requirements or preferences..."
                   rows={3}
                   maxLength={500}
+                  className="w-full resize-none"
                 />
                 <p className="text-xs text-muted-foreground">
                   {specialRequests.length}/500 characters
@@ -305,26 +320,30 @@ export function BookingButton({
               </div>
 
               {/* Price Display - Updated */}
-              <div className="rounded-lg bg-muted/50 p-4 border border-border">
+              <div className="rounded-lg bg-muted/50 p-3 sm:p-4 border border-border">
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2 text-sm">
+                    <span className="text-muted-foreground break-words flex-1">
                       Base Price (per guest)
                     </span>
-                    <span className="font-medium">${price.toFixed(2)}</span>
+                    <span className="font-medium whitespace-nowrap">
+                      ${price.toFixed(2)}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2 text-sm">
+                    <span className="text-muted-foreground break-words flex-1">
                       Number of Guests
                     </span>
-                    <span className="font-medium">× {numberOfGuests}</span>
+                    <span className="font-medium whitespace-nowrap">
+                      × {numberOfGuests}
+                    </span>
                   </div>
                   <div className="h-px bg-border" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-sm font-medium text-muted-foreground break-words flex-1">
                       Total Price
                     </span>
-                    <span className="text-lg font-semibold text-foreground">
+                    <span className="text-lg font-semibold text-foreground whitespace-nowrap">
                       ${calculatedTotalPrice.toFixed(2)}
                     </span>
                   </div>
@@ -332,27 +351,29 @@ export function BookingButton({
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
                 disabled={isLoading}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 onClick={() => handleBook(userId)}
                 disabled={isLoading || (roomId && (!startDate || !endDate))}
+                className="w-full sm:w-auto"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                    <span className="truncate">Processing...</span>
                   </>
                 ) : (
                   <>
-                    <Bookmark className="mr-2 h-4 w-4" />
-                    Confirm Booking
+                    <Bookmark className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Confirm Booking</span>
                   </>
                 )}
               </Button>
@@ -374,57 +395,69 @@ export function BookingButton({
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto gap-0 p-0">
-            <DialogHeader className="px-6 pt-6 pb-4 space-y-2">
-              <DialogTitle className="text-xl font-semibold">
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[500px] max-h-[90vh] overflow-y-auto gap-0 p-0">
+            <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 space-y-2">
+              <DialogTitle className="text-lg sm:text-xl font-semibold break-words pr-8">
                 Create Booking
               </DialogTitle>
-              <DialogDescription className="text-left text-sm text-muted-foreground">
+              <DialogDescription className="text-left text-sm text-muted-foreground break-words">
                 Select a user and provide booking details.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="px-6 pb-6 space-y-4 overflow-hidden">
+            <div className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 overflow-hidden">
               {/* Search Input */}
               <div className="space-y-2">
-                <Label htmlFor="user-search" className="text-sm font-medium">
+                <Label
+                  htmlFor="user-search"
+                  className="text-sm font-medium break-words"
+                >
                   Search Users
                 </Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <Input
                     id="user-search"
                     placeholder="Search by name or email..."
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 w-full"
                   />
                 </div>
               </div>
 
               {/* User Selection */}
               <div className="space-y-2">
-                <Label htmlFor="user-select" className="text-sm font-medium">
+                <Label
+                  htmlFor="user-select"
+                  className="text-sm font-medium break-words"
+                >
                   Select User
                 </Label>
                 <Select
                   value={selectedUserId ? String(selectedUserId) : ""}
                   onValueChange={(val) => setSelectedUserId(Number(val))}
                 >
-                  <SelectTrigger id="user-select">
+                  <SelectTrigger id="user-select" className="w-full">
                     <SelectValue placeholder="Choose a user to book for" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[300px] max-w-[calc(100vw-4rem)] sm:max-w-[468px]">
                     {isUsersLoading ? (
                       <div className="flex items-center justify-center py-6">
                         <Loader2 className="h-5 w-5 animate-spin" />
                       </div>
                     ) : availableUsers.length > 0 ? (
                       availableUsers.map((u) => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{u.name}</span>
-                            <span className="text-xs text-muted-foreground">
+                        <SelectItem
+                          key={u.id}
+                          value={String(u.id)}
+                          className="py-3"
+                        >
+                          <div className="flex flex-col gap-0.5 min-w-0 w-full">
+                            <span className="font-medium text-sm break-all line-clamp-2">
+                              {u.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground break-all line-clamp-1">
                               {u.email}
                             </span>
                           </div>
@@ -444,10 +477,10 @@ export function BookingButton({
               <div className="space-y-2">
                 <Label
                   htmlFor="guests-admin"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-sm"
                 >
-                  <Users className="h-4 w-4" />
-                  Number of Guests
+                  <Users className="h-4 w-4 flex-shrink-0" />
+                  <span className="break-words">Number of Guests</span>
                 </Label>
                 <Input
                   id="guests-admin"
@@ -460,8 +493,9 @@ export function BookingButton({
                       Math.max(1, parseInt(e.target.value) || 1)
                     )
                   }
+                  className="w-full"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground break-words">
                   Price per guest: ${price.toFixed(2)}
                 </p>
               </div>
@@ -472,10 +506,10 @@ export function BookingButton({
                   <div className="space-y-2">
                     <Label
                       htmlFor="check-in-admin"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 text-sm"
                     >
-                      <Calendar className="h-4 w-4" />
-                      Check-in Date
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span className="break-words">Check-in Date</span>
                     </Label>
                     <Input
                       id="check-in-admin"
@@ -484,16 +518,17 @@ export function BookingButton({
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       required
+                      className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label
                       htmlFor="check-out-admin"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 text-sm"
                     >
-                      <Calendar className="h-4 w-4" />
-                      Check-out Date
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span className="break-words">Check-out Date</span>
                     </Label>
                     <Input
                       id="check-out-admin"
@@ -502,11 +537,17 @@ export function BookingButton({
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       required
+                      className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="num-rooms-admin">Number of Rooms</Label>
+                    <Label
+                      htmlFor="num-rooms-admin"
+                      className="text-sm break-words"
+                    >
+                      Number of Rooms
+                    </Label>
                     <Input
                       id="num-rooms-admin"
                       type="number"
@@ -518,6 +559,7 @@ export function BookingButton({
                           Math.max(1, parseInt(e.target.value) || 1)
                         )
                       }
+                      className="w-full"
                     />
                   </div>
                 </>
@@ -525,7 +567,10 @@ export function BookingButton({
 
               {/* Special Requests */}
               <div className="space-y-2">
-                <Label htmlFor="special-requests-admin">
+                <Label
+                  htmlFor="special-requests-admin"
+                  className="text-sm break-words"
+                >
                   Special Requests (Optional)
                 </Label>
                 <Textarea
@@ -535,30 +580,35 @@ export function BookingButton({
                   placeholder="Any special requirements..."
                   rows={3}
                   maxLength={500}
+                  className="w-full resize-none"
                 />
               </div>
 
               {/* Price Display - Updated */}
-              <div className="rounded-lg bg-muted/50 p-4 border">
+              <div className="rounded-lg bg-muted/50 p-3 sm:p-4 border">
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2 text-sm">
+                    <span className="text-muted-foreground break-words flex-1">
                       Base Price (per guest)
                     </span>
-                    <span className="font-medium">${price.toFixed(2)}</span>
+                    <span className="font-medium whitespace-nowrap">
+                      ${price.toFixed(2)}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2 text-sm">
+                    <span className="text-muted-foreground break-words flex-1">
                       Number of Guests
                     </span>
-                    <span className="font-medium">× {numberOfGuests}</span>
+                    <span className="font-medium whitespace-nowrap">
+                      × {numberOfGuests}
+                    </span>
                   </div>
                   <div className="h-px bg-border" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-muted-foreground">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-sm font-medium text-muted-foreground break-words flex-1">
                       Total Price
                     </span>
-                    <span className="text-lg font-semibold">
+                    <span className="text-lg font-semibold whitespace-nowrap">
                       ${calculatedTotalPrice.toFixed(2)}
                     </span>
                   </div>
@@ -566,12 +616,12 @@ export function BookingButton({
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-4 bg-muted/30 border-t flex-row gap-2">
+            <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
                 disabled={isLoading}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 Cancel
               </Button>
@@ -582,17 +632,17 @@ export function BookingButton({
                   isLoading ||
                   (roomId && (!startDate || !endDate))
                 }
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                    <span className="truncate">Processing...</span>
                   </>
                 ) : (
                   <>
-                    <Bookmark className="mr-2 h-4 w-4" />
-                    Confirm Booking
+                    <Bookmark className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Confirm Booking</span>
                   </>
                 )}
               </Button>
