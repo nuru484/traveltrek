@@ -81,13 +81,17 @@ export default function HotelsPage() {
   };
 
   const handleDeleteAllHotels = async () => {
+    const toastId = toast.loading("Deleting Hotels...");
+
     try {
       await deleteAllHotels().unwrap();
+      toast.dismiss(toastId);
       toast.success("All hotels deleted successfully");
       setShowDeleteDialog(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       console.error("Failed to delete all hotels:", error);
+      toast.dismiss(toastId);
       toast.error(message || "Failed to delete all hotels");
     }
   };

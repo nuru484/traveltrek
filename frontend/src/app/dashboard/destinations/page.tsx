@@ -93,13 +93,17 @@ export default function DestinationsPage() {
   };
 
   const handleDeleteAllDestinations = async () => {
+    const toastId = toast.loading("Deleting Flights...");
+
     try {
       await deleteAllDestinations().unwrap();
+      toast.dismiss(toastId);
       toast.success("All destinations deleted successfully");
       setShowDeleteDialog(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       console.error("Failed to delete all destinations:", error);
+      toast.dismiss(toastId);
       toast.error(message || "Failed to delete all destinations");
     }
   };

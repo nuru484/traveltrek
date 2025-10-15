@@ -76,13 +76,17 @@ export default function AdminToursPage() {
   };
 
   const handleDeleteAllTours = async () => {
+    const toastId = toast.loading("Deleting tours...");
+
     try {
       await deleteAllTours().unwrap();
+      toast.dismiss(toastId);
       toast.success("All tours deleted successfully");
       setShowDeleteDialog(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       console.error("Failed to delete all tours:", error);
+      toast.dismiss(toastId);
       toast.error(message || "Failed to delete all tours");
     }
   };
