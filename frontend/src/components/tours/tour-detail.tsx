@@ -322,28 +322,34 @@ export function TourDetail({ tour }: ITourDetailProps) {
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
         {/* Hero Section with Tour Image */}
+        {/* Hero Section with Tour Image */}
         <Card className="overflow-hidden border-0 shadow-md">
           <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
             <div className="absolute inset-0 flex items-center justify-center">
               <ImageOff className="h-16 w-16 text-muted-foreground/30" />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <Badge variant="outline">
+            <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs">
                       <Tag className="h-3 w-3 mr-1" />
                       {tour.type}
                     </Badge>
-                    <Badge variant={tourStatusConfig.variant}>
+                    <Badge
+                      variant={tourStatusConfig.variant}
+                      className="text-xs"
+                    >
                       <StatusIcon className="h-3 w-3 mr-1" />
                       {tourStatusConfig.label}
                     </Badge>
                     {isFullyBooked && (
-                      <Badge variant="destructive">Fully Booked</Badge>
+                      <Badge variant="destructive" className="text-xs">
+                        Fully Booked
+                      </Badge>
                     )}
                     {isBookingDataLoading ? (
-                      <div className="h-5 w-32 bg-white/70 animate-pulse rounded-full"></div>
+                      <div className="h-5 w-24 sm:w-32 bg-white/70 animate-pulse rounded-full"></div>
                     ) : (
                       isTourBooked && (
                         <Badge
@@ -356,23 +362,24 @@ export function TourDetail({ tour }: ITourDetailProps) {
                               ? "outline"
                               : "secondary"
                           }
+                          className="text-xs"
                         >
                           Booking: {bookingStatus}
                         </Badge>
                       )
                     )}
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="text-xs">
                       <Clock className="h-3 w-3 mr-1" />
                       {formatDuration(tour.duration)}
                     </Badge>
                   </div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight break-words">
                     {tour.name}
                   </h1>
                   {tour.destination && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span className="text-base md:text-lg">
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm sm:text-base md:text-lg break-words">
                         {getDestinationDisplay()}
                       </span>
                     </div>
@@ -380,7 +387,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                 </div>
 
                 {/* Actions Dropdown */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
                   {!isAdmin && !isAgent && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -389,14 +396,14 @@ export function TourDetail({ tour }: ITourDetailProps) {
                           size="sm"
                           onClick={handleBookingButtonClick}
                           disabled={isBookingButtonDisabled()}
-                          className="cursor-pointer"
+                          className="cursor-pointer h-8 sm:h-9 px-2 sm:px-3"
                         >
                           {isBookingDataLoading ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
                           ) : (
-                            <Bookmark className="h-4 w-4 mr-2" />
+                            <Bookmark className="h-4 w-4 sm:mr-2" />
                           )}
-                          <span className="hidden sm:inline">
+                          <span className="hidden sm:inline text-xs sm:text-sm">
                             {getBookingButtonText()}
                           </span>
                         </Button>
@@ -421,17 +428,19 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="cursor-pointer"
+                          className="cursor-pointer h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
                           disabled={isLoading}
                         >
                           <Badge
                             variant={tourStatusConfig.variant}
-                            className="mr-2"
+                            className="mr-1 sm:mr-2 text-xs"
                           >
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {tourStatusConfig.label}
+                            <StatusIcon className="h-3 w-3 sm:mr-1" />
+                            <span className="hidden sm:inline">
+                              {tourStatusConfig.label}
+                            </span>
                           </Badge>
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
@@ -464,7 +473,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="cursor-pointer h-9 w-9"
+                          className="cursor-pointer h-8 w-8 sm:h-9 sm:w-9"
                           disabled={isLoading}
                         >
                           <MoreHorizontal className="h-4 w-4" />
