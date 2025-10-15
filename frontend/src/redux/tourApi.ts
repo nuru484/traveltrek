@@ -73,6 +73,30 @@ export const tourApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    updateTourStatus: builder.mutation<
+      IApiResponse<ITourResponse>,
+      {
+        id: number;
+        status: string;
+      }
+    >({
+      query: ({ id, status }) => ({
+        url: `/tours/${id}/status`,
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+        }),
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Tour", id },
+        "Tour",
+        "Tours",
+      ],
+    }),
+
     deleteTour: builder.mutation<void, number>({
       query: (id) => ({
         url: `/tours/${id}`,
@@ -96,6 +120,7 @@ export const {
   useGetTourQuery,
   useCreateTourMutation,
   useUpdateTourMutation,
+  useUpdateTourStatusMutation,
   useDeleteTourMutation,
   useDeleteAllToursMutation,
 } = tourApi;

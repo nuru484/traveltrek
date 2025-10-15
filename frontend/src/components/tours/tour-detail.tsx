@@ -1,12 +1,15 @@
 // src/components/tours/tour-detail.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import Link from "next/link";
 import { RootState } from "@/redux/store";
-import { useDeleteTourMutation } from "@/redux/tourApi";
+import {
+  useDeleteTourMutation,
+  useUpdateTourStatusMutation,
+} from "@/redux/tourApi";
 import {
   useGetAllUserBookingsQuery,
   useCreateBookingMutation,
@@ -17,12 +20,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Calendar,
@@ -39,6 +48,11 @@ import {
   FileText,
   DollarSign,
   Tag,
+  CheckCircle,
+  XCircle,
+  PlayCircle,
+  AlertCircle,
+  ChevronDown,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -48,13 +62,62 @@ interface ITourDetailProps {
   tour: ITour;
 }
 
+const getAvailableStatusTransitions = (currentStatus: string) => {
+  const transitions: Record<string, string[]> = {
+    UPCOMING: ["ONGOING", "CANCELLED"],
+    ONGOING: ["COMPLETED"],
+    COMPLETED: [],
+    CANCELLED: ["UPCOMING"],
+  };
+
+  return transitions[currentStatus] || [];
+};
+
+const getTourStatusConfig = (status: string) => {
+  switch (status) {
+    case "UPCOMING":
+      return {
+        variant: "default" as const,
+        icon: Clock,
+        label: "Upcoming",
+      };
+    case "ONGOING":
+      return {
+        variant: "secondary" as const,
+        icon: PlayCircle,
+        label: "Ongoing",
+      };
+    case "COMPLETED":
+      return {
+        variant: "outline" as const,
+        icon: CheckCircle,
+        label: "Completed",
+      };
+    case "CANCELLED":
+      return {
+        variant: "destructive" as const,
+        icon: XCircle,
+        label: "Cancelled",
+      };
+    default:
+      return {
+        variant: "secondary" as const,
+        icon: AlertCircle,
+        label: status,
+      };
+  }
+};
+
 export function TourDetail({ tour }: ITourDetailProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
+  const canUpdateStatus = isAdmin || isAgent;
 
   const [deleteTour, { isLoading: isDeleting }] = useDeleteTourMutation();
+  const [updateTourStatus, { isLoading: isUpdatingStatus }] =
+    useUpdateTourStatusMutation();
   const [createBooking, { isLoading: isBooking }] = useCreateBookingMutation();
   const [updateBooking, { isLoading: isCancelling }] =
     useUpdateBookingMutation();
@@ -98,6 +161,13 @@ export function TourDetail({ tour }: ITourDetailProps) {
     bookingStatus !== "CANCELLED" &&
     bookingStatus !== "COMPLETED";
   const isFullyBooked = tour.guestsBooked >= tour.maxGuests;
+  const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
+
+  const tourStatusConfig = getTourStatusConfig(tour.status);
+  const StatusIcon = tourStatusConfig.icon;
+  const availableStatusTransitions = getAvailableStatusTransitions(tour.status);
+
+  const isLoading = isDeleting || isBooking || isCancelling || isUpdatingStatus;
 
   const formatDate = (date: string | Date) => {
     return format(new Date(date), "MMM dd, yyyy");
@@ -118,8 +188,26 @@ export function TourDetail({ tour }: ITourDetailProps) {
     return `${name}, ${country}`;
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    const toastId = toast.loading(`Updating tour status to ${newStatus}...`);
+
+    try {
+      await updateTourStatus({
+        id: tour.id,
+        status: newStatus,
+      }).unwrap();
+
+      toast.dismiss(toastId);
+      toast.success(`Tour status updated to ${newStatus} successfully`);
+    } catch (error) {
+      const { message } = extractApiErrorMessage(error);
+      toast.dismiss(toastId);
+      toast.error(message || "Failed to update tour status");
+    }
+  };
+
   const handleEdit = () => {
-    router.push(`/admin-dashboard/tours/${tour.id}/edit`);
+    router.push(`/dashboard/tours/${tour.id}/edit`);
   };
 
   const handleDelete = async () => {
@@ -127,11 +215,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
       await deleteTour(tour.id).unwrap();
       toast.success("Tour deleted successfully");
       setShowDeleteDialog(false);
-      router.push(
-        pathname.startsWith("/admin-dashboard")
-          ? "/admin-dashboard/tours"
-          : "/dashboard/tours"
-      );
+      router.push("/dashboard/tours");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       console.error("Failed to delete tour:", error);
@@ -140,6 +224,12 @@ export function TourDetail({ tour }: ITourDetailProps) {
   };
 
   const handleBook = async () => {
+    if (!user) {
+      toast.error("Please log in to book a tour");
+      router.push("/login");
+      return;
+    }
+
     try {
       await createBooking({
         userId: parseInt(user.id),
@@ -178,7 +268,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
   };
 
   const getBookingButtonText = () => {
-    if (isLoadingBookings || isFetchingBookings) {
+    if (isBookingDataLoading) {
       return "Loading...";
     }
 
@@ -202,18 +292,19 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
   const isBookingButtonDisabled = () => {
     return (
-      isLoadingBookings ||
-      isFetchingBookings ||
+      isBookingDataLoading ||
       isBooking ||
       isCancelling ||
       (isFullyBooked && !isTourBooked) ||
       bookingStatus === "CANCELLED" ||
-      bookingStatus === "COMPLETED"
+      bookingStatus === "COMPLETED" ||
+      tour.status === "CANCELLED" ||
+      tour.status === "COMPLETED"
     );
   };
 
   const handleBookingButtonClick = () => {
-    if (isLoadingBookings || isFetchingBookings) {
+    if (isBookingDataLoading) {
       return;
     }
 
@@ -232,50 +323,141 @@ export function TourDetail({ tour }: ITourDetailProps) {
       <div className="container mx-auto space-y-6">
         {/* Hero Section with Tour Image */}
         <Card className="overflow-hidden border-0 shadow-md">
-          {
-            <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <ImageOff className="h-16 w-16 text-muted-foreground/30" />
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge variant="outline">
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tour.type}
-                      </Badge>
-                      <Badge
-                        variant={
-                          tour.status === "UPCOMING"
-                            ? "default"
-                            : tour.status === "ONGOING"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {tour.status}
-                      </Badge>
-                      {isFullyBooked && (
-                        <Badge variant="destructive">Fully Booked</Badge>
-                      )}
-                      <Badge variant="outline">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDuration(tour.duration)}
-                      </Badge>
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
-                      {tour.name}
-                    </h1>
-                    {tour.destination && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-base md:text-lg">
-                          {getDestinationDisplay()}
-                        </span>
-                      </div>
+          <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <ImageOff className="h-16 w-16 text-muted-foreground/30" />
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <Badge variant="outline">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {tour.type}
+                    </Badge>
+                    <Badge variant={tourStatusConfig.variant}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {tourStatusConfig.label}
+                    </Badge>
+                    {isFullyBooked && (
+                      <Badge variant="destructive">Fully Booked</Badge>
                     )}
+                    {isBookingDataLoading ? (
+                      <div className="h-5 w-32 bg-white/70 animate-pulse rounded-full"></div>
+                    ) : (
+                      isTourBooked && (
+                        <Badge
+                          variant={
+                            bookingStatus === "CONFIRMED"
+                              ? "default"
+                              : bookingStatus === "CANCELLED"
+                              ? "destructive"
+                              : bookingStatus === "COMPLETED"
+                              ? "outline"
+                              : "secondary"
+                          }
+                        >
+                          Booking: {bookingStatus}
+                        </Badge>
+                      )
+                    )}
+                    <Badge variant="outline">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {formatDuration(tour.duration)}
+                    </Badge>
                   </div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+                    {tour.name}
+                  </h1>
+                  {tour.destination && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span className="text-base md:text-lg">
+                        {getDestinationDisplay()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions Dropdown */}
+                <div className="flex gap-2">
+                  {!isAdmin && !isAgent && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isBookingActive ? "secondary" : "default"}
+                          size="sm"
+                          onClick={handleBookingButtonClick}
+                          disabled={isBookingButtonDisabled()}
+                          className="cursor-pointer"
+                        >
+                          {isBookingDataLoading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Bookmark className="h-4 w-4 mr-2" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {getBookingButtonText()}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {isBookingDataLoading
+                            ? "Loading booking status..."
+                            : isBookingActive
+                            ? "Cancel booking"
+                            : isTourBooked
+                            ? `Booking ${bookingStatus}`
+                            : "Book this tour"}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {canUpdateStatus && availableStatusTransitions.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer"
+                          disabled={isLoading}
+                        >
+                          <Badge
+                            variant={tourStatusConfig.variant}
+                            className="mr-2"
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {tourStatusConfig.label}
+                          </Badge>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <div className="px-2 py-1.5 text-sm font-semibold">
+                          Update Status
+                        </div>
+                        <DropdownMenuSeparator />
+                        {availableStatusTransitions.map((status) => {
+                          const statusConfig = getTourStatusConfig(status);
+                          const StatusIcon = statusConfig.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleStatusChange(status)}
+                              disabled={isLoading}
+                              className="cursor-pointer"
+                            >
+                              <StatusIcon className="mr-2 h-4 w-4" />
+                              {statusConfig.label}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
                   {isAdmin && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -283,7 +465,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                           variant="outline"
                           size="icon"
                           className="cursor-pointer h-9 w-9"
-                          disabled={isDeleting}
+                          disabled={isLoading}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -291,7 +473,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem
                           onClick={handleEdit}
-                          disabled={isDeleting}
+                          disabled={isLoading}
                           className="cursor-pointer"
                         >
                           <Edit className="mr-2 h-4 w-4" />
@@ -299,7 +481,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setShowDeleteDialog(true)}
-                          disabled={isDeleting}
+                          disabled={isLoading}
                           className="text-destructive focus:text-destructive cursor-pointer"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -311,7 +493,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                 </div>
               </div>
             </div>
-          }
+          </div>
         </Card>
 
         {/* Content Section */}
@@ -360,6 +542,64 @@ export function TourDetail({ tour }: ITourDetailProps) {
                     </div>
                   </div>
                 )}
+
+                {/* Tour Status */}
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <StatusIcon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">
+                      Tour Status
+                    </p>
+                    {canUpdateStatus &&
+                    availableStatusTransitions.length > 0 ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer w-full justify-between"
+                            disabled={isLoading}
+                          >
+                            <div className="flex items-center">
+                              <StatusIcon className="h-4 w-4 mr-2" />
+                              {tourStatusConfig.label}
+                            </div>
+                            <ChevronDown className="h-4 w-4 ml-2" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-48">
+                          <div className="px-2 py-1.5 text-sm font-semibold">
+                            Update Status
+                          </div>
+                          <DropdownMenuSeparator />
+                          {availableStatusTransitions.map((status) => {
+                            const statusConfig = getTourStatusConfig(status);
+                            const StatusIcon = statusConfig.icon;
+                            return (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={() => handleStatusChange(status)}
+                                disabled={isLoading}
+                                className="cursor-pointer"
+                              >
+                                <StatusIcon className="mr-2 h-4 w-4" />
+                                {statusConfig.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <Badge
+                        variant={tourStatusConfig.variant}
+                        className="text-sm"
+                      >
+                        <StatusIcon className="h-4 w-4 mr-2" />
+                        {tourStatusConfig.label}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
 
                 {/* Price */}
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
@@ -426,9 +666,25 @@ export function TourDetail({ tour }: ITourDetailProps) {
                     <p className="text-base font-semibold text-foreground">
                       {tour.guestsBooked} / {tour.maxGuests} guests
                     </p>
-                    {isFullyBooked && (
-                      <p className="text-xs text-destructive mt-1 font-medium">
+                    {isFullyBooked ? (
+                      <p className="text-xs text-destructive mt-1 font-medium flex items-center gap-1">
+                        <XCircle className="h-3 w-3" />
                         Fully Booked
+                      </p>
+                    ) : tour.status === "CANCELLED" ? (
+                      <p className="text-xs text-destructive mt-1 font-medium flex items-center gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Tour cancelled
+                      </p>
+                    ) : tour.status === "COMPLETED" ? (
+                      <p className="text-xs text-muted-foreground mt-1 font-medium flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Tour completed
+                      </p>
+                    ) : (
+                      <p className="text-xs text-green-600 mt-1 font-medium flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        {tour.maxGuests - tour.guestsBooked} spots remaining
                       </p>
                     )}
                   </div>
@@ -436,7 +692,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
               </div>
 
               {/* Booking Status Section for Users */}
-              {!isAdmin && (
+              {!isAdmin && !isAgent && (
                 <>
                   <Separator />
                   <div>
@@ -449,7 +705,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                       </div>
                     </div>
 
-                    {isLoadingBookings || isFetchingBookings ? (
+                    {isBookingDataLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
@@ -491,22 +747,31 @@ export function TourDetail({ tour }: ITourDetailProps) {
                     ) : (
                       <div className="space-y-4">
                         <p className="text-muted-foreground">
-                          You haven&apos;t booked this tour yet.
+                          {tour.status === "CANCELLED"
+                            ? "This tour has been cancelled."
+                            : tour.status === "COMPLETED"
+                            ? "This tour has been completed."
+                            : isFullyBooked
+                            ? "This tour is fully booked."
+                            : "You haven't booked this tour yet."}
                         </p>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleBookingButtonClick}
-                          disabled={isBookingButtonDisabled()}
-                          className="cursor-pointer"
-                        >
-                          {isBooking ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Bookmark className="mr-2 h-4 w-4" />
+                        {tour.status !== "CANCELLED" &&
+                          tour.status !== "COMPLETED" && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={handleBookingButtonClick}
+                              disabled={isBookingButtonDisabled()}
+                              className="cursor-pointer"
+                            >
+                              {isBooking ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Bookmark className="mr-2 h-4 w-4" />
+                              )}
+                              {getBookingButtonText()}
+                            </Button>
                           )}
-                          {getBookingButtonText()}
-                        </Button>
                       </div>
                     )}
                   </div>
@@ -552,7 +817,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
           open={showBookDialog}
           onOpenChange={setShowBookDialog}
           title="Confirm Booking"
-          description={`Are you sure you want to book "${truncatedTourName}" to ${getDestinationDisplay()} for ₵${tour.price.toLocaleString()}?`}
+          description={`Are you sure youwant to book "${truncatedTourName}" to ${getDestinationDisplay()} for ₵${tour.price.toLocaleString()}?`}
           onConfirm={handleBook}
           confirmText="Book Now"
         />
