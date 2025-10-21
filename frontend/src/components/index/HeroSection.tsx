@@ -2,7 +2,16 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, MapPin, Star } from "lucide-react";
+import {
+  ArrowRight,
+  Play,
+  MapPin,
+  Star,
+  Palmtree,
+  Landmark,
+  Building2,
+  Building,
+} from "lucide-react";
 
 const HeroSection = () => {
   return (
@@ -145,10 +154,10 @@ const HeroSection = () => {
               className="hidden lg:grid grid-cols-2 gap-4 auto-rows-fr"
             >
               {[
-                { name: "Bali, Indonesia", image: "🏝️", price: "$899" },
-                { name: "Paris, France", image: "🗼", price: "$1,299" },
-                { name: "Tokyo, Japan", image: "🏯", price: "$1,499" },
-                { name: "Dubai, UAE", image: "🏙️", price: "$1,099" },
+                { name: "Bali, Indonesia", icon: Palmtree, price: "$899" },
+                { name: "Paris, France", icon: Landmark, price: "$1,299" },
+                { name: "Tokyo, Japan", icon: Building2, price: "$1,499" },
+                { name: "Dubai, UAE", icon: Building, price: "$1,099" },
               ].map((destination, index) => (
                 <motion.div
                   key={destination.name}
@@ -157,7 +166,9 @@ const HeroSection = () => {
                   transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
                   className="group relative bg-card/80 backdrop-blur-md border border-border rounded-xl p-4 hover:bg-card/95 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
                 >
-                  <div className="text-4xl mb-2">{destination.image}</div>
+                  <div className="mb-3 p-2 rounded-lg bg-primary/10 w-fit">
+                    <destination.icon className="w-8 h-8 text-primary" />
+                  </div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h3 className="font-semibold text-card-foreground text-sm mb-1 group-hover:text-primary transition-colors">
@@ -175,29 +186,6 @@ const HeroSection = () => {
           </div>
         </div>
       </div>
-
-      {/* Scroll Indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.8 }}
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex flex-col items-center gap-2 text-muted-foreground"
-      >
-        <span className="text-xs font-medium uppercase tracking-wider">
-          Scroll to explore
-        </span>
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="w-6 h-10 border-2 border-border rounded-full flex justify-center p-1"
-        >
-          <div className="w-1.5 h-3 bg-foreground/40 rounded-full" />
-        </motion.div>
-      </motion.div>
-
-      {/* Decorative Blurs */}
-      <div className="absolute top-20 right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-20 left-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl" />
     </section>
   );
 };
