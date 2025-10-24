@@ -33,11 +33,14 @@ async function main() {
     },
   });
 
-  logger.info('✅ Admin user seeded successfully:', {
-    id: admin.id,
-    email: admin.email,
-    name: admin.name,
-    role: admin.role,
+  logger.info({
+    message: '✅ Admin user seeded successfully',
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+    },
   });
 }
 
