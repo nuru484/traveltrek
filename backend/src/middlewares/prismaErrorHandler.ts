@@ -29,30 +29,49 @@ const PRISMA_ERROR_MESSAGES: Record<string, string> = {
 };
 
 /**
+ * Type guard to check if an object has a specific property
+ */
+const hasProperty = <K extends string>(
+  obj: unknown,
+  key: K,
+): obj is Record<K, unknown> => {
+  return typeof obj === 'object' && obj !== null && key in obj;
+};
+
+/**
  * Check if error is a Prisma error
  */
-export const isPrismaError = (error: any): boolean => {
+export const isPrismaError = (error: unknown): boolean => {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError ||
     error instanceof Prisma.PrismaClientValidationError ||
     error instanceof Prisma.PrismaClientInitializationError ||
     error instanceof Prisma.PrismaClientRustPanicError ||
-    error.constructor?.name?.startsWith('PrismaClient') ||
-    error.name?.startsWith('PrismaClient')
+    (hasProperty(error, 'constructor') &&
+      hasProperty(error.constructor, 'name') &&
+      typeof error.constructor.name === 'string' &&
+      error.constructor.name.startsWith('PrismaClient')) ||
+    (hasProperty(error, 'name') &&
+      typeof error.name === 'string' &&
+      error.name.startsWith('PrismaClient'))
   );
 };
 
 /**
  * Extract field names from Prisma error meta
  */
-const extractFieldNames = (meta: any): string[] => {
+const extractFieldNames = (
+  meta: Record<string, unknown> | undefined,
+): string[] => {
   if (!meta) return [];
 
-  if (meta.target && Array.isArray(meta.target)) {
-    return meta.target;
+  if (hasProperty(meta, 'target') && Array.isArray(meta.target)) {
+    return meta.target.filter(
+      (item): item is string => typeof item === 'string',
+    );
   }
 
-  if (meta.field_name) {
+  if (hasProperty(meta, 'field_name') && typeof meta.field_name === 'string') {
     return [meta.field_name];
   }
 
@@ -76,7 +95,9 @@ const formatFieldName = (field: string): string => {
 const handleUniqueConstraintError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(error.meta);
+  const fields = extractFieldNames(
+    error.meta as Record<string, unknown> | undefined,
+  );
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   let message = 'A record with this information already exists';
@@ -112,7 +133,9 @@ const handleUniqueConstraintError = (
 const handleForeignKeyError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(error.meta);
+  const fields = extractFieldNames(
+    error.meta as Record<string, unknown> | undefined,
+  );
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
@@ -139,13 +162,16 @@ const handleRecordNotFoundError = (
 ): CustomError => {
   const message = 'The requested record was not found';
 
+  const meta = error.meta as Record<string, unknown> | undefined;
+  const cause = meta && hasProperty(meta, 'cause') ? meta.cause : undefined;
+
   return new CustomError(404, message, {
     layer: 'database',
     severity: ErrorSeverity.LOW,
     code: 'RECORD_NOT_FOUND',
     context: {
       prismaCode: error.code,
-      cause: error.meta?.cause,
+      cause: cause,
     },
   });
 };
@@ -156,7 +182,9 @@ const handleRecordNotFoundError = (
 const handleNullConstraintError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(error.meta);
+  const fields = extractFieldNames(
+    error.meta as Record<string, unknown> | undefined,
+  );
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
@@ -181,7 +209,9 @@ const handleNullConstraintError = (
 const handleValueTooLongError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(error.meta);
+  const fields = extractFieldNames(
+    error.meta as Record<string, unknown> | undefined,
+  );
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
