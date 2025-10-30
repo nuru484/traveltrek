@@ -55,7 +55,6 @@ export const userApi = apiSlice.injectEndpoints({
       invalidatesTags: ["Users"],
     }),
 
-    // Update user profile (now sends FormData)
     updateUserProfile: builder.mutation<
       IUserResponse,
       { userId: number; data: FormData }
@@ -99,7 +98,6 @@ export const userApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // Delete all users (Admin only)
     deleteAllUsers: builder.mutation<
       IDeleteUsersResponse,
       { confirmDelete: string }

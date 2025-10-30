@@ -83,7 +83,6 @@ export default function UserForm({ mode, user }: IUserFormProps) {
 
   const handleImageChange = (file: File | undefined) => {
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         form.setError("profilePicture", {
           type: "manual",
@@ -101,7 +100,6 @@ export default function UserForm({ mode, user }: IUserFormProps) {
         return;
       }
 
-      // Clean up previous preview URL if it exists and it's not the user's original profile picture
       if (previewUrl && previewUrl !== user?.profilePicture) {
         URL.revokeObjectURL(previewUrl);
       }

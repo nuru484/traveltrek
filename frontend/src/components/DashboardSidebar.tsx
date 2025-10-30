@@ -27,7 +27,7 @@ import {
   useSidebar,
 } from "./ui/sidebar";
 
-// Navigation items for admins and customers
+// Navigation items for admins
 const adminNavigationItems = [
   {
     name: "Dashboard",
@@ -76,6 +76,36 @@ const adminNavigationItems = [
   },
 ];
 
+// Navigation items for agents
+const agentNavigationItems = [
+  {
+    name: "Dashboard",
+    path: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Tours",
+    path: "/dashboard/tours",
+    icon: MapPin,
+  },
+  {
+    name: "Flights",
+    path: "/dashboard/flights",
+    icon: Plane,
+  },
+  {
+    name: "Hotels",
+    path: "/dashboard/hotels",
+    icon: Hotel,
+  },
+  {
+    name: "Destinations",
+    path: "/dashboard/destinations",
+    icon: Home,
+  },
+];
+
+// Navigation items for customers
 const customerNavigationItems = [
   {
     name: "Dashboard",
@@ -112,13 +142,15 @@ const customerNavigationItems = [
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
 
   const { isMobile, setOpenMobile } = useSidebar();
 
-  const navigationItems = isAdmin
-    ? adminNavigationItems
-    : customerNavigationItems;
+  const navigationItems =
+    user?.role === "ADMIN"
+      ? adminNavigationItems
+      : user?.role === "AGENT"
+      ? agentNavigationItems
+      : customerNavigationItems;
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -164,7 +196,7 @@ export default function DashboardSidebar() {
                   <Link
                     href={item.path}
                     className="flex items-center w-full"
-                    onClick={handleLinkClick} // Add this handler
+                    onClick={handleLinkClick}
                   >
                     <item.icon
                       className={`h-6 w-6 ${
