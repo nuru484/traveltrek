@@ -12,22 +12,36 @@ import { UserRole } from '../../types/user-profile.types';
 
 const destinationRoutes = Router();
 
-// Create a new destination
-destinationRoutes.post('/destinations', createDestination);
+destinationRoutes.post(
+  '/destinations',
+  authorizeRole([UserRole.ADMIN]),
+  createDestination,
+);
 
-// Get a single destination by ID
-destinationRoutes.get('/destinations/:id', getDestination);
+destinationRoutes.get(
+  '/destinations/:id',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  getDestination,
+);
 
-// Update a destination by ID
-destinationRoutes.put('/destinations/:id', updateDestination);
+destinationRoutes.put(
+  '/destinations/:id',
+  authorizeRole([UserRole.ADMIN]),
+  updateDestination,
+);
 
-// Delete a destination by ID
-destinationRoutes.delete('/destinations/:id', deleteDestination);
+destinationRoutes.delete(
+  '/destinations/:id',
+  authorizeRole([UserRole.ADMIN]),
+  deleteDestination,
+);
 
-// Get all destinations
-destinationRoutes.get('/destinations', getAllDestinations);
+destinationRoutes.get(
+  '/destinations',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  getAllDestinations,
+);
 
-// Delete all destinations
 destinationRoutes.delete(
   '/destinations',
   authorizeRole([UserRole.ADMIN]),

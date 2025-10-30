@@ -13,24 +13,34 @@ import { UserRole } from '../../types/user-profile.types';
 
 const flightRoutes = Router();
 
-// Create a new flight
-flightRoutes.post('/flights', createFlight);
+flightRoutes.post('/flights', authorizeRole([UserRole.ADMIN]), createFlight);
 
-// Get a single flight by ID
-flightRoutes.get('/flights/:id', getFlight);
+flightRoutes.get(
+  '/flights/:id',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  getFlight,
+);
 
-flightRoutes.patch('/flights/:id/status', updateFlightStatus);
+flightRoutes.patch(
+  '/flights/:id/status',
+  authorizeRole([UserRole.ADMIN]),
+  updateFlightStatus,
+);
 
-// Update a flight by ID
-flightRoutes.put('/flights/:id', updateFlight);
+flightRoutes.put('/flights/:id', authorizeRole([UserRole.ADMIN]), updateFlight);
 
-// Delete a flight by ID
-flightRoutes.delete('/flights/:id', deleteFlight);
+flightRoutes.delete(
+  '/flights/:id',
+  authorizeRole([UserRole.ADMIN]),
+  deleteFlight,
+);
 
-// Get all flights
-flightRoutes.get('/flights', getAllFlights);
+flightRoutes.get(
+  '/flights',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  getAllFlights,
+);
 
-// Delete all flights
 flightRoutes.delete(
   '/flights',
   authorizeRole([UserRole.ADMIN]),

@@ -20,19 +20,13 @@ userRoutes.post(
   ...registerUser,
 );
 
-// Update user profile
 userRoutes.put(
   '/users/:userId',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   ...updateUserProfile,
 );
 
-// Get all users with pagination
-userRoutes.get(
-  '/users',
-  authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
-  getAllUsers,
-);
+userRoutes.get('/users', authorizeRole([UserRole.ADMIN]), getAllUsers);
 
 userRoutes.get(
   '/users/:userId',
@@ -40,21 +34,18 @@ userRoutes.get(
   getUserById,
 );
 
-// Change user role
 userRoutes.patch(
   '/users/:userId/role',
   authorizeRole([UserRole.ADMIN]),
   changeUserRole,
 );
 
-// Delete a user
 userRoutes.delete(
   '/users/:userId',
   authorizeRole([UserRole.ADMIN]),
   deleteUser,
 );
 
-// Delete all users
 userRoutes.delete('/users', authorizeRole([UserRole.ADMIN]), deleteAllUsers);
 
 export default userRoutes;

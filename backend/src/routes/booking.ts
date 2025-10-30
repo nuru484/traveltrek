@@ -33,7 +33,7 @@ bookingRoutes.put(
 
 bookingRoutes.delete(
   '/bookings/:id',
-  authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
+  authorizeRole([UserRole.ADMIN]),
   deleteBooking,
 );
 
