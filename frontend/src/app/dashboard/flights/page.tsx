@@ -22,7 +22,7 @@ export default function FlightsPage() {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
+  const isAdmin = user?.role === "ADMIN";
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);

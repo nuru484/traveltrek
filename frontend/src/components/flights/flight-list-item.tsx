@@ -43,7 +43,8 @@ interface IFlightListItemProps {
 export function FlightListItem({ flight }: IFlightListItemProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
+  const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
   const [deleteFlight, { isLoading: isDeleting }] = useDeleteFlightMutation();
   const [updateBooking, { isLoading: isCancelling }] =
     useUpdateBookingMutation();
@@ -78,6 +79,11 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
     bookingStatus !== "COMPLETED";
 
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
+
+  // Check if flight is bookable based on status
+  const flightStatus = flight.status ?? "SCHEDULED";
+  const isFlightBookable = flightStatus === "SCHEDULED";
+  const shouldShowBookButton = isFlightBookable && !isFlightBooked;
 
   useEffect(() => {
     if (isBookingsError) {
@@ -395,21 +401,45 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                       <span className="hidden sm:inline">Delete</span>
                       <span className="sm:hidden">Del</span>
                     </Button>
-                    <BookingButton
-                      flightId={flight.id}
-                      price={flight.price}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-none sm:min-w-[80px] cursor-pointer"
-                      disabled={isDeleting || flight.seatsAvailable <= 0}
-                      label={
-                        flight.seatsAvailable <= 0 ? "Fully Booked" : undefined
-                      }
-                    />
+                    {/* Admins can book only scheduled flights */}
+                    {isFlightBookable && (
+                      <BookingButton
+                        flightId={flight.id}
+                        price={flight.price}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none sm:min-w-[80px] cursor-pointer"
+                        disabled={isDeleting || flight.seatsAvailable <= 0}
+                        label={
+                          flight.seatsAvailable <= 0
+                            ? "Fully Booked"
+                            : undefined
+                        }
+                      />
+                    )}
+                  </>
+                ) : isAgent ? (
+                  <>
+                    {/* Agents can only view and book scheduled flights */}
+                    {isFlightBookable && (
+                      <BookingButton
+                        flightId={flight.id}
+                        price={flight.price}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none sm:min-w-[80px] cursor-pointer"
+                        disabled={isDeleting || flight.seatsAvailable <= 0}
+                        label={
+                          flight.seatsAvailable <= 0
+                            ? "Fully Booked"
+                            : undefined
+                        }
+                      />
+                    )}
                   </>
                 ) : (
                   <>
-                    {/* Show loading state while fetching booking data */}
+                    {/* Regular users */}
                     {isBookingDataLoading ? (
                       <Button
                         variant="secondary"
@@ -422,8 +452,8 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                       </Button>
                     ) : isFlightBooked ? (
                       <>
-                        {isBookingActive ? (
-                          // Active booking - show cancel button
+                        {isBookingActive && isFlightBookable ? (
+                          // Active booking on scheduled flight - show cancel button
                           <Button
                             variant="secondary"
                             size="sm"
@@ -435,7 +465,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                             {isCancelling ? "Cancelling..." : "Cancel"}
                           </Button>
                         ) : (
-                          // Cancelled or Completed booking - show status
+                          // Cancelled, Completed booking, or flight not scheduled - show status only
                           <Button
                             variant="secondary"
                             size="sm"
@@ -447,8 +477,8 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                           </Button>
                         )}
                       </>
-                    ) : (
-                      // Not booked - show book button
+                    ) : shouldShowBookButton ? (
+                      // Not booked and flight is scheduled - show book button
                       <BookingButton
                         flightId={flight.id}
                         price={flight.price}
@@ -463,7 +493,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                             : undefined
                         }
                       />
-                    )}
+                    ) : null}
                   </>
                 )}
               </div>
@@ -498,18 +528,20 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Flight"
-        description={`Are you sure you want to delete "${truncateText(
-          flight.flightNumber
-        )}"? This action cannot be undone.`}
-        onConfirm={handleDelete}
-        confirmText="Delete"
-        isDestructive
-      />
+      {/* Delete Confirmation Dialog - Only for Admins */}
+      {isAdmin && (
+        <ConfirmationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="Delete Flight"
+          description={`Are you sure you want to delete "${truncateText(
+            flight.flightNumber
+          )}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          confirmText="Delete"
+          isDestructive
+        />
+      )}
 
       {/* Cancel Booking Confirmation Dialog */}
       <ConfirmationDialog

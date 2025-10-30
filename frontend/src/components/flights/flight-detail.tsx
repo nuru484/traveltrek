@@ -127,7 +127,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
-  const canUpdateStatus = isAdmin || isAgent;
+  const canUpdateStatus = isAdmin;
 
   const [deleteFlight, { isLoading: isDeleting }] = useDeleteFlightMutation();
   const [updateFlightStatus, { isLoading: isUpdatingStatus }] =

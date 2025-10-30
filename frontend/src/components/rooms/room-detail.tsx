@@ -48,10 +48,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
-  const isAgent = user?.role === "AGENT";
-  const canManageRooms = isAdmin || isAgent;
-
-  console.log(room);
+  const canManageRooms = isAdmin;
 
   const [deleteRoom, { isLoading: isDeleting }] = useDeleteRoomMutation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

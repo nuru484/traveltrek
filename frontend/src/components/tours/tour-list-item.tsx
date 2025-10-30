@@ -39,7 +39,8 @@ interface ITourListItemProps {
 export function TourListItem({ tour }: ITourListItemProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
+  const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
   const [deleteTour, { isLoading: isDeleting }] = useDeleteTourMutation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -78,6 +79,11 @@ export function TourListItem({ tour }: ITourListItemProps) {
   const availableSpots = tour.maxGuests - tour.guestsBooked;
 
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
+
+  // Check if tour is upcoming (only show booking button for upcoming tours)
+  const tourStatus = tour.status.toLowerCase();
+  const isTourUpcoming = tourStatus === "upcoming";
+  const shouldShowBookButton = isTourUpcoming && !isTourBooked;
 
   const handleView = () => {
     router.push(`/dashboard/tours/${tour.id}/detail`);
@@ -380,19 +386,37 @@ export function TourListItem({ tour }: ITourListItemProps) {
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
-                <BookingButton
-                  tourId={tour.id}
-                  price={tour.price}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"
-                  disabled={isDeleting || isFullyBooked}
-                  label={isFullyBooked ? "Fully Booked" : undefined}
-                />
+                {/* Admins can book upcoming tours */}
+                {isTourUpcoming && (
+                  <BookingButton
+                    tourId={tour.id}
+                    price={tour.price}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"
+                    disabled={isDeleting || isFullyBooked}
+                    label={isFullyBooked ? "Fully Booked" : undefined}
+                  />
+                )}
+              </>
+            ) : isAgent ? (
+              <>
+                {/* Agents can only view and book upcoming tours */}
+                {isTourUpcoming && (
+                  <BookingButton
+                    tourId={tour.id}
+                    price={tour.price}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"
+                    disabled={isDeleting || isFullyBooked}
+                    label={isFullyBooked ? "Fully Booked" : undefined}
+                  />
+                )}
               </>
             ) : (
               <>
-                {/* Show loading state or booking button */}
+                {/* Regular users */}
                 {isBookingDataLoading ? (
                   <Button
                     variant="secondary"
@@ -404,6 +428,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
                     Loading...
                   </Button>
                 ) : isTourBooked ? (
+                  /* Show booking status if user has booked */
                   <Button
                     variant={getBookingButtonVariant()}
                     size="sm"
@@ -414,7 +439,8 @@ export function TourListItem({ tour }: ITourListItemProps) {
                     {getBookingStatusIcon(bookingStatus || "")}
                     {getBookingButtonText()}
                   </Button>
-                ) : (
+                ) : shouldShowBookButton ? (
+                  /* Show book button only for upcoming tours */
                   <BookingButton
                     tourId={tour.id}
                     price={tour.price}
@@ -425,25 +451,27 @@ export function TourListItem({ tour }: ITourListItemProps) {
                     disabled={isFullyBooked}
                     label={isFullyBooked ? "Fully Booked" : undefined}
                   />
-                )}
+                ) : null}
               </>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Delete Dialog */}
-      <ConfirmationDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Tour"
-        description={`Are you sure you want to delete "${truncateText(
-          tour.name
-        )}"? This action cannot be undone.`}
-        onConfirm={handleDelete}
-        confirmText="Delete"
-        isDestructive
-      />
+      {/* Delete Dialog - Only for Admins */}
+      {isAdmin && (
+        <ConfirmationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="Delete Tour"
+          description={`Are you sure you want to delete "${truncateText(
+            tour.name
+          )}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          confirmText="Delete"
+          isDestructive
+        />
+      )}
     </>
   );
 }

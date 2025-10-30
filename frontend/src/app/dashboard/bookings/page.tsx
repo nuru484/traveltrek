@@ -17,6 +17,8 @@ const BookingsPage = () => {
   const searchParams = useSearchParams();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
+  const canViewAllBookings = isAdmin || isAgent;
 
   const urlUserId = Number(searchParams.get("userId"));
 
@@ -33,7 +35,7 @@ const BookingsPage = () => {
     isLoading: isAdminLoading,
     refetch: adminRefetch,
   } = useGetAllBookingsQuery(params, {
-    skip: !isAdmin || !!urlUserId,
+    skip: !canViewAllBookings || !!urlUserId,
   });
 
   const {
@@ -48,7 +50,7 @@ const BookingsPage = () => {
       params,
     },
     {
-      skip: (!urlUserId && !user?.id) || (!isAdmin && !user?.id),
+      skip: (!urlUserId && !user?.id) || (!canViewAllBookings && !user?.id),
     }
   );
 
@@ -61,13 +63,13 @@ const BookingsPage = () => {
     isError = isUserError;
     isLoading = isUserLoading;
     refetch = userRefetch;
-  } else if (user && !isAdmin) {
+  } else if (user && !canViewAllBookings) {
     bookingsData = userBookingsData;
     error = userError;
     isError = isUserError;
     isLoading = isUserLoading;
     refetch = userRefetch;
-  } else if (isAdmin) {
+  } else if (canViewAllBookings) {
     bookingsData = adminBookingsData;
     error = adminError;
     isError = isAdminError;
@@ -113,16 +115,16 @@ const BookingsPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">
-            {urlUserId && isAdmin
+            {urlUserId && canViewAllBookings
               ? `All Bookings for User #${urlUserId}`
-              : isAdmin && !urlUserId
+              : canViewAllBookings && !urlUserId
               ? "All Bookings"
               : "My Bookings"}
           </h1>
           <p className="text-muted-foreground">
             {urlUserId
               ? "Manage bookings for the selected user"
-              : isAdmin
+              : canViewAllBookings
               ? "Manage all customer bookings"
               : "View and manage your bookings"}
           </p>

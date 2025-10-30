@@ -113,7 +113,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN";
   const isAgent = user?.role === "AGENT";
-  const canUpdateStatus = isAdmin || isAgent;
+  const canUpdateStatus = isAdmin;
 
   const [deleteTour, { isLoading: isDeleting }] = useDeleteTourMutation();
   const [updateTourStatus, { isLoading: isUpdatingStatus }] =

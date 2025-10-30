@@ -99,9 +99,14 @@ const agentNavigationItems = [
     icon: Hotel,
   },
   {
-    name: "Destinations",
-    path: "/dashboard/destinations",
-    icon: Home,
+    name: "Bookings",
+    path: "/dashboard/bookings",
+    icon: BookOpen,
+  },
+  {
+    name: "My Payments",
+    path: "/dashboard/payments",
+    icon: CreditCard,
   },
 ];
 

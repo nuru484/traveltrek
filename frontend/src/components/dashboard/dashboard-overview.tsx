@@ -126,7 +126,7 @@ export function DashboardOverview() {
     isFetching,
   } = useGetDashboardStatsQuery();
 
-  const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
+  const isAdmin = user?.role === "ADMIN";
   const stats = dashboardData?.data;
 
   if (isLoading) {
