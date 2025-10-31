@@ -479,7 +479,6 @@ const handleUpdateBooking = asyncHandler(
       throw new NotFoundError('Booking not found');
     }
 
-    // Validate status transitions
     if (
       status === 'PENDING' &&
       existingBooking.payment?.status === 'COMPLETED'
@@ -495,6 +494,16 @@ const handleUpdateBooking = asyncHandler(
     ) {
       throw new BadRequestError(
         'Cannot cancel booking when payment is completed. Please request a refund instead.',
+      );
+    }
+
+    if (
+      (status === 'CONFIRMED' || status === 'COMPLETED') &&
+      (!existingBooking.payment ||
+        existingBooking.payment.status !== 'COMPLETED')
+    ) {
+      throw new BadRequestError(
+        `Cannot change booking status to ${status} without a completed payment`,
       );
     }
 
@@ -514,7 +523,6 @@ const handleUpdateBooking = asyncHandler(
       }
     }
 
-    // Prevent modification of completed or cancelled bookings
     if (
       (existingBooking.status === 'COMPLETED' ||
         existingBooking.status === 'CANCELLED') &&
@@ -538,7 +546,6 @@ const handleUpdateBooking = asyncHandler(
         if (!targetUser) throw new NotFoundError('User not found');
       }
 
-      // Handle Tour Updates
       if (
         tourId &&
         (tourId !== existingBooking.tourId || numberOfGuests !== undefined)
@@ -549,7 +556,6 @@ const handleUpdateBooking = asyncHandler(
         const guestsToBook = numberOfGuests ?? existingBooking.numberOfGuests;
         let availableSlots = tour.maxGuests - tour.guestsBooked;
 
-        // If updating the same tour, add back the current booking's guests
         if (tourId === existingBooking.tourId) {
           availableSlots += existingBooking.numberOfGuests;
         }
@@ -567,7 +573,6 @@ const handleUpdateBooking = asyncHandler(
           throw new BadRequestError('This tour has already been completed');
         }
 
-        // Restore previous tour guests if changing tours
         if (existingBooking.tourId && tourId !== existingBooking.tourId) {
           await tx.tour.update({
             where: { id: existingBooking.tourId },
@@ -577,9 +582,7 @@ const handleUpdateBooking = asyncHandler(
           });
         }
 
-        // Update guest count for the tour
         if (tourId === existingBooking.tourId) {
-          // Same tour, adjust the difference
           const guestDifference = guestsToBook - existingBooking.numberOfGuests;
           if (guestDifference !== 0) {
             await tx.tour.update({
@@ -593,17 +596,14 @@ const handleUpdateBooking = asyncHandler(
             });
           }
         } else {
-          // Different tour, add new guests
           await tx.tour.update({
             where: { id: tourId },
             data: { guestsBooked: { increment: guestsToBook } },
           });
         }
 
-        // Recalculate price for tour
         calculatedTotalPrice = tour.price * guestsToBook;
 
-        // Recalculate payment deadline
         const deadlineInfo = calculatePaymentDeadline(tour.startDate);
         paymentDeadline = deadlineInfo.deadline;
         requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
@@ -612,7 +612,6 @@ const handleUpdateBooking = asyncHandler(
         existingBooking.tourId &&
         !tourId
       ) {
-        // Only updating guest count for existing tour
         const tour = existingBooking.tour;
         if (!tour) throw new NotFoundError('Tour not found');
 
@@ -626,7 +625,6 @@ const handleUpdateBooking = asyncHandler(
           );
         }
 
-        // Update guest count
         const guestDifference = guestsToBook - existingBooking.numberOfGuests;
         if (guestDifference !== 0) {
           await tx.tour.update({
@@ -640,11 +638,9 @@ const handleUpdateBooking = asyncHandler(
           });
         }
 
-        // Recalculate price
         calculatedTotalPrice = tour.price * guestsToBook;
       }
 
-      // Handle Room Updates
       if (
         roomId &&
         (roomId !== existingBooking.roomId ||
@@ -668,7 +664,6 @@ const handleUpdateBooking = asyncHandler(
           );
         }
 
-        // Validate booking dates
         const dateValidation = validateBookingDates(checkInDate, checkOutDate);
         if (!dateValidation.valid) {
           throw new BadRequestError(dateValidation.error!);
@@ -677,7 +672,6 @@ const handleUpdateBooking = asyncHandler(
         const roomsNeeded = numberOfRooms ?? existingBooking.numberOfRooms;
         const guestsCount = numberOfGuests ?? existingBooking.numberOfGuests;
 
-        // Check capacity
         const totalCapacity = room.capacity * roomsNeeded;
         if (guestsCount > totalCapacity) {
           const roomsRequired = Math.ceil(guestsCount / room.capacity);
@@ -688,7 +682,6 @@ const handleUpdateBooking = asyncHandler(
           );
         }
 
-        // Check availability (exclude current booking from check)
         const availability = await checkRoomAvailability(
           roomId,
           checkInDate,
@@ -696,7 +689,6 @@ const handleUpdateBooking = asyncHandler(
           roomsNeeded,
         );
 
-        // Adjust for current booking if it's the same room
         let adjustedAvailableRooms = availability.availableRooms;
         if (roomId === existingBooking.roomId) {
           adjustedAvailableRooms += existingBooking.numberOfRooms;
@@ -709,7 +701,6 @@ const handleUpdateBooking = asyncHandler(
           );
         }
 
-        // Recalculate price and nights
         numberOfNights = calculateNights(checkInDate, checkOutDate);
         calculatedTotalPrice = calculateRoomBookingPrice(
           room.pricePerNight,
@@ -717,13 +708,11 @@ const handleUpdateBooking = asyncHandler(
           roomsNeeded,
         );
 
-        // Recalculate payment deadline
         const deadlineInfo = calculatePaymentDeadline(checkInDate);
         paymentDeadline = deadlineInfo.deadline;
         requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
       }
 
-      // Handle Flight Updates
       if (
         flightId &&
         (flightId !== existingBooking.flightId || numberOfGuests !== undefined)
@@ -735,7 +724,6 @@ const handleUpdateBooking = asyncHandler(
 
         const seatsNeeded = numberOfGuests ?? existingBooking.numberOfGuests;
 
-        // Adjust for current booking if it's the same flight
         let adjustedAvailableSeats = flight.seatsAvailable;
         if (flightId === existingBooking.flightId) {
           adjustedAvailableSeats += existingBooking.numberOfGuests;
@@ -752,7 +740,6 @@ const handleUpdateBooking = asyncHandler(
           throw new BadRequestError('This flight has been cancelled');
         }
 
-        // Restore previous flight seats if changing flights
         if (existingBooking.flightId && flightId !== existingBooking.flightId) {
           await tx.flight.update({
             where: { id: existingBooking.flightId },
@@ -762,9 +749,7 @@ const handleUpdateBooking = asyncHandler(
           });
         }
 
-        // Update seat count for the flight
         if (flightId === existingBooking.flightId) {
-          // Same flight, adjust the difference
           const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
           if (seatDifference !== 0) {
             await tx.flight.update({
@@ -778,17 +763,14 @@ const handleUpdateBooking = asyncHandler(
             });
           }
         } else {
-          // Different flight, reduce new seats
           await tx.flight.update({
             where: { id: flightId },
             data: { seatsAvailable: { decrement: seatsNeeded } },
           });
         }
 
-        // Recalculate price for flight
         calculatedTotalPrice = flight.price * seatsNeeded;
 
-        // Recalculate payment deadline
         const deadlineInfo = calculatePaymentDeadline(flight.departure);
         paymentDeadline = deadlineInfo.deadline;
         requiresImmediatePayment = deadlineInfo.requiresImmediatePayment;
@@ -797,7 +779,6 @@ const handleUpdateBooking = asyncHandler(
         existingBooking.flightId &&
         !flightId
       ) {
-        // Only updating guest count for existing flight
         const flight = existingBooking.flight;
         if (!flight) throw new NotFoundError('Flight not found');
 
@@ -811,7 +792,6 @@ const handleUpdateBooking = asyncHandler(
           );
         }
 
-        // Update seat count
         const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
         if (seatDifference !== 0) {
           await tx.flight.update({
@@ -825,7 +805,6 @@ const handleUpdateBooking = asyncHandler(
           });
         }
 
-        // Recalculate price
         calculatedTotalPrice = flight.price * seatsNeeded;
       }
 
