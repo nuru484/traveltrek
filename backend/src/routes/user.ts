@@ -26,7 +26,11 @@ userRoutes.put(
   ...updateUserProfile,
 );
 
-userRoutes.get('/users', authorizeRole([UserRole.ADMIN]), getAllUsers);
+userRoutes.get(
+  '/users',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
+  getAllUsers,
+);
 
 userRoutes.get(
   '/users/:userId',
