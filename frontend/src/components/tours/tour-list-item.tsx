@@ -80,7 +80,6 @@ export function TourListItem({ tour }: ITourListItemProps) {
 
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
 
-  // Check if tour is upcoming (only show booking button for upcoming tours)
   const tourStatus = tour.status.toLowerCase();
   const isTourUpcoming = tourStatus === "upcoming";
   const shouldShowBookButton = isTourUpcoming && !isTourBooked;
@@ -326,30 +325,32 @@ export function TourListItem({ tour }: ITourListItemProps) {
           </div>
 
           {/* Availability Indicator */}
-          <div className="mb-4">
-            <div className="w-full bg-muted rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-500 ${
-                  availableSpots > 10
-                    ? "bg-green-500 w-full"
-                    : availableSpots > 5
-                    ? "bg-yellow-500 w-3/4"
-                    : availableSpots > 0
-                    ? "bg-red-500 w-1/4"
-                    : "bg-gray-500 w-0"
-                }`}
-              />
+          {isTourUpcoming && (
+            <div className="mb-4">
+              <div className="w-full bg-muted rounded-full h-1.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all duration-500 ${
+                    availableSpots > 10
+                      ? "bg-green-500 w-full"
+                      : availableSpots > 5
+                      ? "bg-yellow-500 w-3/4"
+                      : availableSpots > 0
+                      ? "bg-red-500 w-1/4"
+                      : "bg-gray-500 w-0"
+                  }`}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 text-center">
+                {availableSpots > 10
+                  ? "Great availability"
+                  : availableSpots > 5
+                  ? "Limited spots"
+                  : availableSpots > 0
+                  ? "Few spots left"
+                  : "Fully booked"}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 text-center">
-              {availableSpots > 10
-                ? "Great availability"
-                : availableSpots > 5
-                ? "Limited spots"
-                : availableSpots > 0
-                ? "Few spots left"
-                : "Fully booked"}
-            </p>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2">
