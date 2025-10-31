@@ -11,7 +11,9 @@
     "startDev": "node --env-file .env build/server.js",
     "migrate": "npx prisma migrate dev --name init",
     "seed": "tsx prisma/seed.ts",
-    "deploy": "npm install && npx prisma generate && npx prisma migrate deploy && npm run seed && npm run build"
+    "deploy": "npm install && npx prisma generate && npx prisma migrate deploy && npm run seed && npm run build",
+    "worker": "node build/worker.js",
+    "worker:dev": "ts-node-dev --respawn --transpile-only --env-file .env worker.ts"
   },
   "keywords": [
     "travel",
@@ -45,6 +47,7 @@
     "@types/redis": "^4.0.10",
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.62.2",
     "cloudinary": "^2.7.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -54,6 +57,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "p-map": "^7.0.3",
     "pino": "^9.7.0",
     "pino-pretty": "^13.1.1",
     "tsx": "^4.20.6"

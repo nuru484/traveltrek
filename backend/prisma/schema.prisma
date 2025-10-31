@@ -115,23 +115,23 @@ model Hotel {
 }
 
 model Room {
-  id             Int      @id @default(autoincrement())
-  hotel          Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  hotelId        Int
-  roomType       String
-  pricePerNight  Float    
-  capacity       Int
-  totalRooms     Int
-  photo          String?
-  description    String?
-  amenities      String[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  hotelId       Int
+  roomType      String
+  pricePerNight Float
+  capacity      Int
+  totalRooms    Int
+  photo         String?
+  description   String?
+  amenities     String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   bookings Booking[]
 
   @@index([hotelId, roomType], name: "room_hotel_type_idx")
-  @@index([pricePerNight], name: "room_price_idx") 
+  @@index([pricePerNight], name: "room_price_idx")
   @@index([capacity], name: "room_capacity_idx")
 }
 
@@ -198,14 +198,13 @@ model Booking {
   numberOfGuests  Int     @default(1)
   specialRequests String?
 
-  // NEW: Room-specific fields
-  startDate          DateTime? // Check-in date for rooms
-  endDate            DateTime? // Check-out date for rooms
-  numberOfRooms      Int       @default(1) // How many rooms booked
-  numberOfNights     Int       @default(1) // Auto-calculated nights
-  
-  paymentDeadline    DateTime? // When payment must be completed
-  requiresImmediatePayment Boolean @default(false) // Flag for same-day bookings
+  startDate      DateTime? // Check-in date for rooms
+  endDate        DateTime? // Check-out date for rooms
+  numberOfRooms  Int       @default(1) // How many rooms booked
+  numberOfNights Int       @default(1) // Auto-calculated nights
+
+  paymentDeadline          DateTime? // When payment must be completed
+  requiresImmediatePayment Boolean   @default(false) // Flag for same-day bookings
 
   totalPrice  Float
   bookingDate DateTime @default(now())
@@ -215,12 +214,12 @@ model Booking {
   payment Payment?
 
   @@unique([userId, tourId])
-  @@unique([userId, roomId, startDate, endDate]) 
+  @@unique([userId, roomId, startDate, endDate])
   @@unique([userId, flightId])
   @@index([userId, tourId, roomId, flightId], name: "booking_user_tour_hotel_room_flight_idx")
   @@index([status])
-  @@index([paymentDeadline]) 
-  @@index([startDate, endDate]) 
+  @@index([paymentDeadline])
+  @@index([startDate, endDate])
 }
 
 enum PaymentStatus {
@@ -254,5 +253,5 @@ model Payment {
 
   @@index([userId], name: "payment_user_idx")
   @@index([transactionReference], name: "payment_transaction_ref_idx")
-  @@index([status]) 
+  @@index([status])
 }

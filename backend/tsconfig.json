@@ -18,6 +18,7 @@
    "include": [
     "server.ts",
     "app.ts",
+    "worker.ts",
     "./src/**/*",
     "types"
   ],
