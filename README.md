@@ -133,6 +133,16 @@ npm install
 npm run migrate
 ```
 
+> ⚙️ **Seed Default Admin User**
+>
+> After running the migration, you must seed the database to create the **default admin user**:
+>
+> ```bash
+> npm run seed
+> ```
+>
+> This step ensures the system has an initial admin account available for login and management.
+
 ### Running the Application
 
 ```bash
@@ -146,7 +156,7 @@ npm start
 
 Default URLs:
 👉 [http://localhost:3000](http://localhost:3000) *(Frontend)*
-👉 [http://localhost:5000](http://localhost:8080) *(Backend API)*
+👉 [http://localhost:8080](http://localhost:8080) *(Backend API)*
 
 ---
 
@@ -175,13 +185,11 @@ traveltrek/
 │   ├── components/
 │   ├── redux/
 │   └── app/
-│   └── other directories/
 │  
 ├── server/          # Express.js backend
 │   ├── prisma/
 │   ├── src/
 │   └── types/
-│   └── other directories/
 │    
 └── public/docs/     # Screenshots & docs
 ```
@@ -237,5 +245,4 @@ is strictly prohibited without prior written permission or a valid license purch
 
 * Developer: **Nurudeen Abdul-Majeed**
 * Email: **[abdulmajeednurudeen47@gmail.com](mailto:abdulmajeednurudeen47@gmail.com)**
-
 
