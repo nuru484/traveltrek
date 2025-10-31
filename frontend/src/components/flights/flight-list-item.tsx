@@ -499,30 +499,32 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
               </div>
 
               {/* Availability Indicator */}
-              <div className="px-0 sm:px-2 pt-4">
-                <div className="w-full bg-muted rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full transition-all duration-500 ${
-                      flight.seatsAvailable > 50
-                        ? "bg-green-500 w-full"
-                        : flight.seatsAvailable > 20
-                        ? "bg-yellow-500 w-3/4"
-                        : flight.seatsAvailable > 0
-                        ? "bg-red-500 w-1/4"
-                        : "bg-gray-500 w-0"
-                    }`}
-                  />
+              {flightStatus === "SCHEDULED" && (
+                <div className="px-0 sm:px-2 pt-4">
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-500 ${
+                        flight.seatsAvailable > 50
+                          ? "bg-green-500 w-full"
+                          : flight.seatsAvailable > 20
+                          ? "bg-yellow-500 w-3/4"
+                          : flight.seatsAvailable > 0
+                          ? "bg-red-500 w-1/4"
+                          : "bg-gray-500 w-0"
+                      }`}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 text-center">
+                    {flight.seatsAvailable > 50
+                      ? "Great availability"
+                      : flight.seatsAvailable > 20
+                      ? "Limited seats"
+                      : flight.seatsAvailable > 0
+                      ? "Few seats left"
+                      : "Fully booked"}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 text-center">
-                  {flight.seatsAvailable > 50
-                    ? "Great availability"
-                    : flight.seatsAvailable > 20
-                    ? "Limited seats"
-                    : flight.seatsAvailable > 0
-                    ? "Few seats left"
-                    : "Fully booked"}
-                </p>
-              </div>
+              )}
             </div>
           </div>
         </CardContent>
