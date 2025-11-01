@@ -116,12 +116,6 @@ export default function LoginPage() {
           <div className="bg-card border border-border rounded-xl shadow-lg overflow-hidden">
             {/* Card Header */}
             <div className="bg-gradient-to-b from-muted/30 to-transparent border-b border-border px-6 py-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
-                <Lock className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-semibold text-foreground mb-2">
-                Welcome Back
-              </h1>
               <p className="text-sm text-muted-foreground">
                 Sign in to access your account
               </p>
