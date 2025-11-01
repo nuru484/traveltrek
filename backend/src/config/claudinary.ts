@@ -1,11 +1,4 @@
 // src/config/claudinary.ts
-
-/**
- * Cloudinary Service
- *
- * This module provides utilities for interacting with Cloudinary API with
- * retry logic, Base64 image support, dynamic configuration, and robust error handling.
- */
 import {
   v2 as cloudinaryBase,
   UploadApiResponse,
@@ -29,23 +22,15 @@ import {
   ICloudinaryDeletionResponse,
 } from '../../types/cloudinary.types';
 
-// Constants
 const MAX_UPLOAD_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
-// Default configuration from environment variables
 export const defaultCloudinaryConfig: ICloudinaryConfig = {
   cloud_name: assertEnv(ENV.CLOUDINARY_CLOUD_NAME, 'CLOUDINARY_CLOUD_NAME'),
   api_key: assertEnv(ENV.CLOUDINARY_API_KEY, 'CLOUDINARY_API_KEY'),
   api_secret: assertEnv(ENV.CLOUDINARY_API_SECRET, 'CLOUDINARY_API_SECRET'),
 };
 
-/**
- * Utility function to extract public ID from a Cloudinary URL
- *
- * @param url - Cloudinary URL
- * @returns Extracted public ID
- */
 export const extractPublicIdFromUrl = (url: string): string => {
   try {
     const urlPath = new URL(url).pathname;
@@ -53,17 +38,10 @@ export const extractPublicIdFromUrl = (url: string): string => {
     const filename = parts[parts.length - 1];
     return filename.split('.')[0];
   } catch (error) {
-    // Fallback to simpler string manipulation
     return url.split('/').slice(-1)[0].split('.')[0];
   }
 };
 
-/**
- * Validates a Cloudinary configuration
- *
- * @param config - Cloudinary configuration object
- * @throws Error if required fields are missing
- */
 const validateConfig = (config: ICloudinaryConfig): void => {
   const requiredFields = ['cloud_name', 'api_key', 'api_secret'];
   const missingFields = requiredFields.filter(
@@ -78,12 +56,6 @@ const validateConfig = (config: ICloudinaryConfig): void => {
   }
 };
 
-/**
- * Creates a configured Cloudinary instance
- *
- * @param config - Cloudinary configuration
- * @returns Configured Cloudinary instance
- */
 const createCloudinaryInstance = (config: ICloudinaryConfig) => {
   validateConfig(config);
   const cloudinaryInstance = cloudinaryBase;
@@ -91,15 +63,6 @@ const createCloudinaryInstance = (config: ICloudinaryConfig) => {
   return cloudinaryInstance;
 };
 
-/**
- * Uploads a file to Cloudinary with retry logic
- *
- * @param file - File object with buffer or Base64 string
- * @param options - Optional upload configuration
- * @param config - Cloudinary configuration
- * @returns Promise resolving to the upload result object
- * @throws CustomError if file is invalid or upload fails after retries
- */
 export const uploadToCloudinary = async (
   file: IUploadedFile | string,
   options: Partial<ICloudinaryUploadOptions> = {},
@@ -199,14 +162,6 @@ export const uploadToCloudinary = async (
   throw new InternalServerError('Unexpected error during upload process');
 };
 
-/**
- * Deletes a file from Cloudinary using its URL or public ID with retry logic
- *
- * @param identifier - Cloudinary URL or public ID of the file to delete
- * @param config - Cloudinary configuration
- * @returns Promise resolving to the deletion result
- * @throws CustomError if deletion fails after retries
- */
 export const deleteFromCloudinary = async (
   identifier: string,
   config: ICloudinaryConfig,
@@ -253,15 +208,6 @@ export const deleteFromCloudinary = async (
   throw new InternalServerError('Unexpected error during deletion process');
 };
 
-/**
- * Uploads multiple files to Cloudinary with retry logic
- *
- * @param files - Array of file objects or Base64 strings to upload
- * @param options - Optional upload configuration
- * @param config - Cloudinary configuration
- * @returns Promise resolving to an array of upload results
- * @throws CustomError if any upload fails after retries
- */
 export const uploadMultipleToCloudinary = async (
   files: (IUploadedFile | string)[],
   options: Partial<ICloudinaryUploadOptions> = {},
@@ -285,9 +231,6 @@ export const uploadMultipleToCloudinary = async (
   }
 };
 
-/**
- * Service class for Cloudinary operations
- */
 export class CloudinaryUploadService implements ICloudinaryUploadService {
   constructor(private config: ICloudinaryConfig) {}
 
@@ -303,12 +246,6 @@ export class CloudinaryUploadService implements ICloudinaryUploadService {
   }
 }
 
-/**
- * Factory function to create a Cloudinary service instance
- *
- * @param config - Cloudinary configuration
- * @returns Cloudinary service instance
- */
 export const createCloudinaryService = (
   config: ICloudinaryConfig,
 ): ICloudinaryUploadService => {
@@ -318,7 +255,6 @@ export const createCloudinaryService = (
   return new CloudinaryUploadService(config);
 };
 
-// Default service instance
 export const cloudinaryService = createCloudinaryService(
   defaultCloudinaryConfig,
 );
