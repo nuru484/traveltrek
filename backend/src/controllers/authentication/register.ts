@@ -121,11 +121,9 @@ const handleRegisterUser = async (
 /**
  * Middleware array for user registration
  */
-const registerUser = [
+export const registerUser = [
   multerUpload.single('profilePicture'),
   validationMiddleware.create(registerUserValidation),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'profilePicture'),
   handleRegisterUser,
 ] as const;
-
-export { registerUser };

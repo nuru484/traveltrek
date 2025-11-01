@@ -44,12 +44,8 @@ const login = asyncHandler(
         },
       });
 
-      if (!user) {
+      if (!user || !password || !user.password) {
         throw new NotFoundError('Invalid credentials');
-      }
-
-      if (!password || (user && !user.password)) {
-        throw new Error('Password or hash missing');
       }
 
       const isPasswordValid = await compare(password, user.password);
