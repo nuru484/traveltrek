@@ -77,7 +77,7 @@ Users can easily explore destinations, book flights, hotels, and tours — while
 | **Database**         | PostgreSQL + Prisma ORM                      |
 | **Auth**             | JWT + Cookies                                |
 | **File Storage**     | Cloudinary                                   |
-| **Queue & Jobs**     | Redis, RabbitMQ                              |
+| **Queue & Jobs**     | Redis, BullMQ                              |
 | **Deployment**       | Render (Backend), Vercel (Frontend)          |
 
 ---
