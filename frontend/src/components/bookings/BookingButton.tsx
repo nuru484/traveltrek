@@ -119,7 +119,7 @@ export function BookingButton({
 
       const payload: IBookingInput = {
         userId: finalUserId,
-        totalPrice: calculatedTotalPrice, // Updated to use calculated price
+        totalPrice: calculatedTotalPrice,
         numberOfGuests,
         specialRequests: specialRequests.trim() || null,
       };
