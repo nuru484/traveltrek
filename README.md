@@ -10,6 +10,7 @@ Users can easily explore destinations, book flights, hotels, and tours — while
 * [Features](#-features)
 * [Tech Stack](#-tech-stack)
 * [Architecture Overview](#-architecture-overview)
+* [Data Model](#-data-model)
 * [Screenshots](#-screenshots)
 * [Getting Started](#-getting-started)
 * [Environment Variables](#-environment-variables)
@@ -18,7 +19,6 @@ Users can easily explore destinations, book flights, hotels, and tours — while
 * [Deployment](#-deployment)
 * [Contributing](#-contributing)
 * [License](#-license)
-* [Author](#-author)
 
 ---
 
@@ -51,11 +51,11 @@ Users can easily explore destinations, book flights, hotels, and tours — while
 
 ### ⚙️ Automated System Intelligence
 
-* **Redis-powered cron jobs**:
+Background workers run as a **separate process** (`worker.ts`) on **BullMQ + Redis**, with repeatable schedulers keeping the platform's data accurate without manual intervention:
 
-  * Automatically mark overdue unpaid bookings as *unpaid*.
-  * Check flight arrival/departure times and auto-update statuses.
-* **RabbitMQ integration** for background task handling and notification queues.
+* **Booking deadline worker** — cancels/flags bookings whose payment deadline has passed (handles same-day "immediate payment" bookings too).
+* **Flight status worker** — auto-transitions flights through `SCHEDULED → DEPARTED → LANDED` (and `DELAYED`/`CANCELLED`) based on departure/arrival times.
+* **Tour status worker** — auto-transitions tours through `UPCOMING → ONGOING → COMPLETED` based on their start/end dates.
 
 ### 🔐 Authentication & Security
 
@@ -68,31 +68,53 @@ Users can easily explore destinations, book flights, hotels, and tours — while
 
 ## 🛠️ Tech Stack
 
-| Layer                | Technology                                   |
-| -------------------- | -------------------------------------------- |
-| **Frontend**         | Next.js (TypeScript), TailwindCSS, shadcn/ui |
-| **State Management** | Redux Toolkit                                |
-| **Validation**       | Zod (frontend), Express Validator (backend)  |
-| **Backend**          | Node.js, Express.js (TypeScript)             |
-| **Database**         | PostgreSQL + Prisma ORM                      |
-| **Auth**             | JWT + Cookies                                |
-| **File Storage**     | Cloudinary                                   |
-| **Queue & Jobs**     | Redis, BullMQ                              |
-| **Deployment**       | Render (Backend), Vercel (Frontend)          |
+| Layer                | Technology                                                        |
+| -------------------- | ----------------------------------------------------------------- |
+| **Frontend**         | Next.js 16 (App Router) + React 19 (TypeScript)                   |
+| **UI & Styling**     | TailwindCSS, shadcn/ui (Radix UI), next-themes, framer-motion     |
+| **State Management** | Redux Toolkit + React-Redux                                       |
+| **Data Tables**      | @tanstack/react-table                                             |
+| **Forms & Validation** | react-hook-form + Zod (frontend), express-validator (backend)  |
+| **Backend**          | Node.js, Express.js (TypeScript)                                  |
+| **Database**         | PostgreSQL + Prisma ORM                                           |
+| **Auth & Security**  | JWT (httpOnly cookies), bcrypt, express-rate-limit, CORS          |
+| **File Storage**     | Cloudinary (uploads via multer)                                  |
+| **Queue & Jobs**     | BullMQ + Redis (ioredis), p-map                                  |
+| **Logging**          | pino + pino-pretty, morgan                                       |
+| **Deployment**       | Render (Backend + Worker), Vercel (Frontend)                     |
 
 ---
 
 ## 🏗️ Architecture Overview
 
-User / Agent / Admin Interface (Next.js + Redux)
-↓
+```
+Customer / Agent / Admin Interface (Next.js 16 + Redux)
+        │  REST (JWT in httpOnly cookies)
+        ▼
 REST API (Express.js + TypeScript)
-↓
-PostgreSQL + Prisma ORM
-↓
-Redis (Cron Jobs) + RabbitMQ (Queues)
+        │
+Prisma ORM ──► PostgreSQL          Cloudinary (media)
+        │
+BullMQ + Redis  ── separate worker process
+   ├── booking deadline worker
+   ├── flight status worker
+   └── tour status worker
+```
 
-File Storage: Cloudinary
+The HTTP API (`server.ts`) and the background **worker** (`worker.ts`) run as two processes against the same database, so scheduled status/booking updates never block API requests.
+
+---
+
+## 🗄️ Data Model
+
+Three roles — **`ADMIN`**, **`AGENT`**, **`CUSTOMER`** — operate over a connected travel-inventory model:
+
+* **Destination** — the hub entity (country/city) that tours, hotels, and flights belong to.
+* **Tour** — typed (`ADVENTURE`, `CULTURAL`, `BEACH`, `CITY`, `WILDLIFE`, `CRUISE`) and status-tracked (`UPCOMING → ONGOING → COMPLETED`/`CANCELLED`), with pricing, duration, and guest capacity.
+* **Hotel → Room** — hotels with star ratings and amenities, each offering rooms with per-night pricing, capacity, and inventory.
+* **Flight** — airline, route (origin → destination), class, pricing, seat inventory, and live status (`SCHEDULED`, `DEPARTED`, `LANDED`, `DELAYED`, `CANCELLED`).
+* **Booking** — a single record that can reference a **tour, room, or flight**, with guest counts, check-in/out dates, auto-calculated nights, a **payment deadline**, and status (`PENDING → CONFIRMED → COMPLETED`/`CANCELLED`).
+* **Payment** — linked to a booking, with amount, currency (default **GHS**), method (`CREDIT_CARD`, `DEBIT_CARD`, `MOBILE_MONEY`, `BANK_TRANSFER`), status (`PENDING`, `COMPLETED`, `FAILED`, `REFUNDED`), and a unique transaction reference.
 
 ---
 
@@ -112,8 +134,7 @@ File Storage: Cloudinary
 
 * **Node.js** >= 18
 * **PostgreSQL** >= 14
-* **Redis**
-* **RabbitMQ**
+* **Redis** (for BullMQ workers)
 
 ### Installation
 
@@ -163,7 +184,7 @@ Default URLs:
 ## 🔐 Environment Variables
 
 Create `.env` files for **both** frontend and backend following the provided `env.example` files.
-Ensure all API keys, database URLs, Cloudinary credentials, and Redis/RabbitMQ connections are properly configured.
+Ensure all API keys, database URLs, Cloudinary credentials, and the Redis connection are properly configured.
 
 ---
 
@@ -172,7 +193,7 @@ Ensure all API keys, database URLs, Cloudinary credentials, and Redis/RabbitMQ c
 * **Users** browse destinations, book flights, hotels, and tours.
 * **Agents** assist users with bookings and payments.
 * **Admins** manage the platform’s entire ecosystem.
-* **System** runs background tasks (via Redis & RabbitMQ) to auto-update and maintain integrity.
+* **System** runs background workers (BullMQ + Redis) to auto-update booking, flight, and tour statuses and maintain data integrity.
 
 ---
 
@@ -181,16 +202,20 @@ Ensure all API keys, database URLs, Cloudinary credentials, and Redis/RabbitMQ c
 ```
 traveltrek/
 │
-├── client/          # Next.js frontend
+├── frontend/        # Next.js 16 app (App Router)
+│   ├── app/
 │   ├── components/
-│   ├── redux/
-│   └── app/
-│  
-├── server/          # Express.js backend
-│   ├── prisma/
+│   └── redux/
+│
+├── backend/         # Express.js API + worker (TypeScript)
+│   ├── prisma/      # Schema, migrations & seed
 │   ├── src/
-│   └── types/
-│    
+│   │   ├── controllers/  routes/  middlewares/  validations/
+│   │   ├── jobs/         # BullMQ queues, workers & schedulers
+│   │   ├── config/  utils/
+│   ├── server.ts    # HTTP API entry point
+│   └── worker.ts    # Background worker entry point
+│
 └── public/docs/     # Screenshots & docs
 ```
 
@@ -206,7 +231,7 @@ Deployed using:
 * **Backend** – Render
 * **Database** – Managed PostgreSQL
 * **File Storage** – Cloudinary
-* **Task Automation** – Redis + RabbitMQ
+* **Task Automation** – BullMQ + Redis (separate worker process)
 
 ---
 
@@ -252,11 +277,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## 🧠 Author
-
-* Developer: **Nurudeen Abdul-Majeed**
-* Email: **[abdulmajeednurudeen47@gmail.com](mailto:abdulmajeednurudeen47@gmail.com)**
 
