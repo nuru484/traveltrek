@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Absolute paths with hashes so the tabs work from /login and /signup too:
@@ -14,6 +15,7 @@ const NAV_LINKS = [
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -24,7 +26,7 @@ const Header = () => {
   return (
     <header
       className={`sticky top-0 z-50 w-full border-b transition-colors duration-300 ${
-        isScrolled
+        isScrolled || menuOpen
           ? "bg-background/95 backdrop-blur-lg border-border"
           : "bg-background/80 backdrop-blur-md border-border/60"
       }`}
@@ -40,7 +42,7 @@ const Header = () => {
             </span>
           </Link>
 
-          {/* Anchor nav — desktop only; phones get the row below */}
+          {/* Anchor nav — desktop only; phones get the menu panel */}
           <nav className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
               <Link
@@ -53,30 +55,54 @@ const Header = () => {
             ))}
           </nav>
 
-          <div className="flex flex-none items-center gap-2">
+          <div className="flex flex-none items-center gap-1.5">
             <Button
               asChild
               size="sm"
-              className="h-9 rounded-full bg-foreground text-background hover:bg-foreground/90 px-3 text-xs sm:px-5 sm:text-sm font-medium whitespace-nowrap"
+              className="h-9 px-3 text-xs sm:px-5 sm:text-sm font-medium whitespace-nowrap"
             >
               <Link href="/login">Try the platform</Link>
             </Button>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted/60 active:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:hidden"
+            >
+              {menuOpen ? (
+                <X className="h-5 w-5" strokeWidth={1.75} />
+              ) : (
+                <Menu className="h-5 w-5" strokeWidth={1.75} />
+              )}
+            </button>
           </div>
         </div>
-
-        {/* Phone anchor row — same links, one scrollable line */}
-        <nav className="md:hidden -mx-4 px-4 pb-2 flex gap-5 overflow-x-auto no-scrollbar">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="py-1.5 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground whitespace-nowrap transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
       </div>
+
+      {/* Phone menu panel — stacked document-style links */}
+      {menuOpen && (
+        <nav className="border-t border-border/60 md:hidden">
+          <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center justify-between border-b border-dashed border-foreground/15 py-3 text-sm font-medium text-foreground last:border-b-0 active:bg-muted/40"
+              >
+                {link.label}
+                <span
+                  aria-hidden
+                  className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
+                >
+                  →
+                </span>
+              </Link>
+            ))}
+          </div>
+        </nav>
+      )}
     </header>
   );
 };
