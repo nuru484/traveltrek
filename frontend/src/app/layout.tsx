@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   keywords: [
     "Travel Trek",
     "travel booking platform",
-    "full-stack portfolio project",
+    "travel and tour platform",
     "flight booking system",
     "hotel reservations",
     "tour management",

@@ -163,7 +163,7 @@ const HeroSection = () => {
             className="h-1.5 w-1.5 flex-none rounded-full bg-primary"
             aria-hidden
           />
-          Full-stack portfolio project · 2026
+          Travel & tour booking · 2026
         </motion.p>
 
         <motion.h1

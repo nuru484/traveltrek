@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Travel Trek — a travel booking platform, built end-to-end. Full-stack portfolio case study.";
+  "Travel Trek — a travel and tour booking platform: flights, hotels, tours, and payments.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -66,7 +66,7 @@ export default function OpengraphImage() {
           >
             <div style={{ display: "flex" }}>TRAVEL TREK ✈ BOARDING PASS</div>
             <div style={{ display: "flex", opacity: 0.7 }}>
-              CASE STUDY · 2026
+              2026
             </div>
           </div>
 
@@ -109,7 +109,7 @@ export default function OpengraphImage() {
                     fontSize: 21,
                   }}
                 >
-                  Try the live platform at traveltrek.dagraroyal.org →
+                  Try the live platform at traveltrek.manuru.dev →
                 </div>
               </div>
 
