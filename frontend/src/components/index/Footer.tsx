@@ -20,17 +20,10 @@ const Footer = () => (
             Full-stack developer in Tamale, Ghana — available for remote work.
             Travel Trek is one project; the approach travels.
           </p>
-          <div className="mt-7 flex flex-col gap-3 min-[420px]:flex-row">
+          <div className="mt-7">
             <Button
               asChild
               className="rounded-full bg-night-foreground px-6 text-night hover:bg-night-foreground/90"
-            >
-              <a href={`mailto:${CONTACT_EMAIL}`}>Get in touch</a>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="rounded-full border-white/25 bg-transparent px-6 text-night-foreground hover:bg-white/10 hover:text-night-foreground"
             >
               <Link
                 href="https://manuru.dev"
