@@ -57,9 +57,9 @@ export function TourFilters({ filters, onFiltersChange }: TourFiltersProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Search Bar */}
-      <div className="relative">
+      <div className="relative w-full lg:max-w-xs">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by tour name or location..."
@@ -70,7 +70,7 @@ export function TourFilters({ filters, onFiltersChange }: TourFiltersProps) {
       </div>
 
       {/* Filters Row */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Tour Type Filter */}
         <Select value={filters.type || "all"} onValueChange={handleTypeChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
@@ -120,7 +120,7 @@ export function TourFilters({ filters, onFiltersChange }: TourFiltersProps) {
 
       {/* Active Filters Display */}
       {hasFiltersApplied && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Active filters:</span>
           {filters.search && (
             <Badge variant="secondary" className="gap-2">

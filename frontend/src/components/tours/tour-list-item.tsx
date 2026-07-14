@@ -200,7 +200,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
 
   return (
     <>
-      <Card className="w-full transition-all duration-300 group border border-border/50 hover:border-border overflow-hidden">
+      <Card className="h-full w-full transition-colors group overflow-hidden">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             {/* Title & Status */}
@@ -222,7 +222,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
                 )}
                 {/* Show loading skeleton or actual booking status */}
                 {isBookingDataLoading ? (
-                  <div className="h-5 w-24 bg-gray-200 animate-pulse rounded-full"></div>
+                  <div className="h-5 w-24 bg-muted animate-pulse rounded-full"></div>
                 ) : (
                   isTourBooked && (
                     <Badge
@@ -323,34 +323,6 @@ export function TourListItem({ tour }: ITourListItemProps) {
               </p>
             </div>
           </div>
-
-          {/* Availability Indicator */}
-          {isTourUpcoming && (
-            <div className="mb-4">
-              <div className="w-full bg-muted rounded-full h-1.5">
-                <div
-                  className={`h-1.5 rounded-full transition-all duration-500 ${
-                    availableSpots > 10
-                      ? "bg-green-500 w-full"
-                      : availableSpots > 5
-                      ? "bg-yellow-500 w-3/4"
-                      : availableSpots > 0
-                      ? "bg-red-500 w-1/4"
-                      : "bg-gray-500 w-0"
-                  }`}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 text-center">
-                {availableSpots > 10
-                  ? "Great availability"
-                  : availableSpots > 5
-                  ? "Limited spots"
-                  : availableSpots > 0
-                  ? "Few spots left"
-                  : "Fully booked"}
-              </p>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2">

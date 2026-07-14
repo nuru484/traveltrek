@@ -238,11 +238,11 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
 
   return (
     <>
-      <Card className="w-full transition-all duration-300 group overflow-hidden">
+      <Card className="h-full w-full gap-0 py-0 transition-colors group overflow-hidden">
         <CardContent className="p-0">
-          <div className="flex flex-col md:flex-row h-full">
+          <div className="flex h-full flex-col">
             {/* Flight Image */}
-            <div className="relative w-full md:w-44 h-36 md:h-auto flex-shrink-0">
+            <div className="relative h-40 w-full flex-shrink-0">
               {flight.photo ? (
                 <Image
                   src={flight.photo}
@@ -281,7 +281,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                     </Badge>
                     {/* Show loading skeleton or actual booking status */}
                     {isBookingDataLoading ? (
-                      <div className="h-5 w-20 bg-gray-200 animate-pulse rounded-full"></div>
+                      <div className="h-5 w-20 bg-muted animate-pulse rounded-full"></div>
                     ) : (
                       isFlightBooked && (
                         <Badge

@@ -48,7 +48,7 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
         {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
-              <div className="h-20 bg-gray-200 rounded"></div>
+              <div className="h-20 bg-muted rounded"></div>
             </CardContent>
           </Card>
         ))}
@@ -163,17 +163,17 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
       WILDLIFE: "bg-yellow-100 text-yellow-800",
       CRUISE: "bg-indigo-100 text-indigo-800",
     };
-    return colors[type as keyof typeof colors] || "bg-gray-100 text-gray-800";
+    return colors[type as keyof typeof colors] || "bg-muted/60 text-gray-800";
   };
 
   const getStatusColor = (status: string) => {
     const colors = {
       UPCOMING: "bg-blue-100 text-blue-800",
       ONGOING: "bg-green-100 text-green-800",
-      COMPLETED: "bg-gray-100 text-gray-800",
+      COMPLETED: "bg-muted/60 text-gray-800",
       CANCELLED: "bg-red-100 text-red-800",
     };
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
+    return colors[status as keyof typeof colors] || "bg-muted/60 text-gray-800";
   };
 
   // Format destination location

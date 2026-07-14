@@ -43,10 +43,10 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
-              <div className="h-6 bg-gray-200 rounded w-48"></div>
+              <div className="h-6 bg-muted rounded w-48"></div>
             </CardHeader>
             <CardContent>
-              <div className="h-20 bg-gray-200 rounded"></div>
+              <div className="h-20 bg-muted rounded"></div>
             </CardContent>
           </Card>
         ))}

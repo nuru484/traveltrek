@@ -30,12 +30,15 @@ const Pagination: React.FC<PaginationProps> = ({
 }) => {
   const { page: currentPage, totalPages } = meta;
 
+  // A single page needs no pagination at all.
+  if (totalPages <= 1) return null;
+
   const buttonClass =
     "cursor-pointer rounded-full border border-foreground/20 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div
-      className={`flex items-center justify-between gap-3 py-4 ${className}`}
+      className={`flex items-center justify-center gap-4 py-4 ${className}`}
     >
       <button
         onClick={() => onPageChange(currentPage - 1)}

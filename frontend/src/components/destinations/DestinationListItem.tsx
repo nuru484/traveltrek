@@ -58,11 +58,11 @@ export default function DestinationListItem({
 
   return (
     <>
-      <Card className="w-full transition-all duration-300 group overflow-hidden">
+      <Card className="h-full w-full gap-0 py-0 transition-colors group overflow-hidden">
         <CardContent className="p-0">
-          <div className="flex flex-col md:flex-row h-full">
+          <div className="flex h-full flex-col">
             {/* Destination Image */}
-            <div className="relative w-full md:w-44 h-36 md:h-auto flex-shrink-0">
+            <div className="relative h-40 w-full flex-shrink-0">
               {destination.photo ? (
                 <Image
                   src={destination.photo}

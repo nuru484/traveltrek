@@ -640,7 +640,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       {flightStatusConfig.label}
                     </Badge>
                     {isBookingDataLoading ? (
-                      <div className="h-5 w-32 bg-gray-200 animate-pulse rounded-full"></div>
+                      <div className="h-5 w-32 bg-muted animate-pulse rounded-full"></div>
                     ) : (
                       isFlightBooked && (
                         <Badge
@@ -997,7 +997,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                   </div>
 
                   {isBookingDataLoading ? (
-                    <div className="h-5 w-40 bg-gray-200 animate-pulse rounded mt-2"></div>
+                    <div className="h-5 w-40 bg-muted animate-pulse rounded mt-2"></div>
                   ) : (
                     <p
                       className={`text-sm flex items-center gap-2 ${

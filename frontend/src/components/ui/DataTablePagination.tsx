@@ -24,8 +24,11 @@ export function DataTablePagination<TData>({
 }: ITablePaginationProps<TData>) {
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
+  // A single page needs no pagination at all.
+  if (totalPages <= 1) return null;
+
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 sm:px-6">
+    <div className="flex items-center justify-center gap-4 border-t border-border bg-card px-4 py-3 sm:px-6">
       <Button
         variant="outline"
         size="sm"
