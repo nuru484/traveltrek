@@ -17,7 +17,7 @@ import {
 } from '../validations/tour-validation';
 import validationMiddleware from '../middlewares/validation';
 import logger from '../utils/logger';
-import { TourStatus } from '../../generated/prisma';
+import { TourStatus } from '../../generated/prisma/client';
 import { body } from 'express-validator';
 
 const handleCreateTour = asyncHandler(

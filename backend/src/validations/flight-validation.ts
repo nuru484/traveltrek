@@ -2,7 +2,7 @@
 import { validator } from './validation-factory';
 import { ValidationChain } from 'express-validator';
 import prisma from '../config/prismaClient';
-import { FlightStatus } from '../../generated/prisma';
+import { FlightStatus } from '../../generated/prisma/client';
 
 export const createFlightValidation: ValidationChain[] = [
   validator.string('flightNumber', {

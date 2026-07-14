@@ -3,7 +3,7 @@ import { Worker } from 'bullmq';
 import prisma from '../config/prismaClient';
 import pMap from 'p-map';
 import { createRedisConnection } from '../config/redisConnection';
-import { TourStatus } from '../../generated/prisma/index';
+import { TourStatus } from '../../generated/prisma/client';
 import logger from '../utils/logger';
 
 export const tourStatusWorker = new Worker(

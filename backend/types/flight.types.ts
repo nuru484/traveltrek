@@ -1,6 +1,6 @@
 // types/flight.types.ts
 import { IDestinationSummary } from './destination.types';
-import { FlightStatus } from '../generated/prisma';
+import { FlightStatus } from '../generated/prisma/client';
 
 export interface IFlightInput {
   flightNumber: string;

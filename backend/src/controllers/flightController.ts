@@ -24,7 +24,7 @@ import {
   updateFlightStatusValidation,
 } from '../validations/flight-validation';
 import logger from '../utils/logger';
-import { FlightStatus } from '../../generated/prisma';
+import { FlightStatus } from '../../generated/prisma/client';
 
 /**
  * Create a new flight
