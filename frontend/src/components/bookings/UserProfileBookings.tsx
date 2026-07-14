@@ -42,8 +42,8 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
   // Loading state
   if (isLoading) {
     return (
-      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-x-0 max-sm:py-4">
-        <CardHeader className="pb-4">
+      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+        <CardHeader className="pb-4 max-sm:px-0">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="space-y-2">
               <Skeleton className="h-6 w-32" />
@@ -52,7 +52,7 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
             <Skeleton className="h-9 w-24 sm:w-auto" />
           </div>
         </CardHeader>
-        <CardContent className="pt-0 max-sm:px-3">
+        <CardContent className="pt-0 max-sm:px-0">
           <BookingsDataTable
             data={[]}
             loading={true}
@@ -78,11 +78,11 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
   if (isError && error) {
     const { message } = extractApiErrorMessage(error);
     return (
-      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-x-0 max-sm:py-4">
-        <CardHeader className="pb-4">
+      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+        <CardHeader className="pb-4 max-sm:px-0">
           <CardTitle className="text-lg sm:text-xl">Recent Bookings</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 max-sm:px-3">
+        <CardContent className="pt-0 max-sm:px-0">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error Loading Bookings</AlertTitle>
@@ -108,8 +108,8 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
 
   // Success state
   return (
-    <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-x-0 max-sm:py-4">
-      <CardHeader className="pb-4">
+    <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+      <CardHeader className="pb-4 max-sm:px-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <CardTitle className="text-lg sm:text-xl">
@@ -137,7 +137,7 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0 max-sm:px-3">
+      <CardContent className="pt-0 max-sm:px-0">
         <BookingsDataTable
           data={bookings}
           loading={false}

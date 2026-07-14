@@ -8,13 +8,11 @@ import Link from "next/link";
 import { RootState } from "@/redux/store";
 import {
   useDeleteTourMutation,
-  useUpdateTourStatusMutation,
-} from "@/redux/tourApi";
+  useUpdateTourStatusMutation } from "@/redux/tourApi";
 import {
   useGetAllUserBookingsQuery,
   useCreateBookingMutation,
-  useUpdateBookingMutation,
-} from "@/redux/bookingApi";
+  useUpdateBookingMutation } from "@/redux/bookingApi";
 import { ITour } from "@/types/tour.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,15 +22,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Calendar,
   Clock,
@@ -44,7 +40,6 @@ import {
   MoreHorizontal,
   Loader2,
   ExternalLink,
-  ImageOff,
   FileText,
   DollarSign,
   Tag,
@@ -52,8 +47,7 @@ import {
   XCircle,
   PlayCircle,
   AlertCircle,
-  ChevronDown,
-} from "lucide-react";
+  ChevronDown } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
@@ -67,8 +61,7 @@ const getAvailableStatusTransitions = (currentStatus: string) => {
     UPCOMING: ["ONGOING", "CANCELLED"],
     ONGOING: ["COMPLETED"],
     COMPLETED: [],
-    CANCELLED: ["UPCOMING"],
-  };
+    CANCELLED: ["UPCOMING"] };
 
   return transitions[currentStatus] || [];
 };
@@ -79,32 +72,27 @@ const getTourStatusConfig = (status: string) => {
       return {
         variant: "default" as const,
         icon: Clock,
-        label: "Upcoming",
-      };
+        label: "Upcoming" };
     case "ONGOING":
       return {
         variant: "secondary" as const,
         icon: PlayCircle,
-        label: "Ongoing",
-      };
+        label: "Ongoing" };
     case "COMPLETED":
       return {
         variant: "outline" as const,
         icon: CheckCircle,
-        label: "Completed",
-      };
+        label: "Completed" };
     case "CANCELLED":
       return {
         variant: "destructive" as const,
         icon: XCircle,
-        label: "Cancelled",
-      };
+        label: "Cancelled" };
     default:
       return {
         variant: "secondary" as const,
         icon: AlertCircle,
-        label: status,
-      };
+        label: status };
   }
 };
 
@@ -131,13 +119,11 @@ export function TourDetail({ tour }: ITourDetailProps) {
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings,
     isError: isBookingsError,
-    error: bookingsError,
-  } = useGetAllUserBookingsQuery(
+    error: bookingsError } = useGetAllUserBookingsQuery(
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30,
-    }
+      refetchOnMountOrArgChange: 30 }
   );
 
   useEffect(() => {
@@ -164,7 +150,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
   const isBookingDataLoading = isLoadingBookings || isFetchingBookings;
 
   const tourStatusConfig = getTourStatusConfig(tour.status);
-  const StatusIcon = tourStatusConfig.icon;
   const availableStatusTransitions = getAvailableStatusTransitions(tour.status);
 
   const isLoading = isDeleting || isBooking || isCancelling || isUpdatingStatus;
@@ -194,8 +179,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
     try {
       await updateTourStatus({
         id: tour.id,
-        status: newStatus,
-      }).unwrap();
+        status: newStatus }).unwrap();
 
       toast.dismiss(toastId);
       toast.success(`Tour status updated to ${newStatus} successfully`);
@@ -234,8 +218,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
       await createBooking({
         userId: parseInt(user.id),
         tourId: tour.id,
-        totalPrice: tour.price,
-      }).unwrap();
+        totalPrice: tour.price }).unwrap();
       toast.success("Tour booked successfully");
       setShowBookDialog(false);
     } catch (error) {
@@ -253,8 +236,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
     try {
       await updateBooking({
         bookingId: userBooking.id,
-        data: { status: "CANCELLED" },
-      }).unwrap();
+        data: { status: "CANCELLED" } }).unwrap();
 
       toast.dismiss(toastId);
       toast.success("Booking cancelled successfully");
@@ -321,14 +303,8 @@ export function TourDetail({ tour }: ITourDetailProps) {
   return (
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
-        <Card className="relative overflow-hidden border-0 py-0 gap-0">
-          <div className="relative hidden w-full md:block md:h-[240px]">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ImageOff className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
-            </div>
-            <div className="absolute inset-0 hidden bg-gradient-to-t from-black/75 via-black/30 to-transparent md:block" />
-          </div>
-            <div className="p-4 sm:p-5 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-6 lg:p-8">
+        <Card className="overflow-hidden py-0 gap-0">
+            <div className="p-4 sm:p-5 md:p-6">
               <div className="flex items-start justify-between gap-2 sm:gap-3 md:gap-4">
                 <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 overflow-hidden">
                   {/* Badges Container with Scroll on Small Screens */}
@@ -380,13 +356,13 @@ export function TourDetail({ tour }: ITourDetailProps) {
                   </div>
 
                   {/* Tour Name - Multi-line with Proper Wrapping */}
-                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground md:text-white leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
+                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
                     {tour.name}
                   </h1>
 
                   {/* Destination with Proper Wrapping */}
                   {tour.destination && (
-                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground md:text-white/85 max-w-full">
+                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground max-w-full">
                       <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
                       <span className="text-xs sm:text-sm md:text-base break-words line-clamp-2 overflow-hidden leading-snug">
                         {getDestinationDisplay()}
@@ -396,7 +372,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                 </div>
 
                 {/* Actions Dropdown - Always Visible */}
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-1.5 md:gap-2 flex-shrink-0">
+                <div className="flex flex-none flex-row items-center gap-1.5 md:gap-2">
                   {!isAdmin && !isAgent && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -553,64 +529,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
                     </div>
                   </div>
                 )}
-
-                {/* Tour Status */}
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                  <StatusIcon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-muted-foreground mb-2">
-                      Tour Status
-                    </p>
-                    {canUpdateStatus &&
-                    availableStatusTransitions.length > 0 ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="cursor-pointer w-full justify-between"
-                            disabled={isLoading}
-                          >
-                            <div className="flex items-center">
-                              <StatusIcon className="h-4 w-4 mr-2" />
-                              {tourStatusConfig.label}
-                            </div>
-                            <ChevronDown className="h-4 w-4 ml-2" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-48">
-                          <div className="px-2 py-1.5 text-sm font-semibold">
-                            Update Status
-                          </div>
-                          <DropdownMenuSeparator />
-                          {availableStatusTransitions.map((status) => {
-                            const statusConfig = getTourStatusConfig(status);
-                            const StatusIcon = statusConfig.icon;
-                            return (
-                              <DropdownMenuItem
-                                key={status}
-                                onClick={() => handleStatusChange(status)}
-                                disabled={isLoading}
-                                className="cursor-pointer"
-                              >
-                                <StatusIcon className="mr-2 h-4 w-4" />
-                                {statusConfig.label}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <Badge
-                        variant={tourStatusConfig.variant}
-                        className="text-sm"
-                      >
-                        <StatusIcon className="h-4 w-4 mr-2" />
-                        {tourStatusConfig.label}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
 
                 {/* Price */}
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
