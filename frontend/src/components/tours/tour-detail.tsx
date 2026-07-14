@@ -321,12 +321,12 @@ export function TourDetail({ tour }: ITourDetailProps) {
   return (
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
-        <Card className="overflow-hidden border-0 shadow-md">
-          <div className="relative w-full h-[200px] sm:h-[220px] md:h-[240px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+        <Card className="overflow-hidden border-0">
+          <div className="relative w-full h-[200px] sm:h-[220px] md:h-[240px]">
             <div className="absolute inset-0 flex items-center justify-center">
               <ImageOff className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 lg:p-8 bg-gradient-to-t from-background/90 via-background/80 to-transparent">
+            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 lg:p-8">
               <div className="flex items-start justify-between gap-2 sm:gap-3 md:gap-4">
                 <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 overflow-hidden">
                   {/* Badges Container with Scroll on Small Screens */}
@@ -518,7 +518,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
         </Card>
 
         {/* Content Section */}
-        <Card className="shadow-sm">
+        <Card className="">
           <CardContent className="p-6 md:p-8">
             <div className="space-y-6">
               {/* Description Section */}

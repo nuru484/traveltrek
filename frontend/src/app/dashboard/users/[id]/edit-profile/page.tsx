@@ -46,7 +46,7 @@ export default function EditUserPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
-        <Card className="shadow-sm">
+        <Card className="">
           <CardHeader>
             <Skeleton className="h-8 w-48" />
           </CardHeader>

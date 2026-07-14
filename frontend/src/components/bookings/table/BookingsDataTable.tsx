@@ -10,23 +10,19 @@ import {
   getSortedRowModel,
   SortingState,
   useReactTable,
-  VisibilityState,
-} from "@tanstack/react-table";
+  VisibilityState } from "@tanstack/react-table";
 import toast from "react-hot-toast";
-import { CalendarIcon } from "lucide-react";
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useDeleteBookingMutation,
-  useDeleteAllBookingsMutation,
-} from "@/redux/bookingApi";
+  useDeleteAllBookingsMutation } from "@/redux/bookingApi";
 import { createBookingColumns } from "./columns";
 import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
@@ -35,6 +31,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IBookingsDataTableProps } from "@/types/booking.types";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface BookingsDataTableProps extends IBookingsDataTableProps {
   showFilters?: boolean;
@@ -61,8 +58,7 @@ export function BookingsDataTable({
   showPagination = true,
   showSelection = true,
   showCustomer,
-  isRecentsView = false,
-}: BookingsDataTableProps) {
+  isRecentsView = false }: BookingsDataTableProps) {
   const user = useSelector((state: RootState) => state.auth.user);
   const userRole = user.role;
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -109,12 +105,10 @@ export function BookingsDataTable({
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
-    },
+      rowSelection },
     manualPagination: true,
     manualFiltering: true,
-    pageCount: Math.ceil(totalCount / pageSize),
-  });
+    pageCount: Math.ceil(totalCount / pageSize) });
 
   const handleDeleteSelected = () => {
     const selectedRows = table.getSelectedRowModel().rows;
@@ -165,8 +159,7 @@ export function BookingsDataTable({
 
     try {
       await deleteAllBookings({
-        confirmDelete: "DELETE_ALL_BOOKINGS",
-      }).unwrap();
+        confirmDelete: "DELETE_ALL_BOOKINGS" }).unwrap();
       toast.dismiss(toastId);
       toast.success("All bookings deleted successfully");
       setDeleteAllDialogOpen(false);
@@ -188,17 +181,12 @@ export function BookingsDataTable({
   if (isRecentsView && isEmpty) {
     return (
       <div className="w-full max-w-full">
-        <div className="flex flex-col items-center justify-center py-8 px-4 text-center border rounded-lg bg-muted/20">
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-            <CalendarIcon className="w-6 h-6 text-muted-foreground" />
-          </div>
-          <div className="text-muted-foreground font-medium">
-            No recent bookings
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            This user hasn&apos;t made any bookings yet
-          </div>
-        </div>
+        <EmptyState
+          className="rounded-lg border border-foreground/15 py-8"
+          eyebrow="No activity"
+          title="No recent bookings."
+          description="This user hasn't made any bookings yet."
+        />
       </div>
     );
   }

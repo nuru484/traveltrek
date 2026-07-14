@@ -164,19 +164,18 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="border-r border-sidebar-border/20 shadow-sm"
-    >
-      <SidebarHeader className="flex items-center py-5 border-b border-sidebar-border/20">
-        <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <SidebarHeader className="flex items-center py-5 border-b border-sidebar-border">
+        <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground hover:bg-transparent">
           <Image
             src="/logo.png"
             alt="Travel Trek Logo"
-            width={50}
-            height={50}
+            width={40}
+            height={40}
           />
-          <span className="text-xl font-bold">TravelTrek</span>
+          <span className="font-display text-xl font-semibold tracking-tight">
+            Travel Trek
+          </span>
         </SidebarMenuButton>
       </SidebarHeader>
 
@@ -192,10 +191,10 @@ export default function DashboardSidebar() {
                   asChild
                   isActive={isActive}
                   tooltip={item.name}
-                  className={`px-4 py-3 gap-4 hover:bg-sidebar-foreground/10 transition-colors ${
+                  className={`px-4 py-3 gap-4 rounded-lg hover:bg-sidebar-accent transition-colors ${
                     isActive
-                      ? "bg-sidebar-primary/10 text-sidebar-primary font-medium border-l-4 border-sidebar-primary"
-                      : "text-sidebar-foreground/90"
+                      ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                      : "text-sidebar-foreground/80"
                   }`}
                 >
                   <Link
@@ -204,9 +203,10 @@ export default function DashboardSidebar() {
                     onClick={handleLinkClick}
                   >
                     <item.icon
-                      className={`h-6 w-6 ${
-                        isActive ? "text-sidebar-primary" : ""
+                      className={`h-5 w-5 ${
+                        isActive ? "text-sidebar-primary" : "opacity-70"
                       }`}
+                      strokeWidth={1.75}
                     />
                     <span className="ml-3">{item.name}</span>
                   </Link>
@@ -217,21 +217,13 @@ export default function DashboardSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="mt-auto border-t border-sidebar-border/20">
-        <SidebarMenuButton className="flex items-center gap-3 text-sidebar-foreground">
-          <Image
-            src="/logo.png"
-            alt="Travel Trek Logo"
-            width={30}
-            height={30}
-          />
-          <div className="text-[12px] text-sidebar-foreground/70">
-            TravelTrek Tour System
-          </div>
-        </SidebarMenuButton>
+      <SidebarFooter className="mt-auto border-t border-sidebar-border">
+        <div className="px-4 py-3 font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/50">
+          TT-2026 · Tour system
+        </div>
       </SidebarFooter>
 
-      <SidebarRail className="bg-sidebar-foreground/5 w-1" />
+      <SidebarRail className="w-1" />
     </Sidebar>
   );
 }

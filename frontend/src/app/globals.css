@@ -92,14 +92,15 @@
   --chart-4: oklch(0.65 0.18 30); /* Sunset orange */
   --chart-5: oklch(0.50 0.15 280); /* Purple mountain */
   
-  --sidebar: oklch(0.96 0.01 240); /* Light blue-tinted */
-  --sidebar-foreground: oklch(0.25 0.02 250); /* Deep navy */
-  --sidebar-primary: oklch(0.55 0.18 230); /* Sky blue */
-  --sidebar-primary-foreground: oklch(1 0 0); /* White */
-  --sidebar-accent: oklch(0.92 0.02 240); /* Light blue-gray */
-  --sidebar-accent-foreground: oklch(0.25 0.02 250); /* Deep navy */
-  --sidebar-border: oklch(0.85 0.02 240); /* Soft border */
-  --sidebar-ring: oklch(0.55 0.18 230); /* Sky blue */
+  /* The dashboard sidebar is the landing page's night band. */
+  --sidebar: var(--night);
+  --sidebar-foreground: var(--night-foreground);
+  --sidebar-primary: oklch(0.75 0.13 230); /* Sky on night */
+  --sidebar-primary-foreground: oklch(0.15 0.02 250);
+  --sidebar-accent: oklch(1 0 0 / 10%); /* Hover surface */
+  --sidebar-accent-foreground: var(--night-foreground);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.75 0.13 230);
 }
 
 .dark {

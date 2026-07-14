@@ -46,7 +46,7 @@ export function UserProfileDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity border-2 border-foreground">
+        <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity border border-foreground">
           <AvatarImage src={user.profilePicture} alt={user.name} />
           <AvatarFallback className="text-sm">
             {getInitials(user.name)}

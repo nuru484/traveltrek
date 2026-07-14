@@ -4,11 +4,9 @@ import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   ArrowUpDown,
-  Calendar,
   CreditCard,
   Smartphone,
-  Building2,
-} from "lucide-react";
+  Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,8 +77,7 @@ export const createPaymentColumns = (
         />
       ),
       enableSorting: false,
-      enableHiding: false,
-    },
+      enableHiding: false },
     {
       accessorKey: "transactionReference",
       header: "Reference",
@@ -91,8 +88,7 @@ export const createPaymentColumns = (
             {reference}
           </div>
         );
-      },
-    },
+      } },
   ];
 
   // Conditionally add user column
@@ -112,8 +108,7 @@ export const createPaymentColumns = (
             </div>
           </div>
         );
-      },
-    });
+      } });
   }
 
   // Conditionally add booking column
@@ -131,8 +126,7 @@ export const createPaymentColumns = (
             </Badge>
           </div>
         );
-      },
-    });
+      } });
   }
 
   // Add remaining columns
@@ -143,7 +137,7 @@ export const createPaymentColumns = (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 h-auto font-semibold hover:bg-transparent"
+          className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
           Amount
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -158,8 +152,7 @@ export const createPaymentColumns = (
             {amount.toFixed(2)}
           </div>
         );
-      },
-    },
+      } },
     {
       accessorKey: "paymentMethod",
       header: "Payment Method",
@@ -171,8 +164,7 @@ export const createPaymentColumns = (
             <span className="text-sm">{getPaymentMethodLabel(method)}</span>
           </div>
         );
-      },
-    },
+      } },
     {
       accessorKey: "status",
       header: "Status",
@@ -183,17 +175,15 @@ export const createPaymentColumns = (
             {status}
           </Badge>
         );
-      },
-    },
+      } },
     {
       accessorKey: "paymentDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 h-auto font-semibold hover:bg-transparent"
+          className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
-          <Calendar className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           <span className="hidden sm:inline">Payment Date</span>
           <ArrowUpDown className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
@@ -212,17 +202,15 @@ export const createPaymentColumns = (
             </div>
           </div>
         );
-      },
-    },
+      } },
     {
       accessorKey: "createdAt",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 h-auto font-semibold hover:bg-transparent"
+          className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
-          <Calendar className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           <span className="hidden sm:inline">Created</span>
           <ArrowUpDown className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
@@ -237,8 +225,7 @@ export const createPaymentColumns = (
             </div>
           </div>
         );
-      },
-    }
+      } }
   );
 
   if (showActions) {
@@ -247,8 +234,7 @@ export const createPaymentColumns = (
       enableHiding: false,
       cell: ({ row }) => (
         <PaymentActionsDropdown payment={row.original} userRole={userRole} />
-      ),
-    });
+      ) });
   }
 
   return columns;

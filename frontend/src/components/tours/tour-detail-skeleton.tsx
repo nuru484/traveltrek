@@ -6,7 +6,7 @@ export function TourDetailSkeleton() {
   return (
     <div className="space-y-6">
       {/* Hero Card Skeleton */}
-      <Card className="overflow-hidden shadow-sm">
+      <Card className="overflow-hidden">
         <CardContent className="p-6 relative">
           {/* Actions Skeleton */}
           <div className="absolute top-3 right-3">

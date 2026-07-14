@@ -4,16 +4,16 @@ import { Mail, Phone, MapPin, Calendar } from "lucide-react";
 
 export function UserProfileHeaderSkeleton() {
   return (
-    <div className="container mx-auto bg-card rounded-2xl p-4 lg:p-8 shadow-sm border border-border hover:shadow-md transition-shadow duration-200">
+    <div className="container mx-auto bg-card rounded-2xl p-4 lg:p-8 border border-border transition- duration-200">
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Avatar Skeleton */}
         <div className="flex-shrink-0 mx-auto lg:mx-0">
           <div className="relative">
-            <div className="h-36 w-36 rounded-full shadow-lg ring-4 ring-background">
+            <div className="h-36 w-36 rounded-full ring-4 ring-background">
               <Skeleton className="h-full w-full rounded-full" />
             </div>
             {/* Online status indicator */}
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-muted rounded-full border-[3px] border-background shadow-sm">
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-muted rounded-full border-[3px] border-background">
               <Skeleton className="h-full w-full rounded-full" />
             </div>
           </div>

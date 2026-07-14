@@ -2,7 +2,7 @@
 "use client";
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Calendar, Package, Hotel, Plane } from "lucide-react";
+import { ArrowUpDown, Package, Hotel, Plane } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,8 +84,7 @@ export const createBookingColumns = (
         />
       ),
       enableSorting: false,
-      enableHiding: false,
-    },
+      enableHiding: false },
     // Removed Booking ID column
     {
       accessorKey: "type",
@@ -100,8 +99,7 @@ export const createBookingColumns = (
             </Badge>
           </div>
         );
-      },
-    },
+      } },
   ];
 
   // Conditionally add customer column
@@ -121,8 +119,7 @@ export const createBookingColumns = (
             </div>
           </div>
         );
-      },
-    });
+      } });
   }
 
   // Add remaining columns
@@ -151,15 +148,14 @@ export const createBookingColumns = (
         return (
           <div className="max-w-[200px] truncate text-sm">{serviceName}</div>
         );
-      },
-    },
+      } },
     {
       accessorKey: "totalPrice",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 h-auto font-semibold hover:bg-transparent"
+          className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
           Total Price
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -168,8 +164,7 @@ export const createBookingColumns = (
       cell: ({ row }) => {
         const totalPrice = row.getValue("totalPrice") as number;
         return <div className="font-medium">${totalPrice.toFixed(2)}</div>;
-      },
-    },
+      } },
     {
       accessorKey: "status",
       header: "Status",
@@ -180,8 +175,7 @@ export const createBookingColumns = (
             {status}
           </Badge>
         );
-      },
-    },
+      } },
     {
       accessorKey: "payment",
       header: "Payment",
@@ -207,17 +201,15 @@ export const createBookingColumns = (
             </div>
           </div>
         );
-      },
-    },
+      } },
     {
       accessorKey: "bookingDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="p-0 h-auto font-semibold hover:bg-transparent"
+          className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
-          <Calendar className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           <span className="hidden sm:inline">Booking Date</span>
           <ArrowUpDown className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
@@ -232,8 +224,7 @@ export const createBookingColumns = (
             </div>
           </div>
         );
-      },
-    }
+      } }
     // Removed Created At column
   );
 
@@ -243,8 +234,7 @@ export const createBookingColumns = (
       enableHiding: false,
       cell: ({ row }) => (
         <BookingActionsDropdown booking={row.original} userRole={userRole} />
-      ),
-    });
+      ) });
   }
 
   return columns;

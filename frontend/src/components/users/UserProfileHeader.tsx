@@ -42,14 +42,14 @@ export function UserProfileHeader({
       case "ADMIN":
         return {
           color:
-            "bg-gradient-to-r from-red-500/10 to-pink-500/10 text-red-600 border-red-200",
+            " -500/10 -500/10 text-red-600 border-red-200",
           icon: Crown,
           label: "Admin",
         };
       case "AGENT":
         return {
           color:
-            "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 text-blue-600 border-blue-200",
+            " -500/10 -500/10 text-blue-600 border-blue-200",
           icon: Shield,
           label: "Agent",
         };
@@ -57,7 +57,7 @@ export function UserProfileHeader({
       default:
         return {
           color:
-            "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 border-emerald-200",
+            " -500/10 -500/10 text-emerald-600 border-emerald-200",
           icon: User,
           label: "Customer",
         };
@@ -101,7 +101,7 @@ export function UserProfileHeader({
   const RoleIcon = roleConfig.icon;
 
   return (
-    <Card className="space-y-4 container  mx-auto shadow-lg border-0 bg-gradient-to-br from-background to-muted/20 rounded-b-none">
+    <Card className="space-y-4 container mx-auto border-0 rounded-b-none">
       <CardContent className="p-0">
         {/* Header Banner */}
         <div
@@ -117,20 +117,20 @@ export function UserProfileHeader({
             {/* Avatar Section */}
             <div className="flex-shrink-0 mx-auto lg:mx-0">
               <div className="relative">
-                <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
+                <Avatar className="h-32 w-32 border-4 border-background">
                   <AvatarImage
                     src={user.profilePicture || undefined}
                     alt={`${user.name ?? "User"} profile picture`}
                     className="object-cover"
                   />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-2xl font-bold">
+                  <AvatarFallback className="text-primary-foreground text-2xl font-bold">
                     {getUserInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
 
                 {/* Status Indicator */}
                 <div className="absolute -bottom-1 -right-1 flex items-center justify-center">
-                  <div className="w-8 h-8 bg-emerald-500 rounded-full border-4 border-background shadow-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-emerald-500 rounded-full border-4 border-background flex items-center justify-center">
                     <div className="w-2 h-2 bg-white rounded-full"></div>
                   </div>
                 </div>

@@ -3,13 +3,13 @@
 import { TourListItem } from "./tour-list-item";
 import { ITour, IToursQueryParams } from "@/types/tour.types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Search } from "lucide-react";
 import ErrorMessage from "../ui/ErrorMessage";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import Pagination from "../ui/Pagination";
 import { TourFilters } from "./TourFilters";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import type { SerializedError } from "@reduxjs/toolkit";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface TourListProps {
   data: ITour[];
@@ -41,8 +41,7 @@ export function TourList({
   onPageChange,
   onLimitChange,
   onFiltersChange,
-  onRefetch,
-}: TourListProps) {
+  onRefetch }: TourListProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -80,9 +79,6 @@ export function TourList({
       {/* Results Info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center hidden sm:flex">
-            <Calendar className="h-4 w-4 text-primary" />
-          </div>
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-foreground">
               Available Tours
@@ -113,19 +109,11 @@ export function TourList({
           />
         </>
       ) : (
-        <div className="text-center py-16">
-          <div className="max-w-md mx-auto px-4">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-              <Search className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No Tours Found
-            </h3>
-            <p className="text-sm sm:text-base text-muted-foreground mb-4">
-              No tours match your search criteria. Try adjusting your filters.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          eyebrow="No results"
+          title="No tours found."
+          description="Nothing matches your search criteria. Try adjusting your filters."
+        />
       )}
     </div>
   );

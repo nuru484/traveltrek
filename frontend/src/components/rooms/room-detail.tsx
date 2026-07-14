@@ -139,7 +139,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <Card className="overflow-hidden shadow-sm">
+        <Card className="overflow-hidden">
           {room.photo && (
             <div className="relative w-full h-64 md:h-80 lg:h-96">
               <Image
@@ -149,7 +149,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+              <div className="absolute inset-0" />
 
               {/* Action buttons - Admin/Agent only */}
               {canManageRooms && (
@@ -159,7 +159,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
                         disabled={isDeleting}
                       >
                         <MoreHorizontal className="h-4 w-4" />
@@ -239,7 +239,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                         </Badge>
                       )}
                   </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white drop-shadow-lg">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white drop-">
                     {room.roomType}
                   </h1>
                   {room.hotel && (

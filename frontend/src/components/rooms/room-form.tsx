@@ -427,7 +427,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                         {/* Preview */}
                         {previewUrl && (
                           <div className="relative w-24 h-24 mx-auto">
-                            <div className="relative w-full h-full rounded-md overflow-hidden border-2 border-muted-foreground/20">
+                            <div className="relative w-full h-full rounded-md overflow-hidden border border-muted-foreground/20">
                               <Image
                                 src={previewUrl}
                                 alt="Room photo preview"
@@ -462,7 +462,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                             type="button"
                             variant="outline"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full bg-muted border-dashed border-2 hover:bg-muted/80"
+                            className="w-full bg-muted border-dashed border hover:bg-muted/80"
                             disabled={isLoading}
                           >
                             <Upload className="mr-2 h-4 w-4" />

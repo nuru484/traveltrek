@@ -63,7 +63,7 @@ export default function PaymentCallbackPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
-      <Card className="w-full max-w-md shadow-lg border-border">
+      <Card className="w-full max-w-md border-border">
         <CardContent className="p-8 text-center space-y-6">
           {(status === "loading" || isLoading) && (
             <div className="space-y-4">

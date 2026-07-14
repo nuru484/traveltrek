@@ -58,7 +58,7 @@ export default function DestinationListItem({
 
   return (
     <>
-      <Card className="w-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group overflow-hidden">
+      <Card className="w-full transition-all duration-300 group overflow-hidden">
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row h-full">
             {/* Destination Image */}
@@ -72,11 +72,11 @@ export default function DestinationListItem({
                   sizes="(max-width: 768px) 100vw, 25vw"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center">
                   <MapPin className="h-8 w-8 text-muted-foreground" />
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
+              <div className="absolute inset-0" />
             </div>
 
             {/* Destination Information */}

@@ -77,7 +77,7 @@ export default function DestinationDetail({
 
   return (
     <div className="container mx-auto space-y-6">
-      <Card className="overflow-hidden border-0 shadow-md">
+      <Card className="overflow-hidden border-0">
         {destination.photo ? (
           <div className="relative w-full h-[300px] md:h-[400px]">
             <Image
@@ -87,7 +87,7 @@ export default function DestinationDetail({
               className="object-cover"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+            <div className="absolute inset-0" />
 
             {isAdmin && (
               <div className="absolute top-4 right-4">
@@ -96,7 +96,7 @@ export default function DestinationDetail({
                     <Button
                       variant="secondary"
                       size="icon"
-                      className="bg-white/95 hover:bg-white text-black shadow-lg cursor-pointer h-9 w-9"
+                      className="bg-white/95 hover:bg-white text-black cursor-pointer h-9 w-9"
                       disabled={isDeleting}
                     >
                       <MoreHorizontal className="h-4 w-4" />
@@ -143,11 +143,11 @@ export default function DestinationDetail({
           </div>
         ) : (
           // Fallback for no image
-          <div className="relative w-full h-[200px] bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+          <div className="relative w-full h-[200px]">
             <div className="absolute inset-0 flex items-center justify-center">
               <ImageOff className="h-16 w-16 text-muted-foreground/30" />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 bg-gradient-to-t from-background/80 to-transparent">
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2 flex-1">
                   <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
@@ -200,7 +200,7 @@ export default function DestinationDetail({
       </Card>
 
       {/* Content Section */}
-      <Card className="shadow-sm">
+      <Card className="">
         <CardContent className="p-6 md:p-8">
           <div className="space-y-6">
             {/* Description Section */}

@@ -33,7 +33,7 @@ export default function RoomDetailPage() {
   if (isLoading)
     return (
       <div className="container mx-auto">
-        <Card className="shadow-sm">
+        <Card className="">
           <CardHeader>
             <Skeleton className="h-8 w-48" />
           </CardHeader>

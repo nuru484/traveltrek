@@ -91,10 +91,7 @@ const UsersManagePage = () => {
 
           <Link
             href="/dashboard/users/create-user"
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-foreground text-background 
-               rounded-md shadow cursor-pointer transition-colors duration-200 
-               hover:bg-foreground/90 text-sm sm:text-base font-medium
-               text-center whitespace-nowrap flex-shrink-0"
+            className="px-3 py-2 sm:px-4 sm:py-2 bg-foreground text-background rounded-md cursor-pointer transition-colors duration-200 hover:bg-foreground/90 text-sm sm:text-base font-medium text-center whitespace-nowrap flex-shrink-0"
           >
             Add User
           </Link>

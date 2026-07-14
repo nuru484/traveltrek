@@ -2,7 +2,7 @@
 "use client";
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Calendar, Image as ImageIcon } from "lucide-react";
+import { ArrowUpDown, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
       />
     ),
     enableSorting: false,
-    enableHiding: false,
-  },
+    enableHiding: false },
   {
     accessorKey: "profilePicture",
     header: "Image",
@@ -57,15 +56,14 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
         </div>
       );
     },
-    enableSorting: false,
-  },
+    enableSorting: false },
   {
     accessorKey: "name",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 h-auto font-semibold hover:bg-transparent text-left justify-start"
+        className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground text-left justify-start"
       >
         Name
         <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -84,8 +82,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
           </div>
         </div>
       );
-    },
-  },
+    } },
   {
     accessorKey: "role",
     header: "Role",
@@ -105,16 +102,14 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
           {role}
         </Badge>
       );
-    },
-  },
+    } },
   {
     accessorKey: "phone",
     header: "Phone",
     cell: ({ row }) => {
       const phone = row.getValue("phone") as string;
       return <span className="text-xs sm:text-sm">{phone}</span>;
-    },
-  },
+    } },
   {
     accessorKey: "address",
     header: () => <span className="hidden lg:inline">Address</span>,
@@ -125,17 +120,15 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
           {address}
         </span>
       );
-    },
-  },
+    } },
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 h-auto font-semibold hover:bg-transparent"
+        className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
       >
-        <Calendar className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
         <span className="hidden sm:inline">Created At</span>
         <ArrowUpDown className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
       </Button>
@@ -148,11 +141,9 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
           <div className="hidden sm:block">{format(date, "MMM dd, yyyy")}</div>
         </div>
       );
-    },
-  },
+    } },
   {
     id: "actions",
     enableHiding: false,
-    cell: ({ row }) => <UserActionsDropdown user={row.original} />,
-  },
+    cell: ({ row }) => <UserActionsDropdown user={row.original} /> },
 ];

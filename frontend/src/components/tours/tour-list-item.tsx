@@ -200,7 +200,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
 
   return (
     <>
-      <Card className="w-full hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group border border-border/50 hover:border-border overflow-hidden">
+      <Card className="w-full transition-all duration-300 group border border-border/50 hover:border-border overflow-hidden">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             {/* Title & Status */}

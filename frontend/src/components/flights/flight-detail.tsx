@@ -454,7 +454,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     <TooltipProvider>
       <div className="space-y-6">
         {/* Hero Section with Flight Image */}
-        <Card className="overflow-hidden shadow-sm">
+        <Card className="overflow-hidden">
           {flight.photo && (
             <div className="relative w-full h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96">
               <Image
@@ -464,7 +464,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+              <div className="absolute inset-0" />
 
               {/* Actions Dropdown */}
               <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2">
@@ -476,7 +476,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                         size="sm"
                         onClick={handleBookingButtonClick}
                         disabled={isBookingButtonDisabled()}
-                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
                       >
                         {isBookingDataLoading ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -508,7 +508,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
                         disabled={isLoading}
                       >
                         <Badge
@@ -551,7 +551,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="bg-white/90 hover:bg-white text-black shadow-sm cursor-pointer"
+                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
                         disabled={isLoading}
                       >
                         <MoreHorizontal className="h-4 w-4" />
@@ -630,7 +630,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
           {/* Content when no image */}
           {!flight.photo && (
-            <div className="p-4 sm:p-6 bg-gradient-to-r from-primary/10 to-secondary/10">
+            <div className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">

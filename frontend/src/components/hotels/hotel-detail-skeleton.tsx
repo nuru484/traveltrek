@@ -6,7 +6,7 @@ export function HotelDetailSkeleton() {
   return (
     <div className="space-y-6">
       {/* Hero Section Skeleton */}
-      <Card className="overflow-hidden shadow-sm">
+      <Card className="overflow-hidden">
         <div className="relative w-full h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96">
           <Skeleton className="absolute inset-0" />
           
