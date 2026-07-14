@@ -105,32 +105,37 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
+    <div className="min-h-dvh bg-hero-band">
       <Header />
 
-      {/* Main Content */}
-      <main className="flex flex-col justify-center items-center px-4 py-8 min-h-[calc(100vh-4rem)]">
+      <main className="flex justify-center px-4 py-10 sm:py-16">
         <div className="w-full max-w-md">
-          {/* Login Card */}
-          <div className="bg-card border border-border rounded-xl shadow-lg overflow-hidden">
-            {/* Card Header */}
-            <div className="bg-gradient-to-b from-muted/30 to-transparent border-b border-border px-6 py-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Sign in to access your account
-              </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
+            Check-in
+          </p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+            Welcome back.
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Sign in to access your account.
+          </p>
+
+          {/* Card in the landing's boarding-pass voice */}
+          <div className="mt-8 overflow-hidden rounded-xl border border-foreground/20 bg-card">
+            <div className="flex items-center justify-between bg-night px-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground">
+              <span>Travel Trek</span>
+              <span className="text-night-foreground/70">Sign in</span>
             </div>
 
-            {/* Card Body */}
-            <div className="px-6 py-8">
-              {/* Demo Login Section */}
+            <div className="px-5 py-7 sm:px-6 sm:py-8">
+              {/* Demo access */}
               <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Quick Demo Access
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-foreground/15" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Quick demo access
                   </span>
-                  <div className="h-px flex-1 bg-border" />
+                  <div className="h-px flex-1 bg-foreground/15" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
@@ -142,13 +147,13 @@ export default function LoginPage() {
                         variant="outline"
                         onClick={() => handleDemoLogin(role)}
                         disabled={isLoading}
-                        className="w-full h-auto py-3 px-4 cursor-pointer bg-card hover:bg-muted hover:text-accent-foreground border-border transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="h-auto w-full cursor-pointer border-foreground/15 bg-card px-4 py-3 transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <div className="flex items-center gap-3 w-full ">
-                          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                            <Icon className="w-4 h-4" />
+                        <div className="flex w-full items-center gap-3">
+                          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" />
                           </div>
-                          <div className="flex-1 text-left">
+                          <div className="min-w-0 flex-1 text-left">
                             <p className="text-sm font-medium text-foreground">
                               {label}
                             </p>
@@ -164,15 +169,14 @@ export default function LoginPage() {
               </div>
 
               {/* Divider */}
-              <div className="flex items-center gap-3 mb-8">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="mb-8 flex items-center gap-3">
+                <div className="h-px flex-1 bg-foreground/15" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                   Or with credentials
                 </span>
-                <div className="h-px flex-1 bg-border" />
+                <div className="h-px flex-1 bg-foreground/15" />
               </div>
 
-              {/* Login Form */}
               <LoginForm
                 form={form}
                 onSubmit={onSubmit}
@@ -181,13 +185,10 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="mt-8 text-center space-y-2">
-            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-              <Lock className="w-3 h-3" />
-              Secured with industry-standard encryption
-            </p>
-          </div>
+          <p className="mt-6 flex items-center justify-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            <Lock className="h-3 w-3" aria-hidden />
+            Secured with industry-standard encryption
+          </p>
         </div>
       </main>
     </div>

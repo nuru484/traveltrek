@@ -60,31 +60,29 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header at the top */}
+    <div className="min-h-dvh bg-hero-band">
       <Header />
 
-      {/* Main content area */}
-      <div className="flex flex-col justify-center items-center p-4 min-h-[calc(100vh-theme(spacing.16))] relative">
-        {/* Background decoration */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5"></div>
+      <main className="flex justify-center px-4 py-10 sm:py-16">
+        <div className="w-full max-w-md">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
+            New passenger
+          </p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+            Create your account.
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Join the platform to book flights, hotels, and tours.
+          </p>
 
-        {/* Main form container with better responsive width constraints */}
-        <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-lg xl:max-w-md z-10">
-          {/* Card wrapper */}
-          <div className="bg-card border border-border rounded-xl shadow-lg p-6 sm:p-8">
-            {/* Header section */}
-            <div className="text-center mb-6 sm:mb-8">
-              <h1 className="text-2xl sm:text-3xl font-bold text-card-foreground mb-2">
-                Create Account
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Join our platform to get started
-              </p>
+          {/* Card in the landing's boarding-pass voice */}
+          <div className="mt-8 overflow-hidden rounded-xl border border-foreground/20 bg-card">
+            <div className="flex items-center justify-between bg-night px-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground">
+              <span>Travel Trek</span>
+              <span className="text-night-foreground/70">Registration</span>
             </div>
 
-            {/* Form section */}
-            <div className="space-y-6">
+            <div className="px-5 py-7 sm:px-6 sm:py-8">
               <SignupForm
                 form={form}
                 onSubmit={onSubmit}
@@ -93,15 +91,11 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Footer decoration */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              By signing up, you agree to our Terms of Service and Privacy
-              Policy
-            </p>
-          </div>
+          <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            By signing up, you agree to the terms of service
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
