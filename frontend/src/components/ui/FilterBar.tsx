@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 /**
  * Shared list toolbar, mobile-first (mirrors khadys-kitchen's FilterBar):
  *
- * - Phones (below lg): the search is always visible and spans the full
- *   width; beneath it a Filters toggle-pill sits on the left with the page
- *   actions on the right. The filter controls live behind the toggle in a
- *   two-column panel.
- * - Desktop (lg up): the search sits inline with the filter controls on one
- *   row; actions align to the right.
+ * - Narrow containers (phones, and tablets with the sidebar open): the
+ *   search is always visible and spans the full width; beneath it a Filters
+ *   toggle-pill sits on the left with the page actions on the right. The
+ *   filter controls live behind the toggle in a two-column panel.
+ * - Wide containers (@4xl/main up): the search sits inline with the filter
+ *   controls on one row; actions align to the right.
  */
 export function FilterBar({
   search,
@@ -50,8 +50,8 @@ export function FilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      {/* Search — full width on phones, inline on desktop */}
-      <div className="relative w-full md:max-w-sm lg:min-w-[200px] lg:max-w-xs">
+      {/* Search — full width until the container can fit the inline row */}
+      <div className="relative w-full @4xl/main:min-w-[200px] @4xl/main:max-w-xs">
         <Search
           className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden
@@ -75,8 +75,8 @@ export function FilterBar({
         ) : null}
       </div>
 
-      {/* Phone row 2: Filters pill left, actions right */}
-      <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 md:w-auto md:flex-1 lg:hidden">
+      {/* Narrow row 2 (phones + tablets with the sidebar open): Filters pill left, actions right */}
+      <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 @4xl/main:hidden">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -102,13 +102,13 @@ export function FilterBar({
         </div>
       </div>
 
-      {/* Desktop: filters inline after the search */}
-      <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:gap-2">
+      {/* Wide containers: filters inline after the search */}
+      <div className="hidden @4xl/main:flex @4xl/main:flex-wrap @4xl/main:items-center @4xl/main:gap-2">
         {children}
         {clearLink}
       </div>
       {actions ? (
-        <div className="hidden lg:ml-auto lg:flex lg:items-center lg:gap-2">
+        <div className="hidden @4xl/main:ml-auto @4xl/main:flex @4xl/main:items-center @4xl/main:gap-2">
           {actions}
         </div>
       ) : null}
@@ -117,7 +117,7 @@ export function FilterBar({
       {open ? (
         <div
           id="filter-bar-panel"
-          className="grid w-full grid-cols-2 gap-2 lg:hidden [&_[data-slot=select-trigger]]:w-full"
+          className="grid w-full grid-cols-2 gap-2 @4xl/main:hidden [&_[data-slot=select-trigger]]:w-full"
         >
           {children}
           {clearLink ? (

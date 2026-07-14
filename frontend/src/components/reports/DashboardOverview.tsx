@@ -9,13 +9,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
 import { useGetDashboardOverviewQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
-import { formatCurrency } from "@/utils/formatCurrency";
 import { Money } from "@/components/ui/Money";
 
 interface DashboardOverviewProps {
@@ -62,24 +59,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Dashboard Overview</h2>
-          <p className="text-muted-foreground">
-            {bookings.data.summary.period.month
-              ? `${bookings.data.summary.period.month}/${bookings.data.summary.period.year}`
-              : bookings.data.summary.period.year || "All Time"}
-          </p>
-        </div>
-        <Button onClick={handleRefresh} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
@@ -91,7 +72,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {bookings.data.summary.totalBookings}
             </div>
             <p className="text-xs text-muted-foreground">
-              Avg: {formatCurrency(bookings.data.summary.averageBookingValue)}
+              Avg:{" "}
+              <Money
+                amount={bookings.data.summary.averageBookingValue}
+                symbol={`${payments.data.summary.currency} `}
+              />
             </p>
           </CardContent>
         </Card>
@@ -123,10 +108,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </CardHeader>
           <CardContent>
             <div className="font-display text-3xl font-semibold tracking-tight">
-              {formatCurrency(
-                payments.data.summary.pendingAmount,
-                payments.data.summary.currency
-              )}
+              <Money
+                amount={payments.data.summary.pendingAmount}
+                symbol={`${payments.data.summary.currency} `}
+              />
             </div>
             <p className="text-xs text-muted-foreground">Awaiting payment</p>
           </CardContent>
@@ -143,15 +128,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {tours.data.topTours.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              {tours.data.summary.totalRevenueAnalyzed > 0 &&
-                formatCurrency(tours.data.summary.totalRevenueAnalyzed)}
+              {tours.data.summary.totalRevenueAnalyzed > 0 && (
+                <Money
+                  amount={tours.data.summary.totalRevenueAnalyzed}
+                  symbol={`${payments.data.summary.currency} `}
+                />
+              )}
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Status Breakdown */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 @2xl/main:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Booking Status</CardTitle>
@@ -199,16 +188,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 ([method, data]) => (
                   <div
                     key={method}
-                    className="flex items-center justify-between"
+                    className="flex items-center justify-between gap-3"
                   >
-                    <span className="text-sm">{method.replace("_", " ")}</span>
-                    <div className="text-right">
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {method.replace("_", " ")}
+                    </span>
+                    <div className="flex-none text-right">
                       <div className="font-medium">{data.count}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(
-                          data.amount,
-                          payments.data.summary.currency
-                        )}
+                        <Money
+                          amount={data.amount}
+                          symbol={`${payments.data.summary.currency} `}
+                        />
                       </div>
                     </div>
                   </div>

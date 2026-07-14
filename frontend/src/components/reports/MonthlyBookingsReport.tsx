@@ -6,11 +6,8 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Calendar, TrendingUp, Users } from "lucide-react";
 import { useGetMonthlyBookingsSummaryQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, IBookingSummary } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -23,8 +20,7 @@ interface MonthlyBookingsReportProps {
 }
 
 export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
-  params,
-}) => {
+  params }) => {
   const { data, error, isError, isLoading, refetch } =
     useGetMonthlyBookingsSummaryQuery(params);
 
@@ -45,8 +41,8 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
             <div className="h-6 bg-muted rounded w-48"></div>
             <div className="h-4 bg-muted rounded w-32"></div>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+          <CardContent className="max-sm:px-3">
+            <div className="grid gap-4 @2xl/main:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-20 bg-muted rounded"></div>
               ))}
@@ -63,44 +59,28 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Monthly Bookings Report</h2>
-          <p className="text-muted-foreground">
-            {summary.period.month
-              ? `${summary.period.month}/${summary.period.year}`
-              : summary.period.year || "All Time"}
-          </p>
-        </div>
-        <Button onClick={handleRefresh} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 @2xl/main:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
               Total Bookings
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalBookings}</div>
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">{summary.totalBookings}</div>
             <p className="text-xs text-muted-foreground">Across all tours</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Total Revenue
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               <Money amount={summary.totalRevenue} symbol="$" />
             </div>
             <p className="text-xs text-muted-foreground">Generated revenue</p>
@@ -108,12 +88,13 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Value</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Average Value
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               <Money amount={summary.averageBookingValue} symbol="$" />
             </div>
             <p className="text-xs text-muted-foreground">Per booking</p>
@@ -128,12 +109,12 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
             <CardTitle>Monthly Breakdown</CardTitle>
             <CardDescription>Bookings and revenue by month</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-sm:px-3">
             <div className="space-y-4">
               {monthlyBreakdown.map((month) => (
                 <div
                   key={month.month}
-                  className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4"
                 >
                   <div>
                     <h4 className="font-medium">
@@ -164,8 +145,8 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
           <CardTitle>Status Distribution</CardTitle>
           <CardDescription>Bookings by status</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="max-sm:px-3">
+          <div className="grid gap-4 grid-cols-2 @3xl/main:grid-cols-4">
             {Object.entries(statusBreakdown).map(([status, count]) => (
               <div
                 key={status}
@@ -198,7 +179,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
             <CardTitle>Recent Bookings</CardTitle>
             <CardDescription>Latest booking activity</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-sm:px-3">
             <div className="space-y-4">
               {bookings.slice(0, 10).map((booking) => (
                 <BookingItem key={booking.id} booking={booking} />
@@ -213,7 +194,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
 
 const BookingItem: React.FC<{ booking: IBookingSummary }> = ({ booking }) => {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4">
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">#{booking.id}</span>

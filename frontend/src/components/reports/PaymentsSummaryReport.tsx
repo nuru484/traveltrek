@@ -6,11 +6,8 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, CreditCard, DollarSign, AlertCircle } from "lucide-react";
 import { useGetPaymentsSummaryQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, IPaymentSummary } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -23,8 +20,7 @@ interface PaymentsSummaryReportProps {
 }
 
 export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
-  params,
-}) => {
+  params }) => {
   const { data, error, isError, isLoading, refetch } =
     useGetPaymentsSummaryQuery(params);
 
@@ -45,7 +41,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
             <CardHeader>
               <div className="h-6 bg-muted rounded w-48"></div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-sm:px-3">
               <div className="h-20 bg-muted rounded"></div>
             </CardContent>
           </Card>
@@ -61,38 +57,20 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
     statusBreakdown,
     methodBreakdown,
     monthlyBreakdown,
-    recentPayments,
-  } = data.data;
+    recentPayments } = data.data;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Payments Summary</h2>
-          <p className="text-muted-foreground">
-            {summary.period.month
-              ? `${summary.period.month}/${summary.period.year}`
-              : summary.period.year || "All Time"}
-          </p>
-        </div>
-        <Button onClick={handleRefresh} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
               Total Payments
             </CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalPayments}</div>
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">{summary.totalPayments}</div>
             <p className="text-xs text-muted-foreground">
               Payment transactions
             </p>
@@ -100,12 +78,13 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Total Revenue
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               <Money amount={summary.totalRevenue} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Completed payments</p>
@@ -113,12 +92,13 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Pending
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               <Money amount={summary.pendingAmount} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Awaiting completion</p>
@@ -126,12 +106,13 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Failed
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="max-sm:px-3">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               <Money amount={summary.failedAmount} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Failed transactions</p>
@@ -145,12 +126,12 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           <CardTitle>Payment Status Distribution</CardTitle>
           <CardDescription>Payments by status with amounts</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+        <CardContent className="max-sm:px-3">
+          <div className="grid gap-4 @2xl/main:grid-cols-2">
             {Object.entries(statusBreakdown).map(([status, data]) => (
               <div
                 key={status}
-                className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Badge
@@ -185,12 +166,12 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           <CardTitle>Payment Methods</CardTitle>
           <CardDescription>Distribution by payment method</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="max-sm:px-3">
           <div className="space-y-4">
             {Object.entries(methodBreakdown).map(([method, data]) => (
               <div
                 key={method}
-                className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4"
               >
                 <div className="min-w-0 flex-1">
                   <h4 className="truncate font-medium">{method.replace("_", " ")}</h4>
@@ -219,12 +200,12 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
             <CardTitle>Monthly Trends</CardTitle>
             <CardDescription>Payment trends by month</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-sm:px-3">
             <div className="space-y-4">
               {monthlyBreakdown.map((month) => (
                 <div
                   key={month.month}
-                  className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4"
                 >
                   <div>
                     <h4 className="truncate font-medium">
@@ -253,7 +234,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
             <CardTitle>Recent Payments</CardTitle>
             <CardDescription>Latest payment transactions</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-sm:px-3">
             <div className="space-y-4">
               {recentPayments.slice(0, 10).map((payment) => (
                 <PaymentItem key={payment.id} payment={payment} />
@@ -268,7 +249,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
 
 const PaymentItem: React.FC<{ payment: IPaymentSummary }> = ({ payment }) => {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 sm:p-4">
       <div className="flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">#{payment.id}</span>

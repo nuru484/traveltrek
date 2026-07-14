@@ -93,15 +93,15 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
           Reset
         </button>
       </div>
-      <CardContent className="space-y-5 p-4 sm:p-5">
+      <CardContent className="@container space-y-5 p-4 sm:p-5">
         {/* Date Filters */}
         {showDateFilters && (
           <div className="space-y-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
               Period
             </p>
-            {/* Year and Month - Responsive Grid */}
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            {/* Year and Month — sided when the card is wide enough, stacked on folds */}
+            <div className="grid grid-cols-1 gap-3 @[280px]:grid-cols-2">
               {/* Year */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Year</Label>
@@ -114,7 +114,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -140,7 +140,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -164,14 +164,14 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
 
               {/* Date Pickers Container */}
               <div className="space-y-2 sm:space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="grid grid-cols-1 gap-2 @[280px]:grid-cols-2">
                   <div className="flex-1 min-w-0">
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full cursor-pointer justify-start text-left font-normal",
                             !startDate && "text-muted-foreground"
                           )}
                         >
@@ -200,7 +200,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full cursor-pointer justify-start text-left font-normal",
                             !endDate && "text-muted-foreground"
                           )}
                         >
@@ -249,7 +249,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
               handleFilterChange("status", value === "ALL" ? undefined : value)
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full cursor-pointer">
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent>
@@ -268,8 +268,8 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
               Tours
             </p>
-            {/* Tour Type and Status - Responsive Grid */}
-            <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+            {/* Tour Type and Status — sided when the card is wide enough */}
+            <div className="grid grid-cols-1 gap-3 @[280px]:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Tour Type</Label>
                 <Select
@@ -281,7 +281,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select tour type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -307,7 +307,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select tour status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -347,8 +347,8 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
               Payments
             </p>
-            {/* Payment Method and Currency - Responsive Grid */}
-            <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+            {/* Payment Method and Currency — one per row so labels never wrap */}
+            <div className="grid grid-cols-1 gap-3">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Payment Method</Label>
                 <Select
@@ -360,7 +360,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,7 +384,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                     )
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full cursor-pointer">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
                   <SelectContent>

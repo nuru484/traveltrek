@@ -8,9 +8,7 @@ import {
   CardHeader,
   CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  RefreshCw,
   MapPin,
   Calendar } from "lucide-react";
 import { useGetTopToursByBookingsQuery } from "@/redux/reportsApi";
@@ -42,7 +40,7 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
       <div className="space-y-4">
         {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="h-20 bg-muted rounded"></div>
             </CardContent>
           </Card>
@@ -57,45 +55,37 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Top Tours Report</h2>
-          <p className="text-muted-foreground">
-            Top performing tours by bookings
-          </p>
-        </div>
-        <Button onClick={handleRefresh} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
       {/* Summary */}
       <Card>
         <CardHeader>
           <CardTitle>Analysis Summary</CardTitle>
           <CardDescription>Overview of analyzed data</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold">
+        <CardContent className="@container max-sm:px-3">
+          <div className="grid grid-cols-1 gap-4 @[360px]:grid-cols-3">
+            <div className="min-w-0">
+              <div className="font-display text-2xl font-semibold tracking-tight">
                 {summary.totalToursAnalyzed}
               </div>
-              <p className="text-sm text-muted-foreground">Tours Analyzed</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Tours Analyzed
+              </p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">
+            <div className="min-w-0">
+              <div className="font-display text-2xl font-semibold tracking-tight">
                 {summary.totalBookingsAnalyzed}
               </div>
-              <p className="text-sm text-muted-foreground">Total Bookings</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Total Bookings
+              </p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">
+            <div className="min-w-0">
+              <div className="font-display text-2xl font-semibold tracking-tight">
                 <Money amount={summary.totalRevenueAnalyzed} symbol="$" />
               </div>
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Total Revenue
+              </p>
             </div>
           </div>
 
@@ -159,7 +149,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
 
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
@@ -189,7 +179,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
           </p>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+        <div className="grid grid-cols-2 gap-4 @3xl/main:grid-cols-4 mb-4">
           <div className="min-w-0">
             <p className="text-sm font-medium">{statistics.totalBookings}</p>
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Total Bookings</p>
