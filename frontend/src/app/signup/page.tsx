@@ -23,19 +23,18 @@ export default function SignupPage() {
 
   const form = useForm<ISignupFormSchema>({
     resolver: zodResolver(signupFormSchema),
+    defaultValues: { name: "", email: "", phone: "" },
   });
 
+  // Minimal registration: name + email or phone. The backend will be updated
+  // to accept this shape and send the user a default password; until then the
+  // API may reject the request and the error surfaces in the form/toast.
   async function onSubmit(data: z.infer<typeof signupFormSchema>) {
     try {
       const formData = new FormData();
       formData.append("name", data.name);
-      formData.append("email", data.email);
-      formData.append("password", data.password);
-      formData.append("role", data.role);
-      formData.append("phone", data.phone);
-      if (data.address) formData.append("address", data.address);
-      if (data.profilePicture)
-        formData.append("profilePicture", data.profilePicture);
+      if (data.email) formData.append("email", data.email);
+      if (data.phone) formData.append("phone", data.phone);
 
       await registerUser(formData).unwrap();
       toast.success("Signup Successful");

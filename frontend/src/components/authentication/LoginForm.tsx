@@ -50,20 +50,20 @@ export default function LoginForm({
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-foreground font-medium text-sm">
-                  Email Address
+                <FormLabel className="font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+                  Email
                 </FormLabel>
                 <FormControl>
                   <Input
                     placeholder="your.email@example.com"
                     type="email"
                     autoComplete="email"
-                    className="h-11 bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all"
+                    className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none"
                     disabled={isLoading}
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-destructive text-xs font-medium" />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -75,12 +75,12 @@ export default function LoginForm({
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between mb-2">
-                  <FormLabel className="text-foreground font-medium text-sm">
+                  <FormLabel className="font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
                     Password
                   </FormLabel>
                   <Link
                     href="/forgot-password"
-                    className="text-xs font-medium text-primary hover:text-primary/80 underline-offset-4 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
+                    className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
                     tabIndex={isLoading ? -1 : 0}
                   >
                     Forgot password?
@@ -92,7 +92,7 @@ export default function LoginForm({
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       autoComplete="current-password"
-                      className="h-11 bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all pr-11"
+                      className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none pr-11"
                       disabled={isLoading}
                       {...field}
                     />
@@ -114,7 +114,7 @@ export default function LoginForm({
                     </button>
                   </div>
                 </FormControl>
-                <FormMessage className="text-destructive text-xs font-medium" />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
@@ -122,7 +122,7 @@ export default function LoginForm({
           {/* Submit Button */}
           <Button
             type="submit"
-            className="w-full cursor-pointer h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="h-11 w-full cursor-pointer rounded-full bg-foreground font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isLoading}
           >
             {isLoading ? (
@@ -143,7 +143,7 @@ export default function LoginForm({
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="text-primary hover:text-primary/80 font-medium underline-offset-4 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             Create Account
           </Link>

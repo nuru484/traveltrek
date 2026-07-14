@@ -14,8 +14,6 @@ import { useLoginMutation } from "@/redux/auth/authApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { useRouter } from "next/navigation";
 import Header from "@/components/index/Header";
-import { Button } from "@/components/ui/button";
-import { User, UserCog, Shield } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -83,23 +81,25 @@ export default function LoginPage() {
     await onSubmit(selectedCredentials);
   };
 
+  // Boarding-style role codes instead of icons — matches the landing's
+  // document vocabulary.
   const demoAccounts = [
     {
       role: "customer" as const,
-      label: "Customer Demo",
-      icon: User,
+      code: "PAX",
+      label: "Customer demo",
       description: "Browse and book travel",
     },
     {
       role: "agent" as const,
-      label: "Agent Demo",
-      icon: UserCog,
+      code: "AGT",
+      label: "Agent demo",
       description: "Manage bookings",
     },
     {
       role: "admin" as const,
-      label: "Admin Demo",
-      icon: Shield,
+      code: "ADM",
+      label: "Admin demo",
       description: "Full system access",
     },
   ];
@@ -113,13 +113,7 @@ export default function LoginPage() {
             so big screens spread out instead of scrolling. */}
         <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-16">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-              Check-in
-            </p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight lg:text-5xl">
-              Welcome back.
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Sign in to access your account.
             </p>
 
@@ -133,29 +127,26 @@ export default function LoginPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-                {demoAccounts.map(({ role, label, icon: Icon, description }) => (
-                  <Button
+                {demoAccounts.map(({ role, code, label, description }) => (
+                  <button
                     key={role}
                     type="button"
-                    variant="outline"
                     onClick={() => handleDemoLogin(role)}
                     disabled={isLoading}
-                    className="h-auto w-full cursor-pointer border-foreground/15 bg-card px-4 py-3 transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <div className="flex w-full items-center gap-3">
-                      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1 text-left">
-                        <p className="text-sm font-medium text-foreground">
-                          {label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {description}
-                        </p>
-                      </div>
-                    </div>
-                  </Button>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">
+                        {label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {description}
+                      </span>
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {code}
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
