@@ -1,23 +1,8 @@
 // src/components/payments/PaymentDetailView.tsx
 import React from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Calendar,
-  DollarSign,
-  User,
-  Mail,
-  ExternalLink,
-  CreditCard,
-  Receipt,
-  Building2,
-  MapPin,
-  Plane,
-  Bed,
-  Hash,
-} from "lucide-react";
 import { IPayment } from "@/types/payment.types";
 
 interface PaymentDetailViewProps {
@@ -25,55 +10,10 @@ interface PaymentDetailViewProps {
   userRole?: "ADMIN" | "USER" | "MANAGER";
 }
 
-const getPaymentStatusColor = (status: string) => {
-  switch (status) {
-    case "PENDING":
-      return "bg-amber-100 text-amber-800 border-amber-200";
-    case "COMPLETED":
-      return "bg-green-100 text-green-800 border-green-200";
-    case "FAILED":
-      return "bg-red-100 text-red-800 border-red-200";
-    case "REFUNDED":
-      return "bg-orange-100 text-orange-800 border-orange-200";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-};
-
-const getPaymentMethodIcon = (method: string) => {
-  switch (method) {
-    case "CREDIT_CARD":
-    case "DEBIT_CARD":
-      return <CreditCard className="h-4 w-4 text-muted-foreground" />;
-    case "MOBILE_MONEY":
-      return <Receipt className="h-4 w-4 text-muted-foreground" />;
-    case "BANK_TRANSFER":
-      return <Building2 className="h-4 w-4 text-muted-foreground" />;
-    default:
-      return <DollarSign className="h-4 w-4 text-muted-foreground" />;
-  }
-};
-
-const getBookingTypeIcon = (type: string) => {
-  switch (type) {
-    case "TOUR":
-      return <MapPin className="h-5 w-5 text-primary" />;
-    case "FLIGHT":
-      return <Plane className="h-5 w-5 text-primary" />;
-    case "ROOM":
-    case "HOTEL":
-      return <Bed className="h-5 w-5 text-primary" />;
-    default:
-      return <Calendar className="h-5 w-5 text-primary" />;
-  }
-};
-
-const formatCurrency = (amount: number, currency: string = "USD") => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-  }).format(amount);
-};
+const formatCurrency = (amount: number, currency: string = "USD") =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+    amount
+  );
 
 const formatDate = (dateString: Date | string | null) => {
   if (!dateString) return "N/A";
@@ -86,217 +26,158 @@ const formatDate = (dateString: Date | string | null) => {
   }).format(new Date(dateString));
 };
 
+/** One mono-labelled record field. */
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-medium text-foreground">
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/** Mono section label with a trailing hairline. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        {children}
+      </span>
+      <div className="hidden h-px flex-1 bg-foreground/15 sm:block" />
+    </div>
+  );
+}
+
+/**
+ * The payment as a receipt-style record: night strip, serif amount, and
+ * dense mono-labelled field grids — no icon chips, no one-field-per-row
+ * dead space.
+ */
 const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
   payment,
   userRole = "USER",
 }) => {
   const isAdmin = userRole === "ADMIN" || userRole === "MANAGER";
+  const bookedType =
+    payment.bookedItem.type.charAt(0) +
+    payment.bookedItem.type.slice(1).toLowerCase();
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-6 w-6 text-primary" />
-              <div>
-                <CardTitle className="text-2xl font-semibold">
-                  Payment Details
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {payment.paymentDate
-                    ? `Paid on ${formatDate(payment.paymentDate)}`
-                    : `Created on ${formatDate(payment.createdAt)}`}
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="secondary"
-              className={getPaymentStatusColor(payment.status)}
-            >
-              {payment.status}
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Customer Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              Customer Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Name
-                </label>
-                <p className="text-sm font-medium break-all">
-                  {payment.user.name}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Email
-                </label>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm break-all">{payment.user.email}</p>
-                </div>
-              </div>
-            </div>
-            <Separator />
-            <Link
-              href={`/dashboard/users/${payment.userId}/user-profile`}
-              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              View Customer Profile
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Payment Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              Payment Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">
-                Amount
-              </span>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="text-lg font-bold text-green-600">
-                  {formatCurrency(payment.amount, payment.currency)}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Payment Method
-              </label>
-              <div className="flex items-center gap-2">
-                {getPaymentMethodIcon(payment.paymentMethod)}
-                <p className="text-sm font-medium">
-                  {payment.paymentMethod.replace("_", " ")}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Transaction Reference
-              </label>
-              <div className="flex items-center gap-2">
-                <Hash className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-mono text-foreground">
-                  {payment.transactionReference}
-                </p>
-              </div>
-            </div>
-
-            {payment.paymentDate && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">
-                  Payment Date
-                </label>
-                <p className="text-sm">{formatDate(payment.paymentDate)}</p>
-              </div>
-            )}
-
-            <Separator />
-
-            <Link
-              href={`/dashboard/bookings/${payment.bookingId}`}
-              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              View Related Booking
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
+    <div className="overflow-hidden rounded-xl border border-foreground/15 bg-card">
+      {/* Receipt strip */}
+      <div className="flex items-center justify-between gap-3 bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground sm:px-6">
+        <span className="truncate">Travel Trek · Payment receipt</span>
+        <span className="flex-none text-night-foreground/70">
+          {payment.status}
+        </span>
       </div>
 
-      {/* Booked Item Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {getBookingTypeIcon(payment.bookedItem.type)}
-            Booked Item Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              Type
-            </label>
-            <div className="flex items-center gap-2">
-              {getBookingTypeIcon(payment.bookedItem.type)}
-              <p className="font-medium">
-                {payment.bookedItem.type.charAt(0) +
-                  payment.bookedItem.type.slice(1).toLowerCase()}
-              </p>
-            </div>
+      <div className="space-y-6 p-4 sm:p-6">
+        {/* Amount */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Amount
+            </p>
+            <p className="mt-1 break-words font-display text-4xl font-semibold tracking-tight text-foreground">
+              {formatCurrency(payment.amount, payment.currency)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {payment.paymentDate
+                ? `Paid on ${formatDate(payment.paymentDate)}`
+                : `Created on ${formatDate(payment.createdAt)}`}
+            </p>
           </div>
+          <Badge variant="outline">{payment.status}</Badge>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              Name
-            </label>
-            <p className="font-medium break-all">{payment.bookedItem.name}</p>
-          </div>
+        {/* Payment record */}
+        <div className="space-y-3">
+          <SectionLabel>Payment</SectionLabel>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
+            <Field label="Method">
+              {payment.paymentMethod.replace(/_/g, " ")}
+            </Field>
+            <Field label="Reference">
+              <span className="font-mono text-[13px]">
+                {payment.transactionReference || "—"}
+              </span>
+            </Field>
+            {payment.paymentDate && (
+              <Field label="Payment date">
+                {formatDate(payment.paymentDate)}
+              </Field>
+            )}
+          </dl>
+        </div>
 
-          {payment.bookedItem.description && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Description
-              </label>
-              <p className="text-sm text-muted-foreground break-all">
-                {payment.bookedItem.description}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Customer */}
+        <div className="space-y-3 border-t border-dashed border-foreground/20 pt-5">
+          <SectionLabel>Customer</SectionLabel>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
+            <Field label="Name">{payment.user.name}</Field>
+            <Field label="Email">
+              <span className="break-all">{payment.user.email}</span>
+            </Field>
+            <Field label="Profile">
+              <Link
+                href={`/dashboard/users/${payment.userId}/user-profile`}
+                className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
+              >
+                View customer profile
+                <ArrowUpRight className="h-3 w-3" aria-hidden />
+              </Link>
+            </Field>
+          </dl>
+        </div>
 
-      {/* Timestamps - Only for Admin */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Payment Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Created
-                </label>
-                <p className="text-sm">{formatDate(payment.createdAt)}</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Last Updated
-                </label>
-                <p className="text-sm">{formatDate(payment.updatedAt)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        {/* Booked item */}
+        <div className="space-y-3 border-t border-dashed border-foreground/20 pt-5">
+          <SectionLabel>Booked item</SectionLabel>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
+            <Field label="Type">{bookedType}</Field>
+            <Field label="Name" className="min-[480px]:col-span-1 lg:col-span-2">
+              {payment.bookedItem.name}
+            </Field>
+            {payment.bookedItem.description && (
+              <Field label="Description" className="col-span-full">
+                <span className="font-normal text-muted-foreground">
+                  {payment.bookedItem.description}
+                </span>
+              </Field>
+            )}
+            <Field label="Booking">
+              <Link
+                href={`/dashboard/bookings/${payment.bookingId}`}
+                className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
+              >
+                View related booking
+                <ArrowUpRight className="h-3 w-3" aria-hidden />
+              </Link>
+            </Field>
+          </dl>
+        </div>
+
+        {/* Admin timeline */}
+        {isAdmin && (
+          <p className="border-t border-dashed border-foreground/20 pt-5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Created · {formatDate(payment.createdAt)} — Last updated ·{" "}
+            {formatDate(payment.updatedAt)}
+          </p>
+        )}
+      </div>
     </div>
   );
 };

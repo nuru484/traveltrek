@@ -1,5 +1,6 @@
 // src/components/destinations/DestinationList.tsx
 "use client";
+import React from "react";
 import { DestinationListItem } from "./DestinationListItem";
 import {
   IDestination,
@@ -14,6 +15,7 @@ import type { SerializedError } from "@reduxjs/toolkit";
 import EmptyState from "@/components/ui/EmptyState";
 
 interface DestinationListProps {
+  toolbarActions?: React.ReactNode;
   data: IDestination[];
   isLoading: boolean;
   isError: boolean;
@@ -47,7 +49,9 @@ export default function DestinationList({
   onFiltersChange,
   onRefetch,
   countries,
-  cities }: DestinationListProps) {
+  cities,
+  toolbarActions,
+}: DestinationListProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -65,21 +69,12 @@ export default function DestinationList({
               key={i}
               className="overflow-hidden rounded-xl border border-foreground/15 bg-card"
             >
-              <Skeleton className="h-40 w-full rounded-none" />
-              <div className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <Skeleton className="h-6 w-16" />
-                </div>
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <div className="flex gap-2 pt-1">
-                  <Skeleton className="h-9 flex-1 rounded-full" />
-                  <Skeleton className="h-9 flex-1 rounded-full" />
-                  <Skeleton className="h-9 flex-1 rounded-full" />
-                </div>
+              <Skeleton className="h-36 w-full rounded-none" />
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
               </div>
             </div>
           ))}
@@ -99,6 +94,7 @@ export default function DestinationList({
     <div className="space-y-6">
       {/* Filters */}
       <DestinationFilters
+        actions={toolbarActions}
         filters={filters}
         onFiltersChange={onFiltersChange}
         countries={countries}

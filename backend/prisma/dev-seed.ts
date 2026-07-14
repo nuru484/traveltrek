@@ -43,4 +43,66 @@ async function run() {
   ]});
   console.log('SEEDED bookings + payments');
 }
-run().catch(e => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
+// SEED_WORST_CASE=1 runs only the worst-case rows; default runs the base set.
+const job = process.env.SEED_WORST_CASE ? worstCase() : run();
+job.catch(e => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
+
+/**
+ * Worst-case content rows — max-length names, unbroken emails, huge amounts —
+ * kept in the dev DB permanently so UI hardening stays testable.
+ */
+export async function worstCase() {
+  const longDesc = 'An impossibly detailed description that keeps going and going to stress every line-clamp, card height, and detail view: '.repeat(6);
+  const dest = await prisma.destination.create({ data: {
+    name: 'Saint-Nicolas-de-la-Grave-upon-Volta International Heritage Riviera & Grand Escarpment District',
+    country: 'The United Republic of Extraordinarily Long Country Names',
+    city: 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
+    description: longDesc,
+  }});
+  const hotel = await prisma.hotel.create({ data: {
+    name: 'The Grand Presidential Continental Panafrican Resort, Conference Centre & Wellness Sanctuary of the Northern Savannah',
+    address: 'Plot 99441B, Avenue of the Extraordinarily Long Boulevard Names, Behind the Old Aerodrome Roundabout, District 47',
+    starRating: 5,
+    amenities: Array.from({ length: 18 }, (_, i) => `amenity-${i + 1}`),
+    destinationId: dest.id,
+    description: longDesc,
+  }});
+  await prisma.room.create({ data: {
+    hotelId: hotel.id, roomType: 'Super-Executive Panoramic Presidential Penthouse Suite With Private Infinity Plunge Pool',
+    pricePerNight: 24493353.34, capacity: 12, totalRooms: 1, amenities: ['everything'],
+  }});
+  const day = 86400000, now2 = Date.now();
+  const flight = await prisma.flight.create({ data: {
+    flightNumber: 'TT-99999-INTERCONTINENTAL-SUPERLONGHAUL',
+    airline: 'Trans-Continental Intercontinental Airways of West Africa, the Sahel & Beyond Ltd.',
+    departure: new Date(now2 + 30 * day), arrival: new Date(now2 + 31 * day),
+    originId: dest.id, destinationId: dest.id === 1 ? 2 : 1,
+    price: 24493353.34, flightClass: 'FIRST_CLASS', duration: 1445, stops: 4, capacity: 2, seatsAvailable: 1,
+  }});
+  const tour = await prisma.tour.create({ data: {
+    name: 'The Complete Unabridged Twelve-Region Grand Heritage, Wildlife, Culinary & Astronomical Expedition of the Entire Subcontinent (Platinum Edition)',
+    type: 'ADVENTURE' as never, duration: 365, price: 24493353.34, maxGuests: 100000, guestsBooked: 99999,
+    startDate: new Date(now2 + 40 * day), endDate: new Date(now2 + 405 * day),
+    destinationId: dest.id, description: longDesc,
+  }});
+  const password = await bcrypt.hash('Password123!', 10);
+  const wcUser = await prisma.user.upsert({
+    where: { email: 'maximiliana.wolfeschlegelsteinhausenbergerdorff@extremelylongdomainnameprovider.example.com' },
+    update: {},
+    create: {
+      name: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman III',
+      email: 'maximiliana.wolfeschlegelsteinhausenbergerdorff@extremelylongdomainnameprovider.example.com',
+      role: Role.CUSTOMER, phone: '233549999999', password,
+    },
+  });
+  const wb = await prisma.booking.create({ data: {
+    userId: wcUser.id, tourId: tour.id, status: BookingStatus.CONFIRMED,
+    numberOfGuests: 42, totalPrice: 24493353.34,
+  }});
+  await prisma.payment.create({ data: {
+    bookingId: wb.id, userId: wcUser.id, amount: 24493353.34,
+    status: PaymentStatus.COMPLETED, paymentMethod: PaymentMethod.BANK_TRANSFER,
+    paymentDate: new Date(), transactionReference: 'TT-PAY-WORSTCASE-24493353',
+  }});
+  console.log('SEEDED worst-case rows (flight ' + flight.id + ')');
+}

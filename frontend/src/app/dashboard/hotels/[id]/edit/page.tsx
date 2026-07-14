@@ -9,6 +9,7 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Hotel } from "lucide-react";
+import FormSkeleton from "@/components/ui/FormSkeleton";
 
 export default function EditHotelPage() {
   const params = useParams<{ id: string }>();
@@ -38,7 +39,7 @@ export default function EditHotelPage() {
             <Skeleton className="h-8 w-48" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-64 w-full" />
+            <FormSkeleton />
           </CardContent>
         </Card>
       </div>

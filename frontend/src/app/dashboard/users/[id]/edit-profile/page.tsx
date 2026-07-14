@@ -10,6 +10,7 @@ import { useGetUserQuery } from "@/redux/userApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import UserForm from "@/components/users/UserForm";
+import FormSkeleton from "@/components/ui/FormSkeleton";
 
 export default function EditUserPage() {
   const params = useParams<{ id: string }>();
@@ -51,7 +52,7 @@ export default function EditUserPage() {
             <Skeleton className="h-8 w-48" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-64 w-full" />
+            <FormSkeleton />
           </CardContent>
         </Card>
       </div>

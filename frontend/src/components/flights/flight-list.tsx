@@ -1,5 +1,6 @@
 // src/components/flights/flight-list.tsx
 "use client";
+import React from "react";
 import { FlightListItem } from "./flight-list-item";
 import { IFlight, IFlightsQueryParams } from "@/types/flight.types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +14,7 @@ import type { SerializedError } from "@reduxjs/toolkit";
 import EmptyState from "@/components/ui/EmptyState";
 
 interface FlightListProps {
+  toolbarActions?: React.ReactNode;
   data: IFlight[];
   isLoading: boolean;
   isError: boolean;
@@ -44,7 +46,9 @@ export function FlightList({
   onLimitChange,
   onFiltersChange,
   onRefetch,
-  destinations }: FlightListProps) {
+  destinations,
+  toolbarActions,
+}: FlightListProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -63,25 +67,22 @@ export function FlightList({
               key={i}
               className="overflow-hidden rounded-xl border border-foreground/15 bg-card"
             >
-              <Skeleton className="h-40 w-full rounded-none" />
+              <Skeleton className="h-36 w-full rounded-none" />
               <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-5 w-40" />
                   </div>
-                  <Skeleton className="h-6 w-16" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
                 </div>
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <div className="flex justify-between gap-2">
+                <div className="flex justify-between gap-2 border-t border-dashed border-foreground/15 pt-3">
                   <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-12" />
                   <Skeleton className="h-3 w-14" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Skeleton className="h-9 flex-1 rounded-full" />
-                  <Skeleton className="h-9 flex-1 rounded-full" />
-                  <Skeleton className="h-9 flex-1 rounded-full" />
                 </div>
               </div>
             </div>
@@ -102,6 +103,7 @@ export function FlightList({
     <div className="space-y-6">
       {/* Filters */}
       <FlightFilters
+        actions={toolbarActions}
         filters={filters}
         onFiltersChange={onFiltersChange}
         destinations={destinations}

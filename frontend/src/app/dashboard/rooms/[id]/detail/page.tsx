@@ -9,6 +9,7 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Bed } from "lucide-react";
+import FormSkeleton from "@/components/ui/FormSkeleton";
 
 export default function RoomDetailPage() {
   const params = useParams<{ id: string }>();
@@ -38,7 +39,7 @@ export default function RoomDetailPage() {
             <Skeleton className="h-8 w-48" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <Skeleton className="h-64 w-full" />
+            <FormSkeleton />
             <div className="grid gap-4 md:grid-cols-2">
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />

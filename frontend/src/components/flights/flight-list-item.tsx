@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Plane } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { IFlight } from "@/types/flight.types";
+import { Money } from "@/components/ui/Money";
 
 interface IFlightListItemProps {
   flight: IFlight;
@@ -59,7 +60,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
           </div>
           <div className="flex-none text-right">
             <p className="text-lg font-semibold text-foreground">
-              ₵{flight.price.toLocaleString()}
+              <Money amount={flight.price} />
             </p>
             <p className="text-[11px] text-muted-foreground">per person</p>
           </div>

@@ -116,7 +116,7 @@ export function TableFilters({
       {/* Filters Row */}
       <div className="flex flex-col xl:flex-row gap-4">
         {/* Search Input */}
-        <div className="flex-1 min-w-0">
+        <div className="w-full min-w-0 md:max-w-sm">
           <Input
             placeholder="Search users by name or email..."
             value={searchInput}

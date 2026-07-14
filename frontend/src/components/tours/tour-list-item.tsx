@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ITour } from "@/types/tour.types";
+import { Money } from "@/components/ui/Money";
 
 interface ITourListItemProps {
   tour: ITour;
@@ -28,7 +29,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
         </div>
         <div className="flex-none text-right">
           <p className="text-lg font-semibold text-foreground">
-            ${tour.price.toLocaleString()}
+            <Money amount={tour.price} symbol="$" />
           </p>
           <p className="text-[11px] text-muted-foreground">per guest</p>
         </div>
@@ -38,11 +39,11 @@ export function TourListItem({ tour }: ITourListItemProps) {
         <p className="mb-1 truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
           {tour.destination?.name ?? "—"}
         </p>
-        <h3 className="line-clamp-2 text-lg font-semibold leading-snug text-foreground">
+        <h3 className="truncate text-lg font-semibold leading-snug text-foreground">
           {tour.name}
         </h3>
         {tour.description && (
-          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 line-clamp-1 text-sm leading-relaxed text-muted-foreground">
             {tour.description}
           </p>
         )}
@@ -51,7 +52,13 @@ export function TourListItem({ tour }: ITourListItemProps) {
       <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
         <span>
           {format(new Date(tour.startDate), "MMM d")} –{" "}
-          {format(new Date(tour.endDate), "MMM d")}
+          {format(
+            new Date(tour.endDate),
+            new Date(tour.startDate).getFullYear() ===
+              new Date(tour.endDate).getFullYear()
+              ? "MMM d"
+              : "MMM d, yyyy"
+          )}
         </span>
         <span>
           {tour.duration} day{tour.duration === 1 ? "" : "s"}

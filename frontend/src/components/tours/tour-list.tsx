@@ -1,5 +1,6 @@
 // src/components/tours/tour-list.tsx
 "use client";
+import React from "react";
 import { TourListItem } from "./tour-list-item";
 import { ITour, IToursQueryParams } from "@/types/tour.types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,7 @@ import type { SerializedError } from "@reduxjs/toolkit";
 import EmptyState from "@/components/ui/EmptyState";
 
 interface TourListProps {
+  toolbarActions?: React.ReactNode;
   data: ITour[];
   isLoading: boolean;
   isError: boolean;
@@ -41,7 +43,9 @@ export function TourList({
   onPageChange,
   onLimitChange,
   onFiltersChange,
-  onRefetch }: TourListProps) {
+  onRefetch,
+  toolbarActions,
+}: TourListProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -94,7 +98,7 @@ export function TourList({
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <TourFilters filters={filters} onFiltersChange={onFiltersChange} />
+      <TourFilters filters={filters} onFiltersChange={onFiltersChange} actions={toolbarActions} />
 
       {/* Results Info */}
       <div className="flex items-center justify-between">

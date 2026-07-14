@@ -16,6 +16,7 @@ import { IReportsQueryParams } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { Money } from "@/components/ui/Money";
 
 interface DashboardOverviewProps {
   params: Omit<IReportsQueryParams, "limit" | "minBookings">;
@@ -103,10 +104,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </CardHeader>
           <CardContent>
             <div className="font-display text-3xl font-semibold tracking-tight">
-              {formatCurrency(
-                payments.data.summary.totalRevenue,
-                payments.data.summary.currency
-              )}
+              <Money
+                amount={payments.data.summary.totalRevenue}
+                symbol={`${payments.data.summary.currency} `}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               {payments.data.summary.totalPayments} payments

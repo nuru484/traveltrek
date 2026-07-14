@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { IPayment } from "@/types/payment.types";
 import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
+import { Money } from "@/components/ui/Money";
 
 const getPaymentMethodIcon = (method: string) => {
   switch (method) {
@@ -147,9 +148,8 @@ export const createPaymentColumns = (
         const amount = row.getValue("amount") as number;
         const currency = row.original.currency;
         return (
-          <div className="font-medium">
-            {currency === "GHS" ? "₵" : "$"}
-            {amount.toFixed(2)}
+          <div className="font-medium whitespace-nowrap">
+            <Money amount={amount} symbol={currency === "GHS" ? "₵" : "$"} />
           </div>
         );
       } },

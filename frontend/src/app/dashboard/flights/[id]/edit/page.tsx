@@ -9,6 +9,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import FormSkeleton from "@/components/ui/FormSkeleton";
 
 export default function EditFlightPage() {
   const params = useParams<{ id: string }>();
@@ -45,7 +46,7 @@ export default function EditFlightPage() {
             </div>
           </div>
         </div>
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <FormSkeleton />
       </div>
     );
   }

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { IBooking } from "@/types/booking.types";
 import { BookingActionsDropdown } from "./BookingActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
+import { Money } from "@/components/ui/Money";
 
 const getBookingTypeIcon = (type: IBooking["type"]) => {
   switch (type) {
@@ -163,7 +164,7 @@ export const createBookingColumns = (
       ),
       cell: ({ row }) => {
         const totalPrice = row.getValue("totalPrice") as number;
-        return <div className="font-medium">${totalPrice.toFixed(2)}</div>;
+        return <div className="font-medium whitespace-nowrap"><Money amount={totalPrice} symbol="$" /></div>;
       } },
     {
       accessorKey: "status",
