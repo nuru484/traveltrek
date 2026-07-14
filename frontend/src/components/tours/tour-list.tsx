@@ -61,25 +61,28 @@ export function TourList({
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="space-y-3 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
+              className="flex flex-col gap-3 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-4 w-16 rounded-full" />
+                <div className="flex gap-1.5">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
                 </div>
-                <Skeleton className="h-6 w-16" />
+                <div className="space-y-1.5">
+                  <Skeleton className="ml-auto h-5 w-16" />
+                  <Skeleton className="ml-auto h-3 w-12" />
+                </div>
               </div>
-              <Skeleton className="h-4 w-3/4" />
-              <div className="grid grid-cols-2 gap-2 min-[480px]:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, j) => (
-                  <Skeleton key={j} className="h-14 rounded-lg" />
-                ))}
+              <div>
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="mt-2 h-5 w-3/4" />
+                <Skeleton className="mt-2.5 h-4 w-full" />
+                <Skeleton className="mt-1.5 h-4 w-2/3" />
               </div>
-              <Skeleton className="h-14 w-full rounded-lg" />
-              <div className="flex gap-2 pt-1">
-                <Skeleton className="h-8 flex-1 rounded-full" />
-                <Skeleton className="h-8 flex-1 rounded-full" />
+              <div className="mt-auto flex justify-between gap-2 border-t border-dashed border-foreground/15 pt-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-3 w-16" />
               </div>
             </div>
           ))}

@@ -15,8 +15,8 @@ import { useGetMonthlyBookingsSummaryQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, IBookingSummary } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
-import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
+import { Money } from "@/components/ui/Money";
 
 interface MonthlyBookingsReportProps {
   params: IReportsQueryParams;
@@ -101,7 +101,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.totalRevenue)}
+              <Money amount={summary.totalRevenue} symbol="$" />
             </div>
             <p className="text-xs text-muted-foreground">Generated revenue</p>
           </CardContent>
@@ -114,7 +114,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.averageBookingValue)}
+              <Money amount={summary.averageBookingValue} symbol="$" />
             </div>
             <p className="text-xs text-muted-foreground">Per booking</p>
           </CardContent>
@@ -133,7 +133,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
               {monthlyBreakdown.map((month) => (
                 <div
                   key={month.month}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
                 >
                   <div>
                     <h4 className="font-medium">
@@ -143,12 +143,12 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
                       {month.bookingCount} bookings
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="min-w-0 text-right">
                     <p className="font-medium">
-                      {formatCurrency(month.revenue)}
+                      <Money amount={month.revenue} symbol="$" />
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Avg: {formatCurrency(month.averageValue)}
+                      Avg: <Money amount={month.averageValue} symbol="$" />
                     </p>
                   </div>
                 </div>
@@ -169,7 +169,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
             {Object.entries(statusBreakdown).map(([status, count]) => (
               <div
                 key={status}
-                className="flex items-center justify-between p-3 border rounded-lg"
+                className="flex flex-wrap items-center justify-between gap-3 p-3 border rounded-lg"
               >
                 <Badge
                   variant={
@@ -213,9 +213,9 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
 
 const BookingItem: React.FC<{ booking: IBookingSummary }> = ({ booking }) => {
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg">
-      <div className="flex-1">
-        <div className="flex items-center space-x-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">#{booking.id}</span>
           <Badge
             variant={
@@ -231,13 +231,13 @@ const BookingItem: React.FC<{ booking: IBookingSummary }> = ({ booking }) => {
             {booking.status}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{booking.user.name}</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="truncate text-sm text-muted-foreground">{booking.user.name}</p>
+        <p className="truncate text-sm text-muted-foreground">
           {booking.tour?.name || "No tour"}
         </p>
       </div>
-      <div className="text-right">
-        <p className="font-medium">{formatCurrency(booking.totalPrice)}</p>
+      <div className="min-w-0 text-right">
+        <p className="font-medium"><Money amount={booking.totalPrice} symbol="$" /></p>
         <p className="text-sm text-muted-foreground">
           {format(new Date(booking.bookingDate), "MMM dd, yyyy")}
         </p>

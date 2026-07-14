@@ -36,14 +36,14 @@ export function TourListItem({ tour }: ITourListItemProps) {
       </div>
 
       <div className="min-w-0">
-        <p className="mb-1 truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        <p className="mb-1.5 truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
           {tour.destination?.name ?? "—"}
         </p>
-        <h3 className="truncate text-lg font-semibold leading-snug text-foreground">
+        <h3 className="truncate font-sans text-lg font-semibold leading-snug text-foreground">
           {tour.name}
         </h3>
         {tour.description && (
-          <p className="mt-1.5 line-clamp-1 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 line-clamp-2 min-h-[2.6rem] text-sm leading-relaxed text-muted-foreground">
             {tour.description}
           </p>
         )}

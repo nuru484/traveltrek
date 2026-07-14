@@ -44,7 +44,11 @@ async function run() {
   console.log('SEEDED bookings + payments');
 }
 // SEED_WORST_CASE=1 runs only the worst-case rows; default runs the base set.
-const job = process.env.SEED_WORST_CASE ? worstCase() : run();
+const job = process.env.SEED_MAXIMIZE
+  ? maximize()
+  : process.env.SEED_WORST_CASE
+    ? worstCase()
+    : run();
 job.catch(e => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
 
 /**
@@ -105,4 +109,103 @@ export async function worstCase() {
     paymentDate: new Date(), transactionReference: 'TT-PAY-WORSTCASE-24493353',
   }});
   console.log('SEEDED worst-case rows (flight ' + flight.id + ')');
+}
+
+/**
+ * SEED_MAXIMIZE=1 — rewrite EVERY existing row (except the admin login) to
+ * worst-case content with real prose, so the whole UI renders under maximum
+ * stress all the time.
+ */
+export async function maximize() {
+  const destDesc =
+    'Stretched along a wide bend of the river where the savannah finally gives way to gallery forest, this district gathers colonial-era trading houses, a labyrinthine night market famous for its charred-pepper suya and hand-dyed indigo cloth, three UNESCO-listed shrine complexes, and a chain of shea-butter cooperatives that welcome visitors at dawn. Most travellers stay a week and still leave a list of things undone, from the canoe crossing at first light to the drumming festivals that close every harvest season.';
+  const hotelDesc =
+    'Originally built in 1932 as the residence of a cocoa magnate and restored plank by plank over eleven years, the property now pairs its shaded verandas and hand-cut terrazzo floors with a full wellness wing, two open-fire kitchens led by award-winning chefs, a rooftop observatory for the harmattan-clear night skies, and gardens that supply the restaurants with everything from lemongrass to sugarloaf pineapple.';
+  const tourDesc =
+    'Beginning with a sunrise crossing of the flood plains while the elephants are still moving between waterholes, the itinerary threads together village homestays with master weavers, a two-night canoe descent past hippo pools and fishing camps, guided walks through baobab groves with a field botanist, evenings of praise-singing and kora music around the fire, and a final ascent of the escarpment for a farewell breakfast looking back across everywhere you have been.';
+  const specialReq =
+    'Our party includes two vegetarian guests, one traveller who uses a lightweight folding wheelchair and can manage two or three steps with assistance, and my elderly mother who needs a ground-floor room close to the dining area; we would also be grateful for a late checkout on the final day because our return flight leaves close to midnight.';
+
+  const LONG_NAMES = {
+    dest: 'Saint-Nicolas-de-la-Grave-upon-Volta International Heritage Riviera and Grand Escarpment Conservation District',
+    country: 'The United Republic of the Northern Territories and Associated Protectorates',
+    city: 'Llanfairpwllgwyngyllgogerychwyrndrobwll-upon-Oti Metropolitan Municipality',
+    hotel: 'The Grand Presidential Continental Pan-African Resort, Conference Centre and Wellness Sanctuary of the Northern Savannah',
+    address: 'Plot 99441B, Avenue of the Distinguished Former Heads of State, Behind the Old Aerodrome Roundabout, Ministries District 47',
+    room: 'Super-Executive Panoramic Presidential Penthouse Suite with Private Infinity Plunge Pool and Butler Pantry',
+    airline: 'Trans-Continental Intercontinental Airways of West Africa, the Sahel and Beyond Limited',
+    tour: 'The Complete Unabridged Twelve-Region Grand Heritage, Wildlife, Culinary and Astronomical Expedition of the Entire Subcontinent (Platinum Anniversary Edition)',
+    user: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman-Vanderbilt III',
+  };
+  const BIG = 24493353.34;
+
+  for (const d of await prisma.destination.findMany()) {
+    await prisma.destination.update({ where: { id: d.id }, data: {
+      name: `${LONG_NAMES.dest} №${d.id}`,
+      country: LONG_NAMES.country,
+      city: LONG_NAMES.city,
+      description: destDesc,
+    }});
+  }
+  for (const h of await prisma.hotel.findMany()) {
+    await prisma.hotel.update({ where: { id: h.id }, data: {
+      name: `${LONG_NAMES.hotel} №${h.id}`,
+      address: LONG_NAMES.address,
+      description: hotelDesc,
+      amenities: ['high-speed fibre wifi throughout','24-hour concierge and butler service','rooftop infinity pool with swim-up bar','full-service spa and hammam','championship-standard tennis courts','private cinema and screening room','artisanal bakery and patisserie','electric vehicle charging bays','kids club with certified childminders','on-call physician and wellness nurse'],
+    }});
+  }
+  for (const r of await prisma.room.findMany()) {
+    await prisma.room.update({ where: { id: r.id }, data: {
+      roomType: `${LONG_NAMES.room} №${r.id}`,
+      pricePerNight: BIG,
+      description: hotelDesc,
+      amenities: ['emperor-size four-poster bed','private infinity plunge pool','dedicated butler pantry','panoramic wraparound balcony','heated marble bathroom floors'],
+    }});
+  }
+  for (const f of await prisma.flight.findMany()) {
+    await prisma.flight.update({ where: { id: f.id }, data: {
+      airline: LONG_NAMES.airline,
+      flightNumber: `TT-${9000 + f.id}-INTERCONTINENTAL-SUPERLONGHAUL`,
+      price: BIG,
+      duration: 1445,
+      stops: 4,
+    }});
+  }
+  for (const t of await prisma.tour.findMany()) {
+    await prisma.tour.update({ where: { id: t.id }, data: {
+      name: `${LONG_NAMES.tour} №${t.id}`,
+      description: tourDesc,
+      price: BIG,
+      maxGuests: 100000,
+      guestsBooked: 99999,
+    }});
+  }
+  const adminEmail = ENVIRONMENT_ADMIN();
+  for (const u of await prisma.user.findMany()) {
+    if (u.email === adminEmail) continue; // keep the login usable
+    await prisma.user.update({ where: { id: u.id }, data: {
+      name: LONG_NAMES.user,
+      email: `maximiliana.wolfeschlegelsteinhausenbergerdorff.okonkwo${u.id}@extremelylongdomainnameprovider-with-subsidiaries.example.com`,
+      address: LONG_NAMES.address,
+    }});
+  }
+  for (const b of await prisma.booking.findMany()) {
+    await prisma.booking.update({ where: { id: b.id }, data: {
+      totalPrice: BIG,
+      numberOfGuests: 999,
+      specialRequests: specialReq,
+    }});
+  }
+  for (const p of await prisma.payment.findMany()) {
+    await prisma.payment.update({ where: { id: p.id }, data: {
+      amount: BIG,
+      transactionReference: `TT-PAY-${p.id}-INTERCONTINENTAL-SETTLEMENT-BATCH-2026-Q3-REF-99441B`,
+    }});
+  }
+  console.log('MAXIMIZED all rows to worst-case content');
+}
+
+function ENVIRONMENT_ADMIN() {
+  return process.env.ADMIN_EMAIL || '';
 }

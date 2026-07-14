@@ -26,44 +26,46 @@ const formatDate = (dateString: Date | string | null) => {
   }).format(new Date(dateString));
 };
 
-/** One mono-labelled record field. */
-function Field({
+/** Manifest row: mono label, dotted leader, value — the landing's cargo-manifest device. */
+function Row({
   label,
   children,
-  className = "",
 }: {
   label: string;
   children: React.ReactNode;
-  className?: string;
 }) {
   return (
-    <div className={`min-w-0 ${className}`}>
-      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-2">
+      <span className="flex-none font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
         {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm font-medium text-foreground">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
-/** Mono section label with a trailing hairline. */
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+      </span>
+      <span
+        aria-hidden
+        className="hidden min-w-4 flex-1 translate-y-[-3px] border-b border-dotted border-foreground/25 sm:block"
+      />
+      <span className="min-w-0 break-words text-sm font-medium text-foreground sm:max-w-[65%] sm:text-right">
         {children}
       </span>
-      <div className="hidden h-px flex-1 bg-foreground/15 sm:block" />
     </div>
   );
 }
 
+/** CSS barcode — the receipt's signature texture. */
+const Barcode = () => (
+  <div
+    aria-hidden
+    className="h-10 w-full text-foreground/80"
+    style={{
+      backgroundImage:
+        "repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px, currentColor 5px 6px, transparent 6px 8px, currentColor 8px 11px, transparent 11px 15px, currentColor 15px 16px, transparent 16px 19px)",
+    }}
+  />
+);
+
 /**
- * The payment as a receipt-style record: night strip, serif amount, and
- * dense mono-labelled field grids — no icon chips, no one-field-per-row
- * dead space.
+ * The payment as a boarding-pass receipt: night strip, a hero band with the
+ * serif amount and a barcode stub, then manifest-style rows with dotted
+ * leaders — typographic, not tabular.
  */
 const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
   payment,
@@ -80,99 +82,96 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
       <div className="flex items-center justify-between gap-3 bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground sm:px-6">
         <span className="truncate">Travel Trek · Payment receipt</span>
         <span className="flex-none text-night-foreground/70">
-          {payment.status}
+          Nº {payment.id}
         </span>
       </div>
 
-      <div className="space-y-6 p-4 sm:p-6">
-        {/* Amount */}
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Amount
-            </p>
-            <p className="mt-1 break-words font-display text-4xl font-semibold tracking-tight text-foreground">
-              {formatCurrency(payment.amount, payment.currency)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+      {/* Amount hero on the paper band, with a tear-off stub */}
+      <div className="flex flex-col gap-6 bg-hero-band px-4 py-6 sm:px-6 min-[560px]:flex-row min-[560px]:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Amount
+          </p>
+          <p className="mt-1 break-words font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+            {formatCurrency(payment.amount, payment.currency)}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Badge variant="outline">{payment.status}</Badge>
+            <span className="text-xs text-muted-foreground">
               {payment.paymentDate
                 ? `Paid on ${formatDate(payment.paymentDate)}`
                 : `Created on ${formatDate(payment.createdAt)}`}
-            </p>
+            </span>
           </div>
-          <Badge variant="outline">{payment.status}</Badge>
         </div>
+        <div className="w-full flex-none border-t border-dashed border-foreground/25 pt-4 min-[560px]:w-44 min-[560px]:border-l min-[560px]:border-t-0 min-[560px]:pl-5 min-[560px]:pt-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            {payment.paymentMethod.replace(/_/g, " ")}
+          </p>
+          <div className="mt-2">
+            <Barcode />
+          </div>
+          <p className="mt-2 break-all font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+            {payment.transactionReference || "No reference"}
+          </p>
+        </div>
+      </div>
 
-        {/* Payment record */}
+      {/* Records */}
+      <div className="grid grid-cols-1 gap-x-10 gap-y-6 p-4 sm:p-6 @4xl/main:grid-cols-2">
         <div className="space-y-3">
-          <SectionLabel>Payment</SectionLabel>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
-            <Field label="Method">
-              {payment.paymentMethod.replace(/_/g, " ")}
-            </Field>
-            <Field label="Reference">
-              <span className="font-mono text-[13px]">
-                {payment.transactionReference || "—"}
-              </span>
-            </Field>
-            {payment.paymentDate && (
-              <Field label="Payment date">
-                {formatDate(payment.paymentDate)}
-              </Field>
-            )}
-          </dl>
-        </div>
-
-        {/* Customer */}
-        <div className="space-y-3 border-t border-dashed border-foreground/20 pt-5">
-          <SectionLabel>Customer</SectionLabel>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
-            <Field label="Name">{payment.user.name}</Field>
-            <Field label="Email">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+            Customer
+          </p>
+          <div className="space-y-2.5">
+            <Row label="Name">{payment.user.name}</Row>
+            <Row label="Email">
               <span className="break-all">{payment.user.email}</span>
-            </Field>
-            <Field label="Profile">
+            </Row>
+            <Row label="Profile">
               <Link
                 href={`/dashboard/users/${payment.userId}/user-profile`}
-                className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
+                className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
               >
-                View customer profile
+                View profile
                 <ArrowUpRight className="h-3 w-3" aria-hidden />
               </Link>
-            </Field>
-          </dl>
+            </Row>
+          </div>
         </div>
 
-        {/* Booked item */}
-        <div className="space-y-3 border-t border-dashed border-foreground/20 pt-5">
-          <SectionLabel>Booked item</SectionLabel>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
-            <Field label="Type">{bookedType}</Field>
-            <Field label="Name" className="min-[480px]:col-span-1 lg:col-span-2">
-              {payment.bookedItem.name}
-            </Field>
-            {payment.bookedItem.description && (
-              <Field label="Description" className="col-span-full">
-                <span className="font-normal text-muted-foreground">
-                  {payment.bookedItem.description}
-                </span>
-              </Field>
-            )}
-            <Field label="Booking">
+        <div className="space-y-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+            Booked item
+          </p>
+          <div className="space-y-2.5">
+            <Row label="Type">{bookedType}</Row>
+            <Row label="Name">{payment.bookedItem.name}</Row>
+            <Row label="Booking">
               <Link
                 href={`/dashboard/bookings/${payment.bookingId}`}
-                className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline"
+                className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
               >
-                View related booking
+                View booking
                 <ArrowUpRight className="h-3 w-3" aria-hidden />
               </Link>
-            </Field>
-          </dl>
+            </Row>
+          </div>
         </div>
 
-        {/* Admin timeline */}
+        {payment.bookedItem.description && (
+          <div className="space-y-2 lg:col-span-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Description
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {payment.bookedItem.description}
+            </p>
+          </div>
+        )}
+
         {isAdmin && (
-          <p className="border-t border-dashed border-foreground/20 pt-5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <p className="border-t border-dashed border-foreground/20 pt-4 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground lg:col-span-2">
             Created · {formatDate(payment.createdAt)} — Last updated ·{" "}
             {formatDate(payment.updatedAt)}
           </p>

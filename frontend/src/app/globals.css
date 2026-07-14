@@ -157,6 +157,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Worst-case hardening: unbroken tokens (long names, emails, references)
+       wrap instead of inflating min-content width anywhere in the app. */
+    overflow-wrap: anywhere;
   }
 
   :root {

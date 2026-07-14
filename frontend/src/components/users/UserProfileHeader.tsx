@@ -78,8 +78,8 @@ export function UserProfileHeader({
   return (
     <div className="overflow-hidden rounded-xl border border-foreground/15 bg-card">
       {/* Record strip */}
-      <div className="flex items-center justify-between bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground sm:px-6">
-        <span>Travel Trek · Passenger record</span>
+      <div className="flex items-center justify-between bg-night px-4 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] min-[400px]:text-[10px] min-[400px]:tracking-[0.2em] text-night-foreground sm:px-6">
+        <span className="min-w-0 truncate">Travel Trek · Passenger record</span>
         {canSeeStatus && (
           <span className="text-night-foreground/70">{user.role}</span>
         )}
@@ -99,7 +99,7 @@ export function UserProfileHeader({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="break-words [overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
               {user.name ?? "Unknown User"}
             </h1>
             {canSeeStatus && (
@@ -112,7 +112,7 @@ export function UserProfileHeader({
         </div>
 
         {/* Record fields */}
-        <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-dashed border-foreground/20 pt-5 min-[480px]:grid-cols-2 lg:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-dashed border-foreground/20 pt-5 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
           <ProfileField label="Email" value={user.email} />
           <ProfileField label="Phone" value={user.phone} />
           <ProfileField label="Address" value={user.address} />

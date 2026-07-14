@@ -8,7 +8,6 @@ import {
   Calendar,
   DollarSign,
   User,
-  Mail,
   ExternalLink,
   MapPin,
   Plane,
@@ -20,8 +19,7 @@ import {
   Clock,
   AlertCircle,
   Hotel,
-  Moon,
-} from "lucide-react";
+  Moon } from "lucide-react";
 import { IBooking } from "@/types/booking.types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -76,8 +74,7 @@ const getBookingTypeIcon = (type: string) => {
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
-  }).format(amount);
+    currency: "USD" }).format(amount);
 };
 
 const formatDate = (dateString: string) => {
@@ -86,16 +83,14 @@ const formatDate = (dateString: string) => {
     month: "long",
     day: "numeric",
     hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateString));
+    minute: "2-digit" }).format(new Date(dateString));
 };
 
 const formatDateOnly = (dateString: string) => {
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "long",
-    day: "numeric",
-  }).format(new Date(dateString));
+    day: "numeric" }).format(new Date(dateString));
 };
 
 const isPaymentDeadlinePassed = (deadline: string) => {
@@ -104,8 +99,7 @@ const isPaymentDeadlinePassed = (deadline: string) => {
 
 const BookingDetailView: React.FC<BookingDetailViewProps> = ({
   booking,
-  userRole = "USER",
-}) => {
+  userRole = "USER" }) => {
   const isAdmin = userRole === "ADMIN" || userRole === "MANAGER";
   const deadlinePassed = booking.paymentDeadline
     ? isPaymentDeadlinePassed(booking.paymentDeadline)
@@ -113,31 +107,27 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {getBookingTypeIcon(booking.type)}
-              <div>
-                <CardTitle className="text-2xl font-semibold">
-                  {booking.type.charAt(0) + booking.type.slice(1).toLowerCase()}{" "}
-                  Booking
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Booked on {formatDate(booking.bookingDate)}
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="secondary"
-              className={getStatusColor(booking.status)}
-            >
-              {booking.status}
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
+      {/* Header — booking record strip */}
+      <div className="overflow-hidden rounded-xl border border-foreground/15 bg-card">
+        <div className="flex items-center justify-between gap-3 bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground sm:px-6">
+          <span className="min-w-0 truncate">Travel Trek · Booking record</span>
+          <span className="flex-none text-night-foreground/70">
+            Nº {booking.id}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-4 sm:p-5">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {booking.type.charAt(0) + booking.type.slice(1).toLowerCase()}{" "}
+            Booking
+          </h1>
+          <Badge variant="secondary" className={getStatusColor(booking.status)}>
+            {booking.status}
+          </Badge>
+          <p className="w-full text-sm text-muted-foreground sm:w-auto">
+            Booked on {formatDate(booking.bookingDate)}
+          </p>
+        </div>
+      </div>
 
       {/* Payment Deadline Alert */}
       {booking.paymentDeadline && booking.status === "PENDING" && (
@@ -162,7 +152,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid items-start gap-6 @4xl/main:grid-cols-2">
         {/* Customer Information */}
         <Card>
           <CardHeader>
@@ -172,23 +162,20 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div>
+            <div className="grid grid-cols-1 gap-4 @2xl/main:grid-cols-2">
+              <div className="min-w-0">
                 <label className="text-sm font-medium text-muted-foreground">
                   Name
                 </label>
-                <p className="text-sm font-medium break-all">
+                <p className="text-sm font-medium break-words [overflow-wrap:anywhere]">
                   {booking.user.name}
                 </p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="text-sm font-medium text-muted-foreground">
                   Email
                 </label>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm break-all">{booking.user.email}</p>
-                </div>
+                <p className="text-sm break-all">{booking.user.email}</p>
               </div>
             </div>
             <Separator />

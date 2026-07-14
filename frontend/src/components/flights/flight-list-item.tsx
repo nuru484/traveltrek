@@ -54,7 +54,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
             <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
               {flight.airline} · {flight.flightNumber}
             </p>
-            <p className="mt-1 truncate text-lg font-semibold text-foreground">
+            <p className="mt-1.5 truncate text-lg font-semibold text-foreground">
               {flight.origin.name} → {flight.destination.name}
             </p>
           </div>

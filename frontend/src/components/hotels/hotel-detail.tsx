@@ -47,6 +47,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import { BookingButton } from "../bookings/BookingButton";
+import { Money } from "@/components/ui/Money";
 
 interface IHotelDetailProps {
   hotel: IHotel;
@@ -141,7 +142,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
 
               {isAdmin && (
                 <div className="absolute top-4 right-4">
@@ -338,18 +339,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                   </div>
                 )}
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                  <Star className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                      Rating
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-
                 {hotel.phone && (
                   <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
                     <Phone className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
@@ -402,17 +391,20 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                         Amenities
                       </h2>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <ul className="grid grid-cols-1 gap-x-6 gap-y-2 min-[480px]:grid-cols-2">
                       {hotel.amenities.map((amenity, index) => (
-                        <Badge
+                        <li
                           key={index}
-                          variant="outline"
-                          className="text-sm py-1 px-3"
+                          className="flex min-w-0 items-baseline gap-2 text-sm text-foreground"
                         >
-                          {amenity}
-                        </Badge>
+                          <span
+                            aria-hidden
+                            className="h-1.5 w-1.5 flex-none rounded-full bg-accent"
+                          />
+                          <span className="break-words">{amenity}</span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 </>
               )}
@@ -442,8 +434,8 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
         </Card>
 
         {/* Available Rooms Section */}
-        <Card className="">
-          <CardContent className="p-6 md:p-8">
+        <Card className="max-sm:rounded-none max-sm:border-x-0 max-sm:py-4">
+          <CardContent className="p-4 sm:p-6 md:p-8 max-sm:px-3">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Bed className="h-5 w-5 text-primary" />
@@ -499,7 +491,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                 <DoorOpen className="h-8 w-8 text-muted-foreground" />
                               </div>
                             )}
-                            <div className="absolute inset-0" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
                           </div>
 
                           {/* Room Information */}
@@ -519,7 +511,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
 
                               <div className="text-right flex-shrink-0 ml-4">
                                 <p className="text-lg font-bold text-primary">
-                                  ₵{room.pricePerNight.toLocaleString()}
+                                  <Money amount={room.pricePerNight} />
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   per night

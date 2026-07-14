@@ -47,7 +47,7 @@ export function DestinationListItem({
           {destination.name}
         </p>
         {destination.description && (
-          <p className="line-clamp-1 text-sm leading-relaxed text-muted-foreground">
+          <p className="line-clamp-2 min-h-[2.6rem] text-sm leading-relaxed text-muted-foreground">
             {destination.description}
           </p>
         )}

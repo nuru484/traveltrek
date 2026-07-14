@@ -15,8 +15,8 @@ import { useGetPaymentsSummaryQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, IPaymentSummary } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
-import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
+import { Money } from "@/components/ui/Money";
 
 interface PaymentsSummaryReportProps {
   params: IReportsQueryParams;
@@ -106,7 +106,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.totalRevenue, summary.currency)}
+              <Money amount={summary.totalRevenue} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Completed payments</p>
           </CardContent>
@@ -119,7 +119,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.pendingAmount, summary.currency)}
+              <Money amount={summary.pendingAmount} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Awaiting completion</p>
           </CardContent>
@@ -132,7 +132,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(summary.failedAmount, summary.currency)}
+              <Money amount={summary.failedAmount} symbol={`${summary.currency} `} />
             </div>
             <p className="text-xs text-muted-foreground">Failed transactions</p>
           </CardContent>
@@ -150,9 +150,9 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
             {Object.entries(statusBreakdown).map(([status, data]) => (
               <div
                 key={status}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Badge
                     variant={
                       status === "COMPLETED"
@@ -168,9 +168,9 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
                   </Badge>
                   <span className="font-medium">{data.count}</span>
                 </div>
-                <div className="text-right">
+                <div className="min-w-0 text-right">
                   <p className="font-medium">
-                    {formatCurrency(data.amount, summary.currency)}
+                    <Money amount={data.amount} symbol={`${summary.currency} `} />
                   </p>
                 </div>
               </div>
@@ -190,17 +190,17 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
             {Object.entries(methodBreakdown).map(([method, data]) => (
               <div
                 key={method}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
               >
-                <div>
-                  <h4 className="font-medium">{method.replace("_", " ")}</h4>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate font-medium">{method.replace("_", " ")}</h4>
                   <p className="text-sm text-muted-foreground">
                     {data.count} transactions
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="min-w-0 text-right">
                   <p className="font-medium">
-                    {formatCurrency(data.amount, summary.currency)}
+                    <Money amount={data.amount} symbol={`${summary.currency} `} />
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {((data.amount / summary.totalRevenue) * 100).toFixed(1)}%
@@ -224,19 +224,19 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
               {monthlyBreakdown.map((month) => (
                 <div
                   key={month.month}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg"
                 >
                   <div>
-                    <h4 className="font-medium">
+                    <h4 className="truncate font-medium">
                       {format(new Date(month.month + "-01"), "MMMM yyyy")}
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       {month.count} payments
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="min-w-0 text-right">
                     <p className="font-medium">
-                      {formatCurrency(month.revenue, summary.currency)}
+                      <Money amount={month.revenue} symbol={`${summary.currency} `} />
                     </p>
                   </div>
                 </div>
@@ -268,9 +268,9 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
 
 const PaymentItem: React.FC<{ payment: IPaymentSummary }> = ({ payment }) => {
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg">
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4 border rounded-lg">
       <div className="flex-1">
-        <div className="flex items-center space-x-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">#{payment.id}</span>
           <Badge
             variant={
@@ -292,9 +292,9 @@ const PaymentItem: React.FC<{ payment: IPaymentSummary }> = ({ payment }) => {
           {payment.booking.tour?.name || "No tour"}
         </p>
       </div>
-      <div className="text-right">
+      <div className="min-w-0 text-right">
         <p className="font-medium">
-          {formatCurrency(payment.amount, payment.currency)}
+          <Money amount={payment.amount} symbol={`${payment.currency} `} />
         </p>
         <p className="text-sm text-muted-foreground">
           {payment.paymentDate

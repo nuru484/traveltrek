@@ -321,12 +321,14 @@ export function TourDetail({ tour }: ITourDetailProps) {
   return (
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
-        <Card className="overflow-hidden border-0">
-          <div className="relative w-full h-[200px] sm:h-[220px] md:h-[240px]">
+        <Card className="relative overflow-hidden border-0 py-0 gap-0">
+          <div className="relative hidden w-full md:block md:h-[240px]">
             <div className="absolute inset-0 flex items-center justify-center">
               <ImageOff className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 lg:p-8">
+            <div className="absolute inset-0 hidden bg-gradient-to-t from-black/75 via-black/30 to-transparent md:block" />
+          </div>
+            <div className="p-4 sm:p-5 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-6 lg:p-8">
               <div className="flex items-start justify-between gap-2 sm:gap-3 md:gap-4">
                 <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 overflow-hidden">
                   {/* Badges Container with Scroll on Small Screens */}
@@ -338,13 +340,14 @@ export function TourDetail({ tour }: ITourDetailProps) {
                       <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                       {tour.type}
                     </Badge>
-                    <Badge
-                      variant={tourStatusConfig.variant}
-                      className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
-                    >
-                      <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                      {tourStatusConfig.label}
-                    </Badge>
+                    {!(canUpdateStatus && availableStatusTransitions.length > 0) && (
+                      <Badge
+                        variant={tourStatusConfig.variant}
+                        className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
+                      >
+                        {tourStatusConfig.label}
+                      </Badge>
+                    )}
                     {isFullyBooked && (
                       <Badge
                         variant="destructive"
@@ -373,23 +376,17 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         </Badge>
                       )
                     )}
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0"
-                    >
-                      <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                      {formatDuration(tour.duration)}
-                    </Badge>
+
                   </div>
 
                   {/* Tour Name - Multi-line with Proper Wrapping */}
-                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
+                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground md:text-white leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
                     {tour.name}
                   </h1>
 
                   {/* Destination with Proper Wrapping */}
                   {tour.destination && (
-                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground max-w-full">
+                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground md:text-white/85 max-w-full">
                       <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
                       <span className="text-xs sm:text-sm md:text-base break-words line-clamp-2 overflow-hidden leading-snug">
                         {getDestinationDisplay()}
@@ -443,15 +440,9 @@ export function TourDetail({ tour }: ITourDetailProps) {
                           className="cursor-pointer h-7 sm:h-8 md:h-9 px-1.5 sm:px-2 md:px-3 text-[10px] sm:text-xs md:text-sm"
                           disabled={isLoading}
                         >
-                          <Badge
-                            variant={tourStatusConfig.variant}
-                            className="mr-1 text-[10px] sm:text-xs"
-                          >
-                            <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 sm:mr-1" />
-                            <span className="hidden md:inline">
-                              {tourStatusConfig.label}
-                            </span>
-                          </Badge>
+                          <span className="text-[11px] sm:text-xs md:text-sm">
+                            {tourStatusConfig.label}
+                          </span>
                           <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -514,7 +505,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
                 </div>
               </div>
             </div>
-          </div>
         </Card>
 
         {/* Content Section */}
@@ -531,7 +521,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                         About This Tour
                       </h2>
                     </div>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p className="text-muted-foreground leading-relaxed break-words [overflow-wrap:anywhere]">
                       {tour.description}
                     </p>
                   </div>
@@ -541,16 +531,16 @@ export function TourDetail({ tour }: ITourDetailProps) {
               )}
 
               {/* Quick Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3 gap-4">
                 {/* Destination */}
                 {tour.destination && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 @2xl/main:col-span-2 @5xl/main:col-span-3">
                     <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-muted-foreground mb-1">
                         Destination
                       </p>
-                      <p className="text-base font-semibold text-foreground mb-2">
+                      <p className="break-words [overflow-wrap:anywhere] text-base font-semibold text-foreground mb-2">
                         {getDestinationDisplay()}
                       </p>
                       <Link

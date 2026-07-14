@@ -464,7 +464,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
 
               {/* Actions Dropdown */}
               <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2">
@@ -580,7 +580,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
               </div>
 
               {/* Hero Content */}
-              <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6">
+              <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Badge
@@ -617,10 +617,10 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                       )
                     )}
                   </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white line-clamp-2">
+                  <h1 className="break-words [overflow-wrap:anywhere] text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white line-clamp-2">
                     {flight.airline}
                   </h1>
-                  <p className="text-sm sm:text-base lg:text-lg text-white/90">
+                  <p className="break-all text-sm sm:text-base lg:text-lg text-white/90">
                     Flight {flight.flightNumber}
                   </p>
                 </div>
@@ -769,7 +769,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           )}
         </Card>
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-4 @2xl/main:grid-cols-2 sm:gap-6">
           {/* Origin */}
           <Card className="border-l-4 border-l-primary">
             <CardContent className="p-4 sm:p-6">
@@ -777,7 +777,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground mb-2">Origin</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="break-words [overflow-wrap:anywhere] text-sm text-muted-foreground leading-relaxed">
                     {getDestinationDisplayName(flight.origin)}
                   </p>
                 </div>
@@ -794,7 +794,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                   <p className="font-semibold text-foreground mb-2">
                     Destination
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="break-words [overflow-wrap:anywhere] text-sm text-muted-foreground leading-relaxed">
                     {getDestinationDisplayName(flight.destination)}
                   </p>
                 </div>

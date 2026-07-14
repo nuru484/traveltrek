@@ -116,7 +116,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
     cell: ({ row }) => {
       const address = row.getValue("address") as string;
       return (
-        <span className="text-xs sm:text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
+        <span title={address} className="text-xs sm:text-sm text-muted-foreground hidden lg:block truncate max-w-[180px]">
           {address}
         </span>
       );

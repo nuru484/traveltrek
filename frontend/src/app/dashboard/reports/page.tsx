@@ -227,7 +227,7 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Tab Content with proper spacing */}
-                <div className="mt-6">
+                <div className="mt-6 min-w-0 overflow-x-hidden">
                   <TabsContent value="overview" className="mt-0 space-y-6">
                     <DashboardOverview params={dashboardParams} />
                   </TabsContent>

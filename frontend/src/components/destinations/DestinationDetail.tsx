@@ -15,17 +15,14 @@ import {
   Edit,
   Trash2,
   MoreHorizontal,
-  Calendar,
   Globe,
   FileText,
-  ImageOff,
-} from "lucide-react";
+  ImageOff } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import toast from "react-hot-toast";
 import Image from "next/image";
@@ -36,8 +33,7 @@ interface IDestinationDetailProps {
 }
 
 export default function DestinationDetail({
-  destination,
-}: IDestinationDetailProps) {
+  destination }: IDestinationDetailProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = user?.role === "ADMIN" || user?.role === "AGENT";
@@ -62,10 +58,6 @@ export default function DestinationDetail({
     }
   };
 
-  const formatDate = (date: string | Date) => {
-    return format(new Date(date), "MMM dd, yyyy");
-  };
-
   const formatDateLong = (date: string | Date) => {
     return format(new Date(date), "EEEE, MMMM dd, yyyy 'at' h:mm a");
   };
@@ -87,7 +79,7 @@ export default function DestinationDetail({
               className="object-cover"
               priority
             />
-            <div className="absolute inset-0" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
 
             {isAdmin && (
               <div className="absolute top-4 right-4">
@@ -225,7 +217,7 @@ export default function DestinationDetail({
                   <p className="text-sm font-medium text-muted-foreground mb-1">
                     Country
                   </p>
-                  <p className="text-base font-semibold text-foreground truncate">
+                  <p className="text-base font-semibold text-foreground break-words [overflow-wrap:anywhere]">
                     {destination.country}
                   </p>
                 </div>
@@ -237,25 +229,12 @@ export default function DestinationDetail({
                   <p className="text-sm font-medium text-muted-foreground mb-1">
                     City
                   </p>
-                  <p className="text-base font-semibold text-foreground truncate">
+                  <p className="text-base font-semibold text-foreground break-words [overflow-wrap:anywhere]">
                     {destination.city || "Not specified"}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <Calendar className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
-                    Added
-                  </p>
-                  <p className="text-base font-semibold text-foreground truncate">
-                    {destination.createdAt
-                      ? formatDate(destination.createdAt)
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Metadata Footer */}

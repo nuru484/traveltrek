@@ -22,8 +22,8 @@ import { useGetTopToursByBookingsQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, ITourTopStats } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
-import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
+import { Money } from "@/components/ui/Money";
 
 interface TopToursReportProps {
   params: IReportsQueryParams;
@@ -98,7 +98,7 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {formatCurrency(summary.totalRevenueAnalyzed)}
+                <Money amount={summary.totalRevenueAnalyzed} symbol="$" />
               </div>
               <p className="text-sm text-muted-foreground">Total Revenue</p>
             </div>
@@ -205,9 +205,9 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
               </div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="min-w-0 text-right">
             <p className="text-2xl font-bold text-primary">
-              {formatCurrency(tour.price)}
+              <Money amount={tour.price} symbol="$" />
             </p>
             <p className="text-sm text-muted-foreground">
               {tour.duration} days
@@ -222,7 +222,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
-          <div className="flex items-center space-x-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium">{statistics.totalBookings}</p>
@@ -230,7 +230,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Users className="h-4 w-4 text-green-500" />
             <div>
               <p className="text-sm font-medium">
@@ -240,17 +240,17 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex min-w-0 items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium">
-                {formatCurrency(statistics.totalRevenue)}
+                <Money amount={statistics.totalRevenue} symbol="$" />
               </p>
               <p className="text-xs text-muted-foreground">Revenue</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Star className="h-4 w-4 text-yellow-500" />
             <div>
               <p className="text-sm font-medium">
@@ -266,20 +266,20 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex items-center space-x-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{getLocationString()}</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-4 border-t">
+          <div className="flex min-w-0 max-w-full items-center gap-2">
+            <MapPin className="h-4 w-4 flex-none text-muted-foreground" />
+            <span className="min-w-0 truncate text-sm">{getLocationString()}</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <Calendar className="h-4 w-4 flex-none text-muted-foreground" />
             <span className="text-sm">
               {format(new Date(tour.startDate), "MMM dd")} -{" "}
               {format(new Date(tour.endDate), "MMM dd, yyyy")}
             </span>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Max: {tour.maxGuests} guests
+          <div className="whitespace-nowrap text-sm text-muted-foreground">
+            Max: {tour.maxGuests.toLocaleString()} guests
           </div>
         </div>
       </CardContent>
