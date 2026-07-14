@@ -132,22 +132,26 @@ export default function LoginPage() {
               {/* Full-width rows on phones; compact 3-up cards on desktop so
                   the wide column doesn't leave dead space to the right. */}
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                {/* Phones: compact two-line rows, code on the right.
+                    Desktop (3-up grid): cards with the code on top. */}
                 {demoAccounts.map(({ role, code, label, description }) => (
                   <button
                     key={role}
                     type="button"
                     onClick={() => handleDemoLogin(role)}
                     disabled={isLoading}
-                    className="cursor-pointer rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 active:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 lg:flex-col lg:items-start lg:justify-start lg:gap-1"
                   >
-                    <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">
+                        {label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {description}
+                      </span>
+                    </span>
+                    <span className="flex-none font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground lg:order-first">
                       {code}
-                    </span>
-                    <span className="mt-1 block text-sm font-medium text-foreground">
-                      {label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {description}
                     </span>
                   </button>
                 ))}
