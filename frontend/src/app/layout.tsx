@@ -88,11 +88,11 @@ export default function RootLayout({
         className={`${cormorantGaramond.variable} ${montserrat.variable} ${plexMono.variable} antialiased`}
       >
         <StoreProvider>
-          {/* Light by default (the public landing is light-only); the
-              dashboard's own toggle can still switch signed-in users. */}
+          {/* Light-only: forcedTheme ignores any stored preference. */}
           <ThemeProvider
             attribute="class"
             defaultTheme="light"
+            forcedTheme="light"
             disableTransitionOnChange
           >
             {/* Toasts follow the app's document voice: card surface, hairline

@@ -7,7 +7,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import ProtectRoutes from "@/components/authentication/ProtectRoutes";
-import ModeToggleButton from "@/components/ModeToggleButton";
 import { UserProfileDropdown } from "@/components/users/UserProfileDropDown";
 
 interface AgriLayoutProps {
@@ -24,7 +23,6 @@ export default function DashboardLayout({ children }: AgriLayoutProps) {
             <SidebarTrigger className="mr-2" />
 
             <div className="flex gap-2">
-              <ModeToggleButton />
               <UserProfileDropdown />
             </div>
           </header>
