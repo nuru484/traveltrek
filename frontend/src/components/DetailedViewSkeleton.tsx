@@ -1,21 +1,16 @@
 "use client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 
 export default function DetailedViewSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Top buttons */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" disabled>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <div className="flex gap-2 ml-auto">
-          <Skeleton className="h-9 w-[100px] rounded-md" />
-          <Skeleton className="h-9 w-[100px] rounded-md" />
+      {/* Header */}
+      <div className="border-b border-border pb-4 sm:pb-6">
+        <div className="mx-auto w-full max-w-7xl space-y-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-64" />
         </div>
       </div>
 

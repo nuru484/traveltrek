@@ -2,7 +2,6 @@
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-muted rounded ${className}`} />
@@ -11,12 +10,13 @@ const Skeleton = ({ className }: { className?: string }) => (
 export function RoomFormSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" disabled>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+      {/* Header */}
+      <div className="border-b border-border pb-4 sm:pb-6">
+        <div className="mx-auto w-full max-w-7xl space-y-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
       </div>
 
       <Card className="max-w-2xl mx-auto">

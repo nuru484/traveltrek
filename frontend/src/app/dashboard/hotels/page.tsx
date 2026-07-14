@@ -70,7 +70,7 @@ export default function HotelsPage() {
   };
 
   return (
-    <div className="container mx-auto space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
         title="Hotels"
         description="Manage hotels and their room inventory."

@@ -77,7 +77,7 @@ const UsersManagePage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-6">
+      <div className="mx-auto w-full max-w-7xl py-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex-1 min-w-0">

@@ -82,7 +82,7 @@ export default function DestinationsPage() {
   };
 
   return (
-    <div className="container mx-auto space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <PageHeader
         title="Destinations"
         description="The places flights, hotels, and tours hang off."

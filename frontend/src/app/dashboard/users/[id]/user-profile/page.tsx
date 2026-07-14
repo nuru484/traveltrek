@@ -32,7 +32,7 @@ const UserProfilePage = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-6xl space-y-8 py-6">
+      <div className="mx-auto w-full max-w-7xl max-w-6xl space-y-8 py-6">
         <UserProfileHeaderSkeleton />
         <div className="space-y-6">
           <UserProfileBookings userId={userId} />
@@ -44,7 +44,7 @@ const UserProfilePage = () => {
 
   if (isError && isViewingOwnProfile && currentUser) {
     return (
-      <div className="container mx-auto max-w-6xl space-y-8 py-6">
+      <div className="mx-auto w-full max-w-7xl max-w-6xl space-y-8 py-6">
         <UserProfileHeader user={currentUser} currentUser={currentUser} />
         <div className="space-y-6">
           <UserProfileBookings userId={userId} />
@@ -56,7 +56,7 @@ const UserProfilePage = () => {
 
   if (isError && isAdmin) {
     return (
-      <div className="container mx-auto max-w-6xl space-y-8 py-6">
+      <div className="mx-auto w-full max-w-7xl max-w-6xl space-y-8 py-6">
         <ErrorMessage error={errorMessage} onRetry={refetch} />
         <div className="space-y-6">
           <UserProfileBookings userId={userId} />
@@ -69,7 +69,7 @@ const UserProfilePage = () => {
   const user = userData?.data ?? null;
 
   return (
-    <div className="container mx-auto max-w-6xl space-y-8 py-6">
+    <div className="mx-auto w-full max-w-7xl max-w-6xl space-y-8 py-6">
       <UserProfileHeader user={user} currentUser={currentUser} />
       <div className="space-y-6">
         <UserProfileBookings userId={userId} />
