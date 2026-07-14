@@ -7,6 +7,8 @@ interface IStatsCardProps {
   title: string;
   value: number;
   subtitle?: string;
+  /** Short mono tag shown opposite the label, e.g. "TRS", "FLT". */
+  code?: string;
   details?: Array<{
     label: string;
     value: number;
@@ -15,25 +17,46 @@ interface IStatsCardProps {
 }
 
 /**
- * Stat tile in the landing's document voice: a mono field label, the figure,
- * and mono status chips — no icon chips, no per-card accent colors.
+ * Stat tile as a boarding-pass field: mono label row with a dotted leader to
+ * a code tag, a serif display figure, and mono status chips below a dashed
+ * tear line.
  */
-export function StatsCard({ title, value, subtitle, details }: IStatsCardProps) {
+export function StatsCard({
+  title,
+  value,
+  subtitle,
+  code,
+  details,
+}: IStatsCardProps) {
   return (
-    <Card className="gap-0 py-5">
-      <CardContent className="px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {title}
-        </p>
-        <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
-          {value.toLocaleString()}
-        </p>
-        {subtitle && (
-          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-        )}
+    <Card className="gap-0 py-0 overflow-hidden">
+      <CardContent className="px-5 py-5">
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            {title}
+          </span>
+          <span
+            aria-hidden
+            className="min-w-3 flex-1 translate-y-[-2px] border-b border-dotted border-foreground/25"
+          />
+          {code && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              {code}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-baseline gap-2">
+          <span className="font-display text-5xl font-semibold leading-none tracking-tight text-foreground">
+            {value.toLocaleString()}
+          </span>
+          {subtitle && (
+            <span className="text-xs text-muted-foreground">{subtitle}</span>
+          )}
+        </div>
 
         {details && details.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-1.5 border-t border-dashed border-foreground/15 pt-3.5">
+          <div className="mt-5 flex flex-wrap gap-1.5 border-t border-dashed border-foreground/20 pt-4">
             {details.map((detail, index) => (
               <Badge key={index} variant={detail.color || "outline"}>
                 {detail.label}: {detail.value}
