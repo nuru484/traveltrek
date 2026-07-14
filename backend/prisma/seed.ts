@@ -46,7 +46,8 @@ async function main() {
 
 main()
   .catch((e) => {
-    logger.error('❌ Error seeding database:', e);
+    // pino takes the merge object first — (msg, err) silently drops the error
+    logger.error({ err: e }, '❌ Error seeding database');
     process.exit(1);
   })
   .finally(async () => {
