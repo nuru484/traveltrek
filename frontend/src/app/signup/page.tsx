@@ -65,8 +65,8 @@ export default function SignupPage() {
 
       <main className="px-4 py-10 sm:py-14">
         {/* Stacked on phones; intro + social sign-up left and the form right
-            on lg so big screens spread out instead of scrolling. */}
-        <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-16">
+            on lg, with the intro centered against the form's height. */}
+        <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
               New passenger

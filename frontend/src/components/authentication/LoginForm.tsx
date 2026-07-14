@@ -58,7 +58,7 @@ export default function LoginForm({
                     placeholder="your.email@example.com"
                     type="email"
                     autoComplete="email"
-                    className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none"
+                    className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none placeholder:text-muted-foreground/50"
                     disabled={isLoading}
                     {...field}
                   />
@@ -92,7 +92,7 @@ export default function LoginForm({
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       autoComplete="current-password"
-                      className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none pr-11"
+                      className="h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none placeholder:text-muted-foreground/50 pr-11"
                       disabled={isLoading}
                       {...field}
                     />
@@ -145,7 +145,7 @@ export default function LoginForm({
             href="/signup"
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            Create Account
+            Signup
           </Link>
         </p>
       </div>

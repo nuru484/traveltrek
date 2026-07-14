@@ -109,12 +109,15 @@ export default function LoginPage() {
       <Header />
 
       <main className="px-4 py-10 sm:py-14">
-        {/* Stacked on phones; intro + demo left and credentials right on lg
-            so big screens spread out instead of scrolling. */}
-        <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-16">
+        {/* Stacked on phones; intro + demo left and credentials right on lg,
+            with the intro centered against the form's height. */}
+        <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
-            <p className="text-sm text-muted-foreground">
-              Sign in to access your account.
+            <h1 className="text-4xl font-semibold tracking-tight lg:text-5xl">
+              Sign in to your account.
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Use your credentials, or explore with a one-click demo.
             </p>
 
             {/* Demo access */}
@@ -126,25 +129,25 @@ export default function LoginPage() {
                 <div className="h-px flex-1 bg-foreground/15" />
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
+              {/* Full-width rows on phones; compact 3-up cards on desktop so
+                  the wide column doesn't leave dead space to the right. */}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 {demoAccounts.map(({ role, code, label, description }) => (
                   <button
                     key={role}
                     type="button"
                     onClick={() => handleDemoLogin(role)}
                     disabled={isLoading}
-                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="cursor-pointer rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground">
-                        {label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {description}
-                      </span>
-                    </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       {code}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium text-foreground">
+                      {label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {description}
                     </span>
                   </button>
                 ))}

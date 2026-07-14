@@ -18,7 +18,7 @@ import { ISignupFormSchema } from "@/validation/auth-validation";
 const LABEL_CLASS =
   "font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground";
 const INPUT_CLASS =
-  "h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none";
+  "h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none placeholder:text-muted-foreground/50";
 
 interface SignupFormProps {
   form: UseFormReturn<ISignupFormSchema>;
@@ -63,49 +63,52 @@ export default function SignupForm({
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className={LABEL_CLASS}>Email</FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    className={INPUT_CLASS}
-                    disabled={isLoading}
-                    {...field}
-                    value={field.value ?? ""}
-                  />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
+          {/* Side by side where the card is wide — reads as "either/or". */}
+          <div className="grid grid-cols-1 gap-6 min-[480px]:grid-cols-2 min-[480px]:gap-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={LABEL_CLASS}>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      className={INPUT_CLASS}
+                      disabled={isLoading}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className={LABEL_CLASS}>Phone</FormLabel>
-                <FormControl>
-                  <Input
-                    type="tel"
-                    placeholder="+233 54 000 0000"
-                    autoComplete="tel"
-                    className={INPUT_CLASS}
-                    disabled={isLoading}
-                    {...field}
-                    value={field.value ?? ""}
-                  />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={LABEL_CLASS}>Phone</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="tel"
+                      placeholder="+233 54 000 0000"
+                      autoComplete="tel"
+                      className={INPUT_CLASS}
+                      disabled={isLoading}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <p className="text-xs leading-relaxed text-muted-foreground">
             One contact is enough — email or phone. We&apos;ll send your
@@ -121,10 +124,10 @@ export default function SignupForm({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
+                Signing up...
               </>
             ) : (
-              "Create account"
+              "Signup"
             )}
           </Button>
         </form>
