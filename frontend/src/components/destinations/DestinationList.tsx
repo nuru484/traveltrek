@@ -1,6 +1,6 @@
 // src/components/destinations/DestinationList.tsx
 "use client";
-import DestinationListItem from "./DestinationListItem";
+import { DestinationListItem } from "./DestinationListItem";
 import {
   IDestination,
   IDestinationQueryParams } from "@/types/destination.types";
