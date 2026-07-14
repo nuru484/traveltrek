@@ -105,7 +105,7 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="min-h-dvh bg-hero-band">
+    <div className="min-h-dvh bg-hero-band pb-20 md:pb-0">
       <Header />
 
       <main className="px-4 py-10 sm:py-14">

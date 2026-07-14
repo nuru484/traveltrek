@@ -7,7 +7,8 @@ import Footer from "@/components/index/Footer";
 
 const page = () => {
   return (
-    <div className="min-h-screen">
+    // pb clears the phone bottom nav bar rendered by Header.
+    <div className="min-h-screen pb-16 md:pb-0">
       <Header />
       <HeroSection />
       <DeparturesSection />
