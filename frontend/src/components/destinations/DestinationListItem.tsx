@@ -62,7 +62,7 @@ export default function DestinationListItem({
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row h-full">
             {/* Destination Image */}
-            <div className="relative w-full md:w-1/4 h-40 md:h-auto flex-shrink-0">
+            <div className="relative w-full md:w-44 h-36 md:h-auto flex-shrink-0">
               {destination.photo ? (
                 <Image
                   src={destination.photo}
@@ -80,7 +80,7 @@ export default function DestinationListItem({
             </div>
 
             {/* Destination Information */}
-            <div className="flex-1 p-4 sm:p-6 flex flex-col">
+            <div className="flex-1 p-4 flex flex-col">
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">

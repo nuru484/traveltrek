@@ -4,12 +4,12 @@ import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { IUser, UserRole } from "@/types/user.types";
 import { UserActionsDropdown } from "./UserActionsDropdown";
+import DateCell from "@/components/ui/DateCell";
 
 export const createUserColumns = (): ColumnDef<IUser>[] => [
   {
@@ -134,13 +134,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
       </Button>
     ),
     cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt") as string);
-      return (
-        <div className="text-xs sm:text-sm">
-          <div className="sm:hidden">{format(date, "MMM dd")}</div>
-          <div className="hidden sm:block">{format(date, "MMM dd, yyyy")}</div>
-        </div>
-      );
+      return <DateCell value={row.getValue("createdAt") as string} />;
     } },
   {
     id: "actions",

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Calendar, DollarSign, Users, MapPin } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useGetDashboardOverviewQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -42,12 +42,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 bg-gray-200 rounded w-24"></div>
-              <div className="h-4 w-4 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-muted rounded w-24"></div>
+              <div className="h-4 w-4 bg-muted rounded"></div>
             </CardHeader>
             <CardContent>
-              <div className="h-8 bg-gray-200 rounded w-20 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-32"></div>
+              <div className="h-8 bg-muted rounded w-20 mb-2"></div>
+              <div className="h-3 bg-muted rounded w-32"></div>
             </CardContent>
           </Card>
         ))}
@@ -80,14 +80,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
               Total Bookings
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               {bookings.data.summary.totalBookings}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -97,12 +96,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Total Revenue
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               {formatCurrency(
                 payments.data.summary.totalRevenue,
                 payments.data.summary.currency
@@ -115,14 +115,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
               Pending Amount
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               {formatCurrency(
                 payments.data.summary.pendingAmount,
                 payments.data.summary.currency
@@ -133,12 +132,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Top Tours</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="font-sans font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+              Top Tours
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="font-display text-3xl font-semibold tracking-tight">
               {tours.data.topTours.length}
             </div>
             <p className="text-xs text-muted-foreground">

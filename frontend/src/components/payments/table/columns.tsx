@@ -7,12 +7,12 @@ import {
   CreditCard,
   Smartphone,
   Building2 } from "lucide-react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { IPayment } from "@/types/payment.types";
 import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
+import DateCell from "@/components/ui/DateCell";
 
 const getPaymentMethodIcon = (method: string) => {
   switch (method) {
@@ -189,19 +189,7 @@ export const createPaymentColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = row.getValue("paymentDate") as Date | null;
-        if (!date) {
-          return <span className="text-muted-foreground text-sm">-</span>;
-        }
-        const paymentDate = new Date(date);
-        return (
-          <div className="text-xs sm:text-sm">
-            <div className="sm:hidden">{format(paymentDate, "MMM dd")}</div>
-            <div className="hidden sm:block">
-              {format(paymentDate, "MMM dd, yyyy")}
-            </div>
-          </div>
-        );
+        return <DateCell value={row.getValue("paymentDate") as Date | null} />;
       } },
     {
       accessorKey: "createdAt",
@@ -216,15 +204,7 @@ export const createPaymentColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.getValue("createdAt") as Date);
-        return (
-          <div className="text-xs sm:text-sm">
-            <div className="sm:hidden">{format(date, "MMM dd")}</div>
-            <div className="hidden sm:block">
-              {format(date, "MMM dd, yyyy")}
-            </div>
-          </div>
-        );
+        return <DateCell value={row.getValue("createdAt") as Date} />;
       } }
   );
 

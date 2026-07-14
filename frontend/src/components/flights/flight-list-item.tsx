@@ -242,7 +242,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row h-full">
             {/* Flight Image */}
-            <div className="relative w-full md:w-1/5 h-40 md:h-auto flex-shrink-0">
+            <div className="relative w-full md:w-44 h-36 md:h-auto flex-shrink-0">
               {flight.photo ? (
                 <Image
                   src={flight.photo}
@@ -260,7 +260,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
             </div>
 
             {/* Flight Information */}
-            <div className="flex-1 p-4 sm:p-6 flex flex-col">
+            <div className="flex-1 p-4 flex flex-col">
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
@@ -498,33 +498,6 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
                 )}
               </div>
 
-              {/* Availability Indicator */}
-              {flightStatus === "SCHEDULED" && (
-                <div className="px-0 sm:px-2 pt-4">
-                  <div className="w-full bg-muted rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full transition-all duration-500 ${
-                        flight.seatsAvailable > 50
-                          ? "bg-green-500 w-full"
-                          : flight.seatsAvailable > 20
-                          ? "bg-yellow-500 w-3/4"
-                          : flight.seatsAvailable > 0
-                          ? "bg-red-500 w-1/4"
-                          : "bg-gray-500 w-0"
-                      }`}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1 text-center">
-                    {flight.seatsAvailable > 50
-                      ? "Great availability"
-                      : flight.seatsAvailable > 20
-                      ? "Limited seats"
-                      : flight.seatsAvailable > 0
-                      ? "Few seats left"
-                      : "Fully booked"}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </CardContent>

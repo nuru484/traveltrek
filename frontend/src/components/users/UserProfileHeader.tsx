@@ -2,18 +2,7 @@
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Shield,
-  Crown,
-  CheckCircle2,
-  Clock,
-} from "lucide-react";
+import EmptyState from "@/components/ui/EmptyState";
 import { IUser } from "@/types/user.types";
 
 type UserProfileHeaderProps = {
@@ -21,6 +10,30 @@ type UserProfileHeaderProps = {
   currentUser?: IUser | null;
 };
 
+/** One labelled field, in the boarding-pass voice. */
+function ProfileField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-medium text-foreground">
+        {value || "Not provided"}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * The profile header as a passenger record: night strip, avatar with serif
+ * name, and mono-labelled fields — no photo banner, no icon chips.
+ */
 export function UserProfileHeader({
   user,
   currentUser,
@@ -37,33 +50,6 @@ export function UserProfileHeader({
         });
   };
 
-  const getRoleConfig = (role?: string) => {
-    switch (role) {
-      case "ADMIN":
-        return {
-          color:
-            " -500/10 -500/10 text-red-600 border-red-200",
-          icon: Crown,
-          label: "Admin",
-        };
-      case "AGENT":
-        return {
-          color:
-            " -500/10 -500/10 text-blue-600 border-blue-200",
-          icon: Shield,
-          label: "Agent",
-        };
-      case "CUSTOMER":
-      default:
-        return {
-          color:
-            " -500/10 -500/10 text-emerald-600 border-emerald-200",
-          icon: User,
-          label: "Customer",
-        };
-    }
-  };
-
   const getUserInitials = (name?: string) => {
     if (!name) return "U";
     return name
@@ -76,188 +62,70 @@ export function UserProfileHeader({
 
   const isAdmin = currentUser?.role === "ADMIN";
   const isViewingOwnProfile = currentUser?.id === user?.id;
+  const canSeeStatus = isAdmin || isViewingOwnProfile;
 
   if (!user) {
     return (
-      <Card className="w-full rounded-b-none">
-        <CardContent className="flex items-center justify-center p-4 lg:p-8">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <User className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-muted-foreground">
-              No user data available
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Please check back later or contact support.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <EmptyState
+        eyebrow="No record"
+        title="No user data available."
+        description="Please check back later or contact support."
+        className="rounded-xl border border-foreground/15 bg-card"
+      />
     );
   }
 
-  const roleConfig = getRoleConfig(user.role);
-  const RoleIcon = roleConfig.icon;
-
   return (
-    <Card className="space-y-4 container mx-auto border-0 rounded-b-none">
-      <CardContent className="p-0">
-        {/* Header Banner */}
-        <div
-          className="h-32 bg-cover bg-center relative overflow-hidden"
-          style={{ backgroundImage: "url('/assets/hero-travel.jpg')" }}
-        >
-          <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-        </div>
+    <div className="overflow-hidden rounded-xl border border-foreground/15 bg-card">
+      {/* Record strip */}
+      <div className="flex items-center justify-between bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground sm:px-6">
+        <span>Travel Trek · Passenger record</span>
+        {canSeeStatus && (
+          <span className="text-night-foreground/70">{user.role}</span>
+        )}
+      </div>
 
-        {/* Main Content */}
-        <div className="relative px-6 py-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Avatar Section */}
-            <div className="flex-shrink-0 mx-auto lg:mx-0">
-              <div className="relative">
-                <Avatar className="h-32 w-32 border-4 border-background">
-                  <AvatarImage
-                    src={user.profilePicture || undefined}
-                    alt={`${user.name ?? "User"} profile picture`}
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="text-primary-foreground text-2xl font-bold">
-                    {getUserInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-
-                {/* Status Indicator */}
-                <div className="absolute -bottom-1 -right-1 flex items-center justify-center">
-                  <div className="w-8 h-8 bg-emerald-500 rounded-full border-4 border-background flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                  </div>
-                </div>
+      <div className="p-4 sm:p-6">
+        {/* Identity */}
+        <div className="flex flex-col items-center gap-4 text-center min-[480px]:flex-row min-[480px]:items-center min-[480px]:text-left">
+          <Avatar className="h-20 w-20 flex-none border border-foreground/15 sm:h-24 sm:w-24">
+            <AvatarImage
+              src={user.profilePicture || undefined}
+              alt={`${user.name ?? "User"} profile picture`}
+              className="object-cover"
+            />
+            <AvatarFallback className="bg-muted font-display text-2xl font-semibold text-foreground">
+              {getUserInitials(user.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+              {user.name ?? "Unknown User"}
+            </h1>
+            {canSeeStatus && (
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5 min-[480px]:justify-start">
+                <Badge variant="outline">Active</Badge>
+                <Badge variant="outline">Verified</Badge>
               </div>
-            </div>
-
-            {/* User Information */}
-            <div className="flex-1 min-w-0 space-y-6">
-              {/* Name and Role */}
-              <div className="text-center lg:text-left space-y-3">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-bold text-foreground tracking-tight break-all">
-                    {user.name ?? "Unknown User"}
-                  </h1>
-                  {(isAdmin || isViewingOwnProfile) && (
-                    <Badge
-                      variant="outline"
-                      className={`${roleConfig.color} font-medium`}
-                    >
-                      <RoleIcon className="w-3 h-3 mr-1.5" />
-                      {roleConfig.label}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="group">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                      <Mail className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Email Address
-                      </p>
-                      <p className="text-base font-medium text-foreground truncate">
-                        {user.email ?? "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                      <Phone className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Phone Number
-                      </p>
-                      <p className="text-base font-medium text-foreground">
-                        {user.phone ?? "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="w-10 h-10 bg-orange-500/10 rounded-lg flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                      <MapPin className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Location
-                      </p>
-                      <p className="text-base font-medium text-foreground">
-                        {user.address ?? "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                      <Calendar className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Member Since
-                      </p>
-                      <p className="text-base font-medium text-foreground">
-                        {formatDate(user.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Badges - Only show to admins or own profile */}
-              {(isAdmin || isViewingOwnProfile) && (
-                <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
-                  <Badge
-                    variant="outline"
-                    className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                  >
-                    <CheckCircle2 className="w-3 h-3 mr-1.5" />
-                    Active Account
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  >
-                    <Shield className="w-3 h-3 mr-1.5" />
-                    Verified
-                  </Badge>
-                </div>
-              )}
-
-              {/* Admin-only information */}
-              {isAdmin && (
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    <span>Last updated: {formatDate(user.updatedAt)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Record fields */}
+        <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-dashed border-foreground/20 pt-5 min-[480px]:grid-cols-2 lg:grid-cols-4">
+          <ProfileField label="Email" value={user.email} />
+          <ProfileField label="Phone" value={user.phone} />
+          <ProfileField label="Address" value={user.address} />
+          <ProfileField label="Member since" value={formatDate(user.createdAt)} />
+        </dl>
+
+        {isAdmin && (
+          <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Last updated · {formatDate(user.updatedAt)}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 

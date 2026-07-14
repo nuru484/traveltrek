@@ -262,7 +262,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
 
         <CardContent className="pt-0">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
-            <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
               <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Destination</p>
@@ -276,7 +276,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
               <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Duration</p>
@@ -284,7 +284,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
               <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Guests</p>
@@ -294,7 +294,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
               <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Created</p>

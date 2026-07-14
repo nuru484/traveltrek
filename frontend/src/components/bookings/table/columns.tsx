@@ -3,12 +3,12 @@
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Package, Hotel, Plane } from "lucide-react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { IBooking } from "@/types/booking.types";
 import { BookingActionsDropdown } from "./BookingActionsDropdown";
+import DateCell from "@/components/ui/DateCell";
 
 const getBookingTypeIcon = (type: IBooking["type"]) => {
   switch (type) {
@@ -215,15 +215,7 @@ export const createBookingColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.getValue("bookingDate") as string);
-        return (
-          <div className="text-xs sm:text-sm">
-            <div className="sm:hidden">{format(date, "MMM dd")}</div>
-            <div className="hidden sm:block">
-              {format(date, "MMM dd, yyyy")}
-            </div>
-          </div>
-        );
+        return <DateCell value={row.getValue("bookingDate") as string} />;
       } }
     // Removed Created At column
   );
