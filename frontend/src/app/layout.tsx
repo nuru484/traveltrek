@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import {
+  Cormorant_Garamond,
+  Montserrat,
+  IBM_Plex_Mono,
+} from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { StoreProvider } from "./StoreProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_BASE_URL || "https://traveltrek.dagraroyal.org";
+import { siteConfig, siteUrl as baseUrl } from "@/lib/site";
 
 const cormorantGaramond = Cormorant_Garamond({
   variable: "--font-heading",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -22,55 +26,52 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
+// Utility face for the landing page's "travel document" details — boarding
+// pass fields, departure codes, manifest rows.
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-mono-plex",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: {
     template: "%s | Travel Trek",
-    default: "Travel Trek — Explore. Experience. Enjoy.",
+    default: siteConfig.title,
   },
-  description:
-    "Travel Trek is a comprehensive travel and tour management system designed to simplify booking, planning, and managing tours and trips. Explore destinations, manage itineraries, and enjoy seamless travel experiences with Travel Trek.",
+  description: siteConfig.description,
   keywords: [
     "Travel Trek",
-    "travel management system",
-    "tour booking",
-    "trip planner",
-    "travel agency software",
-    "tour operator platform",
-    "travel app",
-    "tour packages",
-    "holiday planner",
-    "destination management",
-    "travel portal",
-    "online booking",
+    "travel booking platform",
+    "full-stack portfolio project",
+    "flight booking system",
+    "hotel reservations",
+    "tour management",
+    "Next.js",
+    "Express",
+    "PostgreSQL",
+    "Nurudeen Abdul-Majeed",
   ],
-  authors: [{ name: "Nurudeen Abdul-Majeed" }],
-  creator: "Nurudeen Abdul-Majeed",
-  publisher: "Nurudeen Abdul-Majeed",
+  authors: [{ name: siteConfig.author }],
+  creator: siteConfig.author,
+  publisher: siteConfig.author,
   metadataBase: new URL(baseUrl),
+  alternates: { canonical: "/" },
+  // og:image and twitter:image come from app/opengraph-image.tsx (the
+  // boarding-pass card) — listing images here would override it.
   openGraph: {
-    title: "Travel Trek — Explore. Experience. Enjoy.",
-    description:
-      "Manage and book tours effortlessly with Travel Trek, your all-in-one travel and tour management platform for travelers, guides, and agencies.",
+    title: siteConfig.title,
+    description: siteConfig.description,
     url: baseUrl,
-    siteName: "Travel Trek",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Travel Trek – Explore the world with ease",
-      },
-    ],
+    siteName: siteConfig.name,
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Travel Trek — Explore. Experience. Enjoy.",
-    description:
-      "Travel Trek simplifies travel and tour management — from booking destinations to organizing trips, all in one modern platform.",
-    site: "@TravelTrek",
-    images: ["/open-graph-images/og-image.png"],
+    title: siteConfig.title,
+    description: siteConfig.description,
   },
 };
 
@@ -80,16 +81,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: next-themes stamps the theme class on <html>
+    // before hydration, which is expected to differ from the server HTML.
+    <html lang="en" suppressHydrationWarning>
       <body
-        suppressHydrationWarning
-        className={`${cormorantGaramond.variable} ${montserrat.variable} antialiased`}
+        className={`${cormorantGaramond.variable} ${montserrat.variable} ${plexMono.variable} antialiased`}
       >
         <StoreProvider>
+          {/* Light by default (the public landing is light-only); the
+              dashboard's own toggle can still switch signed-in users. */}
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
-            enableSystem
+            defaultTheme="light"
             disableTransitionOnChange
           >
             <Toaster
