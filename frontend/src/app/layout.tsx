@@ -95,12 +95,34 @@ export default function RootLayout({
             defaultTheme="light"
             disableTransitionOnChange
           >
+            {/* Toasts follow the app's document voice: card surface, hairline
+                border, no drop shadow. Colors come from theme variables so
+                dark dashboard views stay legible. */}
             <Toaster
               position="bottom-right"
               reverseOrder={false}
               toastOptions={{
-                className: "",
                 duration: 5000,
+                style: {
+                  background: "var(--card)",
+                  color: "var(--card-foreground)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  boxShadow: "none",
+                  fontSize: "14px",
+                },
+                success: {
+                  iconTheme: {
+                    primary: "var(--accent)",
+                    secondary: "var(--accent-foreground)",
+                  },
+                },
+                error: {
+                  iconTheme: {
+                    primary: "var(--destructive)",
+                    secondary: "#ffffff",
+                  },
+                },
               }}
             />
             <main>{children}</main>

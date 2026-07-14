@@ -50,7 +50,7 @@ export default function LoginForm({
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+                <FormLabel>
                   Email
                 </FormLabel>
                 <FormControl>
@@ -75,7 +75,7 @@ export default function LoginForm({
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between mb-2">
-                  <FormLabel className="font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground">
+                  <FormLabel>
                     Password
                   </FormLabel>
                   <Link

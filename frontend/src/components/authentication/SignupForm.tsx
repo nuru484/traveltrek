@@ -15,8 +15,6 @@ import {
 } from "@/components/ui/form";
 import { ISignupFormSchema } from "@/validation/auth-validation";
 
-const LABEL_CLASS =
-  "font-mono text-[10px] font-normal uppercase tracking-[0.18em] text-muted-foreground";
 const INPUT_CLASS =
   "h-11 rounded-lg border-foreground/20 bg-background text-[15px] shadow-none placeholder:text-muted-foreground/50";
 
@@ -48,7 +46,7 @@ export default function SignupForm({
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className={LABEL_CLASS}>Full name</FormLabel>
+                <FormLabel>Full name</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Amina Fuseini"
@@ -70,7 +68,7 @@ export default function SignupForm({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={LABEL_CLASS}>Email</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
@@ -92,7 +90,7 @@ export default function SignupForm({
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={LABEL_CLASS}>Phone</FormLabel>
+                  <FormLabel>Phone</FormLabel>
                   <FormControl>
                     <Input
                       type="tel"
