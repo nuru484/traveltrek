@@ -1,263 +1,226 @@
 "use client";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  ArrowRight,
-  Code2,
-  Plane,
-  Hotel,
-  MapPin,
-  Database,
-  Shield,
-  Zap,
-  Github,
-} from "lucide-react";
+import { ArrowRight, Github, Plane } from "lucide-react";
 
-const HeroSection = () => {
-  return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Image */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(/assets/hero-travel.jpg)` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/60 to-background/30" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+/**
+ * Dashed flight path drawn under the hero's italic line, ending in a small
+ * plane — the page's one accent-colored flourish.
+ */
+const FlightPath = ({ reduced }: { reduced: boolean }) => (
+  <svg
+    viewBox="0 0 320 34"
+    className="mt-1 h-7 w-[min(72vw,300px)] text-primary"
+    aria-hidden
+  >
+    <motion.path
+      d="M6 28 Q 160 -8 292 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeDasharray="1 7"
+      strokeLinecap="round"
+      initial={reduced ? false : { pathLength: 0 }}
+      animate={{ pathLength: 1 }}
+      transition={{ duration: 1.1, delay: 0.5, ease: "easeInOut" }}
+    />
+    <motion.g
+      initial={reduced ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, delay: reduced ? 0 : 1.5 }}
+    >
+      <Plane
+        x="294"
+        y="4"
+        width="16"
+        height="16"
+        strokeWidth={1.75}
+        transform="rotate(38 302 12)"
+      />
+    </motion.g>
+  </svg>
+);
+
+/** One labelled field on the boarding pass. */
+const PassField = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-0">
+    <dt className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+      {label}
+    </dt>
+    <dd className="mt-0.5 text-[13px] font-medium leading-snug">{value}</dd>
+  </div>
+);
+
+/** CSS barcode — irregular vertical bars, no image needed. */
+const Barcode = () => (
+  <div
+    aria-hidden
+    className="h-9 w-full text-foreground/80"
+    style={{
+      backgroundImage:
+        "repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px, currentColor 5px 6px, transparent 6px 8px, currentColor 8px 11px, transparent 11px 15px, currentColor 15px 16px, transparent 16px 19px)",
+    }}
+  />
+);
+
+/**
+ * The page's signature: the project's spec sheet rendered as a boarding
+ * pass — perforated stub, punched notches, barcode. Every field is real
+ * project metadata, not decoration.
+ */
+const BoardingPass = ({ reduced }: { reduced: boolean }) => (
+  <motion.div
+    initial={reduced ? false : { opacity: 0, y: 28 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ type: "spring", stiffness: 110, damping: 16, delay: 0.35 }}
+    className="-rotate-[0.4deg]"
+  >
+    <div className="flex flex-col sm:flex-row overflow-hidden rounded-xl border border-foreground/20 bg-card text-card-foreground">
+      {/* Main section */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3 bg-night px-4 py-2.5 text-night-foreground sm:px-5">
+          <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em]">
+            Travel Trek
+            <Plane className="h-3 w-3" strokeWidth={2} aria-hidden />
+            Boarding pass
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground/70 whitespace-nowrap">
+            2026
+          </span>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-4 p-4 min-[480px]:grid-cols-3 sm:p-5">
+          <PassField label="Passenger" value="Nurudeen Abdul-Majeed" />
+          <PassField label="Role" value="Solo — design & engineering" />
+          <PassField label="Route" value="Schema → Screen" />
+          <PassField label="Type" value="Production booking system" />
+          <PassField label="Stack" value="Next.js · Express · PostgreSQL" />
+          <div className="min-w-0">
+            <dt className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+              Status
+            </dt>
+            <dd className="mt-0.5 flex items-center gap-1.5 text-[13px] font-medium leading-snug">
+              <span
+                className="h-1.5 w-1.5 flex-none rounded-full bg-accent"
+                aria-hidden
+              />
+              Live & maintained
+            </dd>
+          </div>
+        </dl>
       </div>
 
-      {/* Pattern Overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }}
-      />
+      {/* Perforation — punched notches show the band behind the pass */}
+      <div className="relative border-t border-dashed border-foreground/25 sm:border-t-0 sm:border-l">
+        <span
+          aria-hidden
+          className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-hero-band sm:left-1/2 sm:top-auto sm:-translate-x-1/2 sm:translate-y-0 sm:-top-2.5"
+        />
+        <span
+          aria-hidden
+          className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-hero-band sm:right-auto sm:left-1/2 sm:top-auto sm:-translate-x-1/2 sm:translate-y-0 sm:-bottom-2.5"
+        />
+      </div>
 
-      {/* Main Content */}
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Column */}
-            <div className="text-center lg:text-left space-y-8">
-              {/* Badge */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/30 text-foreground"
-              >
-                <Code2 className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">
-                  Full-Stack Portfolio Project
-                </span>
-              </motion.div>
+      {/* Tear-off stub */}
+      <div className="flex flex-row items-center gap-4 bg-muted/40 px-4 py-3 sm:w-44 sm:flex-col sm:items-stretch sm:justify-between sm:px-5 sm:py-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Flight
+          </span>
+          <span className="font-mono text-sm font-semibold tracking-wider">
+            TT-2026
+          </span>
+        </div>
+        <div className="min-w-0 flex-1 sm:flex-none">
+          <Barcode />
+        </div>
+        <span className="hidden font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground min-[480px]:block sm:text-center">
+          Admit one
+        </span>
+      </div>
+    </div>
+  </motion.div>
+);
 
-              {/* Heading */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.1 }}
-              >
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
-                  Travel Trek
-                  <span className="block mt-2 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                    Booking Platform
-                  </span>
-                </h1>
-              </motion.div>
+const HeroSection = () => {
+  const reduced = useReducedMotion() ?? false;
 
-              {/* Subheading */}
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto lg:mx-0"
-              >
-                A production-ready travel booking system built with modern
-                technologies. Features secure authentication, payment
-                processing, real-time bookings, and comprehensive admin tools.
-              </motion.p>
+  const fadeUp = (delay: number) => ({
+    initial: reduced ? false : { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.55, delay, ease: "easeOut" as const },
+  });
 
-              {/* Tech Stack Pills */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.25 }}
-                className="flex flex-wrap gap-2 justify-center lg:justify-start"
-              >
-                {[
-                  "Next.js",
-                  "Express.js",
-                  "TypeScript",
-                  "PostgreSQL",
-                  "Redis",
-                ].map((tech) => (
-                  <Badge
-                    key={tech}
-                    variant="secondary"
-                    className="px-3 py-1 text-xs font-medium bg-muted/60 hover:bg-muted transition-colors"
-                  >
-                    {tech}
-                  </Badge>
-                ))}
-              </motion.div>
+  return (
+    <section className="bg-hero-band">
+      <div className="mx-auto max-w-6xl px-4 pb-10 pt-14 sm:px-6 sm:pb-14 sm:pt-20 lg:pt-24">
+        <motion.p
+          {...fadeUp(0)}
+          className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground"
+        >
+          <span
+            className="h-1.5 w-1.5 flex-none rounded-full bg-primary"
+            aria-hidden
+          />
+          Full-stack portfolio project · 2026
+        </motion.p>
 
-              {/* CTA Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
-                className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
-              >
-                <Link href="/login" passHref>
-                  <Button
-                    size="default"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 text-base px-6 py-3 group relative overflow-hidden cursor-pointer"
-                  >
-                    <span className="relative z-10 flex items-center">
-                      Try the Platform
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  </Button>
-                </Link>
+        <motion.h1
+          {...fadeUp(0.08)}
+          className="mt-6 max-w-3xl text-[42px] font-semibold leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl"
+        >
+          A travel booking platform,
+          <span className="block italic">built end-to-end.</span>
+        </motion.h1>
 
-                <Link
-                  href="https://github.com/nuru484/traveltrek.git"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  passHref
-                >
-                  <Button
-                    size="default"
-                    variant="outline"
-                    className="border border-border bg-card/80 backdrop-blur-md text-foreground hover:bg-card/95 hover:border-primary/50 hover:text-foreground transition-all duration-300 text-base px-6 py-3 group cursor-pointer"
-                  >
-                    <Github className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
-                    View Source Code
-                  </Button>
-                </Link>
-              </motion.div>
+        <FlightPath reduced={reduced} />
 
-              {/* Technical Highlights */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                className="flex flex-wrap items-center justify-center lg:justify-start gap-6 sm:gap-8 pt-4"
-              >
-                <div className="text-center lg:text-left">
-                  <div className="text-2xl sm:text-3xl font-bold text-primary flex items-center justify-center lg:justify-start gap-2">
-                    <Database className="w-6 h-6" />
-                    REST API
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Full Backend
-                  </div>
-                </div>
-                <div className="w-px h-12 bg-border hidden sm:block" />
-                <div className="text-center lg:text-left">
-                  <div className="text-2xl sm:text-3xl font-bold text-accent flex items-center justify-center lg:justify-start gap-2">
-                    <Shield className="w-6 h-6" />
-                    Secure
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    JWT Auth & RBAC
-                  </div>
-                </div>
-                <div className="w-px h-12 bg-border hidden sm:block" />
-                <div className="text-center lg:text-left">
-                  <div className="text-2xl sm:text-3xl font-bold text-primary flex items-center justify-center lg:justify-start gap-2">
-                    <Zap className="w-6 h-6" />
-                    Real-time
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Live Bookings
-                  </div>
-                </div>
-              </motion.div>
-            </div>
+        <div className="mt-8 flex flex-col gap-8 lg:mt-10 lg:flex-row lg:items-end lg:justify-between">
+          <motion.p
+            {...fadeUp(0.16)}
+            className="max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base"
+          >
+            Travel Trek is a production-ready booking system — flights, hotels,
+            tours and payments — with secure authentication, real-time
+            availability, and a full admin layer. Designed and engineered solo,
+            from schema to screen.
+          </motion.p>
 
-            {/* Right Column (System Features) */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="hidden lg:grid grid-cols-2 gap-4 auto-rows-fr"
+          <motion.div
+            {...fadeUp(0.22)}
+            className="flex flex-col gap-3 min-[420px]:flex-row lg:flex-none"
+          >
+            <Button
+              asChild
+              size="lg"
+              className="rounded-full bg-foreground px-7 text-background hover:bg-foreground/90"
             >
-              {[
-                {
-                  name: "Flight Booking",
-                  icon: Plane,
-                  description: "Search & reserve flights",
-                  color: "primary",
-                },
-                {
-                  name: "Hotel Reservations",
-                  icon: Hotel,
-                  description: "Book accommodations",
-                  color: "accent",
-                },
-                {
-                  name: "Tour Management",
-                  icon: MapPin,
-                  description: "Explore destinations",
-                  color: "primary",
-                },
-                {
-                  name: "Payment System",
-                  icon: Shield,
-                  description: "Secure transactions",
-                  color: "accent",
-                },
-              ].map((feature, index) => (
-                <motion.div
-                  key={feature.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                  className="group relative bg-card/80 backdrop-blur-md border border-border rounded-xl p-5 hover:bg-card/95 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                >
-                  <div
-                    className={`mb-3 p-2.5 rounded-lg ${
-                      feature.color === "primary"
-                        ? "bg-primary/10"
-                        : "bg-accent/10"
-                    } w-fit`}
-                  >
-                    <feature.icon
-                      className={`w-7 h-7 ${
-                        feature.color === "primary"
-                          ? "text-primary"
-                          : "text-accent"
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <h3
-                      className={`font-semibold text-card-foreground text-sm mb-1 group-hover:${
-                        feature.color === "primary"
-                          ? "text-primary"
-                          : "text-accent"
-                      } transition-colors`}
-                    >
-                      {feature.name}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {feature.description}
-                    </p>
-                  </div>
-                  <div
-                    className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
-                      feature.color === "primary" ? "bg-primary" : "bg-accent"
-                    } opacity-50 group-hover:opacity-100 transition-opacity`}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
+              <Link href="/login">
+                Try the platform
+                <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="rounded-full border-foreground/25 bg-transparent px-7 hover:bg-foreground/5"
+            >
+              <Link
+                href="https://github.com/nuru484/traveltrek"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Github className="mr-1 h-4 w-4" aria-hidden />
+                Source code
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+
+        <div className="mt-12 sm:mt-16">
+          <BoardingPass reduced={reduced} />
         </div>
       </div>
     </section>

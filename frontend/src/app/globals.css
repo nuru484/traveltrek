@@ -6,8 +6,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono-plex);
+  --color-night: var(--night);
+  --color-night-foreground: var(--night-foreground);
+  --color-hero-band: var(--hero-band);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +48,15 @@
 
 :root {
   --radius: 0.625rem;
+
+  /* Landing page surfaces. --night is the fixed deep-navy band used for the
+     engineering section and footer in BOTH themes (a constant brand moment);
+     --hero-band is the paper tint behind the boarding pass — the pass's
+     punched notches use it to read as holes. */
+  --night: oklch(0.21 0.035 255);
+  --night-foreground: oklch(0.95 0.01 240);
+  --hero-band: oklch(0.945 0.015 240);
+
   /* Light theme - Fresh travel palette */
   --background: oklch(0.98 0.01 240); /* Very light blue-tinted white */
   --foreground: oklch(0.25 0.02 250); /* Deep navy blue */
@@ -91,6 +103,8 @@
 }
 
 .dark {
+  --hero-band: oklch(0.22 0.025 252);
+
   /* Dark theme - Night travel palette */
   --background: oklch(0.18 0.02 250); /* Deep midnight blue */
   --foreground: oklch(0.95 0.01 240); /* Off-white with blue tint */
@@ -161,4 +175,17 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Serif display for non-heading elements (wordmark, pull lines). */
+.font-display {
+  font-family: var(--font-heading);
+}
+
+/* Horizontal anchor rows on phones scroll without a visible scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

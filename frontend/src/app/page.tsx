@@ -1,17 +1,19 @@
-import HeroSection from "@/components/index/HeroSection";
-import SystemFeaturesSection from "@/components/index/SystemFeaturesSection";
-import Footer from "@/components/index/Footer";
 import Header from "@/components/index/Header";
+import HeroSection from "@/components/index/HeroSection";
+import DeparturesSection from "@/components/index/DeparturesSection";
+import EngineeringSection from "@/components/index/EngineeringSection";
+import ManifestSection from "@/components/index/ManifestSection";
+import Footer from "@/components/index/Footer";
 
 const page = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      <div className="container mx-auto">
-        <HeroSection />
-        <SystemFeaturesSection />
-        <Footer />
-      </div>
+      <HeroSection />
+      <DeparturesSection />
+      <EngineeringSection />
+      <ManifestSection />
+      <Footer />
     </div>
   );
 };
