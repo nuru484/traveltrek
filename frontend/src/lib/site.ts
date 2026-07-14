@@ -12,8 +12,10 @@ export const siteConfig = {
   name: "Travel Trek",
   /** Full home-page title (the layout template's `default`). */
   title: "Travel Trek — a travel booking platform, built end-to-end",
+  /** ≤130 chars so Google (~155), X (~200), and social previews (~125)
+   *  all show it untruncated. */
   description:
-    "A production-ready travel booking system — flights, hotels, tours and payments — with secure authentication, real-time availability, and a full admin layer. A full-stack portfolio case study by Nurudeen Abdul-Majeed.",
+    "A production-ready travel booking platform — flights, hotels, tours, and payments — built end-to-end by Nurudeen Abdul-Majeed.",
   author: "Nurudeen Abdul-Majeed",
   /** Paper + ink from globals.css, as hex for manifest/theme-color. */
   backgroundColor: "#f6f8fb",

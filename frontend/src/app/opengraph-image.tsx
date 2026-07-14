@@ -97,6 +97,22 @@ export default function OpengraphImage() {
                 </div>
               </div>
 
+              {/* Conversion line — the card should invite a click */}
+              <div style={{ display: "flex" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    background: NIGHT,
+                    color: NIGHT_TEXT,
+                    borderRadius: 999,
+                    padding: "14px 30px",
+                    fontSize: 21,
+                  }}
+                >
+                  Try the live platform at traveltrek.dagraroyal.org →
+                </div>
+              </div>
+
               <div style={{ display: "flex", gap: 34 }}>
                 {[
                   ["PASSENGER", "Nurudeen Abdul-Majeed"],
