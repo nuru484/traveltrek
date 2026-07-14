@@ -8,38 +8,29 @@ import { isBefore } from "date-fns";
 import { RootState } from "@/redux/store";
 import {
   useDeleteFlightMutation,
-  useUpdateFlightStatusMutation,
-} from "@/redux/flightApi";
+  useUpdateFlightStatusMutation } from "@/redux/flightApi";
 import {
   useGetAllUserBookingsQuery,
   useCreateBookingMutation,
-  useUpdateBookingMutation,
-} from "@/redux/bookingApi";
+  useUpdateBookingMutation } from "@/redux/bookingApi";
 import { IFlight } from "@/types/flight.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DialogTitle } from "@/components/ui/dialog";
 import {
   Calendar,
   Clock,
@@ -47,7 +38,6 @@ import {
   Edit,
   Trash2,
   Users,
-  Route,
   Bookmark,
   MoreHorizontal,
   Plane,
@@ -58,12 +48,12 @@ import {
   AlertCircle,
   PlaneTakeoff,
   PlaneLanding,
-  ChevronDown,
-} from "lucide-react";
+  ChevronDown } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { Money } from "@/components/ui/Money";
 
 interface IFlightDetailProps {
   flight: IFlight;
@@ -75,8 +65,7 @@ const getAvailableStatusTransitions = (currentStatus: string) => {
     DELAYED: ["SCHEDULED", "CANCELLED", "DEPARTED"],
     DEPARTED: ["LANDED"],
     CANCELLED: ["SCHEDULED"],
-    LANDED: [],
-  };
+    LANDED: [] };
 
   return transitions[currentStatus] || [];
 };
@@ -86,8 +75,7 @@ const DateTimePicker = ({
   date,
   onChange,
   label,
-  minDate,
-}: {
+  minDate }: {
   date: Date | undefined;
   onChange: (date: Date | undefined) => void;
   label: string;
@@ -151,13 +139,11 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const {
     data: bookingsData,
     isLoading: isLoadingBookings,
-    isFetching: isFetchingBookings,
-  } = useGetAllUserBookingsQuery(
+    isFetching: isFetchingBookings } = useGetAllUserBookingsQuery(
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     {
       skip: !user,
-      refetchOnMountOrArgChange: 30,
-    }
+      refetchOnMountOrArgChange: 30 }
   );
 
   const userBooking = bookingsData?.data.find(
@@ -182,38 +168,32 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
         return {
           variant: "secondary" as const,
           icon: Clock,
-          label: "Scheduled",
-        };
+          label: "Scheduled" };
       case "DEPARTED":
         return {
           variant: "default" as const,
           icon: PlaneTakeoff,
-          label: "Departed",
-        };
+          label: "Departed" };
       case "LANDED":
         return {
           variant: "outline" as const,
           icon: PlaneLanding,
-          label: "Landed",
-        };
+          label: "Landed" };
       case "CANCELLED":
         return {
           variant: "destructive" as const,
           icon: XCircle,
-          label: "Cancelled",
-        };
+          label: "Cancelled" };
       case "DELAYED":
         return {
           variant: "secondary" as const,
           icon: AlertCircle,
-          label: "Delayed",
-        };
+          label: "Delayed" };
       default:
         return {
           variant: "secondary" as const,
           icon: Clock,
-          label: status,
-        };
+          label: status };
     }
   };
 
@@ -234,8 +214,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     try {
       await updateFlightStatus({
         id: flight.id,
-        status: newStatus,
-      }).unwrap();
+        status: newStatus }).unwrap();
 
       toast.dismiss(toastId);
       toast.success(`Flight status updated to ${newStatus} successfully`);
@@ -289,8 +268,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
         id: flight.id,
         status: selectedDelayedStatus,
         departure: newDeparture.toISOString(),
-        arrival: newArrival.toISOString(),
-      }).unwrap();
+        arrival: newArrival.toISOString() }).unwrap();
 
       toast.dismiss(toastId);
       toast.success("Flight delayed status updated successfully");
@@ -353,8 +331,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
       await createBooking({
         userId: parseInt(user.id),
         flightId: flight.id,
-        totalPrice: flight.price,
-      }).unwrap();
+        totalPrice: flight.price }).unwrap();
       toast.success("Flight booked successfully");
       setShowBookDialog(false);
     } catch (error) {
@@ -372,8 +349,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     try {
       await updateBooking({
         bookingId: userBooking.id,
-        data: { status: "CANCELLED" },
-      }).unwrap();
+        data: { status: "CANCELLED" } }).unwrap();
 
       toast.dismiss(toastId);
       toast.success("Booking cancelled successfully");
@@ -453,10 +429,10 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Hero Section with Flight Image */}
-        <Card className="overflow-hidden">
+        {/* Hero — clean image, content below */}
+        <Card className="overflow-hidden py-0 gap-0">
           {flight.photo && (
-            <div className="relative w-full h-48 sm:h-56 md:h-64 lg:h-80 xl:h-96">
+            <div className="relative w-full h-[240px] md:h-[340px]">
               <Image
                 src={flight.photo}
                 alt={`${flight.airline} ${flight.flightNumber}`}
@@ -464,309 +440,92 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-
-              {/* Actions Dropdown */}
-              <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2">
-                {!isAdmin && !isAgent && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={isBookingActive ? "secondary" : "default"}
-                        size="sm"
-                        onClick={handleBookingButtonClick}
-                        disabled={isBookingButtonDisabled()}
-                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
-                      >
-                        {isBookingDataLoading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Bookmark className="h-4 w-4 mr-2" />
-                        )}
-                        <span className="hidden sm:inline">
-                          {getBookingButtonText()}
-                        </span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {isBookingDataLoading
-                          ? "Loading booking status..."
-                          : isBookingActive
-                          ? "Cancel booking"
-                          : isFlightBooked
-                          ? `Booking ${bookingStatus}`
-                          : "Book this flight"}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-
-                {canUpdateStatus && availableStatusTransitions.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
-                        disabled={isLoading}
-                      >
-                        <Badge
-                          variant={flightStatusConfig.variant}
-                          className="mr-2"
-                        >
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {flightStatusConfig.label}
-                        </Badge>
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <div className="px-2 py-1.5 text-sm font-semibold">
-                        Update Status
-                      </div>
-                      <DropdownMenuSeparator />
-                      {availableStatusTransitions.map((status) => {
-                        const statusConfig = getFlightStatusConfig(status);
-                        const StatusIcon = statusConfig.icon;
-                        return (
-                          <DropdownMenuItem
-                            key={status}
-                            onClick={() => handleStatusChange(status)}
-                            disabled={isLoading}
-                            className="cursor-pointer"
-                          >
-                            <StatusIcon className="mr-2 h-4 w-4" />
-                            {statusConfig.label}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                {isAdmin && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
-                        disabled={isLoading}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
-                      <DropdownMenuItem
-                        onClick={handleEdit}
-                        disabled={isLoading}
-                        className="cursor-pointer"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Flight
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteDialog(true)}
-                        disabled={isLoading}
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Flight
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-
-              {/* Hero Content */}
-              <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/90 text-black"
-                    >
-                      {flight.flightClass}
-                    </Badge>
-                    <Badge
-                      variant={flightStatusConfig.variant}
-                      className="bg-white/90 text-black"
-                    >
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {flightStatusConfig.label}
-                    </Badge>
-                    {isBookingDataLoading ? (
-                      <div className="h-5 w-32 bg-white/70 animate-pulse rounded-full"></div>
-                    ) : (
-                      isFlightBooked && (
-                        <Badge
-                          variant={
-                            bookingStatus === "CONFIRMED"
-                              ? "default"
-                              : bookingStatus === "CANCELLED"
-                              ? "destructive"
-                              : bookingStatus === "COMPLETED"
-                              ? "outline"
-                              : "secondary"
-                          }
-                          className="bg-white/90 text-black"
-                        >
-                          Booking: {bookingStatus}
-                        </Badge>
-                      )
-                    )}
-                  </div>
-                  <h1 className="break-words [overflow-wrap:anywhere] text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white line-clamp-2">
-                    {flight.airline}
-                  </h1>
-                  <p className="break-all text-sm sm:text-base lg:text-lg text-white/90">
-                    Flight {flight.flightNumber}
-                  </p>
-                </div>
-              </div>
             </div>
           )}
-
-          {/* Content when no image */}
-          {!flight.photo && (
-            <div className="p-4 sm:p-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{flight.flightClass}</Badge>
-                    <Badge variant={flightStatusConfig.variant}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {flightStatusConfig.label}
+          <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="secondary">{flight.flightClass}</Badge>
+                <Badge variant={flightStatusConfig.variant}>
+                  {flightStatusConfig.label}
+                </Badge>
+                {isBookingDataLoading ? (
+                  <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />
+                ) : (
+                  isFlightBooked && (
+                    <Badge
+                      variant={
+                        bookingStatus === "CONFIRMED"
+                          ? "default"
+                          : bookingStatus === "CANCELLED"
+                          ? "destructive"
+                          : bookingStatus === "COMPLETED"
+                          ? "outline"
+                          : "secondary"
+                      }
+                    >
+                      Booking: {bookingStatus}
                     </Badge>
-                    {isBookingDataLoading ? (
-                      <div className="h-5 w-32 bg-muted animate-pulse rounded-full"></div>
-                    ) : (
-                      isFlightBooked && (
-                        <Badge
-                          variant={
-                            bookingStatus === "CONFIRMED"
-                              ? "default"
-                              : bookingStatus === "CANCELLED"
-                              ? "destructive"
-                              : bookingStatus === "COMPLETED"
-                              ? "outline"
-                              : "secondary"
-                          }
-                        >
-                          Booking: {bookingStatus}
-                        </Badge>
-                      )
-                    )}
-                  </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">
-                    {flight.airline}
-                  </h1>
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    Flight {flight.flightNumber}
-                  </p>
-                </div>
-
-                {/* Actions for no image state */}
-                <div className="flex gap-2">
-                  {!isAdmin && !isAgent && (
+                  )
+                )}
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+                {flight.airline}
+              </h1>
+              <p className="break-all font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                Flight {flight.flightNumber}
+              </p>
+            </div>
+            <div className="flex flex-none items-center gap-1.5 md:gap-2">
+              {!isAdmin && !isAgent && (
+                <Button
+                  variant={isBookingActive ? "secondary" : "default"}
+                  size="sm"
+                  onClick={handleBookingButtonClick}
+                  disabled={isBookingButtonDisabled()}
+                  className="cursor-pointer whitespace-nowrap"
+                >
+                  {isBookingDataLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+                  ) : (
+                    <Bookmark className="h-4 w-4 sm:mr-2" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {getBookingButtonText()}
+                  </span>
+                </Button>
+              )}
+              {isAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button
-                      variant={isBookingActive ? "secondary" : "default"}
-                      size="sm"
-                      onClick={handleBookingButtonClick}
-                      disabled={isBookingButtonDisabled()}
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 flex-none cursor-pointer"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      onClick={handleEdit}
                       className="cursor-pointer"
                     >
-                      {isBookingDataLoading ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Bookmark className="h-4 w-4 mr-2" />
-                      )}
-                      <span className="hidden sm:inline">
-                        {getBookingButtonText()}
-                      </span>
-                    </Button>
-                  )}
-
-                  {canUpdateStatus && availableStatusTransitions.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="cursor-pointer"
-                          disabled={isLoading}
-                        >
-                          <Badge
-                            variant={flightStatusConfig.variant}
-                            className="mr-2"
-                          >
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {flightStatusConfig.label}
-                          </Badge>
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <div className="px-2 py-1.5 text-sm font-semibold">
-                          Update Status
-                        </div>
-                        <DropdownMenuSeparator />
-                        {availableStatusTransitions.map((status) => {
-                          const statusConfig = getFlightStatusConfig(status);
-                          const StatusIcon = statusConfig.icon;
-                          return (
-                            <DropdownMenuItem
-                              key={status}
-                              onClick={() => handleStatusChange(status)}
-                              disabled={isLoading}
-                              className="cursor-pointer"
-                            >
-                              <StatusIcon className="mr-2 h-4 w-4" />
-                              {statusConfig.label}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-
-                  {isAdmin && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="cursor-pointer"
-                          disabled={isLoading}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
-                          onClick={handleEdit}
-                          disabled={isLoading}
-                          className="cursor-pointer"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Flight
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setShowDeleteDialog(true)}
-                          disabled={isLoading}
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Flight
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </div>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Flight
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-destructive focus:text-destructive cursor-pointer"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Flight
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
-          )}
+          </div>
         </Card>
 
         <div className="grid grid-cols-1 items-start gap-4 @2xl/main:grid-cols-2 sm:gap-6">
@@ -802,160 +561,35 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
             </CardContent>
           </Card>
 
-          {/* Schedule */}
+          {/* Departure & Price */}
           <Card className="border-l-4 border-l-accent">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-accent-foreground mt-1 flex-shrink-0" />
-                <div className="flex-1 min-w-0 space-y-3">
-                  <p className="font-semibold text-foreground mb-2">Schedule</p>
-                  <div>
-                    <p className="font-medium text-foreground text-sm">
-                      Departure
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(flight.departure), "MMM dd, HH:mm")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground text-sm">
-                      Arrival
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(flight.arrival), "MMM dd, HH:mm")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pricing & Details */}
-          <Card className="border-l-4 border-l-muted">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start gap-3">
                 <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground mb-2">
-                    Price & Details
+                <div className="flex-1 min-w-0 space-y-2">
+                  <p className="font-semibold text-foreground">
+                    Departure & Price
                   </p>
-                  <div className="space-y-2">
-                    <p className="text-lg font-bold text-primary">
-                      ₵{flight.price.toLocaleString()}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="font-medium text-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDuration(flight.duration)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground flex items-center gap-1">
-                          <Route className="h-3 w-3" />
-                          {flight.stops === 0
-                            ? "Direct"
-                            : `${flight.stops} stop${
-                                flight.stops > 1 ? "s" : ""
-                              }`}
-                        </p>
-                      </div>
-                    </div>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(flight.departure), "MMM dd, yyyy · HH:mm")}
+                  </p>
+                  <p className="text-lg font-bold text-primary">
+                    <Money amount={flight.price} />
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>{formatDuration(flight.duration)}</span>
+                    <span>
+                      {flight.stops === 0
+                        ? "Direct"
+                        : `${flight.stops} stop${flight.stops > 1 ? "s" : ""}`}
+                    </span>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Expanded Schedule & Availability Section */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-          {/* Detailed Schedule */}
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-                <Plane className="h-5 w-5" />
-                Flight Schedule
-              </h3>
-              <div className="space-y-4">
-                {/* Flight Status with Dropdown for Admin/Agent */}
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <p className="font-medium text-foreground mb-2">
-                    Flight Status
-                  </p>
-                  {canUpdateStatus && availableStatusTransitions.length > 0 ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="cursor-pointer w-full justify-between"
-                          disabled={isLoading}
-                        >
-                          <div className="flex items-center">
-                            <StatusIcon className="h-4 w-4 mr-2" />
-                            {flightStatusConfig.label}
-                          </div>
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-48">
-                        <div className="px-2 py-1.5 text-sm font-semibold">
-                          Update Status
-                        </div>
-                        <DropdownMenuSeparator />
-                        {availableStatusTransitions.map((status) => {
-                          const statusConfig = getFlightStatusConfig(status);
-                          const StatusIcon = statusConfig.icon;
-                          return (
-                            <DropdownMenuItem
-                              key={status}
-                              onClick={() => handleStatusChange(status)}
-                              disabled={isLoading}
-                              className="cursor-pointer"
-                            >
-                              <StatusIcon className="mr-2 h-4 w-4" />
-                              {statusConfig.label}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <Badge
-                      variant={flightStatusConfig.variant}
-                      className="text-sm"
-                    >
-                      <StatusIcon className="h-4 w-4 mr-2" />
-                      {flightStatusConfig.label}
-                    </Badge>
-                  )}
-                </div>
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <p className="font-medium text-foreground mb-1">Departure</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(flight.departure)}
-                  </p>
-                </div>
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <p className="font-medium text-foreground mb-1">Arrival</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(flight.arrival)}
-                  </p>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">
-                    Flight Duration:
-                  </span>
-                  <span className="font-medium">
-                    {formatDuration(flight.duration)}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Availability */}
+          {/* Availability & Booking */}
           <Card>
             <CardContent className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
@@ -1034,23 +668,9 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
                     </p>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Class:</span>
-                    <p className="font-medium">{flight.flightClass}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Stops:</span>
-                    <p className="font-medium">
-                      {flight.stops === 0
-                        ? "Direct"
-                        : `${flight.stops} stop${flight.stops > 1 ? "s" : ""}`}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Capacity:</span>
-                    <p className="font-medium">{flight.capacity} seats</p>
-                  </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Capacity:</span>
+                  <p className="font-medium">{flight.capacity} seats</p>
                 </div>
 
                 {/* Action Button for Users (non-admin/agent) */}
@@ -1123,6 +743,94 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Detailed schedule — full width */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6">
+          {/* Detailed Schedule */}
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <Plane className="h-5 w-5" />
+                Flight Schedule
+              </h3>
+              <div className="grid grid-cols-1 items-start gap-4 @2xl/main:grid-cols-4">
+                {/* Flight Status with Dropdown for Admin/Agent */}
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <p className="font-medium text-foreground mb-2">
+                    Flight Status
+                  </p>
+                  {canUpdateStatus && availableStatusTransitions.length > 0 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer w-full justify-between"
+                          disabled={isLoading}
+                        >
+                          <div className="flex items-center">
+                            <StatusIcon className="h-4 w-4 mr-2" />
+                            {flightStatusConfig.label}
+                          </div>
+                          <ChevronDown className="h-4 w-4 ml-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        <div className="px-2 py-1.5 text-sm font-semibold">
+                          Update Status
+                        </div>
+                        <DropdownMenuSeparator />
+                        {availableStatusTransitions.map((status) => {
+                          const statusConfig = getFlightStatusConfig(status);
+                          const StatusIcon = statusConfig.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={status}
+                              onClick={() => handleStatusChange(status)}
+                              disabled={isLoading}
+                              className="cursor-pointer"
+                            >
+                              <StatusIcon className="mr-2 h-4 w-4" />
+                              {statusConfig.label}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <Badge
+                      variant={flightStatusConfig.variant}
+                      className="text-sm"
+                    >
+                      <StatusIcon className="h-4 w-4 mr-2" />
+                      {flightStatusConfig.label}
+                    </Badge>
+                  )}
+                </div>
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="font-medium text-foreground mb-1">Departure</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(flight.departure)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="font-medium text-foreground mb-1">Arrival</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(flight.arrival)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="font-medium text-foreground mb-1">Duration</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDuration(flight.duration)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+
         </div>
 
         {/* Delayed Status Update Modal */}

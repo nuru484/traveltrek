@@ -42,15 +42,10 @@ export function UserProfilePayments({ userId }: UserProfilePaymentsProps) {
   // Loading state
   if (isLoading) {
     return (
-      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
-        <CardHeader className="pb-4 max-sm:px-0">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-48" />
-            </div>
-            <Skeleton className="h-9 w-24 sm:w-auto" />
-          </div>
+      <Card className="w-full gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+        <CardHeader className="pb-2 max-sm:px-0">
+          <CardTitle className="text-lg sm:text-xl">Recent Payments</CardTitle>
+          <p className="text-sm text-muted-foreground">Loading payments…</p>
         </CardHeader>
         <CardContent className="pt-0 max-sm:px-0">
           <PaymentsDataTable
@@ -79,10 +74,27 @@ export function UserProfilePayments({ userId }: UserProfilePaymentsProps) {
   if (isError && error) {
     const { message } = extractApiErrorMessage(error);
     return (
-      <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
-        <CardHeader className="pb-4 max-sm:px-0">
+      <Card className="w-full gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+        <CardHeader className="pb-2 max-sm:px-0">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-lg sm:text-xl">Recent Payments</CardTitle>
-        </CardHeader>
+          {totalCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewAllPayments}
+              className="flex-none cursor-pointer"
+            >
+              View All ({totalCount})
+            </Button>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {totalCount > 0
+            ? `Showing latest ${Math.min(5, totalCount)} of ${totalCount} payments`
+            : "No payments found"}
+        </p>
+      </CardHeader>
         <CardContent className="pt-0 max-sm:px-0">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -109,33 +121,26 @@ export function UserProfilePayments({ userId }: UserProfilePaymentsProps) {
 
   // Success state
   return (
-    <Card className="w-full max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
-      <CardHeader className="pb-4 max-sm:px-0">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <CardTitle className="text-lg sm:text-xl">
-              Recent Payments
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {totalCount > 0
-                ? `Showing latest ${Math.min(
-                    5,
-                    totalCount
-                  )} of ${totalCount} payments`
-                : "No payments found"}
-            </p>
-          </div>
+    <Card className="w-full gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">
+      <CardHeader className="pb-2 max-sm:px-0">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="text-lg sm:text-xl">Recent Payments</CardTitle>
           {totalCount > 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleViewAllPayments}
-              className="w-full sm:w-auto hover:cursor-pointer"
+              className="flex-none cursor-pointer"
             >
               View All ({totalCount})
             </Button>
           )}
         </div>
+        <p className="text-sm text-muted-foreground">
+          {totalCount > 0
+            ? `Showing latest ${Math.min(5, totalCount)} of ${totalCount} payments`
+            : "No payments found"}
+        </p>
       </CardHeader>
 
       <CardContent className="pt-0 max-sm:px-0">

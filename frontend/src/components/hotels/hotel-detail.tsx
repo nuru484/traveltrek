@@ -16,20 +16,17 @@ import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Home,
   MapPin,
   Edit,
   Trash2,
-  Star,
   Bed,
   MoreHorizontal,
   Plus,
@@ -37,11 +34,8 @@ import {
   Eye,
   Bookmark,
   DoorOpen,
-  ImageOff,
   FileText,
-  Calendar,
-  Building2,
-} from "lucide-react";
+  Building2 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
@@ -64,8 +58,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
   const {
     data: bookingsData,
     isError: isBookingsError,
-    error: bookingsError,
-  } = useGetAllUserBookingsQuery(
+    error: bookingsError } = useGetAllUserBookingsQuery(
     { userId: user?.id, params: { page: 1, limit: 1000 } },
     { skip: !user }
   );
@@ -115,10 +108,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
     );
   };
 
-  const formatDate = (date: string | Date) => {
-    return format(new Date(date), "MMM dd, yyyy");
-  };
-
   const formatDateLong = (date: string | Date) => {
     return format(new Date(date), "EEEE, MMMM dd, yyyy 'at' h:mm a");
   };
@@ -132,9 +121,9 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
     <TooltipProvider>
       <div className="container mx-auto space-y-6">
         {/* Hero Section with Hotel Image */}
-        <Card className="overflow-hidden border-0">
-          {hotel.photo ? (
-            <div className="relative w-full h-[300px] md:h-[400px]">
+        <Card className="overflow-hidden py-0 gap-0">
+          {hotel.photo && (
+            <div className="relative w-full h-[240px] md:h-[340px]">
               <Image
                 src={hotel.photo}
                 alt={hotel.name}
@@ -142,150 +131,64 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-
-              {isAdmin && (
-                <div className="absolute top-4 right-4">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="bg-white/95 hover:bg-white text-black cursor-pointer h-9 w-9"
-                        disabled={isDeleting}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem
-                        onClick={handleEdit}
-                        disabled={isDeleting}
-                        className="cursor-pointer"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteDialog(true)}
-                        disabled={isDeleting}
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-
-              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge
-                        variant="secondary"
-                        className="bg-white/95 text-black"
-                      >
-                        <Star className="h-3 w-3 mr-1" />
-                        {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className="bg-white/95 text-black"
-                      >
-                        <Bed className="h-3 w-3 mr-1" />
-                        {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
-                      {hotel.name}
-                    </h1>
-                    {hotel.destination && (
-                      <div className="flex items-center gap-2 text-white/90">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-base md:text-lg">
-                          {hotel.destination.city
-                            ? `${hotel.destination.city}, `
-                            : ""}
-                          {hotel.destination.country}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Fallback for no image
-            <div className="relative w-full h-[200px]">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <ImageOff className="h-16 w-16 text-muted-foreground/30" />
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge variant="outline">
-                        <Star className="h-3 w-3 mr-1" />
-                        {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
-                      </Badge>
-                      <Badge variant="outline">
-                        <Bed className="h-3 w-3 mr-1" />
-                        {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
-                      {hotel.name}
-                    </h1>
-                    {hotel.destination && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-base md:text-lg">
-                          {hotel.destination.city
-                            ? `${hotel.destination.city}, `
-                            : ""}
-                          {hotel.destination.country}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {isAdmin && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="cursor-pointer h-9 w-9"
-                          disabled={isDeleting}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem
-                          onClick={handleEdit}
-                          disabled={isDeleting}
-                          className="cursor-pointer"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setShowDeleteDialog(true)}
-                          disabled={isDeleting}
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </div>
             </div>
           )}
+          <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="outline">
+                  {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
+                </Badge>
+                <Badge variant="outline">
+                  {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+                {hotel.name}
+              </h1>
+              {hotel.destination && (
+                <div className="flex items-start gap-2 text-muted-foreground">
+                  <MapPin className="h-4 w-4 mt-1 flex-none" />
+                  <span className="text-sm md:text-base">
+                    {hotel.destination.city ? `${hotel.destination.city}, ` : ""}
+                    {hotel.destination.country}
+                  </span>
+                </div>
+              )}
+            </div>
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="cursor-pointer h-9 w-9 flex-none"
+                    disabled={isDeleting}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    onClick={handleEdit}
+                    disabled={isDeleting}
+                    className="cursor-pointer"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={isDeleting}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </Card>
 
         {/* Content Section */}
@@ -365,19 +268,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                   </div>
                 </div>
 
-                {hotel.createdAt && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                    <Calendar className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Added
-                      </p>
-                      <p className="text-base font-semibold text-foreground truncate">
-                        {formatDate(hotel.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Amenities Section */}

@@ -23,6 +23,7 @@ export const createTourValidation: ValidationChain[] = [
   validator.number('price', {
     required: true,
     min: 0,
+    max: 10_000_000,
     allowDecimals: true,
   }),
 
@@ -68,6 +69,7 @@ export const updateTourValidation: ValidationChain[] = [
   validator.number('price', {
     required: false,
     min: 0,
+    max: 10_000_000,
     allowDecimals: true,
   }),
 

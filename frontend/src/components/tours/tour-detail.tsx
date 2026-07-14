@@ -155,7 +155,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
   const isLoading = isDeleting || isBooking || isCancelling || isUpdatingStatus;
 
   const formatDate = (date: string | Date) => {
-    return format(new Date(date), "MMM dd, yyyy");
+    return format(new Date(date), "MMM dd, yyyy · h:mm a");
   };
 
   const formatDateLong = (date: string | Date) => {
@@ -355,20 +355,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
                   </div>
 
-                  {/* Tour Name - Multi-line with Proper Wrapping */}
-                  <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground leading-tight break-words line-clamp-2 sm:line-clamp-3 overflow-hidden">
-                    {tour.name}
-                  </h1>
-
-                  {/* Destination with Proper Wrapping */}
-                  {tour.destination && (
-                    <div className="flex items-start gap-1.5 sm:gap-2 text-muted-foreground max-w-full">
-                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
-                      <span className="text-xs sm:text-sm md:text-base break-words line-clamp-2 overflow-hidden leading-snug">
-                        {getDestinationDisplay()}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Actions Dropdown - Always Visible */}
@@ -480,6 +466,18 @@ export function TourDetail({ tour }: ITourDetailProps) {
                   )}
                 </div>
               </div>
+
+              <h1 className="mt-3 text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+                {tour.name}
+              </h1>
+              {tour.destination && (
+                <div className="mt-1.5 flex items-start gap-1.5 sm:gap-2 text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
+                  <span className="text-sm md:text-base break-words [overflow-wrap:anywhere] leading-snug">
+                    {getDestinationDisplay()}
+                  </span>
+                </div>
+              )}
             </div>
         </Card>
 

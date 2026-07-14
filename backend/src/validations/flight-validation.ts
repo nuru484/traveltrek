@@ -16,7 +16,7 @@ export const createFlightValidation: ValidationChain[] = [
   validator.string('airline', {
     required: true,
     minLength: 2,
-    maxLength: 100,
+    maxLength: 60,
     pattern: /^[a-zA-Z\s\-&.()]+$/,
     customMessage:
       'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
@@ -46,6 +46,7 @@ export const createFlightValidation: ValidationChain[] = [
   validator.number('price', {
     required: true,
     min: 0,
+    max: 10_000_000,
     allowDecimals: true,
   }),
 
@@ -100,7 +101,7 @@ export const updateFlightValidation: ValidationChain[] = [
   validator.string('flightNumber', {
     required: false,
     minLength: 3,
-    maxLength: 10,
+    maxLength: 15,
     pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
     customMessage: 'Flight number must be in format like AA123, BA1234, etc.',
   }),
@@ -108,7 +109,7 @@ export const updateFlightValidation: ValidationChain[] = [
   validator.string('airline', {
     required: false,
     minLength: 2,
-    maxLength: 100,
+    maxLength: 60,
     pattern: /^[a-zA-Z\s\-&.()]+$/,
     customMessage:
       'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
@@ -283,7 +284,7 @@ export const flightSearchValidation: ValidationChain[] = [
   validator.string('airline', {
     required: false,
     minLength: 2,
-    maxLength: 100,
+    maxLength: 60,
     customMessage: 'Airline filter must be between 2 and 100 characters',
   }),
 

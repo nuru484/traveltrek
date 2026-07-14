@@ -18,14 +18,13 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
         {children}
       </span>
-      <div className="hidden h-px flex-1 bg-foreground/15 sm:block" />
     </div>
   );
 }
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8 pb-8">
+    <div className="mx-auto max-w-7xl space-y-8 pb-8">
       <div className="space-y-4">
         <Skeleton className="h-3 w-44" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -99,7 +98,7 @@ export function DashboardOverview() {
   }
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="mx-auto max-w-7xl space-y-8 pb-8">
       {/* Main stats */}
       <div className="space-y-4">
         <SectionLabel>Platform overview</SectionLabel>
