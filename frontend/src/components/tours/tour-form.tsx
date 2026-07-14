@@ -163,19 +163,48 @@ export function TourForm({ tour, mode }: ITourFormProps) {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tour Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Safari Adventure" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid gap-6 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tour Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Safari Adventure" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tour Type</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <SelectTrigger className="w-full min-w-0">
+                            <SelectValue placeholder="Select tour type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tourTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}
@@ -197,34 +226,6 @@ export function TourForm({ tour, mode }: ITourFormProps) {
 
               <FormField
                 control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tour Type</FormLabel>
-                    <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select tour type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tourTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="destinationId"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -237,11 +238,11 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                             role="combobox"
                             aria-expanded={open}
                             className={cn(
-                              "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
+                              "h-10 w-full min-w-0 justify-between text-left font-normal",
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            <span className="break-words">
+                            <span className="min-w-0 flex-1 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
                               {field.value
                                 ? destinations.find(
                                     (destination) =>
@@ -287,16 +288,9 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                                       : "opacity-0"
                                   )}
                                 />
-                                <div className="flex flex-col overflow-hidden w-full">
-                                  <span className="break-words">
-                                    {destination.name}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground break-words">
-                                    {destination.city &&
-                                      `${destination.city}, `}
-                                    {destination.country}
-                                  </span>
-                                </div>
+                                <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">
+                                  {destination.name}
+                                </span>
                               </CommandItem>
                             ))}
                           </CommandGroup>

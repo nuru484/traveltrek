@@ -530,7 +530,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
         <div className="grid grid-cols-1 items-start gap-4 @2xl/main:grid-cols-2 sm:gap-6">
           {/* Origin */}
-          <Card className="border-l-4 border-l-primary">
+          <Card className="py-0 border-l-4 border-l-primary">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
@@ -545,7 +545,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           </Card>
 
           {/* Destination */}
-          <Card className="border-l-4 border-l-secondary">
+          <Card className="py-0 border-l-4 border-l-secondary">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-secondary-foreground mt-1 flex-shrink-0" />
@@ -562,7 +562,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           </Card>
 
           {/* Departure & Price */}
-          <Card className="border-l-4 border-l-accent">
+          <Card className="py-0 border-l-4 border-l-accent">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
@@ -590,7 +590,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           </Card>
 
           {/* Availability & Booking */}
-          <Card>
+          <Card className="py-0">
             <CardContent className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                 <Users className="h-5 w-5" />
@@ -748,7 +748,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
         {/* Detailed schedule — full width */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6">
           {/* Detailed Schedule */}
-          <Card>
+          <Card className="py-0">
             <CardContent className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                 <Plane className="h-5 w-5" />

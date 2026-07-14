@@ -118,6 +118,9 @@ export function UserProfileBookings({ userId }: UserProfileBookingsProps) {
     );
   }
 
+  // Nothing to show — the section disappears entirely.
+  if (totalCount === 0) return null;
+
   // Success state
   return (
     <Card className="w-full gap-3 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:py-0">

@@ -9,15 +9,11 @@ import { useDeleteDestinationMutation } from "@/redux/destinationApi";
 import { IDestination } from "@/types/destination.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { } from "@/components/ui/separator";
 import {
-  MapPin,
   Edit,
   Trash2,
-  MoreHorizontal,
-  Globe,
-  FileText,
-  ImageOff } from "lucide-react";
+  MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,9 +65,9 @@ export default function DestinationDetail({
 
   return (
     <div className="container mx-auto space-y-6">
-      <Card className="overflow-hidden border-0">
-        {destination.photo ? (
-          <div className="relative w-full h-[300px] md:h-[400px]">
+      <Card className="overflow-hidden py-0 gap-0">
+        {destination.photo && (
+          <div className="relative w-full h-[240px] md:h-[340px]">
             <Image
               src={destination.photo}
               alt={`${destination.name}`}
@@ -79,168 +75,86 @@ export default function DestinationDetail({
               className="object-cover"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-
-            {isAdmin && (
-              <div className="absolute top-4 right-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="bg-white/95 hover:bg-white text-black cursor-pointer h-9 w-9"
-                      disabled={isDeleting}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem
-                      onClick={handleEdit}
-                      disabled={isDeleting}
-                      className="cursor-pointer"
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteDialog(true)}
-                      disabled={isDeleting}
-                      className="text-destructive focus:text-destructive cursor-pointer"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
-
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">
-                    {destination.name}
-                  </h1>
-                  <div className="flex items-center gap-2 text-white/90">
-                    <MapPin className="h-4 w-4" />
-                    <span className="text-base md:text-lg">
-                      {destination.city ? `${destination.city}, ` : ""}
-                      {destination.country}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Fallback for no image
-          <div className="relative w-full h-[200px]">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ImageOff className="h-16 w-16 text-muted-foreground/30" />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
-                    {destination.name}
-                  </h1>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span className="text-base md:text-lg">
-                      {destination.city ? `${destination.city}, ` : ""}
-                      {destination.country}
-                    </span>
-                  </div>
-                </div>
-                {isAdmin && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="cursor-pointer h-9 w-9"
-                        disabled={isDeleting}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem
-                        onClick={handleEdit}
-                        disabled={isDeleting}
-                        className="cursor-pointer"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteDialog(true)}
-                        disabled={isDeleting}
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            </div>
           </div>
         )}
+        <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
+          <div className="min-w-0 flex-1 space-y-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+              {destination.name}
+            </h1>
+            <dl className="grid max-w-xl grid-cols-2 gap-x-6 gap-y-4">
+              <div className="min-w-0">
+                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Country
+                </dt>
+                <dd className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-medium text-foreground">
+                  {destination.country}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  City
+                </dt>
+                <dd className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-medium text-foreground">
+                  {destination.city || "Not specified"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          {isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 flex-none cursor-pointer"
+                  disabled={isDeleting}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  onClick={handleEdit}
+                  disabled={isDeleting}
+                  className="cursor-pointer"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isDeleting}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </Card>
 
       {/* Content Section */}
-      <Card className="">
-        <CardContent className="p-6 md:p-8">
+      <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
+        <CardContent className="p-4 sm:p-6 max-sm:px-3">
           <div className="space-y-6">
-            {/* Description Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">About</h2>
-              </div>
+            {/* About */}
+            <div className="min-w-0">
+              <h2 className="mb-3 text-lg font-semibold text-foreground">
+                About
+              </h2>
               <p className="text-muted-foreground leading-relaxed">
                 {destination.description ||
                   "No description has been added for this destination yet. Check back later for more details."}
               </p>
             </div>
 
-            <Separator />
-
-            {/* Quick Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <Globe className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
-                    Country
-                  </p>
-                  <p className="text-base font-semibold text-foreground break-words [overflow-wrap:anywhere]">
-                    {destination.country}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
-                    City
-                  </p>
-                  <p className="text-base font-semibold text-foreground break-words [overflow-wrap:anywhere]">
-                    {destination.city || "Not specified"}
-                  </p>
-                </div>
-              </div>
-
-            </div>
-
             {/* Metadata Footer */}
             <div className="pt-4 border-t">
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-col gap-3 text-xs text-muted-foreground min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:items-center min-[480px]:gap-4">
+                <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                   <span className="font-medium">Created:</span>
                   <span>
                     {destination.createdAt
@@ -251,8 +165,8 @@ export default function DestinationDetail({
                 {destination.updatedAt &&
                   destination.createdAt !== destination.updatedAt && (
                     <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1.5">
+                      <span className="max-[479px]:hidden">•</span>
+                      <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                         <span className="font-medium">Last updated:</span>
                         <span>{formatDateLong(destination.updatedAt)}</span>
                       </div>

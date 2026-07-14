@@ -10,12 +10,7 @@ import { IRoom } from "@/types/room.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,21 +18,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Bed,
-  Users,
-  DollarSign,
   Edit,
   Trash2,
   MoreHorizontal,
   Building,
-  CheckCircle,
-  XCircle,
   Loader2,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { Money } from "@/components/ui/Money";
 import { BookingButton } from "../bookings/BookingButton";
 
 interface IRoomDetailProps {
@@ -111,14 +102,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
       ? `${room.roomType.slice(0, 47)}...`
       : room.roomType;
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(price);
-  };
-
   const availabilityPercentage =
     room.totalRooms > 0 ? (room.roomsAvailable / room.totalRooms) * 100 : 0;
 
@@ -129,19 +112,13 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     return "Few rooms left";
   };
 
-  const getAvailabilityColor = () => {
-    if (room.roomsAvailable === 0) return "bg-gray-500";
-    if (availabilityPercentage > 50) return "bg-green-500";
-    if (availabilityPercentage > 20) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <Card className="overflow-hidden">
+        {/* Hero */}
+        <Card className="overflow-hidden py-0 gap-0">
           {room.photo && (
-            <div className="relative w-full h-64 md:h-80 lg:h-96">
+            <div className="relative w-full h-[240px] md:h-[340px]">
               <Image
                 src={room.photo}
                 alt={room.roomType}
@@ -149,328 +126,189 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0" />
-
-              {/* Action buttons - Admin/Agent only */}
-              {canManageRooms && (
-                <div className="absolute top-4 right-4">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white/90 hover:bg-white text-black cursor-pointer"
-                        disabled={isDeleting}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
-                      <DropdownMenuItem
-                        onClick={handleEdit}
-                        disabled={isDeleting}
-                        className="cursor-pointer"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Room
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteDialog(true)}
-                        disabled={isDeleting}
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Room
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-
-              {/* Room Header Info */}
-              <div className="absolute bottom-6 left-4 sm:left-6 right-4">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant={isAvailable ? "default" : "destructive"}
-                      className="bg-white/90 text-black"
-                    >
-                      {isAvailable ? (
-                        <>
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          {room.roomsAvailable} Available
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Fully Booked
-                        </>
-                      )}
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/90 text-black"
-                    >
-                      <Users className="h-3 w-3 mr-1" />
-                      {room.capacity} Guest{room.capacity > 1 ? "s" : ""}
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/90 text-black"
-                    >
-                      <DollarSign className="h-3 w-3 mr-1" />
-                      {formatPrice(room.pricePerNight)}/night
-                    </Badge>
-                    {!canManageRooms && isBookingDataLoading && (
-                      <div className="h-6 w-24 bg-white/70 animate-pulse rounded-full"></div>
-                    )}
-                    {!canManageRooms &&
-                      hasActiveBooking &&
-                      !isBookingDataLoading && (
-                        <Badge
-                          variant={
-                            userBooking?.status === "CONFIRMED"
-                              ? "default"
-                              : "secondary"
-                          }
-                          className="bg-white/90 text-black"
-                        >
-                          Booked: {userBooking?.status}
-                        </Badge>
-                      )}
-                  </div>
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white drop-">
-                    {room.roomType}
-                  </h1>
-                  {room.hotel && (
-                    <button
-                      onClick={handleHotelClick}
-                      className="text-sm sm:text-base hover:cursor-pointer text-white/90 hover:text-white hover:underline transition-colors flex items-center gap-1"
-                    >
-                      <Building className="h-4 w-4" />
-                      {room.hotel.name}
-                    </button>
-                  )}
-                </div>
-              </div>
             </div>
           )}
-
-          <CardContent className="space-y-6 sm:space-y-8 p-4 sm:p-6">
-            {/* Hotel and Availability Cards */}
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant={isAvailable ? "outline" : "destructive"}>
+                  {isAvailable
+                    ? `${room.roomsAvailable} Available`
+                    : "Fully Booked"}
+                </Badge>
+                <Badge variant="outline">
+                  {room.capacity} Guest{room.capacity > 1 ? "s" : ""}
+                </Badge>
+                {!canManageRooms && isBookingDataLoading && (
+                  <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />
+                )}
+                {!canManageRooms &&
+                  hasActiveBooking &&
+                  !isBookingDataLoading && (
+                    <Badge variant="outline">
+                      Booked: {userBooking?.status}
+                    </Badge>
+                  )}
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+                {room.roomType}
+              </h1>
               {room.hotel && (
-                <Card className="border-l-4 border-l-primary">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <Building className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground mb-1">
-                          Hotel
-                        </p>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={handleHotelClick}
-                              className="text-sm text-muted-foreground hover:text-primary transition-colors text-left w-full hover:underline"
-                            >
-                              {room.hotel.name}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>View Hotel Details</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        {room.hotel.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {room.hotel.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <button
+                  onClick={handleHotelClick}
+                  className="flex items-start gap-2 text-left text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline cursor-pointer"
+                >
+                  <Building className="h-4 w-4 mt-1 flex-none" />
+                  <span className="min-w-0 text-sm md:text-base break-words [overflow-wrap:anywhere]">
+                    {room.hotel.name}
+                  </span>
+                </button>
               )}
-
-              <Card
-                className={`border-l-4 ${
-                  isAvailable ? "border-l-green-500" : "border-l-destructive"
-                }`}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-3">
-                    {isAvailable ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-1 flex-shrink-0" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-destructive mt-1 flex-shrink-0" />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground mb-1">
-                        Availability
-                      </p>
-                      <p
-                        className={`text-sm font-medium ${
-                          isAvailable ? "text-green-600" : "text-destructive"
-                        }`}
-                      >
-                        {isAvailable
-                          ? `${room.roomsAvailable} of ${room.totalRooms} rooms available`
-                          : "Fully booked"}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {getAvailabilityStatus()}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
+            {canManageRooms && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 flex-none cursor-pointer"
+                    disabled={isDeleting}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    onClick={handleEdit}
+                    disabled={isDeleting}
+                    className="cursor-pointer"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Room
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={isDeleting}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Room
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </Card>
 
-            {/* Room Details and Booking Section */}
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Room Details */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <Bed className="h-5 w-5" />
-                  Room Details
-                </h3>
-
-                <div className="space-y-4 pl-7">
-                  <div>
-                    <p className="font-medium text-foreground">Room Type</p>
-                    <p className="text-sm text-muted-foreground">
-                      {room.roomType}
-                    </p>
-                  </div>
-
+        {/* Details & booking */}
+        <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
+          <CardContent className="space-y-6 p-4 sm:p-6 max-sm:px-3">
+            <div className="grid grid-cols-1 gap-8 @2xl/main:grid-cols-2">
+              {/* Room details */}
+              <div className="min-w-0 space-y-4">
+                <h2 className="text-lg font-semibold text-foreground">
+                  Room details
+                </h2>
+                <dl className="space-y-4">
                   {room.description && (
-                    <div>
-                      <p className="font-medium text-foreground">Description</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
+                    <div className="min-w-0">
+                      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Description
+                      </dt>
+                      <dd className="mt-1 text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
                         {room.description}
-                      </p>
+                      </dd>
                     </div>
                   )}
-
                   <div>
-                    <p className="font-medium text-foreground">Capacity</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Users className="h-4 w-4" />
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Capacity
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium text-foreground">
                       Up to {room.capacity} guest{room.capacity > 1 ? "s" : ""}
-                    </p>
+                    </dd>
                   </div>
-
                   <div>
-                    <p className="font-medium text-foreground">Total Rooms</p>
-                    <p className="text-sm text-muted-foreground">
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Total rooms
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium text-foreground">
                       {room.totalRooms} room{room.totalRooms > 1 ? "s" : ""} in
                       this category
-                    </p>
+                    </dd>
                   </div>
-
                   {room.amenities && room.amenities.length > 0 && (
-                    <div>
-                      <p className="font-medium text-foreground mb-2">
+                    <div className="min-w-0">
+                      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                         Amenities
-                      </p>
-                      <div className="flex flex-wrap gap-2">
+                      </dt>
+                      <dd className="mt-1.5 flex flex-wrap gap-1.5">
                         {room.amenities.map((amenity, index) => (
                           <Badge
                             key={index}
                             variant="outline"
-                            className="text-xs"
+                            className="max-w-full text-xs"
                           >
-                            {amenity}
+                            <span className="truncate">{amenity}</span>
                           </Badge>
                         ))}
-                      </div>
+                      </dd>
                     </div>
                   )}
-                </div>
+                </dl>
               </div>
 
-              {/* Pricing & Booking Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Pricing & Booking
-                </h3>
-
-                <div className="space-y-4 pl-7">
+              {/* Pricing & booking */}
+              <div className="min-w-0 space-y-4">
+                <h2 className="text-lg font-semibold text-foreground">
+                  Pricing & booking
+                </h2>
+                <div className="space-y-4">
                   <div>
-                    <p className="font-medium text-foreground mb-1">
-                      Price per Night
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Price per night
                     </p>
-                    <p className="text-3xl font-bold text-primary">
-                      {formatPrice(room.pricePerNight)}
+                    <p className="mt-1 break-words font-display text-3xl font-semibold tracking-tight text-foreground">
+                      <Money amount={room.pricePerNight} />
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Excluding taxes and fees
                     </p>
                   </div>
 
                   <div>
-                    <p className="font-medium text-foreground mb-2">
-                      Current Availability
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Availability
                     </p>
-                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className={`h-2 rounded-full transition-all duration-500 ${getAvailabilityColor()}`}
-                        style={{
-                          width: `${availabilityPercentage}%`,
-                        }}
+                        className="h-1.5 rounded-full bg-foreground transition-all duration-500"
+                        style={{ width: `${availabilityPercentage}%` }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      {room.roomsBooked} of {room.totalRooms} rooms booked
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {room.roomsBooked} of {room.totalRooms} rooms booked ·{" "}
+                      {getAvailabilityStatus()}
                     </p>
                   </div>
 
-                  {/* Booking Action Button */}
-                  <div className="space-y-3 pt-4">
+                  {/* Booking actions */}
+                  <div className="space-y-3 pt-2">
                     {canManageRooms ? (
-                      // Admin/Agent view
-                      <>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleEdit}
-                            variant="outline"
-                            className="flex-1 cursor-pointer"
-                            disabled={isDeleting}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </Button>
-                          <Button
-                            onClick={() => setShowDeleteDialog(true)}
-                            variant="destructive"
-                            className="flex-1 cursor-pointer"
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 mr-2" />
-                            )}
-                            Delete
-                          </Button>
-                        </div>
-                        <BookingButton
-                          roomId={room.id}
-                          price={room.pricePerNight}
-                          variant="default"
-                          size="lg"
-                          className="w-full cursor-pointer"
-                          disabled={isDeleting}
-                          label={
-                            !isAvailable
-                              ? "Fully Booked - Book Anyway"
-                              : "Book for Customer"
-                          }
-                        />
-                      </>
+                      <BookingButton
+                        roomId={room.id}
+                        price={room.pricePerNight}
+                        variant="default"
+                        size="lg"
+                        className="w-full cursor-pointer"
+                        disabled={isDeleting}
+                        label={
+                          !isAvailable
+                            ? "Fully Booked - Book Anyway"
+                            : "Book for Customer"
+                        }
+                      />
                     ) : (
-                      // Regular user view
                       <>
                         {isBookingDataLoading ? (
                           <Button
@@ -484,8 +322,8 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                           </Button>
                         ) : hasActiveBooking ? (
                           <div className="space-y-2">
-                            <div className="rounded-lg bg-muted/50 p-4 border border-border">
-                              <p className="text-sm font-medium text-foreground mb-1">
+                            <div className="rounded-lg border border-border bg-muted/50 p-4">
+                              <p className="mb-1 text-sm font-medium text-foreground">
                                 You have an active booking
                               </p>
                               <p className="text-xs text-muted-foreground">
@@ -497,11 +335,11 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                               {userBooking?.type === "ROOM" &&
                                 userBooking.room?.startDate &&
                                 userBooking.room?.endDate && (
-                                  <p className="text-xs text-muted-foreground mt-1">
+                                  <p className="mt-1 text-xs text-muted-foreground">
                                     {new Date(
                                       userBooking.room.startDate
                                     ).toLocaleDateString()}{" "}
-                                    -
+                                    –{" "}
                                     {new Date(
                                       userBooking.room.endDate
                                     ).toLocaleDateString()}
@@ -537,34 +375,45 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                         )}
                       </>
                     )}
-                  </div>
 
-                  {/* Additional Info */}
-                  {!isAvailable && (
-                    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 border border-amber-200 dark:border-amber-900">
-                      <p className="text-xs text-amber-800 dark:text-amber-200">
-                        💡 This room is currently fully booked. Check back later
-                        or try different dates.
+                    {!isAvailable && (
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        This room is currently fully booked. Check back later or
+                        try different dates.
                       </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Metadata */}
-            <div className="pt-4 border-t border-border">
-              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <div>
-                  <span className="font-medium">Added:</span>{" "}
-                  {new Date(room.createdAt).toLocaleDateString()}
-                </div>
-                <div>
-                  <span className="font-medium">Last Updated:</span>{" "}
-                  {new Date(room.updatedAt).toLocaleDateString()}
-                </div>
+            <dl className="grid grid-cols-1 gap-3 border-t border-dashed border-foreground/20 pt-4 min-[480px]:grid-cols-2">
+              <div>
+                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Created
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-foreground">
+                  {new Date(room.createdAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </dd>
               </div>
-            </div>
+              <div>
+                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Last updated
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-foreground">
+                  {new Date(room.updatedAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </dd>
+              </div>
+            </dl>
           </CardContent>
         </Card>
 

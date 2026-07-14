@@ -323,11 +323,11 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                               role="combobox"
                               aria-expanded={originOpen}
                               className={cn(
-                                "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
+                                "h-10 w-full min-w-0 justify-between text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              <span className="break-words">
+                              <span className="min-w-0 flex-1 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
                                 {getOriginDisplayText(field.value)}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -366,15 +366,9 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                                         : "opacity-0"
                                     )}
                                   />
-                                  <div className="flex flex-col overflow-hidden w-full">
-                                    <span className="break-words">
-                                      {origin.name}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground break-words">
-                                      {origin.city && `${origin.city}, `}
-                                      {origin.country}
-                                    </span>
-                                  </div>
+                                  <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">
+                                    {origin.name}
+                                  </span>
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -403,11 +397,11 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                               role="combobox"
                               aria-expanded={destinationOpen}
                               className={cn(
-                                "w-full justify-between text-left break-words whitespace-normal h-auto min-h-10 py-2",
+                                "h-10 w-full min-w-0 justify-between text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              <span className="break-words">
+                              <span className="min-w-0 flex-1 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
                                 {getDestinationDisplayText(field.value)}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -501,7 +495,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                           onValueChange={field.onChange}
                           defaultValue={field.value}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full min-w-0">
                             <SelectValue placeholder="Select flight class" />
                           </SelectTrigger>
                           <SelectContent>

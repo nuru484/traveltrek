@@ -241,7 +241,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                         value={field.value?.toString() || ""}
                         disabled={isHotelsLoading || !!hotelId}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full min-w-0">
                           <SelectValue
                             placeholder={
                               isHotelsLoading
@@ -256,15 +256,17 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                               key={hotel.id}
                               value={hotel.id.toString()}
                             >
-                              {hotel.name} ({hotel?.destination?.city},{" "}
-                              {hotel?.destination.country})
+                              <span className="min-w-0 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
+                                {hotel.name} ({hotel?.destination?.city},{" "}
+                                {hotel?.destination.country})
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </FormControl>
                     {selectedHotel && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="min-w-0 text-sm text-muted-foreground mt-1 [overflow-wrap:anywhere]">
                         Selected: {selectedHotel.name} (
                         {selectedHotel.destination.city},{" "}
                         {selectedHotel.destination.country})
@@ -286,7 +288,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                         onValueChange={field.onChange}
                         value={field.value}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full min-w-0">
                           <SelectValue placeholder="Select room type" />
                         </SelectTrigger>
                         <SelectContent>

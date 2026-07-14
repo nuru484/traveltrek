@@ -26,6 +26,7 @@ import { User, Bookmark, Search, Loader2, Calendar, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IBookingInput } from "@/types/booking.types";
+import { Money } from "@/components/ui/Money";
 
 interface IBookingButtonProps {
   tourId?: number;
@@ -73,17 +74,22 @@ export function BookingButton({
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // New state for additional booking details
-  const [numberOfGuests, setNumberOfGuests] = useState<number>(1);
+  // New state for additional booking details. The counts are kept as raw
+  // strings so the field can be cleared while typing; they are clamped on
+  // blur and when the booking is submitted.
+  const [numberOfGuests, setNumberOfGuests] = useState<string>("1");
   const [specialRequests, setSpecialRequests] = useState<string>("");
 
   // Room-specific state
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [numberOfRooms, setNumberOfRooms] = useState<number>(1);
+  const [numberOfRooms, setNumberOfRooms] = useState<string>("1");
+
+  const guestsCount = Math.min(20, Math.max(1, parseInt(numberOfGuests) || 1));
+  const roomsCount = Math.min(10, Math.max(1, parseInt(numberOfRooms) || 1));
 
   // Calculate total price based on number of guests
-  const calculatedTotalPrice = price * numberOfGuests;
+  const calculatedTotalPrice = price * guestsCount;
 
   // Handle search errors
   useEffect(() => {
@@ -99,11 +105,11 @@ export function BookingButton({
     if (!isDialogOpen) {
       setSelectedUserId(null);
       setSearchTerm("");
-      setNumberOfGuests(1);
+      setNumberOfGuests("1");
       setSpecialRequests("");
       setStartDate("");
       setEndDate("");
-      setNumberOfRooms(1);
+      setNumberOfRooms("1");
     }
   }, [isDialogOpen]);
 
@@ -120,7 +126,7 @@ export function BookingButton({
       const payload: IBookingInput = {
         userId: finalUserId,
         totalPrice: calculatedTotalPrice,
-        numberOfGuests,
+        numberOfGuests: guestsCount,
         specialRequests: specialRequests.trim() || null,
       };
 
@@ -132,7 +138,7 @@ export function BookingButton({
         payload.roomId = roomId;
         payload.startDate = startDate;
         payload.endDate = endDate;
-        payload.numberOfRooms = numberOfRooms;
+        payload.numberOfRooms = roomsCount;
       } else {
         throw new Error("No booking type specified");
       }
@@ -221,58 +227,57 @@ export function BookingButton({
                   min={1}
                   max={20}
                   value={numberOfGuests}
-                  onChange={(e) =>
-                    setNumberOfGuests(
-                      Math.max(1, parseInt(e.target.value) || 1)
-                    )
-                  }
+                  onChange={(e) => setNumberOfGuests(e.target.value)}
+                  onBlur={() => setNumberOfGuests(String(guestsCount))}
                   placeholder="Enter number of guests"
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground break-words">
-                  Price per guest: ${price.toFixed(2)}
+                  Price per guest: <Money amount={price} />
                 </p>
               </div>
 
               {/* Room-specific fields */}
               {roomId && (
                 <>
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="check-in"
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span className="break-words">Check-in Date</span>
-                    </Label>
-                    <Input
-                      id="check-in"
-                      type="date"
-                      min={minDate}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      required
-                      className="w-full"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="check-in"
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words">Check-in Date</span>
+                      </Label>
+                      <Input
+                        id="check-in"
+                        type="date"
+                        min={minDate}
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="check-out"
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span className="break-words">Check-out Date</span>
-                    </Label>
-                    <Input
-                      id="check-out"
-                      type="date"
-                      min={startDate || minDate}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      required
-                      className="w-full"
-                    />
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="check-out"
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words">Check-out Date</span>
+                      </Label>
+                      <Input
+                        id="check-out"
+                        type="date"
+                        min={startDate || minDate}
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -285,11 +290,8 @@ export function BookingButton({
                       min={1}
                       max={10}
                       value={numberOfRooms}
-                      onChange={(e) =>
-                        setNumberOfRooms(
-                          Math.max(1, parseInt(e.target.value) || 1)
-                        )
-                      }
+                      onChange={(e) => setNumberOfRooms(e.target.value)}
+                      onBlur={() => setNumberOfRooms(String(roomsCount))}
                       placeholder="Enter number of rooms"
                       className="w-full"
                     />
@@ -327,7 +329,7 @@ export function BookingButton({
                       Base Price (per guest)
                     </span>
                     <span className="font-medium whitespace-nowrap">
-                      ${price.toFixed(2)}
+                      <Money amount={price} />
                     </span>
                   </div>
                   <div className="flex justify-between items-start gap-2 text-sm">
@@ -335,7 +337,7 @@ export function BookingButton({
                       Number of Guests
                     </span>
                     <span className="font-medium whitespace-nowrap">
-                      × {numberOfGuests}
+                      × {guestsCount}
                     </span>
                   </div>
                   <div className="h-px bg-border" />
@@ -344,7 +346,7 @@ export function BookingButton({
                       Total Price
                     </span>
                     <span className="text-lg font-semibold text-foreground whitespace-nowrap">
-                      ${calculatedTotalPrice.toFixed(2)}
+                      <Money amount={calculatedTotalPrice} />
                     </span>
                   </div>
                 </div>
@@ -426,119 +428,120 @@ export function BookingButton({
                 </div>
               </div>
 
-              {/* User Selection */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="user-select"
-                  className="text-sm font-medium break-words"
-                >
-                  Select User
-                </Label>
-                <Select
-                  value={selectedUserId ? String(selectedUserId) : ""}
-                  onValueChange={(val) => setSelectedUserId(Number(val))}
-                >
-                  <SelectTrigger id="user-select" className="w-full">
-                    <SelectValue placeholder="Choose a user to book for" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px] max-w-[calc(100vw-4rem)] sm:max-w-[468px]">
-                    {isUsersLoading ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      </div>
-                    ) : availableUsers.length > 0 ? (
-                      availableUsers.map((u) => (
-                        <SelectItem
-                          key={u.id}
-                          value={String(u.id)}
-                          className="py-3"
-                        >
-                          <div className="flex flex-col gap-0.5 min-w-0 w-full">
-                            <span className="font-medium text-sm break-all line-clamp-2">
-                              {u.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground break-all line-clamp-1">
-                              {u.email}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center py-8">
-                        <User className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                        <p className="text-sm">No users found</p>
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* User Selection */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="user-select"
+                    className="text-sm font-medium break-words"
+                  >
+                    Select User
+                  </Label>
+                  <Select
+                    value={selectedUserId ? String(selectedUserId) : ""}
+                    onValueChange={(val) => setSelectedUserId(Number(val))}
+                  >
+                    <SelectTrigger id="user-select" className="w-full">
+                      <SelectValue placeholder="Choose a user to book for" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] max-w-[calc(100vw-4rem)] sm:max-w-[468px]">
+                      {isUsersLoading ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        </div>
+                      ) : availableUsers.length > 0 ? (
+                        availableUsers.map((u) => (
+                          <SelectItem
+                            key={u.id}
+                            value={String(u.id)}
+                            className="py-3"
+                          >
+                            <div className="flex flex-col gap-0.5 min-w-0 w-full">
+                              <span className="font-medium text-sm break-all line-clamp-2">
+                                {u.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground break-all line-clamp-1">
+                                {u.email}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center py-8">
+                          <User className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                          <p className="text-sm">No users found</p>
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Number of Guests */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="guests-admin"
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Users className="h-4 w-4 flex-shrink-0" />
-                  <span className="break-words">Number of Guests</span>
-                </Label>
-                <Input
-                  id="guests-admin"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={numberOfGuests}
-                  onChange={(e) =>
-                    setNumberOfGuests(
-                      Math.max(1, parseInt(e.target.value) || 1)
-                    )
-                  }
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground break-words">
-                  Price per guest: ${price.toFixed(2)}
-                </p>
+                {/* Number of Guests */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="guests-admin"
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Users className="h-4 w-4 flex-shrink-0" />
+                    <span className="break-words">Number of Guests</span>
+                  </Label>
+                  <Input
+                    id="guests-admin"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={numberOfGuests}
+                    onChange={(e) => setNumberOfGuests(e.target.value)}
+                    onBlur={() => setNumberOfGuests(String(guestsCount))}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground break-words">
+                    Price per guest: <Money amount={price} />
+                  </p>
+                </div>
               </div>
 
               {/* Room-specific fields */}
               {roomId && (
                 <>
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="check-in-admin"
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span className="break-words">Check-in Date</span>
-                    </Label>
-                    <Input
-                      id="check-in-admin"
-                      type="date"
-                      min={minDate}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      required
-                      className="w-full"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="check-in-admin"
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words">Check-in Date</span>
+                      </Label>
+                      <Input
+                        id="check-in-admin"
+                        type="date"
+                        min={minDate}
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="check-out-admin"
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Calendar className="h-4 w-4 flex-shrink-0" />
-                      <span className="break-words">Check-out Date</span>
-                    </Label>
-                    <Input
-                      id="check-out-admin"
-                      type="date"
-                      min={startDate || minDate}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      required
-                      className="w-full"
-                    />
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="check-out-admin"
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span className="break-words">Check-out Date</span>
+                      </Label>
+                      <Input
+                        id="check-out-admin"
+                        type="date"
+                        min={startDate || minDate}
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        required
+                        className="w-full"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -554,11 +557,8 @@ export function BookingButton({
                       min={1}
                       max={10}
                       value={numberOfRooms}
-                      onChange={(e) =>
-                        setNumberOfRooms(
-                          Math.max(1, parseInt(e.target.value) || 1)
-                        )
-                      }
+                      onChange={(e) => setNumberOfRooms(e.target.value)}
+                      onBlur={() => setNumberOfRooms(String(roomsCount))}
                       className="w-full"
                     />
                   </div>
@@ -592,7 +592,7 @@ export function BookingButton({
                       Base Price (per guest)
                     </span>
                     <span className="font-medium whitespace-nowrap">
-                      ${price.toFixed(2)}
+                      <Money amount={price} />
                     </span>
                   </div>
                   <div className="flex justify-between items-start gap-2 text-sm">
@@ -600,7 +600,7 @@ export function BookingButton({
                       Number of Guests
                     </span>
                     <span className="font-medium whitespace-nowrap">
-                      × {numberOfGuests}
+                      × {guestsCount}
                     </span>
                   </div>
                   <div className="h-px bg-border" />
@@ -609,7 +609,7 @@ export function BookingButton({
                       Total Price
                     </span>
                     <span className="text-lg font-semibold whitespace-nowrap">
-                      ${calculatedTotalPrice.toFixed(2)}
+                      <Money amount={calculatedTotalPrice} />
                     </span>
                   </div>
                 </div>

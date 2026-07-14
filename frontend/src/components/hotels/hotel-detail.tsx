@@ -24,17 +24,14 @@ import {
   DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Home,
-  MapPin,
   Edit,
   Trash2,
   Bed,
   MoreHorizontal,
   Plus,
-  Phone,
   Eye,
   Bookmark,
   DoorOpen,
-  FileText,
   Building2 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -134,27 +131,48 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
             </div>
           )}
           <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
-            <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap gap-1.5">
                 <Badge variant="outline">
                   {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
                 </Badge>
-                <Badge variant="outline">
-                  {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
-                </Badge>
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
                 {hotel.name}
               </h1>
-              {hotel.destination && (
-                <div className="flex items-start gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 mt-1 flex-none" />
-                  <span className="text-sm md:text-base">
-                    {hotel.destination.city ? `${hotel.destination.city}, ` : ""}
-                    {hotel.destination.country}
-                  </span>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1 @2xl/main:grid-cols-3">
+                {hotel.destination && (
+                  <div className="min-w-0">
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Location
+                    </dt>
+                    <dd className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-medium text-foreground">
+                      {hotel.destination.city
+                        ? `${hotel.destination.city}, `
+                        : ""}
+                      {hotel.destination.country}
+                    </dd>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Address
+                  </dt>
+                  <dd className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-medium text-foreground">
+                    {hotel.address}
+                  </dd>
                 </div>
-              )}
+                {hotel.phone && (
+                  <div className="min-w-0">
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Contact
+                    </dt>
+                    <dd className="mt-1 break-words [overflow-wrap:anywhere] text-sm font-medium text-foreground">
+                      {hotel.phone}
+                    </dd>
+                  </div>
+                )}
+              </dl>
             </div>
             {isAdmin && (
               <DropdownMenu>
@@ -192,82 +210,18 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
         </Card>
 
         {/* Content Section */}
-        <Card className="">
-          <CardContent className="p-6 md:p-8">
+        <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
+          <CardContent className="p-4 sm:p-6 max-sm:px-3">
             <div className="space-y-6">
-              {/* Description Section */}
-              {hotel.description && (
-                <>
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <h2 className="text-lg font-semibold text-foreground">
-                        About
-                      </h2>
-                    </div>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {hotel.description}
-                    </p>
-                  </div>
-
-                  <Separator />
-                </>
-              )}
-
-              {/* Quick Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                  <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                      Address
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {hotel.address}
-                    </p>
-                  </div>
-                </div>
-
-                {hotel.destination && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                    <Building2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Destination
-                      </p>
-                      <p className="text-base font-semibold text-foreground truncate">
-                        {hotel.destination.name}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {hotel.phone && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                    <Phone className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Contact
-                      </p>
-                      <p className="text-base font-semibold text-foreground truncate">
-                        {hotel.phone}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                  <Bed className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                      Available Rooms
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {availableRooms} Room{availableRooms !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-
+              {/* About */}
+              <div className="min-w-0">
+                <h2 className="mb-3 text-lg font-semibold text-foreground">
+                  About
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  {hotel.description ||
+                    "No description has been added for this hotel yet. Check back later for more details."}
+                </p>
               </div>
 
               {/* Amenities Section */}
@@ -302,15 +256,15 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
               {/* Metadata Footer */}
               {hotel.createdAt && (
                 <div className="pt-4 border-t">
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex flex-col gap-3 text-xs text-muted-foreground min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:items-center min-[480px]:gap-4">
+                    <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                       <span className="font-medium">Created:</span>
                       <span>{formatDateLong(hotel.createdAt)}</span>
                     </div>
                     {hotel.updatedAt && hotel.createdAt !== hotel.updatedAt && (
                       <>
-                        <span>•</span>
-                        <div className="flex items-center gap-1.5">
+                        <span className="max-[479px]:hidden">•</span>
+                        <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                           <span className="font-medium">Last updated:</span>
                           <span>{formatDateLong(hotel.updatedAt)}</span>
                         </div>
@@ -324,8 +278,8 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
         </Card>
 
         {/* Available Rooms Section */}
-        <Card className="max-sm:rounded-none max-sm:border-x-0 max-sm:py-4">
-          <CardContent className="p-4 sm:p-6 md:p-8 max-sm:px-3">
+        <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
+          <CardContent className="p-4 sm:p-6 max-sm:px-3">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Bed className="h-5 w-5 text-primary" />
@@ -385,7 +339,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                           </div>
 
                           {/* Room Information */}
-                          <div className="flex-1 p-4 flex flex-col">
+                          <div className="min-w-0 flex-1 p-4 flex flex-col">
                             {/* Header */}
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1 min-w-0">
@@ -393,14 +347,14 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                   {room.roomType}
                                 </h4>
                                 {room.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                  <p className="text-xs text-muted-foreground line-clamp-2 break-words [overflow-wrap:anywhere]">
                                     {room.description}
                                   </p>
                                 )}
                               </div>
 
-                              <div className="text-right flex-shrink-0 ml-4">
-                                <p className="text-lg font-bold text-primary">
+                              <div className="text-right flex-none ml-3 max-w-[45%]">
+                                <p className="text-lg font-bold text-primary break-words">
                                   <Money amount={room.pricePerNight} />
                                 </p>
                                 <p className="text-xs text-muted-foreground">

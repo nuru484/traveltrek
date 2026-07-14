@@ -129,7 +129,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         className="p-0 h-auto font-mono text-[10px] font-normal uppercase tracking-[0.15em] text-muted-foreground hover:bg-transparent hover:text-foreground"
       >
-        <span className="hidden sm:inline">Created At</span>
+        <span>Created At</span>
         <ArrowUpDown className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
       </Button>
     ),

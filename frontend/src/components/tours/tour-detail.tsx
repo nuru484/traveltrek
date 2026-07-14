@@ -39,7 +39,6 @@ import {
   Bookmark,
   MoreHorizontal,
   Loader2,
-  ExternalLink,
   FileText,
   DollarSign,
   Tag,
@@ -471,19 +470,22 @@ export function TourDetail({ tour }: ITourDetailProps) {
                 {tour.name}
               </h1>
               {tour.destination && (
-                <div className="mt-1.5 flex items-start gap-1.5 sm:gap-2 text-muted-foreground">
+                <Link
+                  href={`/dashboard/destinations/${tour.destination.id}/detail`}
+                  className="mt-1.5 flex items-start gap-1.5 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline sm:gap-2"
+                >
                   <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5 sm:mt-1" />
-                  <span className="text-sm md:text-base break-words [overflow-wrap:anywhere] leading-snug">
+                  <span className="min-w-0 text-sm md:text-base break-words [overflow-wrap:anywhere] leading-snug">
                     {getDestinationDisplay()}
                   </span>
-                </div>
+                </Link>
               )}
             </div>
         </Card>
 
         {/* Content Section */}
-        <Card className="">
-          <CardContent className="p-6 md:p-8">
+        <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
+          <CardContent className="p-4 sm:p-6 max-sm:px-3">
             <div className="space-y-6">
               {/* Description Section */}
               {tour.description && (
@@ -506,28 +508,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
               {/* Quick Info Grid */}
               <div className="grid grid-cols-1 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3 gap-4">
-                {/* Destination */}
-                {tour.destination && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 @2xl/main:col-span-2 @5xl/main:col-span-3">
-                    <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Destination
-                      </p>
-                      <p className="break-words [overflow-wrap:anywhere] text-base font-semibold text-foreground mb-2">
-                        {getDestinationDisplay()}
-                      </p>
-                      <Link
-                        href={`/dashboard/destinations/${tour.destination.id}/detail`}
-                        className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 hover:underline transition-colors"
-                      >
-                        View Details
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
                 {/* Price */}
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
                   <DollarSign className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
@@ -708,15 +688,15 @@ export function TourDetail({ tour }: ITourDetailProps) {
               {/* Metadata Footer */}
               {tour.createdAt && (
                 <div className="pt-4 border-t">
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex flex-col gap-3 text-xs text-muted-foreground min-[480px]:flex-row min-[480px]:flex-wrap min-[480px]:items-center min-[480px]:gap-4">
+                    <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                       <span className="font-medium">Created:</span>
                       <span>{formatDateLong(tour.createdAt)}</span>
                     </div>
                     {tour.updatedAt && tour.createdAt !== tour.updatedAt && (
                       <>
-                        <span>•</span>
-                        <div className="flex items-center gap-1.5">
+                        <span className="max-[479px]:hidden">•</span>
+                        <div className="flex flex-col gap-0.5 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-1.5">
                           <span className="font-medium">Last updated:</span>
                           <span>{formatDateLong(tour.updatedAt)}</span>
                         </div>
