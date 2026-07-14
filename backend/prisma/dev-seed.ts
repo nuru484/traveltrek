@@ -77,7 +77,7 @@ export async function worstCase() {
   }});
   const day = 86400000, now2 = Date.now();
   const flight = await prisma.flight.create({ data: {
-    flightNumber: 'TT-99999-INTERCONTINENTAL-SUPERLONGHAUL',
+    flightNumber: 'TT-99999-LHX',
     airline: 'Trans-Continental Intercontinental Airways of West Africa, the Sahel & Beyond Ltd.',
     departure: new Date(now2 + 30 * day), arrival: new Date(now2 + 31 * day),
     originId: dest.id, destinationId: dest.id === 1 ? 2 : 1,
@@ -127,17 +127,17 @@ export async function maximize() {
     'Our party includes two vegetarian guests, one traveller who uses a lightweight folding wheelchair and can manage two or three steps with assistance, and my elderly mother who needs a ground-floor room close to the dining area; we would also be grateful for a late checkout on the final day because our return flight leaves close to midnight.';
 
   const LONG_NAMES = {
-    dest: 'Saint-Nicolas-de-la-Grave-upon-Volta International Heritage Riviera and Grand Escarpment Conservation District',
-    country: 'The United Republic of the Northern Territories and Associated Protectorates',
-    city: 'Llanfairpwllgwyngyllgogerychwyrndrobwll-upon-Oti Metropolitan Municipality',
-    hotel: 'The Grand Presidential Continental Pan-African Resort, Conference Centre and Wellness Sanctuary of the Northern Savannah',
+    dest: 'Saint-Nicolas-de-la-Grave-upon-Volta International Heritage Riviera and Escarpment District', // 93
+    country: 'The United Republic of the Northern Territories and Protectorates', // 66
+    city: 'Llanfairpwllgwyngyllgogerychwyrndrobwll-upon-Oti Municipality', // 61
+    hotel: 'The Grand Presidential Continental Pan-African Resort, Conference Centre and Wellness Sanctuary', // 97
     address: 'Plot 99441B, Avenue of the Distinguished Former Heads of State, Behind the Old Aerodrome Roundabout, Ministries District 47',
-    room: 'Super-Executive Panoramic Presidential Penthouse Suite with Private Infinity Plunge Pool and Butler Pantry',
-    airline: 'Trans-Continental Intercontinental Airways of West Africa, the Sahel and Beyond Limited',
-    tour: 'The Complete Unabridged Twelve-Region Grand Heritage, Wildlife, Culinary and Astronomical Expedition of the Entire Subcontinent (Platinum Anniversary Edition)',
-    user: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman-Vanderbilt III',
+    room: 'Super-Executive Panoramic Presidential Penthouse Suite with Private Plunge Pool', // 80
+    airline: 'Trans-Continental Intercontinental Airways of West Africa', // 58
+    tour: 'The Complete Twelve-Region Grand Heritage, Wildlife, Culinary and Astronomical Expedition Platinum', // 101 -> trim
+    user: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman-Vanderbilt III', // 93
   };
-  const BIG = 24493353.34;
+  const BIG = 9999999.99;
 
   for (const d of await prisma.destination.findMany()) {
     await prisma.destination.update({ where: { id: d.id }, data: {
@@ -166,7 +166,7 @@ export async function maximize() {
   for (const f of await prisma.flight.findMany()) {
     await prisma.flight.update({ where: { id: f.id }, data: {
       airline: LONG_NAMES.airline,
-      flightNumber: `TT-${9000 + f.id}-INTERCONTINENTAL-SUPERLONGHAUL`,
+      flightNumber: `TT-${9000 + f.id}-LH`,
       price: BIG,
       duration: 1445,
       stops: 4,
@@ -200,7 +200,7 @@ export async function maximize() {
   for (const p of await prisma.payment.findMany()) {
     await prisma.payment.update({ where: { id: p.id }, data: {
       amount: BIG,
-      transactionReference: `TT-PAY-${p.id}-INTERCONTINENTAL-SETTLEMENT-BATCH-2026-Q3-REF-99441B`,
+      transactionReference: `TT-PAY-${p.id}-SETTLEMENT-2026-Q3-REF-99441B`,
     }});
   }
   console.log('MAXIMIZED all rows to worst-case content');
