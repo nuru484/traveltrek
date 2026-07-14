@@ -3,11 +3,7 @@
 import * as React from "react";
 import {
   Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,15 +12,13 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon, RotateCcw } from "lucide-react";
+  PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { IReportsQueryParams } from "@/types/reports.types";
 import { cn } from "@/lib/utils";
@@ -44,8 +38,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   onReset,
   showTourFilters = true,
   showPaymentFilters = true,
-  showDateFilters = true,
-}) => {
+  showDateFilters = true }) => {
   const [startDate, setStartDate] = React.useState<Date>();
   const [endDate, setEndDate] = React.useState<Date>();
 
@@ -58,8 +51,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
       onFiltersChange({
         ...filters,
         startDate: format(startDate, "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
-      });
+        endDate: format(endDate, "yyyy-MM-dd") });
     }
   };
 
@@ -69,8 +61,7 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
       year,
       month,
       startDate: undefined,
-      endDate: undefined,
-    });
+      endDate: undefined });
   };
 
   const currentYear = new Date().getFullYear();
@@ -91,28 +82,24 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   ];
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 pb-4">
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-lg">Filters</CardTitle>
-          <CardDescription className="text-sm">
-            Filter reports by various criteria
-          </CardDescription>
-        </div>
-        <Button
+    <Card className="w-full gap-0 overflow-hidden py-0">
+      <div className="flex items-center justify-between gap-3 bg-night px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground">
+        <span>Filters</span>
+        <button
+          type="button"
           onClick={onReset}
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto flex-shrink-0"
+          className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground/80 underline-offset-4 hover:text-night-foreground hover:underline"
         >
-          <RotateCcw className="h-4 w-4 mr-2" />
           Reset
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4 sm:space-y-6">
+        </button>
+      </div>
+      <CardContent className="space-y-5 p-4 sm:p-5">
         {/* Date Filters */}
         {showDateFilters && (
           <div className="space-y-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Period
+            </p>
             {/* Year and Month - Responsive Grid */}
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
               {/* Year */}
@@ -237,23 +224,24 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                   </div>
                 </div>
 
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleDateRangeChange}
-                    disabled={!startDate || !endDate}
-                    size="sm"
-                    className="w-full sm:w-auto px-6"
-                  >
-                    Apply Date Range
-                  </Button>
-                </div>
+                <Button
+                  onClick={handleDateRangeChange}
+                  disabled={!startDate || !endDate}
+                  size="sm"
+                  className="w-full cursor-pointer"
+                >
+                  Apply date range
+                </Button>
               </div>
             </div>
           </div>
         )}
 
         {/* Booking Status */}
-        <div className="space-y-2">
+        <div className="space-y-2 border-t border-dashed border-foreground/15 pt-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+            Booking
+          </p>
           <Label className="text-sm font-medium">Booking Status</Label>
           <Select
             value={filters.status ?? "ALL"}
@@ -276,7 +264,10 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
 
         {/* Tour Filters */}
         {showTourFilters && (
-          <div className="space-y-4">
+          <div className="space-y-4 border-t border-dashed border-foreground/15 pt-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Tours
+            </p>
             {/* Tour Type and Status - Responsive Grid */}
             <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
               <div className="space-y-2">
@@ -352,7 +343,10 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
 
         {/* Payment Filters */}
         {showPaymentFilters && (
-          <div className="space-y-4">
+          <div className="space-y-4 border-t border-dashed border-foreground/15 pt-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Payments
+            </p>
             {/* Payment Method and Currency - Responsive Grid */}
             <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
               <div className="space-y-2">
@@ -407,7 +401,10 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
         )}
 
         {/* Results Limit */}
-        <div className="space-y-2">
+        <div className="space-y-2 border-t border-dashed border-foreground/15 pt-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+            Results
+          </p>
           <Label className="text-sm font-medium">Results Limit</Label>
           <Select
             value={filters.limit?.toString() ?? "10"}

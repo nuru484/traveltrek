@@ -6,18 +6,13 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   RefreshCw,
   MapPin,
-  Star,
-  Users,
-  Calendar,
-  DollarSign,
-} from "lucide-react";
+  Calendar } from "lucide-react";
 import { useGetTopToursByBookingsQuery } from "@/redux/reportsApi";
 import { IReportsQueryParams, ITourTopStats } from "@/types/reports.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -150,31 +145,8 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
 
 const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
   tourStats,
-  rank,
-}) => {
+  rank }) => {
   const { tour, statistics } = tourStats;
-
-  const getTourTypeColor = (type: string) => {
-    const colors = {
-      ADVENTURE: "bg-red-100 text-red-800",
-      CULTURAL: "bg-purple-100 text-purple-800",
-      BEACH: "bg-blue-100 text-blue-800",
-      CITY: "bg-green-100 text-green-800",
-      WILDLIFE: "bg-yellow-100 text-yellow-800",
-      CRUISE: "bg-indigo-100 text-indigo-800",
-    };
-    return colors[type as keyof typeof colors] || "bg-muted/60 text-gray-800";
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      UPCOMING: "bg-blue-100 text-blue-800",
-      ONGOING: "bg-green-100 text-green-800",
-      COMPLETED: "bg-muted/60 text-gray-800",
-      CANCELLED: "bg-red-100 text-red-800",
-    };
-    return colors[status as keyof typeof colors] || "bg-muted/60 text-gray-800";
-  };
 
   // Format destination location
   const getLocationString = () => {
@@ -188,28 +160,24 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-full text-sm font-bold">
-              #{rank}
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">{tour.name}</h3>
-              <div className="flex items-center space-x-2 mt-1">
-                <Badge className={getTourTypeColor(tour.type)}>
-                  {tour.type}
-                </Badge>
-                <Badge className={getStatusColor(tour.status)}>
-                  {tour.status}
-                </Badge>
-              </div>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+              Nº{rank}
+            </p>
+            <h3 className="mt-1 text-lg font-semibold leading-snug">
+              {tour.name}
+            </h3>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary">{tour.type}</Badge>
+              <Badge variant="outline">{tour.status}</Badge>
             </div>
           </div>
-          <div className="min-w-0 text-right">
-            <p className="text-2xl font-bold text-primary">
+          <div className="flex-none text-right">
+            <p className="text-xl font-semibold text-foreground">
               <Money amount={tour.price} symbol="$" />
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {tour.duration} days
             </p>
           </div>
@@ -222,47 +190,35 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">{statistics.totalBookings}</p>
-              <p className="text-xs text-muted-foreground">Total Bookings</p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{statistics.totalBookings}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Total Bookings</p>
           </div>
 
-          <div className="flex min-w-0 items-center gap-2">
-            <Users className="h-4 w-4 text-green-500" />
-            <div>
-              <p className="text-sm font-medium">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
                 {statistics.confirmedBookings}
               </p>
-              <p className="text-xs text-muted-foreground">Confirmed</p>
-            </div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Confirmed</p>
           </div>
 
-          <div className="flex min-w-0 items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
                 <Money amount={statistics.totalRevenue} symbol="$" />
               </p>
-              <p className="text-xs text-muted-foreground">Revenue</p>
-            </div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Revenue</p>
           </div>
 
-          <div className="flex min-w-0 items-center gap-2">
-            <Star className="h-4 w-4 text-yellow-500" />
-            <div>
-              <p className="text-sm font-medium">
-                {statistics.averageRating > 0
-                  ? statistics.averageRating.toFixed(1)
-                  : "N/A"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {statistics.reviewCount} review
-                {statistics.reviewCount !== 1 ? "s" : ""}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {statistics.averageRating > 0
+                ? statistics.averageRating.toFixed(1)
+                : "N/A"}
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              {statistics.reviewCount} review
+              {statistics.reviewCount !== 1 ? "s" : ""}
+            </p>
           </div>
         </div>
 
