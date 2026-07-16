@@ -11,6 +11,16 @@ interface IENV {
   COOKIE_DOMAIN?: string;
   CORS_ACCESS?: string;
   DATABASE_URL: string;
+  /** Frog (Wigal) SMS credentials — all three unset means log-only SMS. */
+  FROG_API_KEY?: string;
+  FROG_SENDER_ID?: string;
+  FROG_USERNAME?: string;
+  /** Base URL embedded in emailed links (password reset). */
+  FRONTEND_URL: string;
+  /** OAuth client id for Google sign-in; unset disables the endpoint (503). */
+  GOOGLE_CLIENT_ID?: string;
+  MAIL_FROM_EMAIL: string;
+  MAIL_FROM_NAME: string;
   NODE_ENV: string;
   PAYSTACK_CALLBACK_URL?: string;
   PAYSTACK_SECRET_KEY: string;
@@ -18,6 +28,12 @@ interface IENV {
   REDIS_URL: string;
   REFRESH_TOKEN_EXPIRY: string;
   REFRESH_TOKEN_SECRET: string;
+  /** SMTP_HOST unset means the mailer logs instead of sending (dev-friendly). */
+  SMTP_HOST?: string;
+  SMTP_PASSWORD?: string;
+  SMTP_PORT: number;
+  SMTP_SECURE: boolean;
+  SMTP_USER?: string;
 }
 
 export function assertEnv<T>(value: T | undefined, name: string): T {
@@ -52,6 +68,13 @@ const ENV: IENV = {
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
   CORS_ACCESS: process.env.CORS_ACCESS,
   DATABASE_URL: assertEnv(process.env.DATABASE_URL, 'DATABASE_URL'),
+  FROG_API_KEY: process.env.FROG_API_KEY,
+  FROG_SENDER_ID: process.env.FROG_SENDER_ID,
+  FROG_USERNAME: process.env.FROG_USERNAME,
+  FRONTEND_URL: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  MAIL_FROM_EMAIL: process.env.MAIL_FROM_EMAIL ?? 'no-reply@traveltrek.local',
+  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME ?? 'TravelTrek',
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   PAYSTACK_CALLBACK_URL: process.env.PAYSTACK_CALLBACK_URL,
   PAYSTACK_SECRET_KEY: assertEnv(
@@ -65,6 +88,11 @@ const ENV: IENV = {
     process.env.REFRESH_TOKEN_SECRET,
     'REFRESH_TOKEN_SECRET',
   ),
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+  SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
+  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+  SMTP_USER: process.env.SMTP_USER,
 };
 
 export default ENV;

@@ -38,7 +38,8 @@ import { type SafeUser, userSelect } from '#utils/mappers/user.mapper.js';
 export type UserActor = Pick<IUser, 'id' | 'role'>;
 
 export interface UserDeleteSummary {
-  email: string;
+  /** Null for phone-only accounts (email is a nullable column). */
+  email: null | string;
   name: string;
 }
 

@@ -29,6 +29,16 @@ vi.mock('#config/claudinary.js', () => {
   };
 });
 
+// Capture outbound email/SMS instead of hitting SMTP/Frog. Tests read OTP
+// codes and reset links out of the recorded messages (see
+// test/helpers/messages.ts).
+vi.mock('#lib/mail.js', () => ({
+  sendMail: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('#lib/sms.js', () => ({
+  sendSms: vi.fn(() => Promise.resolve()),
+}));
+
 // No test may hit the real network. Paystack calls go through axios; tests
 // that exercise payments must set explicit mock behaviour on these fns.
 vi.mock('axios', () => {

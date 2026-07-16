@@ -30,7 +30,8 @@ export type SafeUser = Prisma.UserGetPayload<{ select: typeof userSelect }>;
 export interface UserDTO {
   address?: string;
   createdAt: Date;
-  email: string;
+  /** Absent for phone-only signups (nullable column, dropped from the JSON). */
+  email?: string;
   id: number;
   name: string;
   phone?: string;
@@ -42,7 +43,7 @@ export interface UserDTO {
 export const toUserDTO = (user: SafeUser): UserDTO => ({
   address: user.address ?? undefined,
   createdAt: user.createdAt,
-  email: user.email,
+  email: user.email ?? undefined,
   id: user.id,
   name: user.name,
   phone: user.phone ?? undefined,

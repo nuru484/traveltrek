@@ -2,14 +2,17 @@
 //
 // Two thin bundles over the auth service's user creation:
 //
-// - registerUser — the PUBLIC signup (POST /auth/register-user). No
-//   authentication runs before it, so it NEVER trusts a role from the body:
-//   every public signup is a CUSTOMER, and a session is issued immediately.
+// - registerUser — the PUBLIC signup (POST /auth/register-user), now MINIMAL:
+//   name + (email OR phone), password optional (passwordless accounts sign in
+//   via OTP/Google and complete their profile later). No authentication runs
+//   before it, so it NEVER trusts a role from the body: every public signup
+//   is a CUSTOMER, and a session is issued immediately.
 // - adminCreateUser — POST /users (borrowed by routes/user.ts, behind
 //   authenticate-jwt + authorizeRole). Only an ADMIN actor may create users
 //   (agents pass the route gate but are refused here, as in the legacy
-//   handler), the body's role is honoured, and NO session cookies are issued
-//   for the created account.
+//   handler), the stricter legacy field requirements still apply (password
+//   excepted), the body's role is honoured, and NO session cookies are
+//   issued for the created account.
 //
 // Both share the multer -> zod -> Cloudinary pipeline; if user creation fails
 // after the middleware already uploaded a picture, that upload is reclaimed
@@ -41,11 +44,16 @@ import { sendSuccess } from '#utils/http-response.js';
 import logger from '#utils/logger.js';
 import { toUserDTO } from '#utils/mappers/user.mapper.js';
 import {
+  AdminCreateUserBody,
+  adminCreateUserSchema,
   RegisterUserBody,
   registerUserSchema,
 } from '#validations/auth-validation.js';
 
-const toRegisterInput = (body: RegisterUserBody): RegisterInput => ({
+/** Bodies of both creation flows; admin's is a stricter superset shape. */
+type UserCreationBody = AdminCreateUserBody | RegisterUserBody;
+
+const toRegisterInput = (body: UserCreationBody): RegisterInput => ({
   address: body.address,
   email: body.email,
   name: body.name,
@@ -58,7 +66,7 @@ const toRegisterInput = (body: RegisterUserBody): RegisterInput => ({
 /** Runs the given creation; if it fails after the middleware already uploaded
  * a profile picture, reclaims that upload best-effort before rethrowing. */
 const createReclaimingUpload = async (
-  body: RegisterUserBody,
+  body: UserCreationBody,
   create: () => Promise<RegisteredUser>,
 ): Promise<RegisteredUser> => {
   try {
@@ -102,7 +110,7 @@ const handleAdminCreateUser = asyncHandler(
       throw new UnauthorizedError('Unauthorized. Only admins can add users.');
     }
 
-    const body = req.body as RegisterUserBody;
+    const body = req.body as AdminCreateUserBody;
     const user = await createReclaimingUpload(body, () =>
       adminCreateUserService(toRegisterInput(body), body.role),
     );
@@ -115,18 +123,20 @@ const handleAdminCreateUser = asyncHandler(
   },
 );
 
-const creationPipeline = [
+/** Shared multer -> zod -> Cloudinary pipeline; the schema differs (public
+ * signup is minimal, admin creation keeps the legacy requirements). */
+const creationPipeline = (schema: Parameters<typeof zodValidation.body>[0]) => [
   multerUpload.single('profilePicture'),
-  ...zodValidation.body(registerUserSchema),
+  ...zodValidation.body(schema),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'profilePicture'),
 ];
 
 export const registerUser: RequestHandler[] = [
-  ...creationPipeline,
+  ...creationPipeline(registerUserSchema),
   handleRegisterUser,
 ];
 
 export const adminCreateUser: RequestHandler[] = [
-  ...creationPipeline,
+  ...creationPipeline(adminCreateUserSchema),
   handleAdminCreateUser,
 ];

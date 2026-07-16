@@ -1,14 +1,17 @@
 // src/services/auth.service.ts
 //
-// Domain logic for authentication: registration, enumeration-safe password
-// login with account lockout, refresh-token ROTATION (each refresh token is
-// spendable exactly once; a replay outside the tab-race grace window is
-// treated as theft and signs the account out everywhere via the tokenVersion
-// session epoch), and logout. Token minting is centralized in mintAuthTokens —
-// nothing else signs JWTs. The service never touches req/res or cookies
-// (those live in the controllers); it takes typed inputs, talks to the
-// injected Prisma client + clock + config, and throws typed errors. Refresh
-// jtis are stored as sha256 hashes and are single-use.
+// Domain logic for authentication: registration (password optional — minimal
+// signups authenticate via OTP or Google until they set one), enumeration-safe
+// password login with account lockout, passwordless OTP login (email or SMS),
+// forgot/reset password, Google sign-in, refresh-token ROTATION (each refresh
+// token is spendable exactly once; a replay outside the tab-race grace window
+// is treated as theft and signs the account out everywhere via the
+// tokenVersion session epoch), and logout. Token minting is centralized in
+// mintAuthTokens — nothing else signs JWTs. The service never touches req/res
+// or cookies (those live in the controllers); it takes typed inputs, talks to
+// the injected Prisma client + clock + config + mail/sms/google, and throws
+// typed errors. All one-time secrets (refresh jtis, OTP codes, reset tokens)
+// are stored as sha256 hashes and are single-use.
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
@@ -21,6 +24,7 @@ import {
   type User,
 } from '#config/prismaClient.js';
 import {
+  ServiceUnavailableError,
   TooManyRequestsError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
@@ -33,8 +37,11 @@ import { UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
 import { userSelect } from '#utils/mappers/user.mapper.js';
 import {
+  generateOtpCode,
+  generateResetToken,
   hashSecurityToken,
   parseExpiryMs,
+  timingSafeEqualHex,
 } from '#utils/security-token.js';
 import { verifyJwtToken } from '#utils/verify-jwt-token.js';
 
@@ -62,6 +69,15 @@ const LOGIN_LOCK_MINUTES = 15;
  * rejected without nuking the whole account. */
 const REFRESH_REUSE_GRACE_MS = 30_000;
 
+/** OTP login codes: lifetime, wrong-guess cap per code, and the minimum gap
+ * between two codes for the same account (khadys's resend-cooldown shape). */
+const OTP_TTL_MINUTES = 10;
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
+/** Password-reset links are longer-lived than OTPs but still single-use. */
+const PASSWORD_RESET_TTL_MINUTES = 30;
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -72,17 +88,29 @@ export interface LoginInput {
   password: string;
 }
 
+/** How an OTP-login caller identifies the account — validation guarantees
+ * exactly one of the two is present. */
+export interface OtpContact {
+  email?: string;
+  phone?: string;
+}
+
 export interface RegisterInput {
   address?: string;
-  email: string;
+  /** Optional: phone-only signups have no email (name + email OR phone). */
+  email?: string;
   name: string;
-  password: string;
+  /** Optional: passwordless accounts sign in via OTP (or Google) instead. */
+  password?: string;
   phone?: string;
   /** Cloudinary URL, already uploaded by the route's middleware. */
   profilePicture?: string;
 }
 
-type AuthDeps = Pick<AppDeps, 'clock' | 'config' | 'logger' | 'prisma'>;
+type AuthDeps = Pick<
+  AppDeps,
+  'clock' | 'config' | 'google' | 'logger' | 'mail' | 'prisma' | 'sms'
+>;
 
 /** The password-free user shape plus tokenVersion, so the registration
  * controller can mint a session without a second read. */
@@ -96,17 +124,18 @@ export type RegisteredUser = Prisma.UserGetPayload<{
 }>;
 
 export const makeAuthService = (d: AuthDeps) => {
-  const { clock, config, logger, prisma } = d;
+  const { clock, config, google, logger, mail, prisma, sms } = d;
 
-  /** Persists a user with the given role; the password is hashed here. */
+  /** Persists a user with the given role; a password, when given, is hashed
+   * here — passwordless accounts store null and sign in via OTP/Google. */
   const createUser = async (
     input: RegisterInput,
     role: Role,
   ): Promise<RegisteredUser> => {
-    const hashedPassword = await bcrypt.hash(
-      input.password,
-      BCRYPT_SALT_ROUNDS,
-    );
+    const hashedPassword =
+      input.password === undefined
+        ? null
+        : await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
     return prisma.user.create({
       data: {
         address: input.address,
@@ -210,14 +239,17 @@ export const makeAuthService = (d: AuthDeps) => {
   /**
    * Verifies email + password and returns the user (the controller mints
    * tokens / sets cookies). Uniform "Invalid credentials" (same status, same
-   * timing) for both unknown-email and wrong-password — no user enumeration.
+   * timing) for unknown-email, passwordless-account and wrong-password — no
+   * user enumeration.
    */
   const login = async (input: LoginInput): Promise<User> => {
     const user = await prisma.user.findUnique({
       where: { email: input.email },
     });
 
-    if (!user) {
+    // Passwordless accounts (minimal signup / Google) have no hash to check —
+    // the dummy compare keeps their timing identical to unknown emails.
+    if (user?.password == null) {
       await bcrypt.compare(input.password, DUMMY_PASSWORD_HASH);
       throw new UnauthorizedError('Invalid credentials', {
         code: 'INVALID_CREDENTIALS',
@@ -405,14 +437,320 @@ export const makeAuthService = (d: AuthDeps) => {
     invalidateCachedTokenVersion(decoded.id);
   };
 
+  // ---- Passwordless OTP login, password reset, Google sign-in ----
+
+  /** Fire-and-forget delivery: a slow/failed send never blocks or fails the
+   * request (and keeps request-OTP / forgot-password timing uniform). */
+  const dispatch = (delivery: Promise<void>, what: string): void => {
+    void delivery.catch((error: unknown) => {
+      logger.error({ err: error }, `${what} dispatch threw`);
+    });
+  };
+
+  /** Resolves the account an OTP request/verify identifies (email or phone). */
+  const findUserByContact = (contact: OtpContact): Promise<null | User> => {
+    if (contact.email) {
+      return prisma.user.findUnique({ where: { email: contact.email } });
+    }
+    if (contact.phone) {
+      return prisma.user.findUnique({ where: { phone: contact.phone } });
+    }
+    return Promise.resolve(null);
+  };
+
+  /** One live token per (user, type): issuing a new one drops any prior
+   * unconsumed tokens of that type. Only the sha256 hash is stored. */
+  const issueSecurityToken = async (
+    userId: number,
+    type: TokenType,
+    plainToken: string,
+    ttlMinutes: number,
+  ): Promise<void> => {
+    await prisma.userSecurityToken.deleteMany({
+      where: { consumedAt: null, type, userId },
+    });
+    await prisma.userSecurityToken.create({
+      data: {
+        expiresAt: new Date(clock.timestamp() + ttlMinutes * 60_000),
+        tokenHash: hashSecurityToken(plainToken),
+        type,
+        userId,
+      },
+    });
+  };
+
+  /** Every OTP failure mode (unknown contact, no live code, expired, dead
+   * from too many guesses, wrong code) collapses into this one uniform 401
+   * so responses never reveal WHY a code was refused. */
+  const invalidOtpError = (): UnauthorizedError =>
+    new UnauthorizedError(
+      'Your code is invalid or has expired. Request a new one.',
+      { code: 'INVALID_OTP', layer: 'auth' },
+    );
+
+  /**
+   * Requests a passwordless login code. ALWAYS resolves for unknown contacts
+   * (same response as known ones — no enumeration); for a real account a
+   * 6-digit code is issued (replacing any prior live one) and sent to the
+   * channel the caller identified themselves by. Re-requests inside the
+   * cooldown are refused with a 429 (khadys's resend behaviour).
+   */
+  const requestOtpLogin = async (contact: OtpContact): Promise<void> => {
+    const user = await findUserByContact(contact);
+    if (!user) {
+      // Spend comparable work to the known-contact path so response timing
+      // doesn't reveal whether the contact has an account.
+      await bcrypt.compare('otp-timing-guard', DUMMY_PASSWORD_HASH);
+      logger.info(
+        { event: 'otp_login_unknown_contact' },
+        'OTP login requested for an unknown contact',
+      );
+      return;
+    }
+
+    const latest = await prisma.userSecurityToken.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { type: TokenType.OTP_LOGIN, userId: user.id },
+    });
+    if (
+      latest &&
+      clock.timestamp() - latest.createdAt.getTime() <
+        OTP_RESEND_COOLDOWN_SECONDS * 1000
+    ) {
+      throw new TooManyRequestsError(
+        'Please wait a moment before requesting another code.',
+        { code: 'RESEND_COOLDOWN', layer: 'auth' },
+      );
+    }
+
+    const code = generateOtpCode();
+    await issueSecurityToken(user.id, TokenType.OTP_LOGIN, code, OTP_TTL_MINUTES);
+
+    const message = `Your TravelTrek login code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
+    if (contact.email && user.email) {
+      dispatch(
+        mail.send({
+          subject: 'Your TravelTrek login code',
+          text: message,
+          to: user.email,
+        }),
+        'OTP email',
+      );
+    } else if (contact.phone && user.phone) {
+      dispatch(sms.send({ message, to: user.phone }), 'OTP SMS');
+    }
+  };
+
+  /**
+   * Verifies a passwordless login code and returns the user (the controller
+   * mints tokens / sets cookies). Wrong guesses increment the code's attempt
+   * counter — at the cap the code is dead and a fresh one must be requested.
+   * A correct guess is consumed atomically (redeemable at most once) and
+   * clears any password-failure lockout state.
+   */
+  const verifyOtpLogin = async (
+    contact: OtpContact,
+    code: string,
+  ): Promise<User> => {
+    const user = await findUserByContact(contact);
+    if (!user) throw invalidOtpError();
+
+    const record = await prisma.userSecurityToken.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { consumedAt: null, type: TokenType.OTP_LOGIN, userId: user.id },
+    });
+    if (
+      !record ||
+      record.expiresAt.getTime() < clock.timestamp() ||
+      record.attempts >= OTP_MAX_ATTEMPTS
+    ) {
+      throw invalidOtpError();
+    }
+
+    if (!timingSafeEqualHex(record.tokenHash, hashSecurityToken(code))) {
+      await prisma.userSecurityToken.update({
+        data: { attempts: { increment: 1 } },
+        where: { id: record.id },
+      });
+      throw invalidOtpError();
+    }
+
+    // Guarded consume: two concurrent verifies race here and only one wins.
+    const consumed = await prisma.userSecurityToken.updateMany({
+      data: { consumedAt: clock.now() },
+      where: { consumedAt: null, id: record.id },
+    });
+    if (consumed.count === 0) throw invalidOtpError();
+
+    // A successful OTP login is as good as a correct password: clear the
+    // failure counter and any temporary lock.
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await prisma.user.update({
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+        where: { id: user.id },
+      });
+    }
+
+    return user;
+  };
+
+  /**
+   * Forgot password. ALWAYS resolves (never reveals whether the email has an
+   * account). For a real account a single-use 256-bit link token is issued
+   * (sha256 stored) and the reset URL is emailed.
+   */
+  const requestPasswordReset = async (email: string): Promise<void> => {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user?.email) {
+      // Same dummy work as the known-email path (see requestOtpLogin).
+      await bcrypt.compare('reset-timing-guard', DUMMY_PASSWORD_HASH);
+      logger.info(
+        { event: 'password_reset_unknown_email' },
+        'Password reset requested for an unknown email',
+      );
+      return;
+    }
+
+    const token = generateResetToken();
+    await issueSecurityToken(
+      user.id,
+      TokenType.PASSWORD_RESET,
+      token,
+      PASSWORD_RESET_TTL_MINUTES,
+    );
+
+    const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${token}`;
+    dispatch(
+      mail.send({
+        subject: 'Reset your TravelTrek password',
+        text:
+          `Hi ${user.name},\n\nWe received a request to reset your password. ` +
+          `Use the link below within ${PASSWORD_RESET_TTL_MINUTES} minutes:\n\n` +
+          `${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        to: user.email,
+      }),
+      'Password-reset email',
+    );
+    logger.info({ userId: user.id }, 'Password reset email requested');
+  };
+
+  /**
+   * Redeems a reset link: validates + consumes the token (atomic guarded
+   * update — single-use), sets the new bcrypt hash, and bumps the session
+   * epoch so every live session on every device must sign in again.
+   */
+  const resetPassword = async (
+    token: string,
+    newPassword: string,
+  ): Promise<void> => {
+    const record = await prisma.userSecurityToken.findUnique({
+      where: { tokenHash: hashSecurityToken(token) },
+    });
+    if (
+      record?.type !== TokenType.PASSWORD_RESET ||
+      record.consumedAt !== null ||
+      record.expiresAt.getTime() < clock.timestamp()
+    ) {
+      throw new UnauthorizedError(
+        'This reset link is invalid or has expired. Request a new one.',
+        { code: 'INVALID_RESET_TOKEN', layer: 'auth' },
+      );
+    }
+    const consumed = await prisma.userSecurityToken.updateMany({
+      data: { consumedAt: clock.now() },
+      where: { consumedAt: null, id: record.id },
+    });
+    if (consumed.count === 0) {
+      throw new UnauthorizedError(
+        'This reset link is invalid or has expired. Request a new one.',
+        { code: 'INVALID_RESET_TOKEN', layer: 'auth' },
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+    await prisma.user.update({
+      data: { password: hashedPassword, tokenVersion: { increment: 1 } },
+      where: { id: record.userId },
+    });
+    // Drop every other outstanding code/link/refresh registration: the epoch
+    // bump already rejects the JWTs, and no stale secret should survive a
+    // password change.
+    await prisma.userSecurityToken.deleteMany({
+      where: { consumedAt: null, userId: record.userId },
+    });
+    invalidateCachedTokenVersion(record.userId);
+  };
+
+  /**
+   * Google sign-in: verifies the ID token via the injected google client,
+   * then resolves the account — by googleId first, else by verified email
+   * (linking the googleId for next time), else a fresh passwordless CUSTOMER.
+   * The controller mints tokens / sets cookies for the returned user.
+   */
+  const googleSignIn = async (idToken: string): Promise<User> => {
+    if (!config.GOOGLE_CLIENT_ID) {
+      throw new ServiceUnavailableError('Google sign-in is not configured', {
+        code: 'GOOGLE_NOT_CONFIGURED',
+        layer: 'auth',
+      });
+    }
+
+    const identity = await google.verifyIdToken(idToken);
+    if (!identity) {
+      throw new UnauthorizedError('Google sign-in failed. Please try again.', {
+        code: 'INVALID_GOOGLE_TOKEN',
+        layer: 'auth',
+      });
+    }
+
+    const byGoogleId = await prisma.user.findUnique({
+      where: { googleId: identity.googleId },
+    });
+    if (byGoogleId) return byGoogleId;
+
+    // Only a VERIFIED Google email may claim an existing account (or mint a
+    // new one) — otherwise anyone could register an unverified Google account
+    // with someone else's address and take over their profile.
+    if (!identity.emailVerified) {
+      throw new UnauthorizedError(
+        'Your Google account email is not verified.',
+        { code: 'GOOGLE_EMAIL_UNVERIFIED', layer: 'auth' },
+      );
+    }
+
+    const byEmail = await prisma.user.findUnique({
+      where: { email: identity.email },
+    });
+    if (byEmail) {
+      return prisma.user.update({
+        data: { googleId: identity.googleId },
+        where: { id: byEmail.id },
+      });
+    }
+
+    return prisma.user.create({
+      data: {
+        email: identity.email,
+        googleId: identity.googleId,
+        name: identity.name,
+        role: Role.CUSTOMER,
+      },
+    });
+  };
+
   return {
     adminCreateUser,
+    googleSignIn,
     invalidateSession,
     login,
     logout,
     mintAuthTokens,
     refresh,
     register,
+    requestOtpLogin,
+    requestPasswordReset,
+    resetPassword,
+    verifyOtpLogin,
   };
 };
 
@@ -420,10 +758,15 @@ export const authService = makeAuthService(defaultDeps);
 
 export const {
   adminCreateUser,
+  googleSignIn,
   invalidateSession,
   login,
   logout,
   mintAuthTokens,
   refresh,
   register,
+  requestOtpLogin,
+  requestPasswordReset,
+  resetPassword,
+  verifyOtpLogin,
 } = authService;

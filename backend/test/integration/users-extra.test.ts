@@ -114,10 +114,10 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
       where: { id: user.id },
     });
     expect(row.password).not.toBe('NewPassword9!');
-    expect(await bcrypt.compare('NewPassword9!', row.password)).toBe(true);
-    expect(await bcrypt.compare(TEST_PASSWORD, row.password)).toBe(false);
+    expect(await bcrypt.compare('NewPassword9!', row.password!)).toBe(true);
+    expect(await bcrypt.compare(TEST_PASSWORD, row.password!)).toBe(false);
     // BCRYPT_SALT_ROUNDS from config/constants.
-    expect(bcrypt.getRounds(row.password)).toBe(10);
+    expect(bcrypt.getRounds(row.password!)).toBe(10);
   });
 
   it('returns 404 for an admin updating a missing user', async () => {

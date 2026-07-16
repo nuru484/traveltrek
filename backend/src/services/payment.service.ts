@@ -216,6 +216,15 @@ export const makePaymentService = (
       throw new BadRequestError('Invalid payment method');
     }
 
+    // Paystack requires a customer email on every transaction; phone-only
+    // accounts must add one before they can pay online.
+    const payerEmail = booking.user.email;
+    if (!payerEmail) {
+      throw new BadRequestError(
+        'An email address is required for online payment; please add one to your profile',
+      );
+    }
+
     if (booking.payment) {
       if (booking.payment.status === PaymentStatus.COMPLETED) {
         throw new BadRequestError('Payment already completed');
@@ -228,7 +237,7 @@ export const makePaymentService = (
           callbackUrl: callbackUrl(),
           channels: [getPaystackChannel(paymentMethod)],
           currency: 'GHS',
-          email: booking.user.email,
+          email: payerEmail,
           metadata: { bookingId },
           reference: booking.payment.transactionReference ?? undefined,
         });
@@ -255,7 +264,7 @@ export const makePaymentService = (
       callbackUrl: callbackUrl(),
       channels: [getPaystackChannel(paymentMethod)],
       currency: 'GHS',
-      email: booking.user.email,
+      email: payerEmail,
       metadata: { bookingId },
       reference: `booking_${String(bookingId)}_${String(clock.now().getTime())}`,
     });

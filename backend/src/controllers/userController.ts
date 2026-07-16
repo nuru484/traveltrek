@@ -173,7 +173,7 @@ const handleDeleteUser = asyncHandler(
     );
 
     sendSuccess(res, {
-      message: `User "${deleted.name}" (${deleted.email}) deleted successfully`,
+      message: `User "${deleted.name}" (${deleted.email ?? 'no email'}) deleted successfully`,
     });
   },
 );

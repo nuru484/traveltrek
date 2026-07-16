@@ -17,16 +17,26 @@ enum Role {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  name           String
-  email          String   @unique
-  password       String
+  id   Int    @id @default(autoincrement())
+  name String
+
+  /// Nullable: phone-only signups have no email. Postgres allows multiple
+  /// NULLs under a unique index, so the constraint still holds where it matters.
+  email String? @unique
+
+  /// Nullable: minimal signups and Google-created accounts have no password —
+  /// they authenticate via OTP login or Google until they set one.
+  password       String?
   role           Role     @default(CUSTOMER)
   phone          String?  @unique
   address        String?
   profilePicture String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  /// Google account subject (`sub` claim) once the user signs in with Google;
+  /// set at creation or linked to an existing verified-email account.
+  googleId String? @unique
 
   /// Session epoch: every issued token embeds it, and a mismatch on
   /// verification rejects the token. Bumping it invalidates every live
@@ -65,6 +75,10 @@ model UserSecurityToken {
 
   expiresAt  DateTime
   consumedAt DateTime?
+
+  /// Wrong-guess counter for OTP codes; at the cap the token is dead and a
+  /// fresh code must be requested. Unused (0) for REFRESH/PASSWORD_RESET rows.
+  attempts Int @default(0)
 
   /// Rotation audit trail: when a refresh token is exchanged, the hash of the
   /// successor's jti is recorded on the consumed row.

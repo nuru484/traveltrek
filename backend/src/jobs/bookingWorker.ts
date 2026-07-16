@@ -78,7 +78,7 @@ export const bookingDeadlineWorker = new Worker(
 
           cancelledCount++;
           logger.info(
-            `❌ Cancelled booking #${booking.id} for user ${booking.user.email}`,
+            `❌ Cancelled booking #${booking.id} for user ${booking.user.email ?? `#${booking.userId}`}`,
           );
         } catch (err) {
           failureCount++;
