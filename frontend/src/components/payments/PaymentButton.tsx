@@ -23,6 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, Smartphone, DollarSign, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { formatMoney } from "@/utils/format-money";
 
 const paymentMethods = [
   {
@@ -149,7 +150,7 @@ export function PaymentButton({
                   Amount to Pay:
                 </span>
                 <span className="text-lg font-semibold text-primary">
-                  {currency} {amount.toLocaleString()}
+                  {formatMoney(amount, { exact: true })}
                 </span>
               </div>
             </CardContent>
@@ -203,7 +204,7 @@ export function PaymentButton({
                 Processing...
               </>
             ) : (
-              `Pay ${currency} ${amount.toLocaleString()}`
+              `Pay ${formatMoney(amount, { exact: true })}`
             )}
           </Button>
         </DialogFooter>

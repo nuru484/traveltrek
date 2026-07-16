@@ -1,8 +1,11 @@
 // test/integration/tours.test.ts
 //
 // Baseline behaviour of the tour CRUD surface before the service-layer
-// refactor: role gates, validation, pagination and filters.
+// refactor: role gates, validation, pagination and filters — plus the
+// soft-delete semantics introduced with the deletedAt column.
 import { describe, expect, it } from 'vitest';
+
+import prisma from '#config/prismaClient.js';
 
 import { authedApi } from '../helpers/auth.js';
 import {
@@ -149,5 +152,63 @@ describe('DELETE /api/v1/tours/:id', () => {
     const tour = await createTour();
     const res = await authedApi(customer).delete(`/api/v1/tours/${tour.id}`);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('tour soft deletes', () => {
+  it('hides a deleted tour from list and get, but keeps the row', async () => {
+    const admin = await createAdmin();
+    const destination = await createDestination();
+    const tour = await createTour({
+      destinationId: destination.id,
+      name: 'Tombstone Trek',
+    });
+
+    const del = await authedApi(admin).delete(`/api/v1/tours/${tour.id}`);
+    expect(del.status).toBe(200);
+
+    // Vanishes from the list...
+    const list = await authedApi(admin).get('/api/v1/tours?search=Tombstone');
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(0);
+
+    // ...and the direct get 404s...
+    const gone = await authedApi(admin).get(`/api/v1/tours/${tour.id}`);
+    expect(gone.status).toBe(404);
+
+    // ...but the row survives in the DB with a deletedAt tombstone (explicit
+    // deletedAt predicate opts out of the extension's scoping).
+    const tombstone = await prisma.tour.findFirst({
+      where: { deletedAt: { not: null }, id: tour.id },
+    });
+    expect(tombstone).not.toBeNull();
+    expect(tombstone?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('allows re-creating a tour with the same name after deletion', async () => {
+    const admin = await createAdmin();
+    const destination = await createDestination();
+    const tour = await createTour({
+      destinationId: destination.id,
+      name: 'Recreated Ridge Walk',
+    });
+
+    const del = await authedApi(admin).delete(`/api/v1/tours/${tour.id}`);
+    expect(del.status).toBe(200);
+
+    const res = await authedApi(admin).post('/api/v1/tours').send({
+      description: 'Same name, brand new tour',
+      destinationId: destination.id,
+      endDate: '2027-03-08',
+      maxGuests: 12,
+      name: 'Recreated Ridge Walk',
+      price: 95000,
+      startDate: '2027-03-01',
+      type: 'ADVENTURE',
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.name).toBe('Recreated Ridge Walk');
+    expect(res.body.data.id).not.toBe(tour.id);
   });
 });

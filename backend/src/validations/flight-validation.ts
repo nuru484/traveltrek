@@ -72,10 +72,15 @@ const flightFields = z.object({
     .number('A valid originId is required')
     .int('A valid originId is required')
     .min(1, 'A valid originId is required'),
+  // Integer minor units (pesewas): GH₵ 1.00 = 100. Max 10,000,000 GHS.
   price: z.coerce
-    .number('Price must be a number between 0 and 10,000,000')
-    .min(0, 'Price must be a number between 0 and 10,000,000')
-    .max(10_000_000, 'Price must be a number between 0 and 10,000,000'),
+    .number('Price must be an integer (pesewas) between 0 and 1,000,000,000')
+    .int('Price must be an integer (pesewas) between 0 and 1,000,000,000')
+    .min(0, 'Price must be an integer (pesewas) between 0 and 1,000,000,000')
+    .max(
+      1_000_000_000,
+      'Price must be an integer (pesewas) between 0 and 1,000,000,000',
+    ),
   stops: z.coerce
     .number('Stops must be an integer between 0 and 5')
     .int('Stops must be an integer between 0 and 5')
@@ -121,9 +126,14 @@ export const updateFlightSchema = flightFields
       .min(0, 'Capacity must be an integer between 0 and 850')
       .max(850, 'Capacity must be an integer between 0 and 850')
       .optional(),
+    // Legacy floor was 1 GHS; ×100 in pesewas.
     price: z.coerce
-      .number('Price must be a number greater than or equal to 1')
-      .min(1, 'Price must be a number greater than or equal to 1')
+      .number('Price must be an integer (pesewas) greater than or equal to 100')
+      .int('Price must be an integer (pesewas) greater than or equal to 100')
+      .min(
+        100,
+        'Price must be an integer (pesewas) greater than or equal to 100',
+      )
       .optional(),
     status: z
       .enum(
@@ -170,9 +180,10 @@ export const flightListQuery = paginationQuery
     destinationId: z.coerce.number().int().min(1).optional(),
     flightClass: z.enum(FLIGHT_CLASSES).optional(),
     maxDuration: z.coerce.number().int().min(30).max(1440).optional(),
-    maxPrice: z.coerce.number().min(0).optional(),
+    // Price bounds are integer minor units (pesewas), like the price column.
+    maxPrice: z.coerce.number().int().min(0).optional(),
     maxStops: z.coerce.number().int().min(0).max(5).optional(),
-    minPrice: z.coerce.number().min(0).optional(),
+    minPrice: z.coerce.number().int().min(0).optional(),
     minSeats: z.coerce.number().int().min(1).max(850).optional(),
     originId: z.coerce.number().int().min(1).optional(),
     search: z

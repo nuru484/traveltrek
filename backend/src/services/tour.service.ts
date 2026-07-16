@@ -94,16 +94,19 @@ export const makeTourService = (
 ) => {
   const { clock, logger, prisma } = d;
 
+  // findFirst (not findUnique) so the soft-delete extension scopes the read:
+  // a soft-deleted destination cannot host new tours.
   const requireDestination = async (id: number): Promise<void> => {
-    const destination = await prisma.destination.findUnique({
+    const destination = await prisma.destination.findFirst({
       select: { id: true },
       where: { id },
     });
     if (!destination) throw new NotFoundError('Destination not found');
   };
 
+  // findFirst so soft-deleted tours 404 like hard-deleted ones did.
   const getTourById = async (id: number) => {
-    const tour = await prisma.tour.findUnique({
+    const tour = await prisma.tour.findFirst({
       include: tourInclude,
       where: { id },
     });
@@ -131,7 +134,7 @@ export const makeTourService = (
   };
 
   const updateTour = async (id: number, input: Partial<TourInput>) => {
-    const existing = await prisma.tour.findUnique({
+    const existing = await prisma.tour.findFirst({
       include: {
         bookings: { select: { id: true } },
         destination: { select: { id: true } },
@@ -216,7 +219,7 @@ export const makeTourService = (
     id: number,
     newStatus: TourStatus,
   ) => {
-    const tour = await prisma.tour.findUnique({
+    const tour = await prisma.tour.findFirst({
       include: { bookings: { include: { payment: true } } },
       where: { id },
     });
@@ -296,6 +299,8 @@ export const makeTourService = (
       await prisma.booking.updateMany({
         data: { status: BookingStatus.CANCELLED },
         where: {
+          // updateMany is not auto-scoped; leave soft-deleted rows untouched.
+          deletedAt: null,
           status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
           tourId: id,
         },
@@ -310,7 +315,7 @@ export const makeTourService = (
   };
 
   const deleteTour = async (id: number): Promise<void> => {
-    const tour = await prisma.tour.findUnique({
+    const tour = await prisma.tour.findFirst({
       include: { bookings: { select: { id: true } } },
       where: { id },
     });
@@ -340,7 +345,11 @@ export const makeTourService = (
       );
     }
 
-    await prisma.tour.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.tour.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
   };
 
   /**
@@ -412,8 +421,11 @@ export const makeTourService = (
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.tour.deleteMany({});
+    // Soft delete every active tour (already-deleted rows keep their original
+    // deletedAt timestamp).
+    await prisma.tour.updateMany({
+      data: { deletedAt: now },
+      where: { deletedAt: null },
     });
 
     return tours.length;

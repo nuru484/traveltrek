@@ -52,8 +52,10 @@ const bookingFields = z.object({
   roomId: intField('roomId').optional(),
   specialRequests: z.string().nullish(),
   startDate: z.string().optional(),
+  // Integer minor units (pesewas); the service recalculates it anyway.
   totalPrice: z.coerce
     .number('totalPrice must be a number')
+    .int('totalPrice must be an integer (pesewas)')
     .min(0, 'totalPrice must be greater than or equal to 0'),
   tourId: intField('tourId').optional(),
   userId: intField('userId'),

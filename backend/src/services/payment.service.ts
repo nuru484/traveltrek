@@ -181,7 +181,8 @@ export const makePaymentService = (
 
     // The legacy handler also fetched tour/room/flight relations here but
     // never read them; only the payment and the payer's email are used.
-    const booking = await prisma.booking.findUnique({
+    // findFirst so soft-deleted bookings 404 like hard-deleted ones did.
+    const booking = await prisma.booking.findFirst({
       include: {
         payment: true,
         user: true,
@@ -232,8 +233,11 @@ export const makePaymentService = (
 
       if (booking.payment.status === PaymentStatus.PENDING) {
         // Re-initialize Paystack for the existing pending payment.
+        // totalPrice is already integer pesewas — exactly the minor units
+        // Paystack expects, so no ×100 conversion (the legacy Float-GHS one
+        // was removed).
         const resumed = await paystack.initialize({
-          amount: booking.totalPrice * 100,
+          amount: booking.totalPrice,
           callbackUrl: callbackUrl(),
           channels: [getPaystackChannel(paymentMethod)],
           currency: 'GHS',
@@ -259,8 +263,9 @@ export const makePaymentService = (
       // constraint then rejects the second Payment row (Prisma P2002).
     }
 
+    // totalPrice is already integer pesewas (Paystack minor units); no ×100.
     const initialized = await paystack.initialize({
-      amount: booking.totalPrice * 100,
+      amount: booking.totalPrice,
       callbackUrl: callbackUrl(),
       channels: [getPaystackChannel(paymentMethod)],
       currency: 'GHS',
@@ -312,7 +317,7 @@ export const makePaymentService = (
 
     const bookingId = parseInt(String(rawBookingId), 10);
 
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.booking.findFirst({
       where: { id: bookingId },
     });
 
@@ -320,6 +325,9 @@ export const makePaymentService = (
       return { kind: 'booking_not_found' };
     }
 
+    // Paystack reports amounts in minor units — the same unit totalPrice now
+    // stores (pesewas), so both the comparison and the returned amount are
+    // unit-for-unit (the legacy ÷100 GHS conversions were removed).
     if (verified.status !== 'success') {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
@@ -327,21 +335,21 @@ export const makePaymentService = (
       });
 
       return {
-        amount: verified.amount / 100,
+        amount: verified.amount,
         bookingId,
         kind: 'not_successful',
         reference,
       };
     }
 
-    if (verified.amount / 100 !== booking.totalPrice) {
+    if (verified.amount !== booking.totalPrice) {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
         where: { transactionReference: reference },
       });
 
       return {
-        amount: verified.amount / 100,
+        amount: verified.amount,
         bookingId,
         kind: 'amount_mismatch',
         reference,
@@ -362,7 +370,7 @@ export const makePaymentService = (
     });
 
     return {
-      amount: verified.amount / 100,
+      amount: verified.amount,
       bookingId,
       kind: 'completed',
       reference,
@@ -388,7 +396,7 @@ export const makePaymentService = (
 
     const verified = await paystack.verify(reference);
 
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.booking.findFirst({
       where: { id: bookingId },
     });
 
@@ -396,7 +404,8 @@ export const makePaymentService = (
       throw new NotFoundError('Booking not found');
     }
 
-    if (verified.amount / 100 !== booking.totalPrice) {
+    // Both sides are integer minor units (pesewas); no ÷100.
+    if (verified.amount !== booking.totalPrice) {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
         where: { transactionReference: reference },
@@ -429,7 +438,7 @@ export const makePaymentService = (
     actor: PaymentActor,
     id: number,
   ): Promise<PaymentWithRelations> => {
-    const payment = await prisma.payment.findUnique({
+    const payment = await prisma.payment.findFirst({
       include: paymentInclude,
       where: { id },
     });
@@ -549,7 +558,7 @@ export const makePaymentService = (
       throw new BadRequestError('Invalid payment status');
     }
 
-    const payment = await prisma.payment.findUnique({
+    const payment = await prisma.payment.findFirst({
       include: { booking: true },
       where: { id },
     });
@@ -629,7 +638,7 @@ export const makePaymentService = (
       throw new UnauthorizedError('Only administrators can refund payments');
     }
 
-    const payment = await prisma.payment.findUnique({
+    const payment = await prisma.payment.findFirst({
       include: { booking: true },
       where: { id },
     });
@@ -693,7 +702,7 @@ export const makePaymentService = (
       throw new UnauthorizedError('Only administrators can delete payments');
     }
 
-    const payment = await prisma.payment.findUnique({
+    const payment = await prisma.payment.findFirst({
       include: { booking: true },
       where: { id },
     });
@@ -709,7 +718,11 @@ export const makePaymentService = (
       );
     }
 
-    await prisma.payment.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.payment.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
 
     await prisma.booking.update({
       data: { status: BookingStatus.PENDING },
@@ -755,7 +768,10 @@ export const makePaymentService = (
     const bookingIds = payments.map((p) => p.bookingId);
 
     await prisma.$transaction(async (tx) => {
-      await tx.payment.deleteMany({});
+      await tx.payment.updateMany({
+        data: { deletedAt: clock.now() },
+        where: { deletedAt: null },
+      });
 
       await tx.booking.updateMany({
         data: { status: BookingStatus.PENDING },

@@ -53,6 +53,8 @@ const tourFormSchema = z.object({
       message: "Tour type is required",
     }
   ),
+  // GHS decimal in the form; converted to integer pesewas (×100) on submit
+  // and back (÷100) when hydrating edit defaults.
   price: z.number().min(0, "Price must be a non-negative number"),
   maxGuests: z.number().min(1, "Max guests must be a positive number"),
   startDate: z.string().min(1, "Start date is required"),
@@ -95,7 +97,8 @@ export function TourForm({ tour, mode }: ITourFormProps) {
       name: tour?.name || "",
       description: tour?.description || "",
       type: tour?.type || "ADVENTURE",
-      price: tour?.price || 0,
+      // API price is integer pesewas; the form edits GHS decimals.
+      price: tour ? tour.price / 100 : 0,
       maxGuests: tour?.maxGuests || 0,
       startDate: tour?.startDate
         ? tour.startDate.split("T")[0] +
@@ -117,7 +120,8 @@ export function TourForm({ tour, mode }: ITourFormProps) {
         name: values.name,
         description: values.description || null,
         type: values.type,
-        price: values.price,
+        // GHS decimal -> integer pesewas for the API.
+        price: Math.round(values.price * 100),
         maxGuests: values.maxGuests,
         startDate: new Date(values.startDate).toISOString(),
         endDate: new Date(values.endDate).toISOString(),

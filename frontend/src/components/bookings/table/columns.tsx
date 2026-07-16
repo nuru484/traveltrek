@@ -164,7 +164,7 @@ export const createBookingColumns = (
       ),
       cell: ({ row }) => {
         const totalPrice = row.getValue("totalPrice") as number;
-        return <div className="font-medium whitespace-nowrap"><Money amount={totalPrice} symbol="$" /></div>;
+        return <div className="font-medium whitespace-nowrap"><Money amount={totalPrice} /></div>;
       } },
     {
       accessorKey: "status",

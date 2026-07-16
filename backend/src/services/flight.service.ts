@@ -145,12 +145,13 @@ export const makeFlightService = (
     input: FlightInput,
   ): Promise<FlightWithFullRelations> => {
     try {
+      // findFirst so soft-deleted destinations cannot host new flights.
       const [origin, destination] = await Promise.all([
-        prisma.destination.findUnique({
+        prisma.destination.findFirst({
           select: { id: true },
           where: { id: input.originId },
         }),
-        prisma.destination.findUnique({
+        prisma.destination.findFirst({
           select: { id: true },
           where: { id: input.destinationId },
         }),
@@ -166,6 +167,8 @@ export const makeFlightService = (
 
       // flightNumber uniqueness stays a DB constraint (as before); a duplicate
       // surfaces as a Prisma P2002 handled by the central error middleware.
+      // Note: the constraint spans soft-deleted rows too (khadys convention) —
+      // a soft-deleted flight keeps holding its flightNumber.
       return await prisma.flight.create({
         data: {
           airline: input.airline,
@@ -197,7 +200,8 @@ export const makeFlightService = (
   const getFlightById = async (
     id: number,
   ): Promise<FlightWithSummaryRelations> => {
-    const flight = await prisma.flight.findUnique({
+    // findFirst so soft-deleted flights 404 like hard-deleted ones did.
+    const flight = await prisma.flight.findFirst({
       include: flightSummaryInclude,
       where: { id },
     });
@@ -236,8 +240,13 @@ export const makeFlightService = (
         );
       }
 
-      const existingFlight = await prisma.flight.findUnique({
-        include: { bookings: { select: { id: true, status: true } } },
+      const existingFlight = await prisma.flight.findFirst({
+        include: {
+          bookings: {
+            select: { id: true, status: true },
+            where: { deletedAt: null },
+          },
+        },
         where: { id },
       });
       if (!existingFlight) throw new NotFoundError('Flight not found');
@@ -345,13 +354,13 @@ export const makeFlightService = (
       if (input.originId !== undefined || input.destinationId !== undefined) {
         const [origin, destination] = await Promise.all([
           input.originId !== undefined
-            ? prisma.destination.findUnique({
+            ? prisma.destination.findFirst({
                 select: { id: true },
                 where: { id: input.originId },
               })
             : null,
           input.destinationId !== undefined
-            ? prisma.destination.findUnique({
+            ? prisma.destination.findFirst({
                 select: { id: true },
                 where: { id: input.destinationId },
               })
@@ -522,8 +531,10 @@ export const makeFlightService = (
     id: number,
     change: FlightStatusChangeInput,
   ): Promise<FlightWithFullRelations> => {
-    const existingFlight = await prisma.flight.findUnique({
-      include: { bookings: { include: { payment: true } } },
+    const existingFlight = await prisma.flight.findFirst({
+      include: {
+        bookings: { include: { payment: true }, where: { deletedAt: null } },
+      },
       where: { id },
     });
     if (!existingFlight) throw new NotFoundError('Flight not found');
@@ -729,6 +740,8 @@ export const makeFlightService = (
       await prisma.booking.updateMany({
         data: { status: BookingStatus.CANCELLED },
         where: {
+          // updateMany is not auto-scoped; leave soft-deleted rows untouched.
+          deletedAt: null,
           flightId: id,
           status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
         },
@@ -749,7 +762,8 @@ export const makeFlightService = (
    * are only logged (they survive as orphans).
    */
   const deleteFlight = async (id: number): Promise<FlightDeleteSummary> => {
-    const flight = await prisma.flight.findUnique({
+    // Nested reads are not auto-scoped; soft-deleted bookings don't block.
+    const flight = await prisma.flight.findFirst({
       include: {
         bookings: {
           select: {
@@ -757,6 +771,7 @@ export const makeFlightService = (
             payment: { select: { amount: true, id: true, status: true } },
             status: true,
           },
+          where: { deletedAt: null },
         },
       },
       where: { id },
@@ -787,6 +802,7 @@ export const makeFlightService = (
           booking.payment.status === PaymentStatus.PENDING),
     );
     if (bookingsWithPayments.length > 0) {
+      // Amounts are integer pesewas; the message keeps displaying GHS (2 dp).
       const totalAmount = bookingsWithPayments.reduce(
         (sum, booking) => sum + (booking.payment?.amount ?? 0),
         0,
@@ -796,7 +812,7 @@ export const makeFlightService = (
         `Cannot delete flight with ${bookingsWithPayments.length} booking(s) that have payment records ` +
           `(${bookingsWithPayments.filter((b) => b.payment?.status === PaymentStatus.COMPLETED).length} completed, ` +
           `${bookingsWithPayments.filter((b) => b.payment?.status === PaymentStatus.PENDING).length} pending). ` +
-          `Total amount: ${totalAmount.toFixed(2)}. ` +
+          `Total amount: ${(totalAmount / 100).toFixed(2)}. ` +
           `Please process refunds for all payments before deleting this flight.`,
       );
     }
@@ -816,7 +832,11 @@ export const makeFlightService = (
       );
     }
 
-    await prisma.flight.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.flight.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
 
     if (flight.photo) {
       try {
@@ -857,7 +877,9 @@ export const makeFlightService = (
     }
 
     const flights = await prisma.flight.findMany({
-      include: { bookings: { include: { payment: true } } },
+      include: {
+        bookings: { include: { payment: true }, where: { deletedAt: null } },
+      },
     });
 
     const flightsWithNonDeletableStatus: number[] = [];
@@ -931,7 +953,10 @@ export const makeFlightService = (
       .map((flight) => flight.photo)
       .filter((photo): photo is string => Boolean(photo));
 
-    await prisma.flight.deleteMany({});
+    await prisma.flight.updateMany({
+      data: { deletedAt: clock.now() },
+      where: { deletedAt: null },
+    });
 
     // Clean up photos from Cloudinary after the successful deletion.
     await Promise.allSettled(

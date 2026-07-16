@@ -29,7 +29,7 @@ export function TourListItem({ tour }: ITourListItemProps) {
         </div>
         <div className="flex-none text-right">
           <p className="text-lg font-semibold text-foreground">
-            <Money amount={tour.price} symbol="$" />
+            <Money amount={tour.price} />
           </p>
           <p className="text-[11px] text-muted-foreground">per guest</p>
         </div>

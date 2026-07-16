@@ -72,9 +72,9 @@ const canTouchProfile = (actor: UserActor, userId: number): boolean =>
   actor.role === UserRole.AGENT;
 
 export const makeUserService = (
-  d: Pick<AppDeps, 'cloudinary' | 'logger' | 'prisma'>,
+  d: Pick<AppDeps, 'clock' | 'cloudinary' | 'logger' | 'prisma'>,
 ) => {
-  const { cloudinary, logger, prisma } = d;
+  const { clock, cloudinary, logger, prisma } = d;
 
   /** Best-effort Cloudinary delete; a cleanup failure never fails the request. */
   const cleanupPicture = async (
@@ -99,7 +99,8 @@ export const makeUserService = (
       );
     }
 
-    const user = await prisma.user.findUnique({
+    // findFirst so soft-deleted users 404 like hard-deleted ones did.
+    const user = await prisma.user.findFirst({
       select: userSelect,
       where: { id: userId },
     });
@@ -165,7 +166,7 @@ export const makeUserService = (
     const uploadedImageUrl = input.profilePicture;
 
     try {
-      const existingUser = await prisma.user.findUnique({
+      const existingUser = await prisma.user.findFirst({
         select: { email: true, phone: true, profilePicture: true },
         where: { id: userId },
       });
@@ -174,6 +175,10 @@ export const makeUserService = (
         throw new CustomError(HTTP_STATUS_CODES.NOT_FOUND, 'User not found.');
       }
 
+      // Uniqueness pre-checks use findUnique ON PURPOSE (unscoped): the DB
+      // unique constraints span soft-deleted rows (khadys convention), so a
+      // tombstoned user still holds its email/phone and the pre-check must
+      // see it — otherwise the update would die on a raw P2002 instead.
       if (input.email && input.email !== existingUser.email) {
         const userByEmail = await prisma.user.findUnique({
           where: { email: input.email },
@@ -261,7 +266,7 @@ export const makeUserService = (
       throw new ForbiddenError('You cannot change your own role');
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findFirst({
       select: { role: true },
       where: { id: userId },
     });
@@ -308,7 +313,7 @@ export const makeUserService = (
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findFirst({
       select: {
         email: true,
         id: true,
@@ -338,10 +343,14 @@ export const makeUserService = (
       );
     }
 
-    await prisma.user.delete({ where: { id: userId } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.user.update({
+      data: { deletedAt: clock.now() },
+      where: { id: userId },
+    });
 
     // Deleted accounts must lose access at once, not at cache expiry: the
-    // next request re-reads the DB, finds no row, and is rejected.
+    // next request re-reads the DB (scoped), finds no row, and is rejected.
     invalidateCachedTokenVersion(userId);
 
     if (existingUser.profilePicture) {
@@ -411,8 +420,10 @@ export const makeUserService = (
       user.profilePicture ? [user.profilePicture] : [],
     );
 
-    const deleteResult = await prisma.user.deleteMany({
+    const deleteResult = await prisma.user.updateMany({
+      data: { deletedAt: clock.now() },
       where: {
+        deletedAt: null,
         id: { not: actor.id },
       },
     });

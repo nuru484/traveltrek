@@ -444,7 +444,8 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
         ...topTourSelect,
         bookings: {
           select: topTourBookingSelect,
-          where: { bookingDate: periodClause(params, year) },
+          // Nested reads are not auto-scoped; skip soft-deleted bookings.
+          where: { bookingDate: periodClause(params, year), deletedAt: null },
         },
       },
       where: tourWhere,

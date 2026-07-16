@@ -109,7 +109,8 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
         : "",
       originId: flight?.origin?.id || 0,
       destinationId: flight?.destination?.id || 0,
-      price: flight?.price || 0,
+      // API price is integer pesewas; the form edits GHS decimals.
+      price: flight ? flight.price / 100 : 0,
       flightClass: flight?.flightClass || IFlightClass.ECONOMY,
       stops: flight?.stops || 0,
       capacity: flight?.seatsAvailable || 0,
@@ -176,7 +177,8 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
       formData.append("arrival", new Date(values.arrival).toISOString());
       formData.append("originId", values.originId.toString());
       formData.append("destinationId", values.destinationId.toString());
-      formData.append("price", values.price.toString());
+      // GHS decimal -> integer pesewas for the API.
+      formData.append("price", Math.round(values.price * 100).toString());
       formData.append("flightClass", values.flightClass);
       if (values.stops !== undefined)
         formData.append("stops", values.stops.toString());

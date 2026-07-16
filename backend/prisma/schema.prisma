@@ -48,9 +48,15 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  /// Soft delete: reads are auto-scoped to `deletedAt: null` by the client
+  /// extension (src/lib/soft-delete-extension.ts).
+  deletedAt DateTime?
+
   bookings       Booking[]
   payments       Payment[]
   securityTokens UserSecurityToken[]
+
+  @@index([deletedAt])
 }
 
 enum TokenType {
@@ -113,18 +119,21 @@ model Tour {
   type         TourType
   status       TourStatus @default(UPCOMING)
   duration     Int
-  price        Float
+  /// Integer minor units (pesewas): GH₵ 1.00 = 100.
+  price        Int
   maxGuests    Int
   guestsBooked Int        @default(0)
   startDate    DateTime
   endDate      DateTime
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
 
   bookings      Booking[]
-  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   destinationId Int
 
+  @@index([deletedAt])
   @@index([name], name: "tour_name_idx")
   @@index([startDate, endDate], name: "tour_start_end_idx")
   @@index([type, status], name: "tour_type_status_idx")
@@ -138,14 +147,16 @@ model Destination {
   country     String
   city        String?
   photo       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   tours              Tour[]
   hotels             Hotel[]
   originFlights      Flight[] @relation("FlightOrigin")
   destinationFlights Flight[] @relation("FlightDestination")
 
+  @@index([deletedAt])
   @@index([name], name: "destination_name_idx")
   @@index([country, city], name: "destination_country_city_idx")
 }
@@ -159,13 +170,15 @@ model Hotel {
   photo         String?
   starRating    Int         @default(3)
   amenities     String[]
-  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   destinationId Int
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
 
   rooms Room[]
 
+  @@index([deletedAt])
   @@index([name], name: "hotel_name_idx")
   @@index([destinationId], name: "hotel_destination_idx")
   @@index([starRating], name: "hotel_star_rating_idx")
@@ -174,20 +187,23 @@ model Hotel {
 
 model Room {
   id            Int      @id @default(autoincrement())
-  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  hotel         Hotel     @relation(fields: [hotelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   hotelId       Int
   roomType      String
-  pricePerNight Float
+  /// Integer minor units (pesewas): GH₵ 1.00 = 100.
+  pricePerNight Int
   capacity      Int
   totalRooms    Int
   photo         String?
   description   String?
   amenities     String[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   bookings Booking[]
 
+  @@index([deletedAt])
   @@index([hotelId, roomType], name: "room_hotel_type_idx")
   @@index([pricePerNight], name: "room_price_idx")
   @@index([capacity], name: "room_capacity_idx")
@@ -207,11 +223,12 @@ model Flight {
   airline        String
   departure      DateTime
   arrival        DateTime
-  origin         Destination  @relation("FlightOrigin", fields: [originId], references: [id], onDelete: Cascade)
+  origin         Destination  @relation("FlightOrigin", fields: [originId], references: [id], onDelete: Restrict)
   originId       Int
-  destination    Destination  @relation("FlightDestination", fields: [destinationId], references: [id], onDelete: Cascade)
+  destination    Destination  @relation("FlightDestination", fields: [destinationId], references: [id], onDelete: Restrict)
   destinationId  Int
-  price          Float
+  /// Integer minor units (pesewas): GH₵ 1.00 = 100.
+  price          Int
   photo          String?
   flightClass    String
   status         FlightStatus @default(SCHEDULED)
@@ -221,9 +238,11 @@ model Flight {
   seatsAvailable Int          @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
 
   bookings Booking[]
 
+  @@index([deletedAt])
   @@index([originId, destinationId])
   @@index([departure, arrival])
   @@index([status])
@@ -239,16 +258,16 @@ enum BookingStatus {
 
 model Booking {
   id     Int  @id @default(autoincrement())
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   userId Int
 
-  tour   Tour? @relation(fields: [tourId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tour   Tour? @relation(fields: [tourId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   tourId Int?
 
-  room   Room? @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  room   Room? @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   roomId Int?
 
-  flight   Flight? @relation(fields: [flightId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  flight   Flight? @relation(fields: [flightId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   flightId Int?
 
   status BookingStatus @default(PENDING)
@@ -264,16 +283,19 @@ model Booking {
   paymentDeadline          DateTime? // When payment must be completed
   requiresImmediatePayment Boolean   @default(false) // Flag for same-day bookings
 
-  totalPrice  Float
-  bookingDate DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  /// Integer minor units (pesewas): GH₵ 1.00 = 100.
+  totalPrice  Int
+  bookingDate DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   payment Payment?
 
   @@unique([userId, tourId])
   @@unique([userId, roomId, startDate, endDate])
   @@unique([userId, flightId])
+  @@index([deletedAt])
   @@index([userId, tourId, roomId, flightId], name: "booking_user_tour_hotel_room_flight_idx")
   @@index([status])
   @@index([paymentDeadline])
@@ -296,11 +318,12 @@ enum PaymentMethod {
 
 model Payment {
   id                   Int           @id @default(autoincrement())
-  booking              Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  booking              Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   bookingId            Int           @unique
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   userId               Int
-  amount               Float
+  /// Integer minor units (pesewas): GH₵ 1.00 = 100.
+  amount               Int
   currency             String        @default("GHS")
   status               PaymentStatus @default(PENDING)
   paymentDate          DateTime?
@@ -308,7 +331,9 @@ model Payment {
   transactionReference String?       @unique
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
 
+  @@index([deletedAt])
   @@index([userId], name: "payment_user_idx")
   @@index([transactionReference], name: "payment_transaction_ref_idx")
   @@index([status])

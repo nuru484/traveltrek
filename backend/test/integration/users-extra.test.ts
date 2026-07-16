@@ -252,8 +252,14 @@ describe('DELETE /api/v1/users/:userId (guards)', () => {
       `User "${customer.name}" (${customer.email}) deleted successfully`,
     );
 
-    const gone = await prisma.user.findUnique({ where: { id: customer.id } });
+    // Soft delete: hidden from scoped reads, but the row survives with a
+    // deletedAt tombstone (findUnique is deliberately unscoped).
+    const gone = await prisma.user.findFirst({ where: { id: customer.id } });
     expect(gone).toBeNull();
+    const tombstone = await prisma.user.findUnique({
+      where: { id: customer.id },
+    });
+    expect(tombstone?.deletedAt).toBeInstanceOf(Date);
   });
 
   it('returns 404 for a missing user', async () => {

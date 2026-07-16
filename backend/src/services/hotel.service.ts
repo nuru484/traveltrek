@@ -70,9 +70,9 @@ export type HotelSortField = (typeof HOTEL_SORT_FIELDS)[number];
 export type HotelUpdateInput = Partial<HotelInput>;
 
 export const makeHotelService = (
-  d: Pick<AppDeps, 'cloudinary' | 'logger' | 'prisma'>,
+  d: Pick<AppDeps, 'clock' | 'cloudinary' | 'logger' | 'prisma'>,
 ) => {
-  const { cloudinary, logger, prisma } = d;
+  const { clock, cloudinary, logger, prisma } = d;
 
   /** Best-effort Cloudinary delete; a cleanup failure never fails the request. */
   const cleanupPhoto = async (
@@ -86,16 +86,19 @@ export const makeHotelService = (
     }
   };
 
+  // findFirst (not findUnique) so the soft-delete extension scopes the read:
+  // a soft-deleted destination cannot host new hotels.
   const requireDestination = async (id: number): Promise<void> => {
-    const destination = await prisma.destination.findUnique({
+    const destination = await prisma.destination.findFirst({
       select: { id: true },
       where: { id },
     });
     if (!destination) throw new NotFoundError('Destination not found');
   };
 
+  // findFirst so soft-deleted hotels 404 like hard-deleted ones did.
   const getHotelById = async (id: number) => {
-    const hotel = await prisma.hotel.findUnique({
+    const hotel = await prisma.hotel.findFirst({
       include: hotelInclude,
       where: { id },
     });
@@ -134,7 +137,7 @@ export const makeHotelService = (
     const uploadedPhotoUrl = input.photo;
 
     try {
-      const existing = await prisma.hotel.findUnique({
+      const existing = await prisma.hotel.findFirst({
         select: { photo: true },
         where: { id },
       });
@@ -187,8 +190,9 @@ export const makeHotelService = (
   };
 
   const deleteHotel = async (id: number): Promise<void> => {
-    const hotel = await prisma.hotel.findUnique({
-      include: { rooms: { select: { id: true } } },
+    // Nested reads are not auto-scoped: only active (non-deleted) rooms block.
+    const hotel = await prisma.hotel.findFirst({
+      include: { rooms: { select: { id: true }, where: { deletedAt: null } } },
       where: { id },
     });
     if (!hotel) throw new NotFoundError('Hotel not found');
@@ -199,7 +203,11 @@ export const makeHotelService = (
       );
     }
 
-    await prisma.hotel.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.hotel.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
 
     if (hotel.photo) {
       await cleanupPhoto(
@@ -223,7 +231,7 @@ export const makeHotelService = (
         id: true,
         name: true,
         photo: true,
-        rooms: { select: { id: true } },
+        rooms: { select: { id: true }, where: { deletedAt: null } },
       },
     });
 
@@ -235,8 +243,9 @@ export const makeHotelService = (
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.hotel.deleteMany({});
+    await prisma.hotel.updateMany({
+      data: { deletedAt: clock.now() },
+      where: { deletedAt: null },
     });
 
     const photosToClean = hotels.flatMap((hotel) =>

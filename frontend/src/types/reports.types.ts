@@ -1,3 +1,7 @@
+// NOTE: every money field in these report shapes (totalPrice, amount,
+// price, revenue, totalRevenue, *Amount, totalRevenueAnalyzed,
+// averageBookingValue, averageValue) is integer minor units (pesewas):
+// GH₵ 1.00 = 100. Averages may carry 2-dp fractions of a pesewa.
 // types/reports.types.ts
 import { IDestinationSummary } from "./tour.types";
 export interface IUserSummary {

@@ -30,6 +30,7 @@ export interface IPayment {
   id: number;
   bookingId: number;
   userId: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   amount: number;
   currency: string;
   paymentMethod: string;
@@ -71,6 +72,7 @@ export interface IPaymentVerificationResponse {
   success: boolean;
   message: string;
   data?: {
+    /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
     amount: number;
     reference: string;
     paymentStatus: IPaymentStatus;
@@ -131,6 +133,7 @@ export interface IRefundPaymentResponse {
     paymentId: number;
     status: IPaymentStatus;
     bookingStatus: string;
+    /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
     refundAmount: number;
     reason: string;
     updatedAt: Date;

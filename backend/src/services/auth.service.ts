@@ -243,7 +243,9 @@ export const makeAuthService = (d: AuthDeps) => {
    * user enumeration.
    */
   const login = async (input: LoginInput): Promise<User> => {
-    const user = await prisma.user.findUnique({
+    // findFirst so the soft-delete extension scopes the read: a soft-deleted
+    // account behaves exactly like an unknown email.
+    const user = await prisma.user.findFirst({
       where: { email: input.email },
     });
 
@@ -338,7 +340,8 @@ export const makeAuthService = (d: AuthDeps) => {
       throw invalidRefreshError();
     }
 
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    // findFirst: a soft-deleted account can no longer refresh a session.
+    const user = await prisma.user.findFirst({ where: { id: decoded.id } });
     if (!user) {
       throw new UnauthorizedError('Account not found. Please log in again.', {
         code: 'USER_NOT_FOUND',
@@ -449,11 +452,12 @@ export const makeAuthService = (d: AuthDeps) => {
 
   /** Resolves the account an OTP request/verify identifies (email or phone). */
   const findUserByContact = (contact: OtpContact): Promise<null | User> => {
+    // findFirst: soft-deleted accounts read as unknown contacts.
     if (contact.email) {
-      return prisma.user.findUnique({ where: { email: contact.email } });
+      return prisma.user.findFirst({ where: { email: contact.email } });
     }
     if (contact.phone) {
-      return prisma.user.findUnique({ where: { phone: contact.phone } });
+      return prisma.user.findFirst({ where: { phone: contact.phone } });
     }
     return Promise.resolve(null);
   };
@@ -604,7 +608,8 @@ export const makeAuthService = (d: AuthDeps) => {
    * (sha256 stored) and the reset URL is emailed.
    */
   const requestPasswordReset = async (email: string): Promise<void> => {
-    const user = await prisma.user.findUnique({ where: { email } });
+    // findFirst: soft-deleted accounts read as unknown emails.
+    const user = await prisma.user.findFirst({ where: { email } });
     if (!user?.email) {
       // Same dummy work as the known-email path (see requestOtpLogin).
       await bcrypt.compare('reset-timing-guard', DUMMY_PASSWORD_HASH);
@@ -707,7 +712,10 @@ export const makeAuthService = (d: AuthDeps) => {
       });
     }
 
-    const byGoogleId = await prisma.user.findUnique({
+    // findFirst on both lookups: a soft-deleted account can neither sign in
+    // nor be linked. Its unique email/googleId stay held (khadys convention),
+    // so a re-signup for that identity surfaces as a P2002 conflict.
+    const byGoogleId = await prisma.user.findFirst({
       where: { googleId: identity.googleId },
     });
     if (byGoogleId) return byGoogleId;
@@ -722,7 +730,7 @@ export const makeAuthService = (d: AuthDeps) => {
       );
     }
 
-    const byEmail = await prisma.user.findUnique({
+    const byEmail = await prisma.user.findFirst({
       where: { email: identity.email },
     });
     if (byEmail) {

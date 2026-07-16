@@ -4,16 +4,13 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { IPayment } from "@/types/payment.types";
+import { formatMoney } from "@/utils/format-money";
 
 interface PaymentDetailViewProps {
   payment: IPayment;
   userRole?: "ADMIN" | "USER" | "MANAGER";
 }
 
-const formatCurrency = (amount: number, currency: string = "USD") =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
-    amount
-  );
 
 const formatDate = (dateString: Date | string | null) => {
   if (!dateString) return "N/A";
@@ -93,7 +90,7 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
             Amount
           </p>
           <p className="mt-1 break-words font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            {formatCurrency(payment.amount, payment.currency)}
+            {formatMoney(payment.amount, { exact: true })}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge variant="outline">{payment.status}</Badge>

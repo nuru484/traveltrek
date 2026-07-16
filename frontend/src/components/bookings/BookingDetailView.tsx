@@ -22,6 +22,7 @@ import {
   Moon } from "lucide-react";
 import { IBooking } from "@/types/booking.types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatMoney } from "@/utils/format-money";
 
 interface BookingDetailViewProps {
   booking: IBooking;
@@ -71,11 +72,6 @@ const getBookingTypeIcon = (type: string) => {
   }
 };
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD" }).format(amount);
-};
 
 const formatDate = (dateString: string) => {
   return new Intl.DateTimeFormat("en-US", {
@@ -315,7 +311,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-green-600" />
                 <span className="text-xl font-bold text-green-600">
-                  {formatCurrency(booking.totalPrice)}
+                  {formatMoney(booking.totalPrice, { exact: true })}
                 </span>
               </div>
             </div>
@@ -560,7 +556,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                   Amount
                 </label>
                 <p className="text-lg font-semibold">
-                  {formatCurrency(booking.payment.amount)}
+                  {formatMoney(booking.payment.amount, { exact: true })}
                 </p>
               </div>
               <div className="space-y-1">

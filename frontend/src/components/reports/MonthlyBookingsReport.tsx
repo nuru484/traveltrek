@@ -81,7 +81,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
           </CardHeader>
           <CardContent className="max-sm:px-3">
             <div className="font-display text-3xl font-semibold tracking-tight">
-              <Money amount={summary.totalRevenue} symbol="$" />
+              <Money amount={summary.totalRevenue} />
             </div>
             <p className="text-xs text-muted-foreground">Generated revenue</p>
           </CardContent>
@@ -95,7 +95,7 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
           </CardHeader>
           <CardContent className="max-sm:px-3">
             <div className="font-display text-3xl font-semibold tracking-tight">
-              <Money amount={summary.averageBookingValue} symbol="$" />
+              <Money amount={summary.averageBookingValue} />
             </div>
             <p className="text-xs text-muted-foreground">Per booking</p>
           </CardContent>
@@ -126,10 +126,10 @@ export const MonthlyBookingsReport: React.FC<MonthlyBookingsReportProps> = ({
                   </div>
                   <div className="min-w-0 text-right">
                     <p className="font-medium">
-                      <Money amount={month.revenue} symbol="$" />
+                      <Money amount={month.revenue} />
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Avg: <Money amount={month.averageValue} symbol="$" />
+                      Avg: <Money amount={month.averageValue} />
                     </p>
                   </div>
                 </div>
@@ -218,7 +218,7 @@ const BookingItem: React.FC<{ booking: IBookingSummary }> = ({ booking }) => {
         </p>
       </div>
       <div className="min-w-0 text-right">
-        <p className="font-medium"><Money amount={booking.totalPrice} symbol="$" /></p>
+        <p className="font-medium"><Money amount={booking.totalPrice} /></p>
         <p className="text-sm text-muted-foreground">
           {format(new Date(booking.bookingDate), "MMM dd, yyyy")}
         </p>

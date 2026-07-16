@@ -28,6 +28,7 @@ export interface IFlight {
   arrival: string;
   origin: IDestinationSummary;
   destination: IDestinationSummary;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   price: number;
   status: IFlightStatus;
   flightClass: IFlightClass;
@@ -51,7 +52,9 @@ export interface IFlightsQueryParams {
   search?: string;
   airline?: string;
   flightClass?: IFlightClass;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   minPrice?: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   maxPrice?: number;
   originId?: number;
   destinationId?: number;

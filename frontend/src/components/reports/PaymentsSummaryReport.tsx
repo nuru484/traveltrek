@@ -85,7 +85,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent className="max-sm:px-3">
             <div className="font-display text-3xl font-semibold tracking-tight">
-              <Money amount={summary.totalRevenue} symbol={`${summary.currency} `} />
+              <Money amount={summary.totalRevenue} />
             </div>
             <p className="text-xs text-muted-foreground">Completed payments</p>
           </CardContent>
@@ -99,7 +99,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent className="max-sm:px-3">
             <div className="font-display text-3xl font-semibold tracking-tight">
-              <Money amount={summary.pendingAmount} symbol={`${summary.currency} `} />
+              <Money amount={summary.pendingAmount} />
             </div>
             <p className="text-xs text-muted-foreground">Awaiting completion</p>
           </CardContent>
@@ -113,7 +113,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
           </CardHeader>
           <CardContent className="max-sm:px-3">
             <div className="font-display text-3xl font-semibold tracking-tight">
-              <Money amount={summary.failedAmount} symbol={`${summary.currency} `} />
+              <Money amount={summary.failedAmount} />
             </div>
             <p className="text-xs text-muted-foreground">Failed transactions</p>
           </CardContent>
@@ -151,7 +151,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
                 </div>
                 <div className="min-w-0 text-right">
                   <p className="font-medium">
-                    <Money amount={data.amount} symbol={`${summary.currency} `} />
+                    <Money amount={data.amount} />
                   </p>
                 </div>
               </div>
@@ -181,7 +181,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
                 </div>
                 <div className="min-w-0 text-right">
                   <p className="font-medium">
-                    <Money amount={data.amount} symbol={`${summary.currency} `} />
+                    <Money amount={data.amount} />
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {((data.amount / summary.totalRevenue) * 100).toFixed(1)}%
@@ -217,7 +217,7 @@ export const PaymentsSummaryReport: React.FC<PaymentsSummaryReportProps> = ({
                   </div>
                   <div className="min-w-0 text-right">
                     <p className="font-medium">
-                      <Money amount={month.revenue} symbol={`${summary.currency} `} />
+                      <Money amount={month.revenue} />
                     </p>
                   </div>
                 </div>
@@ -275,7 +275,7 @@ const PaymentItem: React.FC<{ payment: IPaymentSummary }> = ({ payment }) => {
       </div>
       <div className="min-w-0 text-right">
         <p className="font-medium">
-          <Money amount={payment.amount} symbol={`${payment.currency} `} />
+          <Money amount={payment.amount} />
         </p>
         <p className="text-sm text-muted-foreground">
           {payment.paymentDate

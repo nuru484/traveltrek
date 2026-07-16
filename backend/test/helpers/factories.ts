@@ -79,7 +79,8 @@ export const createTour = async (
       endDate,
       maxGuests: overrides.maxGuests ?? 10,
       name: overrides.name ?? `Tour ${n}`,
-      price: overrides.price ?? 500,
+      // Integer pesewas: GH₵ 500.00.
+      price: overrides.price ?? 50000,
       startDate,
       type: TourType.ADVENTURE,
     },
@@ -114,7 +115,8 @@ export const createRoom = async (
     data: {
       capacity: 2,
       hotelId,
-      pricePerNight: overrides.pricePerNight ?? 150,
+      // Integer pesewas: GH₵ 150.00.
+      pricePerNight: overrides.pricePerNight ?? 15000,
       roomType: 'DOUBLE',
       totalRooms: overrides.totalRooms ?? 5,
     },
@@ -145,7 +147,8 @@ export const createFlight = async (
       flightClass: 'ECONOMY',
       flightNumber: `TA-${1000 + n}`,
       originId,
-      price: overrides.price ?? 800,
+      // Integer pesewas: GH₵ 800.00.
+      price: overrides.price ?? 80000,
       seatsAvailable: overrides.capacity ?? 100,
       stops: 0,
     },

@@ -24,7 +24,8 @@ const tourFields = z.object({
     .trim()
     .min(3, 'Tour name must be between 3 and 200 characters')
     .max(200, 'Tour name must be between 3 and 200 characters'),
-  price: z.number().min(0).max(10_000_000),
+  // Integer minor units (pesewas): GH₵ 1.00 = 100. Max 10,000,000 GHS.
+  price: z.number().int().min(0).max(1_000_000_000),
   startDate: z.coerce.date('startDate must be a valid date'),
   type: z.enum(TourType),
 });
@@ -62,10 +63,11 @@ export const tourListQuery = paginationQuery
     endDate: z.coerce.date().optional(),
     maxDuration: z.coerce.number().int().min(1).optional(),
     maxGuests: z.coerce.number().int().min(1).max(1000).optional(),
-    maxPrice: z.coerce.number().min(0).optional(),
+    // Price bounds are integer minor units (pesewas), like the price column.
+    maxPrice: z.coerce.number().int().min(0).optional(),
     minDuration: z.coerce.number().int().min(1).optional(),
     minGuests: z.coerce.number().int().min(1).optional(),
-    minPrice: z.coerce.number().min(0).optional(),
+    minPrice: z.coerce.number().int().min(0).optional(),
     search: z
       .string()
       .trim()

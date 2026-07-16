@@ -55,6 +55,7 @@ export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 
 export interface IBookingPayment {
   id: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   amount: number;
   status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
   paymentMethod:
@@ -73,6 +74,7 @@ export interface IBookingBase {
   paymentDeadline: string;
   payment: IBookingPayment | null;
   status: BookingStatus;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   totalPrice: number;
   bookingDate: string;
   createdAt: string;
@@ -108,6 +110,7 @@ export interface IBookingResponse {
     bookingDetails?: {
       paymentDeadline: string;
       requiresImmediatePayment: boolean;
+      /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
       calculatedPrice: number;
       numberOfNights?: number;
       tourStartDate?: string;
@@ -132,6 +135,7 @@ export interface IBookingInput {
   tourId?: number | null;
   roomId?: number | null;
   flightId?: number | null;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   totalPrice: number;
   status?: BookingStatus;
 

@@ -14,6 +14,7 @@ export const flightFormSchema = z.object({
   arrival: z.string().min(1, "Arrival date is required"),
   originId: z.number().min(1, "Origin is required"),
   destinationId: z.number().min(1, "Destination is required"),
+  // GHS decimal in the form (converted to integer pesewas ×100 on submit).
   price: z
     .number()
     .min(0, "Price must be a positive number")

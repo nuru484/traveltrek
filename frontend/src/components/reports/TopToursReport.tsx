@@ -81,7 +81,7 @@ export const TopToursReport: React.FC<TopToursReportProps> = ({ params }) => {
             </div>
             <div className="min-w-0">
               <div className="font-display text-2xl font-semibold tracking-tight">
-                <Money amount={summary.totalRevenueAnalyzed} symbol="$" />
+                <Money amount={summary.totalRevenueAnalyzed} />
               </div>
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Total Revenue
@@ -165,7 +165,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
           </div>
           <div className="flex-none text-right">
             <p className="text-xl font-semibold text-foreground">
-              <Money amount={tour.price} symbol="$" />
+              <Money amount={tour.price} />
             </p>
             <p className="text-xs text-muted-foreground">
               {tour.duration} days
@@ -194,7 +194,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
 
           <div className="min-w-0">
             <p className="text-sm font-medium">
-                <Money amount={statistics.totalRevenue} symbol="$" />
+                <Money amount={statistics.totalRevenue} />
               </p>
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Revenue</p>
           </div>

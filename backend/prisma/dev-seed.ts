@@ -204,7 +204,8 @@ export async function maximize() {
     tour: 'The Complete Twelve-Region Grand Heritage, Wildlife, Culinary and Astronomical Expedition Platinum', // 101 -> trim
     user: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman-Vanderbilt III', // 93
   };
-  const BIG = 9999999.99;
+  // Integer pesewas (GH₵ 9,999,999.99).
+  const BIG = 999_999_999;
 
   for (const d of await prisma.destination.findMany()) {
     await prisma.destination.update({
@@ -347,7 +348,7 @@ export async function worstCase() {
       amenities: ['everything'],
       capacity: 12,
       hotelId: hotel.id,
-      pricePerNight: 24493353.34,
+      pricePerNight: 999_999_999,
       roomType:
         'Super-Executive Panoramic Presidential Penthouse Suite With Private Infinity Plunge Pool',
       totalRooms: 1,
@@ -367,7 +368,7 @@ export async function worstCase() {
       flightClass: 'FIRST_CLASS',
       flightNumber: 'TT-99999-LHX',
       originId: dest.id,
-      price: 24493353.34,
+      price: 999_999_999,
       seatsAvailable: 1,
       stops: 4,
     },
@@ -381,7 +382,7 @@ export async function worstCase() {
       guestsBooked: 99999,
       maxGuests: 100000,
       name: 'The Complete Unabridged Twelve-Region Grand Heritage, Wildlife, Culinary & Astronomical Expedition of the Entire Subcontinent (Platinum Edition)',
-      price: 24493353.34,
+      price: 999_999_999,
       startDate: new Date(now2 + 40 * day),
       type: 'ADVENTURE' as never,
     },
@@ -406,14 +407,14 @@ export async function worstCase() {
     data: {
       numberOfGuests: 42,
       status: BookingStatus.CONFIRMED,
-      totalPrice: 24493353.34,
+      totalPrice: 999_999_999,
       tourId: tour.id,
       userId: wcUser.id,
     },
   });
   await prisma.payment.create({
     data: {
-      amount: 24493353.34,
+      amount: 999_999_999,
       bookingId: wb.id,
       paymentDate: new Date(),
       paymentMethod: PaymentMethod.BANK_TRANSFER,

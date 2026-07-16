@@ -32,6 +32,7 @@ import {
 } from "@/redux/paymentApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { formatMoney } from "@/utils/format-money";
 
 interface PaymentActionsDropdownProps {
   payment: IPayment;
@@ -240,9 +241,7 @@ export function PaymentActionsDropdown({
         title="Refund Payment"
         description={`Are you sure you want to refund payment ${
           payment.transactionReference
-        } for ${payment.currency} ${payment.amount.toFixed(
-          2
-        )}? This will mark the payment as refunded and cancel the associated booking.`}
+        } for ${formatMoney(payment.amount, { exact: true })}? This will mark the payment as refunded and cancel the associated booking.`}
         onConfirm={handleRefundPayment}
         confirmText="Refund Payment"
         cancelText="Cancel"

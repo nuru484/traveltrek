@@ -50,12 +50,17 @@ export type DestinationSortField = (typeof DESTINATION_SORT_FIELDS)[number];
 
 export type DestinationUpdateInput = Partial<DestinationInput>;
 
-/** Narrow relation counts used by the delete guards. */
+/**
+ * Narrow relation counts used by the delete guards. Nested reads are not
+ * scoped by the soft-delete extension, so each carries an explicit
+ * `deletedAt: null` — soft-deleted dependents no longer block a delete
+ * (matching the old hard-delete world where they no longer existed).
+ */
 const dependencyInclude = {
-  destinationFlights: { select: { id: true } },
-  hotels: { select: { id: true } },
-  originFlights: { select: { id: true } },
-  tours: { select: { id: true } },
+  destinationFlights: { select: { id: true }, where: { deletedAt: null } },
+  hotels: { select: { id: true }, where: { deletedAt: null } },
+  originFlights: { select: { id: true }, where: { deletedAt: null } },
+  tours: { select: { id: true }, where: { deletedAt: null } },
 } satisfies Prisma.DestinationInclude;
 
 type DestinationWithDependencies = Prisma.DestinationGetPayload<{
@@ -79,9 +84,9 @@ const blockingDependencies = (
 };
 
 export const makeDestinationService = (
-  d: Pick<AppDeps, 'cloudinary' | 'logger' | 'prisma'>,
+  d: Pick<AppDeps, 'clock' | 'cloudinary' | 'logger' | 'prisma'>,
 ) => {
-  const { cloudinary, logger, prisma } = d;
+  const { clock, cloudinary, logger, prisma } = d;
 
   /**
    * Case-insensitive uniqueness guard for name + country (+ city when one is
@@ -119,8 +124,9 @@ export const makeDestinationService = (
     }
   };
 
+  // findFirst so soft-deleted destinations 404 like hard-deleted ones did.
   const getDestinationById = async (id: number) => {
-    const destination = await prisma.destination.findUnique({ where: { id } });
+    const destination = await prisma.destination.findFirst({ where: { id } });
     if (!destination) throw new NotFoundError('Destination not found');
     return destination;
   };
@@ -171,7 +177,7 @@ export const makeDestinationService = (
 
       if (input.name) {
         // Compare against the stored country/city when the update omits them.
-        const current = await prisma.destination.findUnique({
+        const current = await prisma.destination.findFirst({
           select: { city: true, country: true },
           where: { id },
         });
@@ -185,7 +191,7 @@ export const makeDestinationService = (
         }
       }
 
-      const existing = await prisma.destination.findUnique({
+      const existing = await prisma.destination.findFirst({
         select: { photo: true },
         where: { id },
       });
@@ -229,7 +235,7 @@ export const makeDestinationService = (
   };
 
   const deleteDestination = async (id: number): Promise<void> => {
-    const destination = await prisma.destination.findUnique({
+    const destination = await prisma.destination.findFirst({
       include: dependencyInclude,
       where: { id },
     });
@@ -244,7 +250,11 @@ export const makeDestinationService = (
       );
     }
 
-    await prisma.destination.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.destination.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
 
     if (destination.photo) {
       await cleanupPhoto(
@@ -279,7 +289,10 @@ export const makeDestinationService = (
       .map((dest) => dest.photo)
       .filter((photo): photo is string => Boolean(photo));
 
-    await prisma.destination.deleteMany({});
+    await prisma.destination.updateMany({
+      data: { deletedAt: clock.now() },
+      where: { deletedAt: null },
+    });
 
     await Promise.allSettled(
       photos.map((photo) =>

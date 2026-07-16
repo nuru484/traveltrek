@@ -508,9 +508,15 @@ describe('DELETE /api/v1/payments/:id', () => {
       bookingId: booking.id,
       paymentId,
     });
+    // Soft delete: hidden from scoped reads, but the row survives with a
+    // deletedAt tombstone (findUnique is deliberately unscoped).
     expect(
-      await prisma.payment.findUnique({ where: { id: paymentId } }),
+      await prisma.payment.findFirst({ where: { id: paymentId } }),
     ).toBeNull();
+    const tombstone = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(tombstone?.deletedAt).toBeInstanceOf(Date);
 
     const reverted = await prisma.booking.findUnique({
       where: { id: booking.id },

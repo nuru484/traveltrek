@@ -32,7 +32,9 @@ const resolveLiveTokenVersion = async (
   const cached = getCachedTokenVersion(userId);
   if (cached !== undefined) return cached;
 
-  const user = await prisma.user.findUnique({
+  // findFirst so the soft-delete extension scopes the read: a soft-deleted
+  // account reads as "no longer exists" and loses access at once.
+  const user = await prisma.user.findFirst({
     select: { tokenVersion: true },
     where: { id: userId },
   });

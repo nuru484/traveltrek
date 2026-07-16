@@ -56,9 +56,11 @@ const roomFields = z.object({
     .number('A valid hotelId is required')
     .int('A valid hotelId is required')
     .min(1, 'A valid hotelId is required'),
+  // Integer minor units (pesewas): GH₵ 1.00 = 100.
   pricePerNight: z.coerce
-    .number('Price per night must be a positive number')
-    .positive('Price per night must be a positive number'),
+    .number('Price per night must be a positive integer (pesewas)')
+    .int('Price per night must be a positive integer (pesewas)')
+    .positive('Price per night must be a positive integer (pesewas)'),
   // Either a client-sent URL or, after the Cloudinary middleware runs, the
   // uploaded image URL. A multipart file upload arrives as req.file instead
   // and is guarded by the controller's photo-file middleware.
@@ -92,9 +94,10 @@ export const roomListQuery = paginationQuery
       .optional(),
     hotelId: z.coerce.number().int().min(1).optional(),
     maxCapacity: z.coerce.number().int().min(1).optional(),
-    maxPrice: z.coerce.number().min(0).optional(),
+    // Price bounds are integer minor units (pesewas), like pricePerNight.
+    maxPrice: z.coerce.number().int().min(0).optional(),
     minCapacity: z.coerce.number().int().min(1).optional(),
-    minPrice: z.coerce.number().min(0).optional(),
+    minPrice: z.coerce.number().int().min(0).optional(),
     roomType: z
       .string()
       .trim()

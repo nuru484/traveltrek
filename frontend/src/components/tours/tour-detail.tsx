@@ -50,6 +50,7 @@ import {
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
+import { formatMoney } from "@/utils/format-money";
 
 interface ITourDetailProps {
   tour: ITour;
@@ -513,7 +514,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
                       Price
                     </p>
                     <p className="text-2xl font-bold text-primary">
-                      ₵{tour.price.toLocaleString()}
+                      {formatMoney(tour.price, { exact: true })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       per person
@@ -721,7 +722,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
           open={showBookDialog}
           onOpenChange={setShowBookDialog}
           title="Confirm Booking"
-          description={`Are you sure youwant to book "${truncatedTourName}" to ${getDestinationDisplay()} for ₵${tour.price.toLocaleString()}?`}
+          description={`Are you sure youwant to book "${truncatedTourName}" to ${getDestinationDisplay()} for ${formatMoney(tour.price, { exact: true })}?`}
           onConfirm={handleBook}
           confirmText="Book Now"
         />

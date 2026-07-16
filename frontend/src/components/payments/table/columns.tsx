@@ -149,7 +149,7 @@ export const createPaymentColumns = (
         const currency = row.original.currency;
         return (
           <div className="font-medium whitespace-nowrap">
-            <Money amount={amount} symbol={currency === "GHS" ? "₵" : "$"} />
+            <Money amount={amount} />
           </div>
         );
       } },

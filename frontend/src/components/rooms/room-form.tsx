@@ -35,6 +35,8 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 const roomFormSchema = z.object({
   hotelId: z.number().min(1, "Hotel is required"),
   roomType: z.string().min(1, "Room type is required"),
+  // GHS decimal in the form; converted to integer pesewas (×100) on submit
+  // and back (÷100) when hydrating edit defaults.
   pricePerNight: z.number().min(0, "Price must be a positive number"),
   capacity: z.number().min(1, "Capacity must be at least 1"),
   totalRooms: z.number().min(1, "Total rooms must be at least 1"),
@@ -84,7 +86,8 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
     defaultValues: {
       hotelId: getDefaultHotelId(),
       roomType: room?.roomType || "",
-      pricePerNight: room?.pricePerNight || 0,
+      // API pricePerNight is integer pesewas; the form edits GHS decimals.
+      pricePerNight: room ? room.pricePerNight / 100 : 0,
       capacity: room?.capacity || 1,
       totalRooms: room?.totalRooms || 1,
       description: room?.description || null,
@@ -160,7 +163,11 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       const formData = new FormData();
       formData.append("hotelId", values.hotelId.toString());
       formData.append("roomType", values.roomType);
-      formData.append("pricePerNight", values.pricePerNight.toString());
+      // GHS decimal -> integer pesewas for the API.
+      formData.append(
+        "pricePerNight",
+        Math.round(values.pricePerNight * 100).toString()
+      );
       formData.append("capacity", values.capacity.toString());
       formData.append("totalRooms", values.totalRooms.toString());
       if (values.description)

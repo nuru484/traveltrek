@@ -9,6 +9,7 @@ export interface IRoomHotel {
 export interface IRoom {
   id: number;
   roomType: string;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   pricePerNight: number;
   capacity: number;
   description: string | null;
@@ -44,7 +45,9 @@ export interface IRoomQueryParams {
   hotelId?: number;
   roomType?: string;
   available?: boolean;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   minPrice?: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   maxPrice?: number;
   minCapacity?: number;
   maxCapacity?: number;

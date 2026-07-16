@@ -28,6 +28,7 @@ export interface ITour {
   type: TourType;
   status: TourStatus;
   duration: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   price: number;
   maxGuests: number;
   guestsBooked: number;
@@ -49,7 +50,9 @@ export interface IToursQueryParams {
   search?: string;
   type?: TourType;
   status?: TourStatus;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   minPrice?: number;
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   maxPrice?: number;
   location?: string;
 }
@@ -69,6 +72,7 @@ export interface ITourInput {
   name: string;
   description?: string | null;
   type: "ADVENTURE" | "CULTURAL" | "BEACH" | "CITY" | "WILDLIFE" | "CRUISE";
+  /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   price: number;
   maxGuests: number;
   startDate: string;

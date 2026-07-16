@@ -32,8 +32,9 @@ const rand = mulberry32(20260714);
 const pick = <T>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
 const between = (min: number, max: number) =>
   Math.floor(rand() * (max - min + 1)) + min;
+// min/max are whole GHS; the result is integer pesewas (whole-GHS steps of 5).
 const money = (min: number, max: number) =>
-  Math.round((min + rand() * (max - min)) / 5) * 5;
+  Math.round((min + rand() * (max - min)) / 5) * 5 * 100;
 
 const DAY = 86400000;
 const NOW = new Date('2026-07-14T12:00:00Z').getTime();

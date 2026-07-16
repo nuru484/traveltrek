@@ -54,6 +54,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import { Money } from "@/components/ui/Money";
+import { formatMoney } from "@/utils/format-money";
 
 interface IFlightDetailProps {
   flight: IFlight;
@@ -921,7 +922,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
             flight.origin
           )} to ${getDestinationDisplayName(
             flight.destination
-          )} for ₵${flight.price.toLocaleString()}?`}
+          )} for ${formatMoney(flight.price, { exact: true })}?`}
           onConfirm={handleBook}
           confirmText="Book Now"
         />

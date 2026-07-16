@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePaymentCallbackQuery } from "@/redux/paymentApi";
 import toast from "react-hot-toast";
+import { formatMoney } from "@/utils/format-money";
 
 type PaymentStatus = "loading" | "success" | "failed" | "error";
 
@@ -112,7 +113,7 @@ export default function PaymentCallbackPage() {
                     Amount:
                   </span>
                   <span className="text-sm font-semibold text-foreground">
-                    GHS {result.data.amount?.toLocaleString()}
+                    {result.data.amount != null ? formatMoney(result.data.amount, { exact: true }) : null}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

@@ -235,7 +235,8 @@ export const makeBookingService = (
     endDate: Date,
     numberOfRoomsNeeded: number,
   ): Promise<{ available: boolean; availableRooms: number }> => {
-    const room = await prisma.room.findUnique({ where: { id: roomId } });
+    // findFirst so a soft-deleted room reads as unavailable.
+    const room = await prisma.room.findFirst({ where: { id: roomId } });
     if (!room) {
       return { available: false, availableRooms: 0 };
     }
@@ -385,7 +386,9 @@ export const makeBookingService = (
       );
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    // findFirst everywhere below so soft-deleted rows 404 like hard-deleted
+    // ones did (the soft-delete extension does not scope findUnique).
+    const targetUser = await prisma.user.findFirst({ where: { id: userId } });
     if (!targetUser) throw new NotFoundError('User not found');
 
     let tour: null | Tour = null;
@@ -397,7 +400,7 @@ export const makeBookingService = (
     let requiresImmediatePayment = false;
 
     if (tourId) {
-      tour = await prisma.tour.findUnique({ where: { id: tourId } });
+      tour = await prisma.tour.findFirst({ where: { id: tourId } });
       if (!tour) throw new NotFoundError('Tour not found');
 
       const availableSlots = tour.maxGuests - tour.guestsBooked;
@@ -438,7 +441,7 @@ export const makeBookingService = (
         throw new BadRequestError(dateValidation.error);
       }
 
-      room = await prisma.room.findUnique({ where: { id: roomId } });
+      room = await prisma.room.findFirst({ where: { id: roomId } });
       if (!room) throw new NotFoundError('Room not found');
 
       const roomsNeeded = numberOfRooms ?? 1;
@@ -480,7 +483,7 @@ export const makeBookingService = (
     }
 
     if (flightId) {
-      flight = await prisma.flight.findUnique({ where: { id: flightId } });
+      flight = await prisma.flight.findFirst({ where: { id: flightId } });
       if (!flight) throw new NotFoundError('Flight not found');
 
       const seatsNeeded = numberOfGuests ?? 1;
@@ -505,6 +508,9 @@ export const makeBookingService = (
 
     // Counter updates ride the same transaction as the create, so a failed
     // insert (e.g. the duplicate-booking unique constraint) rolls them back.
+    // Note: the duplicate-booking unique constraints span soft-deleted rows
+    // (khadys convention) — a soft-deleted booking still holds its
+    // user+tour/room/flight slot until it is restored or hard-purged.
     const booking = await prisma.$transaction(async (tx) => {
       if (tourId && tour) {
         const guestsToBook = numberOfGuests ?? 1;
@@ -562,7 +568,7 @@ export const makeBookingService = (
     actor: BookingActor,
     id: number,
   ): Promise<BookingWithRelations> => {
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.booking.findFirst({
       include: bookingInclude,
       where: { id },
     });
@@ -593,7 +599,7 @@ export const makeBookingService = (
       userId,
     } = input;
 
-    const existingBooking = await prisma.booking.findUnique({
+    const existingBooking = await prisma.booking.findFirst({
       include: {
         flight: true,
         payment: true,
@@ -658,7 +664,7 @@ export const makeBookingService = (
 
     return await prisma.$transaction(async (tx) => {
       if (userId) {
-        const targetUser = await tx.user.findUnique({ where: { id: userId } });
+        const targetUser = await tx.user.findFirst({ where: { id: userId } });
         if (!targetUser) throw new NotFoundError('User not found');
       }
 
@@ -666,7 +672,7 @@ export const makeBookingService = (
         tourId &&
         (tourId !== existingBooking.tourId || numberOfGuests !== undefined)
       ) {
-        const tour = await tx.tour.findUnique({ where: { id: tourId } });
+        const tour = await tx.tour.findFirst({ where: { id: tourId } });
         if (!tour) throw new NotFoundError('Tour not found');
 
         const guestsToBook = numberOfGuests ?? existingBooking.numberOfGuests;
@@ -764,7 +770,7 @@ export const makeBookingService = (
           endDate ||
           numberOfRooms !== undefined)
       ) {
-        const room = await tx.room.findUnique({ where: { id: roomId } });
+        const room = await tx.room.findFirst({ where: { id: roomId } });
         if (!room) throw new NotFoundError('Room not found');
 
         const checkInDate = startDate
@@ -833,7 +839,7 @@ export const makeBookingService = (
         flightId &&
         (flightId !== existingBooking.flightId || numberOfGuests !== undefined)
       ) {
-        const flight = await tx.flight.findUnique({ where: { id: flightId } });
+        const flight = await tx.flight.findFirst({ where: { id: flightId } });
         if (!flight) throw new NotFoundError('Flight not found');
 
         const seatsNeeded = numberOfGuests ?? existingBooking.numberOfGuests;
@@ -963,7 +969,7 @@ export const makeBookingService = (
       throw new UnauthorizedError('Only admins and agents can delete bookings');
     }
 
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.booking.findFirst({
       include: {
         payment: true,
         user: { select: { email: true, id: true, name: true } },
@@ -1009,8 +1015,11 @@ export const makeBookingService = (
       }
     }
 
+    const deletedAt = clock.now();
     await prisma.$transaction(async (tx) => {
       if (booking.tourId) {
+        // findUnique on purpose (unscoped): restore the counter even when the
+        // tour itself has been soft-deleted meanwhile.
         const tour = await tx.tour.findUnique({
           where: { id: booking.tourId },
         });
@@ -1036,16 +1045,18 @@ export const makeBookingService = (
         }
       }
 
-      // 'CANCELLED' is kept from the legacy list even though PaymentStatus
-      // has no such member — it can never match, exactly as before.
-      if (
-        booking.payment &&
-        ['CANCELLED', 'FAILED', 'PENDING'].includes(booking.payment.status)
-      ) {
-        await tx.payment.delete({ where: { id: booking.payment.id } });
+      // Soft-delete the payment alongside the booking. Legacy removed
+      // 'CANCELLED'/FAILED/PENDING payments explicitly and REFUNDED ones via
+      // the Payment→Booking FK cascade; with soft deletes the payment must be
+      // tombstoned explicitly in every deletable case.
+      if (booking.payment) {
+        await tx.payment.update({
+          data: { deletedAt },
+          where: { id: booking.payment.id },
+        });
       }
 
-      await tx.booking.delete({ where: { id } });
+      await tx.booking.update({ data: { deletedAt }, where: { id } });
     });
 
     return {
@@ -1248,7 +1259,21 @@ export const makeBookingService = (
         }
       }
 
-      await tx.booking.deleteMany({});
+      // Soft-delete the bookings and (mirroring the legacy FK cascade) their
+      // remaining FAILED/REFUNDED payments — COMPLETED/PENDING ones are
+      // blocked above.
+      const deletedAt = clock.now();
+      await tx.payment.updateMany({
+        data: { deletedAt },
+        where: {
+          bookingId: { in: bookings.map((b) => b.id) },
+          deletedAt: null,
+        },
+      });
+      await tx.booking.updateMany({
+        data: { deletedAt },
+        where: { deletedAt: null },
+      });
     });
 
     return {

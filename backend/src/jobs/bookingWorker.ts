@@ -49,32 +49,36 @@ export const bookingDeadlineWorker = new Worker(
       expiredBookings,
       async (booking) => {
         try {
-          await prisma.booking.update({
-            data: { status: 'CANCELLED' },
-            where: { id: booking.id },
+          // The cancel and its counter restores are atomic: a failure rolls
+          // everything back, so seats/guests can never drift from bookings.
+          await prisma.$transaction(async (tx) => {
+            await tx.booking.update({
+              data: { status: 'CANCELLED' },
+              where: { id: booking.id },
+            });
+
+            if (booking.tourId && booking.tour) {
+              await tx.tour.update({
+                data: {
+                  guestsBooked: {
+                    decrement: booking.numberOfGuests,
+                  },
+                },
+                where: { id: booking.tourId },
+              });
+            }
+
+            if (booking.flightId && booking.flight) {
+              await tx.flight.update({
+                data: {
+                  seatsAvailable: {
+                    increment: booking.numberOfGuests,
+                  },
+                },
+                where: { id: booking.flightId },
+              });
+            }
           });
-
-          if (booking.tourId && booking.tour) {
-            await prisma.tour.update({
-              data: {
-                guestsBooked: {
-                  decrement: booking.numberOfGuests,
-                },
-              },
-              where: { id: booking.tourId },
-            });
-          }
-
-          if (booking.flightId && booking.flight) {
-            await prisma.flight.update({
-              data: {
-                seatsAvailable: {
-                  increment: booking.numberOfGuests,
-                },
-              },
-              where: { id: booking.flightId },
-            });
-          }
 
           cancelledCount++;
           logger.info(

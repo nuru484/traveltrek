@@ -75,7 +75,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Avg:{" "}
               <Money
                 amount={bookings.data.summary.averageBookingValue}
-                symbol={`${payments.data.summary.currency} `}
               />
             </p>
           </CardContent>
@@ -91,7 +90,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="font-display text-3xl font-semibold tracking-tight">
               <Money
                 amount={payments.data.summary.totalRevenue}
-                symbol={`${payments.data.summary.currency} `}
               />
             </div>
             <p className="text-xs text-muted-foreground">
@@ -110,7 +108,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="font-display text-3xl font-semibold tracking-tight">
               <Money
                 amount={payments.data.summary.pendingAmount}
-                symbol={`${payments.data.summary.currency} `}
               />
             </div>
             <p className="text-xs text-muted-foreground">Awaiting payment</p>
@@ -131,7 +128,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {tours.data.summary.totalRevenueAnalyzed > 0 && (
                 <Money
                   amount={tours.data.summary.totalRevenueAnalyzed}
-                  symbol={`${payments.data.summary.currency} `}
                 />
               )}
             </p>
@@ -198,7 +194,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       <div className="text-xs text-muted-foreground">
                         <Money
                           amount={data.amount}
-                          symbol={`${payments.data.summary.currency} `}
                         />
                       </div>
                     </div>

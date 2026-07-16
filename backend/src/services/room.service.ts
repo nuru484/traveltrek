@@ -169,7 +169,8 @@ export const makeRoomService = (
     startDate: Date,
     endDate: Date,
   ): Promise<RoomAvailabilityCounts> => {
-    const room = await prisma.room.findUnique({
+    // findFirst so a soft-deleted room reports {0, 0} like a missing one.
+    const room = await prisma.room.findFirst({
       select: { totalRooms: true },
       where: { id: roomId },
     });
@@ -205,12 +206,13 @@ export const makeRoomService = (
 
   const createRoom = async (input: RoomInput): Promise<RoomWithAvailability> => {
     try {
-      const hotel = await prisma.hotel.findUnique({
+      const hotel = await prisma.hotel.findFirst({
         select: { id: true },
         where: { id: input.hotelId },
       });
       if (!hotel) throw new NotFoundError('Hotel not found');
 
+      // Auto-scoped: a soft-deleted room's type may be reused for a new room.
       const existingRoom = await prisma.room.findFirst({
         where: {
           hotelId: input.hotelId,
@@ -257,7 +259,7 @@ export const makeRoomService = (
     id: number,
     window: DateWindowInput = {},
   ): Promise<RoomWithAvailability> => {
-    const room = await prisma.room.findUnique({
+    const room = await prisma.room.findFirst({
       include: roomInclude,
       where: { id },
     });
@@ -277,11 +279,13 @@ export const makeRoomService = (
     const uploadedPhotoUrl = input.photo;
 
     try {
-      const existingRoom = await prisma.room.findUnique({
+      const existingRoom = await prisma.room.findFirst({
         include: {
           bookings: {
             select: { id: true, numberOfRooms: true, status: true },
+            // Nested reads are not auto-scoped; skip soft-deleted bookings.
             where: {
+              deletedAt: null,
               OR: [
                 { status: BookingStatus.PENDING },
                 { status: BookingStatus.CONFIRMED },
@@ -307,7 +311,7 @@ export const makeRoomService = (
           );
         }
 
-        const hotel = await prisma.hotel.findUnique({
+        const hotel = await prisma.hotel.findFirst({
           select: { id: true },
           where: { id: input.hotelId },
         });
@@ -506,7 +510,7 @@ export const makeRoomService = (
       end,
     );
 
-    const room = await prisma.room.findUnique({
+    const room = await prisma.room.findFirst({
       select: { roomType: true, totalRooms: true },
       where: { id: roomId },
     });
@@ -531,12 +535,14 @@ export const makeRoomService = (
    * bookings never block, they are only counted for the response.
    */
   const deleteRoom = async (id: number): Promise<RoomDeleteSummary> => {
-    const room = await prisma.room.findUnique({
+    // Nested reads are not auto-scoped; soft-deleted bookings don't block.
+    const room = await prisma.room.findFirst({
       include: {
         bookings: {
           include: {
             payment: { select: { amount: true, id: true, status: true } },
           },
+          where: { deletedAt: null },
         },
         hotel: { select: { id: true, name: true } },
       },
@@ -631,7 +637,11 @@ export const makeRoomService = (
       );
     }
 
-    await prisma.room.delete({ where: { id } });
+    // Soft delete: the row survives (deletedAt set); scoped reads hide it.
+    await prisma.room.update({
+      data: { deletedAt: clock.now() },
+      where: { id },
+    });
 
     if (room.photo) {
       await cleanupPhoto(
@@ -666,6 +676,7 @@ export const makeRoomService = (
       include: {
         bookings: {
           include: { payment: { select: { id: true, status: true } } },
+          where: { deletedAt: null },
         },
         hotel: { select: { id: true, name: true } },
       },
@@ -784,7 +795,8 @@ export const makeRoomService = (
       );
     }
 
-    await prisma.room.deleteMany({
+    await prisma.room.updateMany({
+      data: { deletedAt: now },
       where: { id: { in: deletableRooms.map((r) => r.id) } },
     });
 
