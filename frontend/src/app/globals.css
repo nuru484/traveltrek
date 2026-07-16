@@ -134,12 +134,15 @@
   --input: oklch(0.30 0.03 250); /* Input field */
   --ring: oklch(0.65 0.20 230); /* Bright blue ring */
   
-  /* Chart colors - vibrant for dark mode */
-  --chart-1: oklch(0.65 0.22 230); /* Bright ocean blue */
-  --chart-2: oklch(0.60 0.18 180); /* Bright turquoise */
-  --chart-3: oklch(0.70 0.15 50); /* Bright sand */
-  --chart-4: oklch(0.70 0.20 35); /* Bright sunset orange */
-  --chart-5: oklch(0.60 0.18 290); /* Bright purple */
+  /* Chart colors - dark mode. Tuned to the dataviz lightness band
+     (OKLCH L 0.48–0.67 against the dark card surface) so every step keeps
+     >= 3:1 contrast and adjacent hues stay CVD-distinguishable — validated
+     with the dataviz palette checker, not by eye. */
+  --chart-1: oklch(0.62 0.15 230); /* Ocean blue */
+  --chart-2: oklch(0.60 0.14 180); /* Turquoise */
+  --chart-3: oklch(0.65 0.11 50); /* Sand */
+  --chart-4: oklch(0.63 0.15 35); /* Sunset orange */
+  --chart-5: oklch(0.60 0.16 290); /* Purple */
   
   --sidebar: oklch(0.22 0.03 250); /* Dark blue sidebar */
   --sidebar-foreground: oklch(0.95 0.01 240); /* Off-white */
@@ -192,4 +195,39 @@ html {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* ---- Report printing ----
+   Print only the marked report data. `printReport()` toggles the
+   `report-printing` class on <body>; the rules below hide the app chrome,
+   filters and buttons, leaving just the `.report-print-area` content. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body.report-printing * {
+    visibility: hidden;
+  }
+
+  body.report-printing .report-print-area,
+  body.report-printing .report-print-area * {
+    visibility: visible;
+  }
+
+  body.report-printing .report-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Keep each top-level block (KPI row, chart grid, lists) from splitting
+     awkwardly across a page break where possible. */
+  body.report-printing .report-print-area > * {
+    break-inside: avoid;
+  }
 }

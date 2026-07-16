@@ -1,6 +1,9 @@
 // src/redux/dashboardApi.ts
 import { apiSlice } from "./apiSlice";
-import { IDashboardResponse } from "@/types/dashboard.types";
+import {
+  IDashboardResponse,
+  INeedsAttentionResponse,
+} from "@/types/dashboard.types";
 
 export const dashboardApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -11,7 +14,17 @@ export const dashboardApi = apiSlice.injectEndpoints({
       }),
       providesTags: ["Dashboard"],
     }),
+
+    // Staff-only operational counts for the dashboard attention strip.
+    getNeedsAttention: builder.query<INeedsAttentionResponse, void>({
+      query: () => ({
+        url: "/dashboard/needs-attention",
+        method: "GET",
+      }),
+      providesTags: ["NeedsAttention"],
+    }),
   }),
 });
 
-export const { useGetDashboardStatsQuery } = dashboardApi;
+export const { useGetDashboardStatsQuery, useGetNeedsAttentionQuery } =
+  dashboardApi;

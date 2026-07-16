@@ -64,6 +64,12 @@ export interface MonthlyBookingsReport {
     period: ReportPeriod;
     totalBookings: number;
     totalRevenue: number;
+    /** Additive: per-KPI change vs the equal-length previous window. */
+    trends: {
+      averageBookingValue: ReportTrend;
+      totalBookings: ReportTrend;
+      totalRevenue: ReportTrend;
+    };
   };
 }
 
@@ -94,6 +100,14 @@ export interface PaymentsSummaryReport {
     refundedAmount: number;
     totalPayments: number;
     totalRevenue: number;
+    /** Additive: per-KPI change vs the equal-length previous window. */
+    trends: {
+      failedAmount: ReportTrend;
+      pendingAmount: ReportTrend;
+      refundedAmount: ReportTrend;
+      totalPayments: ReportTrend;
+      totalRevenue: ReportTrend;
+    };
   };
 }
 
@@ -117,6 +131,15 @@ export interface ReportPeriodParams {
   month?: number;
   startDate?: string;
   year?: number;
+}
+
+/**
+ * Per-KPI trend vs the equal-length previous window. `percentage` is the
+ * absolute change (2dp); `direction` carries the sign.
+ */
+export interface ReportTrend {
+  direction: 'down' | 'flat' | 'up';
+  percentage: number;
 }
 
 export interface TopToursParams extends ReportPeriodParams {
@@ -231,34 +254,78 @@ const topTourSelect = {
   type: true,
 } satisfies Prisma.TourSelect;
 
+/** Resolved report window: concrete start/end instants. */
+interface PeriodWindow {
+  end: Date;
+  start: Date;
+}
+
+/**
+ * The trend math (dms getDateRanges pattern): if the previous window has no
+ * activity, any current activity reads as +100% up; otherwise the percentage
+ * is the absolute change rounded to 2dp with the sign in `direction`.
+ */
+const calculateTrend = (current: number, previous: number): ReportTrend => {
+  if (previous === 0) {
+    return {
+      direction: current > 0 ? 'up' : 'flat',
+      percentage: current > 0 ? 100 : 0,
+    };
+  }
+
+  const change = ((current - previous) / previous) * 100;
+
+  return {
+    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
+    percentage: Math.abs(Math.round(change * 100) / 100),
+  };
+};
+
 /**
  * The legacy date-window precedence: explicit range → year+month → whole
  * year. Month windows are built in server-local time and the range endpoints
  * with `new Date(string)`, exactly as the old handlers did.
  */
-const periodClause = (
+const periodWindow = (
   params: ReportPeriodParams,
   year: number,
-): Prisma.DateTimeFilter => {
+): PeriodWindow => {
   if (params.startDate && params.endDate) {
     return {
-      gte: new Date(params.startDate),
-      lte: new Date(params.endDate),
+      end: new Date(params.endDate),
+      start: new Date(params.startDate),
     };
   }
 
   if (params.month) {
     return {
-      gte: new Date(year, params.month - 1, 1),
-      lte: new Date(year, params.month, 0, 23, 59, 59),
+      end: new Date(year, params.month, 0, 23, 59, 59),
+      start: new Date(year, params.month - 1, 1),
     };
   }
 
   return {
-    gte: new Date(year, 0, 1),
-    lte: new Date(year, 11, 31, 23, 59, 59),
+    end: new Date(year, 11, 31, 23, 59, 59),
+    start: new Date(year, 0, 1),
   };
 };
+
+/**
+ * The equal-length window immediately before `window` (dms getDateRanges
+ * "previous" pattern): ends 1ms before the current start.
+ */
+const previousWindow = (window: PeriodWindow): PeriodWindow => {
+  const end = new Date(window.start.getTime() - 1);
+  return {
+    end,
+    start: new Date(end.getTime() - (window.end.getTime() - window.start.getTime())),
+  };
+};
+
+const windowClause = (window: PeriodWindow): Prisma.DateTimeFilter => ({
+  gte: window.start,
+  lte: window.end,
+});
 
 const periodEcho = (
   params: ReportPeriodParams,
@@ -281,18 +348,28 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
     params: MonthlyBookingsParams,
   ): Promise<MonthlyBookingsReport> => {
     const year = resolveYear(params.year);
+    const window = periodWindow(params, year);
 
-    const where: Prisma.BookingWhereInput = {
-      bookingDate: periodClause(params, year),
-    };
-    if (params.tourId) where.tourId = params.tourId;
-    if (params.customerId) where.customerId = params.customerId;
-    if (params.status) where.status = params.status;
+    const entityWhere: Prisma.BookingWhereInput = {};
+    if (params.tourId) entityWhere.tourId = params.tourId;
+    if (params.customerId) entityWhere.customerId = params.customerId;
+    if (params.status) entityWhere.status = params.status;
 
-    const bookings = await prisma.booking.findMany({
-      select: monthlyBookingSelect,
-      where,
-    });
+    const [bookings, previousTotals] = await Promise.all([
+      prisma.booking.findMany({
+        select: monthlyBookingSelect,
+        where: { ...entityWhere, bookingDate: windowClause(window) },
+      }),
+      // Equal-length previous window, same entity filters — feeds the trends.
+      prisma.booking.aggregate({
+        _count: { _all: true },
+        _sum: { totalPrice: true },
+        where: {
+          ...entityWhere,
+          bookingDate: windowClause(previousWindow(window)),
+        },
+      }),
+    ]);
 
     const totalBookings = bookings.length;
     const totalRevenue = bookings.reduce(
@@ -327,6 +404,11 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
         (statusBreakdown[booking.status] ?? 0) + 1;
     }
 
+    const previousBookings = previousTotals._count._all;
+    const previousRevenue = previousTotals._sum.totalPrice ?? 0;
+    const previousAverage =
+      previousBookings > 0 ? previousRevenue / previousBookings : 0;
+
     return {
       bookings: bookings.slice(0, 10),
       monthlyBreakdown: [...monthlyBuckets.values()],
@@ -336,6 +418,14 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
         period: periodEcho(params, year),
         totalBookings,
         totalRevenue,
+        trends: {
+          averageBookingValue: calculateTrend(
+            averageBookingValue,
+            previousAverage,
+          ),
+          totalBookings: calculateTrend(totalBookings, previousBookings),
+          totalRevenue: calculateTrend(totalRevenue, previousRevenue),
+        },
       },
     };
   };
@@ -345,19 +435,39 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
     params: PaymentsSummaryParams,
   ): Promise<PaymentsSummaryReport> => {
     const year = resolveYear(params.year);
+    const window = periodWindow(params, year);
 
-    const where: Prisma.PaymentWhereInput = {
+    const entityWhere: Prisma.PaymentWhereInput = {
       currency: params.currency,
-      paymentDate: periodClause(params, year),
     };
-    if (params.paymentMethod) where.paymentMethod = params.paymentMethod;
-    if (params.status) where.status = params.status;
-    if (params.customerId) where.customerId = params.customerId;
+    if (params.paymentMethod) entityWhere.paymentMethod = params.paymentMethod;
+    if (params.status) entityWhere.status = params.status;
+    if (params.customerId) entityWhere.customerId = params.customerId;
 
-    const payments = await prisma.payment.findMany({
-      select: paymentSummarySelect,
-      where,
-    });
+    const [payments, previousGroups] = await Promise.all([
+      prisma.payment.findMany({
+        select: paymentSummarySelect,
+        where: { ...entityWhere, paymentDate: windowClause(window) },
+      }),
+      // Equal-length previous window, same entity filters — feeds the trends.
+      prisma.payment.groupBy({
+        _count: { _all: true },
+        _sum: { amount: true },
+        by: ['status'],
+        where: {
+          ...entityWhere,
+          paymentDate: windowClause(previousWindow(window)),
+        },
+      }),
+    ]);
+
+    const previousAmount = (status: PaymentStatus): number =>
+      previousGroups.find((group) => group.status === status)?._sum.amount ??
+      0;
+    const previousPayments = previousGroups.reduce(
+      (sum, group) => sum + group._count._all,
+      0,
+    );
 
     const sumWhere = (status: PaymentStatus): number =>
       payments
@@ -420,6 +530,25 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
         refundedAmount: sumWhere(PaymentStatus.REFUNDED),
         totalPayments: payments.length,
         totalRevenue: sumWhere(PaymentStatus.COMPLETED),
+        trends: {
+          failedAmount: calculateTrend(
+            sumWhere(PaymentStatus.FAILED),
+            previousAmount(PaymentStatus.FAILED),
+          ),
+          pendingAmount: calculateTrend(
+            sumWhere(PaymentStatus.PENDING),
+            previousAmount(PaymentStatus.PENDING),
+          ),
+          refundedAmount: calculateTrend(
+            sumWhere(PaymentStatus.REFUNDED),
+            previousAmount(PaymentStatus.REFUNDED),
+          ),
+          totalPayments: calculateTrend(payments.length, previousPayments),
+          totalRevenue: calculateTrend(
+            sumWhere(PaymentStatus.COMPLETED),
+            previousAmount(PaymentStatus.COMPLETED),
+          ),
+        },
       },
     };
   };
@@ -445,7 +574,10 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
         bookings: {
           select: topTourBookingSelect,
           // Nested reads are not auto-scoped; skip soft-deleted bookings.
-          where: { bookingDate: periodClause(params, year), deletedAt: null },
+          where: {
+            bookingDate: windowClause(periodWindow(params, year)),
+            deletedAt: null,
+          },
         },
       },
       where: tourWhere,

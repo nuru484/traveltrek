@@ -1,16 +1,51 @@
 // src/components/dashboard/dashboard-overview.tsx
+//
+// The dashboard, dms-architecture edition: header → platform stats (row A)
+// → business stats with trends (row B, staff) → needs-attention strip →
+// paired widget rows (trend chart | status donut, recent bookings | top
+// tours). Every widget owns its own query and renders its own
+// skeleton/error/retry — no page-level all-or-nothing. Customers keep the
+// platform stats, quick actions and their travel-summary block.
 "use client";
 import { useSelector } from "react-redux";
+import Link from "next/link";
 import { RootState } from "@/redux/store";
 import { isStaff } from "@/utils/roles";
-import { useGetDashboardStatsQuery } from "@/redux/dashboardApi";
-import { StatsCard } from "./stats-card";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useGetDashboardStatsQuery,
+  useGetNeedsAttentionQuery,
+} from "@/redux/dashboardApi";
+import {
+  useGetMonthlyBookingsSummaryQuery,
+  useGetPaymentsSummaryQuery,
+  useGetTopToursByBookingsQuery,
+} from "@/redux/reportsApi";
+import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { formatMoney } from "@/utils/format-money";
 import { Button } from "@/components/ui/button";
-import ErrorMessage from "@/components/ui/ErrorMessage";
-import EmptyState from "@/components/ui/EmptyState";
-import Link from "next/link";
+import { StatsCard } from "./stats-card";
+import { NeedsAttention } from "./needs-attention";
+import {
+  BusinessStatsSkeleton,
+  NeedsAttentionSkeleton,
+  PlatformStatsSkeleton,
+  StatsCardSkeleton,
+} from "./skeletons";
+import {
+  BreakdownDonut,
+  CardError,
+  ChartCardSkeleton,
+  ListCardSkeleton,
+  TrendChart,
+} from "@/components/reports/report-charts";
+import {
+  bookingStatusSegments,
+  bookingsTrendPoints,
+} from "@/components/reports/report-data";
+import {
+  RecentBookingsCard,
+  TopToursRankedCard,
+} from "@/components/reports/report-lists";
 
 /** Mono section label with a trailing hairline, as on the landing page. */
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -23,177 +58,258 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DashboardSkeleton() {
-  return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-8">
-      <div className="space-y-4">
-        <Skeleton className="h-3 w-44" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="gap-0 py-5">
-              <CardContent className="space-y-3 px-5">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-8 w-16" />
-                <Skeleton className="h-3 w-28" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <Skeleton className="h-3 w-52" />
-        <div className="grid gap-4 md:grid-cols-2">
-          {[...Array(2)].map((_, i) => (
-            <Card key={i} className="gap-0 py-5">
-              <CardContent className="space-y-3 px-5">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-8 w-16" />
-                <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                  <Skeleton className="h-5 w-24 rounded-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DashboardOverview() {
   const user = useSelector((state: RootState) => state.auth.user);
-  const {
-    data: dashboardData,
-    isLoading,
-    isError,
-    refetch,
-  } = useGetDashboardStatsQuery();
-
   // Backend sends the bookings/users blocks to ADMIN and AGENT alike.
   const staff = isStaff(user);
-  const stats = dashboardData?.data;
 
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
+  const statsQuery = useGetDashboardStatsQuery();
+  const attentionQuery = useGetNeedsAttentionQuery(undefined, { skip: !staff });
+  // Business widgets read the reports endpoints with their default window
+  // (the current year), so trends compare against the previous year.
+  const bookingsQuery = useGetMonthlyBookingsSummaryQuery({}, { skip: !staff });
+  const paymentsQuery = useGetPaymentsSummaryQuery({}, { skip: !staff });
+  const toursQuery = useGetTopToursByBookingsQuery({}, { skip: !staff });
 
-  if (isError) {
-    return (
-      <ErrorMessage
-        error="We encountered an error while fetching your data."
-        title="Failed to load dashboard data"
-        onRetry={() => refetch()}
-      />
-    );
-  }
+  const stats = statsQuery.data?.data;
+  const attention = attentionQuery.data?.data;
+  const bookingsReport = bookingsQuery.data?.data;
+  const paymentsReport = paymentsQuery.data?.data;
+  const toursReport = toursQuery.data?.data;
 
-  if (!stats) {
-    return (
-      <EmptyState
-        eyebrow="No data"
-        title="Nothing to report yet."
-        description="Statistics will appear here once the platform has activity."
-      />
-    );
-  }
+  const statsError = extractApiErrorMessage(statsQuery.error).message;
+  const attentionError = extractApiErrorMessage(attentionQuery.error).message;
+  const bookingsError = extractApiErrorMessage(bookingsQuery.error).message;
+  const paymentsError = extractApiErrorMessage(paymentsQuery.error).message;
+  const toursError = extractApiErrorMessage(toursQuery.error).message;
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-8">
-      {/* Main stats */}
+      {/* Platform stats — row A */}
       <div className="space-y-4">
         <SectionLabel>Platform overview</SectionLabel>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Tours"
-            code="TRS"
-            value={stats.tours.total}
-            subtitle="Total tour packages"
-            details={[
-              { label: "Upcoming", value: stats.tours.upcoming, color: "secondary" },
-              { label: "Ongoing", value: stats.tours.ongoing, color: "default" },
-            ]}
+        {statsQuery.isLoading ? (
+          <PlatformStatsSkeleton />
+        ) : statsQuery.isError || !stats ? (
+          <CardError
+            title="Platform overview"
+            message={statsError || "Failed to load platform stats"}
+            onRetry={statsQuery.refetch}
           />
-          <StatsCard
-            title="Hotels"
-            code="HTL"
-            value={stats.hotels.total}
-            subtitle="Hotels available"
-            details={[
-              {
-                label: "Rooms",
-                value: stats.hotels.availableRooms,
-                color: "secondary",
-              },
-            ]}
-          />
-          <StatsCard
-            title="Flights"
-            code="FLT"
-            value={stats.flights.total}
-            subtitle="Flight options"
-            details={[
-              {
-                label: "Seats",
-                value: stats.flights.availableSeats,
-                color: "secondary",
-              },
-            ]}
-          />
-          <StatsCard
-            title="Destinations"
-            code="DST"
-            value={stats.destinations.total}
-            subtitle="Places to explore"
-          />
-        </div>
-      </div>
-
-      {/* Admin-only stats */}
-      {staff && stats.bookings && stats.users && (
-        <div className="space-y-4">
-          <SectionLabel>Management overview</SectionLabel>
-          <div className="grid gap-4 md:grid-cols-2">
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatsCard
-              title="Bookings"
-              code="BKG"
-              value={stats.bookings.total}
-              subtitle="Total bookings"
+              title="Tours"
+              code="TRS"
+              value={stats.tours.total}
+              subtitle="Total tour packages"
               details={[
-                { label: "Pending", value: stats.bookings.pending, color: "outline" },
-                {
-                  label: "Confirmed",
-                  value: stats.bookings.confirmed,
-                  color: "secondary",
-                },
-                {
-                  label: "Completed",
-                  value: stats.bookings.completed,
-                  color: "default",
-                },
+                { label: "Upcoming", value: stats.tours.upcoming, color: "secondary" },
+                { label: "Ongoing", value: stats.tours.ongoing, color: "default" },
               ]}
             />
             <StatsCard
-              title="Users"
-              code="USR"
-              value={stats.users.total}
-              subtitle="Registered users"
+              title="Hotels"
+              code="HTL"
+              value={stats.hotels.total}
+              subtitle="Hotels available"
               details={[
-                {
-                  label: "Customers",
-                  value: stats.users.customers,
-                  color: "secondary",
-                },
-                { label: "Agents", value: stats.users.agents, color: "outline" },
-                {
-                  label: "Admins",
-                  value: stats.users.admins,
-                  color: "destructive",
-                },
+                { label: "Rooms", value: stats.hotels.availableRooms, color: "secondary" },
               ]}
+            />
+            <StatsCard
+              title="Flights"
+              code="FLT"
+              value={stats.flights.total}
+              subtitle="Flight options"
+              details={[
+                { label: "Seats", value: stats.flights.availableSeats, color: "secondary" },
+              ]}
+            />
+            <StatsCard
+              title="Destinations"
+              code="DST"
+              value={stats.destinations.total}
+              subtitle="Places to explore"
             />
           </div>
+        )}
+      </div>
+
+      {/* Business stats — row B (staff) */}
+      {staff && (
+        <div className="space-y-4">
+          <SectionLabel>Business overview</SectionLabel>
+          {statsQuery.isLoading &&
+          bookingsQuery.isLoading &&
+          paymentsQuery.isLoading ? (
+            <BusinessStatsSkeleton />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Bookings + customers ← dashboard stats */}
+              {statsQuery.isLoading ? (
+                <>
+                  <StatsCardSkeleton pills={3} />
+                  <StatsCardSkeleton pills={1} />
+                </>
+              ) : statsQuery.isError || !stats?.bookings || !stats.users ? (
+                <div className="sm:col-span-2">
+                  <CardError
+                    title="Bookings & customers"
+                    message={statsError || "Failed to load booking stats"}
+                    onRetry={statsQuery.refetch}
+                  />
+                </div>
+              ) : (
+                <>
+                  <StatsCard
+                    title="Bookings"
+                    code="BKG"
+                    value={stats.bookings.total}
+                    subtitle="All time"
+                    details={[
+                      { label: "Pending", value: stats.bookings.pending, color: "outline" },
+                      { label: "Confirmed", value: stats.bookings.confirmed, color: "secondary" },
+                      { label: "Completed", value: stats.bookings.completed, color: "default" },
+                    ]}
+                  />
+                  <StatsCard
+                    title="Customers"
+                    code="CST"
+                    value={stats.users.customers}
+                    subtitle="Registered"
+                    details={[
+                      { label: "Staff", value: stats.users.agents + stats.users.admins, color: "outline" },
+                    ]}
+                  />
+                </>
+              )}
+
+              {/* Revenue ← payments summary (this year) */}
+              {paymentsQuery.isLoading ? (
+                <StatsCardSkeleton pills={2} />
+              ) : paymentsQuery.isError || !paymentsReport ? (
+                <CardError
+                  title="Revenue"
+                  message={paymentsError || "Failed to load revenue"}
+                  onRetry={paymentsQuery.refetch}
+                />
+              ) : (
+                <StatsCard
+                  title="Revenue"
+                  code="REV"
+                  value={formatMoney(paymentsReport.summary.totalRevenue)}
+                  subtitle="This year"
+                  trend={paymentsReport.summary.trends.totalRevenue}
+                  details={[
+                    {
+                      label: "Pending",
+                      value: formatMoney(paymentsReport.summary.pendingAmount),
+                      color: "outline",
+                    },
+                  ]}
+                />
+              )}
+
+              {/* Avg booking value ← bookings summary (this year) */}
+              {bookingsQuery.isLoading ? (
+                <StatsCardSkeleton pills={1} />
+              ) : bookingsQuery.isError || !bookingsReport ? (
+                <CardError
+                  title="Avg booking value"
+                  message={bookingsError || "Failed to load booking value"}
+                  onRetry={bookingsQuery.refetch}
+                />
+              ) : (
+                <StatsCard
+                  title="Avg booking"
+                  code="AVG"
+                  value={formatMoney(bookingsReport.summary.averageBookingValue)}
+                  subtitle="This year"
+                  trend={bookingsReport.summary.trends.averageBookingValue}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Needs attention (staff) */}
+      {staff &&
+        (attentionQuery.isLoading ? (
+          <NeedsAttentionSkeleton />
+        ) : attentionQuery.isError || !attention ? (
+          <CardError
+            title="Needs attention"
+            message={attentionError || "Failed to load the attention summary"}
+            onRetry={attentionQuery.refetch}
+          />
+        ) : (
+          <NeedsAttention data={attention} />
+        ))}
+
+      {/* Bookings over time | status donut (staff) */}
+      {staff && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {bookingsQuery.isLoading ? (
+            <ChartCardSkeleton title="Bookings over time" height={280} />
+          ) : bookingsQuery.isError || !bookingsReport ? (
+            <CardError
+              title="Bookings over time"
+              message={bookingsError || "Failed to load trend"}
+              onRetry={bookingsQuery.refetch}
+            />
+          ) : (
+            <TrendChart
+              title="Bookings over time"
+              data={bookingsTrendPoints(bookingsReport.monthlyBreakdown)}
+            />
+          )}
+
+          {bookingsQuery.isLoading ? (
+            <ChartCardSkeleton title="Bookings by status" height={280} />
+          ) : bookingsQuery.isError || !bookingsReport ? (
+            <CardError
+              title="Bookings by status"
+              message={bookingsError || "Failed to load breakdown"}
+              onRetry={bookingsQuery.refetch}
+            />
+          ) : (
+            <BreakdownDonut
+              title="Bookings by status"
+              segments={bookingStatusSegments(bookingsReport.statusBreakdown)}
+              valueKind="count"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Recent bookings | top tours (staff) */}
+      {staff && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {bookingsQuery.isLoading ? (
+            <ListCardSkeleton title="Recent bookings" />
+          ) : bookingsQuery.isError || !bookingsReport ? (
+            <CardError
+              title="Recent bookings"
+              message={bookingsError || "Failed to load bookings"}
+              onRetry={bookingsQuery.refetch}
+            />
+          ) : (
+            <RecentBookingsCard bookings={bookingsReport.bookings} />
+          )}
+
+          {toursQuery.isLoading ? (
+            <ListCardSkeleton title="Top tours by bookings" rows={6} />
+          ) : toursQuery.isError || !toursReport ? (
+            <CardError
+              title="Top tours by bookings"
+              message={toursError || "Failed to load top tours"}
+              onRetry={toursQuery.refetch}
+            />
+          ) : (
+            <TopToursRankedCard topTours={toursReport.topTours} />
+          )}
         </div>
       )}
 
@@ -243,9 +359,7 @@ export function DashboardOverview() {
             </p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <Button asChild className="cursor-pointer">
-                <Link href="/dashboard/bookings">
-                  View my bookings
-                </Link>
+                <Link href="/dashboard/bookings">View my bookings</Link>
               </Button>
               <Button asChild variant="outline" className="cursor-pointer">
                 <Link href="/dashboard/tours">Browse tours</Link>

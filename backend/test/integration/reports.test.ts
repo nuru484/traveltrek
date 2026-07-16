@@ -18,6 +18,7 @@ import prisma, {
 import { api, authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
+  createAgent,
   createCustomer,
   createFlight,
   createHotel,
@@ -140,6 +141,41 @@ describe('GET /api/v1/reports/bookings/monthly-summary', () => {
     expect(res.body.data.summary.totalBookings).toBe(2);
     expect(res.body.data.summary.totalRevenue).toBe(800);
     expect(res.body.data.summary.period.month).toBe(3);
+  });
+
+  it('computes per-KPI trends against the equal-length previous window', async () => {
+    const admin = await createAdmin();
+    await seedBookingScenario();
+
+    // Current = April 2026 (1 booking, 200); previous = the equal-length
+    // window before it, i.e. March 2026 (2 bookings, 800, avg 400).
+    const res = await authedApi(admin).get(
+      '/api/v1/reports/bookings/monthly-summary?startDate=2026-04-01&endDate=2026-04-30',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.summary.trends).toEqual({
+      averageBookingValue: { direction: 'down', percentage: 50 },
+      totalBookings: { direction: 'down', percentage: 50 },
+      totalRevenue: { direction: 'down', percentage: 75 },
+    });
+  });
+
+  it('reports upward trends as 100% when the previous window is empty', async () => {
+    const admin = await createAdmin();
+    await seedBookingScenario();
+
+    // Whole-year 2026 window: the previous window (2025) has no bookings.
+    const res = await authedApi(admin).get(
+      '/api/v1/reports/bookings/monthly-summary?year=2026',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.summary.trends).toEqual({
+      averageBookingValue: { direction: 'up', percentage: 100 },
+      totalBookings: { direction: 'up', percentage: 100 },
+      totalRevenue: { direction: 'up', percentage: 100 },
+    });
   });
 
   it('filters by an explicit date range and echoes it in the period', async () => {
@@ -299,6 +335,31 @@ describe('GET /api/v1/reports/payments/summary', () => {
     });
   });
 
+  it('computes per-KPI trends against the equal-length previous window', async () => {
+    const admin = await createAdmin();
+    await seedPaymentScenario();
+
+    // Current = April 2026 (1 FAILED, 200); previous = March 2026
+    // (COMPLETED 500 + PENDING 300).
+    const res = await authedApi(admin).get(
+      '/api/v1/reports/payments/summary?startDate=2026-04-01&endDate=2026-04-30',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.summary.trends).toEqual({
+      // FAILED: 200 now vs 0 before → up 100%.
+      failedAmount: { direction: 'up', percentage: 100 },
+      // PENDING: 0 now vs 300 before → down 100%.
+      pendingAmount: { direction: 'down', percentage: 100 },
+      // REFUNDED: nothing in either window → flat 0%.
+      refundedAmount: { direction: 'flat', percentage: 0 },
+      // 1 payment now vs 2 before → down 50%.
+      totalPayments: { direction: 'down', percentage: 50 },
+      // Revenue (COMPLETED): 0 now vs 500 before → down 100%.
+      totalRevenue: { direction: 'down', percentage: 100 },
+    });
+  });
+
   it('filters by payment method', async () => {
     const admin = await createAdmin();
     await seedPaymentScenario();
@@ -418,7 +479,7 @@ describe('GET /api/v1/reports/tours/top-by-bookings', () => {
     expect(topTours[1].tour.id).toBe(t2.id);
 
     // No tourType/tourStatus sent: their keys are absent from the echo.
-    expect(summary.filters).toEqual({ limit: 5, minBookings: 1 });
+    expect(summary.filters).toEqual({ limit: 10, minBookings: 1 });
     expect(summary.period).toEqual({ month: null, year: 2026 });
     expect(summary.totalToursAnalyzed).toBe(3);
     expect(summary.totalBookingsAnalyzed).toBe(4);
@@ -548,6 +609,146 @@ describe('GET /api/v1/dashboard', () => {
 
   it('requires authentication', async () => {
     const res = await api().get('/api/v1/dashboard');
+
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /api/v1/dashboard/needs-attention', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  /**
+   * 1 pending booking, 1 pending + 1 failed payment, one low-occupancy tour
+   * starting soon (plus a half-full one and a far-future one that don't
+   * count), one mostly-empty flight departing soon (plus a selling one and
+   * one outside the window).
+   */
+  const seedNeedsAttentionScenario = async () => {
+    const now = Date.now();
+    const [c1, c2, c3, c4, c5] = await Promise.all([
+      createCustomer(),
+      createCustomer(),
+      createCustomer(),
+      createCustomer(),
+      createCustomer(),
+    ]);
+
+    // Bookings (their carrier tours start +30d — outside the 14-day window).
+    const bookingTour = await createTour();
+    await createBooking({
+      bookingDate: '2026-06-01T12:00:00Z',
+      customerId: c1.id,
+      status: BookingStatus.PENDING,
+      totalPrice: 100,
+      tourId: bookingTour.id,
+    });
+    await createBooking({
+      bookingDate: '2026-06-02T12:00:00Z',
+      customerId: c2.id,
+      status: BookingStatus.CONFIRMED,
+      totalPrice: 100,
+      tourId: bookingTour.id,
+    });
+
+    // Payments: PENDING and FAILED count; COMPLETED does not. Each needs its
+    // own booking (bookingId is unique) — all CONFIRMED so the pending
+    // bookings count stays at 1.
+    const paymentRows = [
+      { customer: c3, status: PaymentStatus.PENDING },
+      { customer: c4, status: PaymentStatus.FAILED },
+      { customer: c5, status: PaymentStatus.COMPLETED },
+    ];
+    for (const row of paymentRows) {
+      const tour = await createTour();
+      const booking = await createBooking({
+        bookingDate: '2026-06-03T12:00:00Z',
+        customerId: row.customer.id,
+        status: BookingStatus.CONFIRMED,
+        totalPrice: 100,
+        tourId: tour.id,
+      });
+      await prisma.payment.create({
+        data: {
+          amount: 100,
+          bookingId: booking.id,
+          customerId: row.customer.id,
+          paymentMethod: PaymentMethod.MOBILE_MONEY,
+          status: row.status,
+          transactionReference: `attention-ref-${String(booking.id)}`,
+        },
+      });
+    }
+
+    // Tours: 0/10 booked starting in 7 days counts (< 30%); 5/10 does not;
+    // an empty far-future tour is outside the 14-day window.
+    await createTour({ startDate: new Date(now + 7 * DAY_MS) });
+    const halfFull = await createTour({ startDate: new Date(now + 7 * DAY_MS) });
+    await prisma.tour.update({
+      data: { guestsBooked: 5 },
+      where: { id: halfFull.id },
+    });
+
+    // Flights: 100/100 seats free departing in 3 days counts (> 70%); 50/100
+    // does not; the default factory departure (+14d) is outside the window.
+    const emptyFlight = await createFlight({ capacity: 100 });
+    await prisma.flight.update({
+      data: { departure: new Date(now + 3 * DAY_MS) },
+      where: { id: emptyFlight.id },
+    });
+    const sellingFlight = await createFlight({ capacity: 100 });
+    await prisma.flight.update({
+      data: { departure: new Date(now + 3 * DAY_MS), seatsAvailable: 50 },
+      where: { id: sellingFlight.id },
+    });
+    await createFlight({ capacity: 100 });
+  };
+
+  it('returns the operational counts to an admin', async () => {
+    const admin = await createAdmin();
+    await seedNeedsAttentionScenario();
+
+    const res = await authedApi(admin).get('/api/v1/dashboard/needs-attention');
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe(
+      'Needs-attention summary retrieved successfully',
+    );
+    expect(res.body.data).toEqual({
+      failedPayments: 1,
+      flightsDepartingSoonLowSeats: 1,
+      pendingBookings: 1,
+      pendingPayments: 1,
+      upcomingToursLowOccupancy: 1,
+    });
+  });
+
+  it('is available to agents', async () => {
+    const agent = await createAgent();
+
+    const res = await authedApi(agent).get('/api/v1/dashboard/needs-attention');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({
+      failedPayments: 0,
+      flightsDepartingSoonLowSeats: 0,
+      pendingBookings: 0,
+      pendingPayments: 0,
+      upcomingToursLowOccupancy: 0,
+    });
+  });
+
+  it('is forbidden for customers', async () => {
+    const customer = await createCustomer();
+
+    const res = await authedApi(customer).get(
+      '/api/v1/dashboard/needs-attention',
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('requires authentication', async () => {
+    const res = await api().get('/api/v1/dashboard/needs-attention');
 
     expect(res.status).toBe(401);
   });

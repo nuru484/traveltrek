@@ -5,6 +5,28 @@
 // types/reports.types.ts
 import { IDestinationSummary } from "./tour.types";
 
+/**
+ * Per-KPI change vs the equal-length previous window. Mirrors the backend
+ * `ReportTrend` (services/report.service.ts): `percentage` is the absolute
+ * change (2dp); `direction` carries the sign.
+ */
+export interface ITrend {
+  direction: "up" | "down" | "flat";
+  percentage: number;
+}
+
+/**
+ * One slice of a breakdown chart, derived client-side from the backend's
+ * Partial<Record<..., count | {count, amount}>> breakdown maps. `amount` is
+ * integer pesewas.
+ */
+export interface IBreakdownSegment {
+  key: string;
+  count: number;
+  amount: number;
+  percentage: number;
+}
+
 /** Customer summary embedded in report rows (nullable email column). */
 export interface ICustomerSummary {
   id: number;
@@ -106,6 +128,11 @@ export interface IMonthlyBookingsResponse {
         startDate: string | null;
         endDate: string | null;
       };
+      trends: {
+        totalBookings: ITrend;
+        totalRevenue: ITrend;
+        averageBookingValue: ITrend;
+      };
     };
     monthlyBreakdown: Array<{
       month: string;
@@ -136,6 +163,13 @@ export interface IPaymentsSummaryResponse {
         month: number | null;
         startDate: string | null;
         endDate: string | null;
+      };
+      trends: {
+        totalPayments: ITrend;
+        totalRevenue: ITrend;
+        pendingAmount: ITrend;
+        failedAmount: ITrend;
+        refundedAmount: ITrend;
       };
     };
     /** Only statuses/methods that occurred are present (backend Partial<Record>). */

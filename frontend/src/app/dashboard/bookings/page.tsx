@@ -23,9 +23,17 @@ const BookingsPage = () => {
 
   const urlCustomerId = Number(searchParams.get("customerId"));
 
+  // ?status= deep links (e.g. the dashboard's needs-attention tiles) land
+  // pre-filtered; unknown values are ignored.
+  const urlStatus = searchParams.get("status");
+  const initialStatus = (
+    ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"] as const
+  ).find((status) => status === urlStatus);
+
   const [params, setParams] = React.useState<IBookingsQueryParams>({
     page: 1,
     limit: 10,
+    status: initialStatus,
   });
 
   // Queries

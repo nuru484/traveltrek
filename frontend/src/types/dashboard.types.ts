@@ -34,3 +34,20 @@ export interface IDashboardResponse {
   message: string;
   data: IDashboardStats;
 }
+
+/**
+ * Mirrors the backend `NeedsAttentionCounts`
+ * (services/dashboard.service.ts) — live operational counts for staff.
+ */
+export interface INeedsAttentionCounts {
+  pendingBookings: number;
+  pendingPayments: number;
+  upcomingToursLowOccupancy: number;
+  flightsDepartingSoonLowSeats: number;
+  failedPayments: number;
+}
+
+export interface INeedsAttentionResponse {
+  message: string;
+  data: INeedsAttentionCounts;
+}

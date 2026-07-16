@@ -11,9 +11,10 @@
 //   isISO8601() check. The strings pass through unparsed: the service both
 //   builds the Prisma window from them and echoes them verbatim in
 //   `summary.period`, exactly as before.
-// - limit (1–20, default 5) and minBookings (>= 0, default 1) move their
+// - limit (1–20, default 10) and minBookings (>= 0, default 1) move their
 //   handler-side destructure defaults here; the wire echo in
-//   `summary.filters` is unchanged.
+//   `summary.filters` is unchanged. (The limit default was raised from the
+//   legacy 5 to 10 for the reports rebuild — the UI no longer sends it.)
 import { z } from 'zod';
 
 import {
@@ -84,7 +85,7 @@ export const topToursQuery = z.object({
     .int('Limit must be between 1 and 20')
     .min(1, 'Limit must be between 1 and 20')
     .max(20, 'Limit must be between 1 and 20')
-    .default(5),
+    .default(10),
   minBookings: z.coerce
     .number('Minimum bookings must be non-negative')
     .int('Minimum bookings must be non-negative')
