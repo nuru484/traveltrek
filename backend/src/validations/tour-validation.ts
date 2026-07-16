@@ -1,337 +1,116 @@
-import { ValidationChain } from 'express-validator';
-
-import { TourStatus, TourType } from '../../generated/prisma/client';
-import prisma from '../config/prismaClient';
 // src/validations/tour-validation.ts
-import { validator } from '../validations/validation-factory';
+//
+// Zod schemas for the tour domain (replaces the express-validator chains).
+// Boundary rules only — shape, ranges, enums and date ordering. Invariants
+// that need the database (destination existence, booking guards, status
+// transitions) live in services/tour.service.ts.
+import { z } from 'zod';
 
-export const createTourValidation: ValidationChain[] = [
-  validator.string('name', {
-    customMessage: 'Tour name must be between 3 and 200 characters',
-    maxLength: 200,
-    minLength: 3,
-    required: true,
-  }),
+import { TourStatus, TourType } from '../config/prismaClient';
+import { TOUR_SORT_FIELDS } from '../services/tour.service';
+import { boolQuery, paginationQuery } from './common-validation';
 
-  validator.string('description', {
-    customMessage: 'Description must not exceed 5000 characters',
-    maxLength: 5000,
-    required: false,
-  }),
+const tourFields = z.object({
+  description: z
+    .string()
+    .trim()
+    .max(5000, 'Description must not exceed 5000 characters')
+    .optional(),
+  destinationId: z.number().int().min(1),
+  endDate: z.coerce.date('endDate must be a valid date'),
+  maxGuests: z.number().int().min(1).max(1000),
+  name: z
+    .string('Tour name must be between 3 and 200 characters')
+    .trim()
+    .min(3, 'Tour name must be between 3 and 200 characters')
+    .max(200, 'Tour name must be between 3 and 200 characters'),
+  price: z.number().min(0).max(10_000_000),
+  startDate: z.coerce.date('startDate must be a valid date'),
+  type: z.enum(TourType),
+});
 
-  validator.enum('type', Object.values(TourType), { required: true }),
+export const createTourSchema = tourFields
+  .refine((body) => body.startDate.getTime() >= Date.now(), {
+    error: 'Start date must be in the future',
+    path: ['startDate'],
+  })
+  .refine((body) => body.endDate > body.startDate, {
+    error: 'End date must be after start date',
+    path: ['endDate'],
+  });
 
-  validator.number('price', {
-    allowDecimals: true,
-    max: 10_000_000,
-    min: 0,
-    required: true,
-  }),
+// Date rules involving the stored tour (future-dating an edit, ordering
+// against the unchanged date) are enforced by the update service, which knows
+// the existing row. Here we only check ordering when both dates are sent.
+export const updateTourSchema = tourFields
+  .partial()
+  .refine(
+    (body) => !body.startDate || !body.endDate || body.endDate > body.startDate,
+    { error: 'End date must be after start date', path: ['endDate'] },
+  );
 
-  validator.integer('maxGuests', {
-    max: 1000,
-    min: 1,
-    required: true,
-  }),
+export const tourStatusSchema = z.object({
+  status: z.enum(TourStatus, 'Invalid tour status'),
+});
 
-  validator.date('startDate', {
-    minDate: new Date(),
-    required: true,
-  }),
-
-  validator.date('endDate', {
-    compareDateField: 'startDate',
-    compareDateOperation: 'after',
-    required: true,
-  }),
-
-  validator.number('destinationId', {
-    min: 1,
-    required: true,
-  }),
-];
-
-export const updateTourValidation: ValidationChain[] = [
-  validator.string('name', {
-    customMessage: 'Tour name must be between 3 and 200 characters',
-    maxLength: 200,
-    minLength: 3,
-    required: false,
-  }),
-
-  validator.string('description', {
-    customMessage: 'Description must not exceed 5000 characters',
-    maxLength: 5000,
-    required: false,
-  }),
-
-  validator.enum('type', Object.values(TourType), { required: false }),
-
-  validator.number('price', {
-    allowDecimals: true,
-    max: 10_000_000,
-    min: 0,
-    required: false,
-  }),
-
-  validator.integer('maxGuests', {
-    max: 1000,
-    min: 1,
-    required: false,
-  }),
-
-  validator.date('startDate', {
-    minDate: new Date(),
-    required: false,
-  }),
-
-  validator.date('endDate', {
-    required: false,
-  }),
-
-  validator.custom(
-    'endDate',
-    (value: string, req) => {
-      if (!value) return true;
-
-      const endDate = new Date(value);
-      const startDate = req.body.startDate
-        ? new Date(req.body.startDate)
-        : null;
-
-      if (!startDate) return true;
-
-      return endDate > startDate;
+export const tourListQuery = paginationQuery
+  .extend({
+    availableOnly: boolQuery.optional(),
+    city: z.string().trim().min(1).max(255).optional(),
+    country: z.string().trim().min(1).max(255).optional(),
+    destinationId: z.coerce.number().int().min(1).optional(),
+    endDate: z.coerce.date().optional(),
+    maxDuration: z.coerce.number().int().min(1).optional(),
+    maxGuests: z.coerce.number().int().min(1).max(1000).optional(),
+    maxPrice: z.coerce.number().min(0).optional(),
+    minDuration: z.coerce.number().int().min(1).optional(),
+    minGuests: z.coerce.number().int().min(1).optional(),
+    minPrice: z.coerce.number().min(0).optional(),
+    search: z
+      .string()
+      .trim()
+      .min(1, 'Search term must be between 1 and 200 characters')
+      .max(200, 'Search term must be between 1 and 200 characters')
+      .optional(),
+    sortBy: z.enum(TOUR_SORT_FIELDS).default('createdAt'),
+    sortOrder: z.enum(['asc', 'desc']).default('desc'),
+    startDate: z.coerce.date().optional(),
+    status: z.enum(TourStatus).optional(),
+    type: z.enum(TourType).optional(),
+  })
+  .refine(
+    (q) =>
+      q.minPrice === undefined ||
+      q.maxPrice === undefined ||
+      q.maxPrice >= q.minPrice,
+    {
+      error: 'Maximum price must be greater than or equal to minimum price',
+      path: ['maxPrice'],
     },
-    'End date must be after start date',
-    { required: false },
-  ),
-
-  validator.number('destinationId', {
-    min: 1,
-    required: false,
-  }),
-];
-
-export const tourIdParamValidation: ValidationChain[] = [
-  validator.integer('id', {
-    min: 1,
-    required: true,
-  }),
-];
-
-export const paginationQueryValidation: ValidationChain[] = [
-  validator.integer('page', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('limit', {
-    max: 1000,
-    min: 1,
-    required: false,
-  }),
-];
-
-export const tourSearchValidation: ValidationChain[] = [
-  validator.string('search', {
-    customMessage: 'Search term must be between 1 and 200 characters',
-    maxLength: 200,
-    minLength: 1,
-    required: false,
-  }),
-
-  validator.enum('type', Object.values(TourType), { required: false }),
-
-  validator.enum('status', Object.values(TourStatus), { required: false }),
-
-  validator.number('minPrice', {
-    allowDecimals: true,
-    min: 0,
-    required: false,
-  }),
-
-  validator.number('maxPrice', {
-    allowDecimals: true,
-    min: 0,
-    required: false,
-  }),
-
-  validator.custom(
-    'maxPrice',
-    (value: number, req) => {
-      const minPrice = req.query?.minPrice;
-      if (!value || !minPrice) return true;
-
-      return parseFloat(value.toString()) >= parseFloat(minPrice.toString());
+  )
+  .refine(
+    (q) =>
+      q.minDuration === undefined ||
+      q.maxDuration === undefined ||
+      q.maxDuration >= q.minDuration,
+    {
+      error:
+        'Maximum duration must be greater than or equal to minimum duration',
+      path: ['maxDuration'],
     },
-    'Maximum price must be greater than or equal to minimum price',
-    { required: false },
-  ),
-
-  validator.integer('minDuration', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('maxDuration', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.custom(
-    'maxDuration',
-    (value: number, req) => {
-      const minDuration = req.query?.minDuration;
-      if (!value || !minDuration) return true;
-
-      return parseInt(value.toString()) >= parseInt(minDuration.toString());
+  )
+  .refine(
+    (q) =>
+      q.minGuests === undefined ||
+      q.maxGuests === undefined ||
+      q.maxGuests >= q.minGuests,
+    {
+      error: 'Maximum guests must be greater than or equal to minimum guests',
+      path: ['maxGuests'],
     },
-    'Maximum duration must be greater than or equal to minimum duration',
-    { required: false },
-  ),
+  );
 
-  validator.integer('minGuests', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('maxGuests', {
-    max: 1000,
-    min: 1,
-    required: false,
-  }),
-
-  validator.custom(
-    'maxGuests',
-    (value: number, req) => {
-      const minGuests = req.query?.minGuests;
-      if (!value || !minGuests) return true;
-
-      return parseInt(value.toString()) >= parseInt(minGuests.toString());
-    },
-    'Maximum guests must be greater than or equal to minimum guests',
-    { required: false },
-  ),
-
-  validator.date('startDate', {
-    required: false,
-  }),
-
-  validator.date('endDate', {
-    required: false,
-  }),
-
-  validator.boolean('availableOnly', {
-    required: false,
-  }),
-
-  validator.enum(
-    'sortBy',
-    [
-      'createdAt',
-      'updatedAt',
-      'startDate',
-      'endDate',
-      'price',
-      'duration',
-      'maxGuests',
-      'guestsBooked',
-      'name',
-    ],
-    { required: false },
-  ),
-
-  validator.enum('sortOrder', ['asc', 'desc'], {
-    required: false,
-  }),
-];
-
-export const getAllToursValidation: ValidationChain[] = [
-  ...paginationQueryValidation,
-  ...tourSearchValidation,
-];
-
-export const bulkTourValidation: ValidationChain[] = [
-  validator.array('tourIds', {
-    itemType: 'number',
-    maxLength: 100,
-    minLength: 1,
-    required: true,
-    unique: true,
-  }),
-
-  validator.custom(
-    'tourIds',
-    (value: number[]) => {
-      if (!Array.isArray(value)) return false;
-      return value.every((id) => Number.isInteger(id) && id > 0);
-    },
-    'All tour IDs must be positive integers',
-    { required: false },
-  ),
-];
-
-export const tourAvailabilityValidation: ValidationChain[] = [
-  validator.integer('tourId', {
-    min: 1,
-    required: true,
-  }),
-
-  validator.custom(
-    'tourId',
-    async (value: number) => {
-      if (!value) return true;
-
-      const tour = await prisma.tour.findUnique({
-        where: { id: Number(value) },
-      });
-
-      return !!tour;
-    },
-    'Tour does not exist',
-    { required: false },
-  ),
-
-  validator.integer('guests', {
-    max: 1000,
-    min: 1,
-    required: true,
-  }),
-
-  validator.custom(
-    'guests',
-    async (value: number, req) => {
-      const tourId = req.body.tourId || req.query.tourId;
-      if (!value || !tourId) return true;
-
-      const tour = await prisma.tour.findUnique({
-        select: { guestsBooked: true, maxGuests: true },
-        where: { id: Number(tourId) },
-      });
-
-      if (!tour) return true;
-
-      const availableSeats = tour.maxGuests - tour.guestsBooked;
-      return value <= availableSeats;
-    },
-    'Requested number of guests exceeds available seats',
-    { required: false },
-  ),
-];
-
-export const tourDateRangeValidation: ValidationChain[] = [
-  validator.date('fromDate', {
-    required: true,
-  }),
-
-  validator.date('toDate', {
-    compareDateField: 'fromDate',
-    compareDateOperation: 'after-or-same',
-    required: true,
-  }),
-];
-
-export const updateTourStatusValidation: ValidationChain[] = [
-  validator.enum('status', Object.values(TourStatus), { required: true }),
-];
+export type CreateTourBody = z.infer<typeof createTourSchema>;
+export type TourListQuery = z.infer<typeof tourListQuery>;
+export type TourStatusBody = z.infer<typeof tourStatusSchema>;
+export type UpdateTourBody = z.infer<typeof updateTourSchema>;

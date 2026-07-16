@@ -38,6 +38,6 @@ tourRoutes.get(
   ...getAllTours,
 );
 
-tourRoutes.delete('/tours', authorizeRole([UserRole.ADMIN]), deleteAllTours);
+tourRoutes.delete('/tours', authorizeRole([UserRole.ADMIN]), ...deleteAllTours);
 
 export default tourRoutes;
