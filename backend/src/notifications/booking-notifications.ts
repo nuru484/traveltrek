@@ -71,7 +71,7 @@ const tripDatesLine = (booking: BookingRowForNotice): string => {
 };
 
 export const makeBookingNotifications = (
-  d: Pick<AppDeps, 'config' | 'logger' | 'mail' | 'sms'>,
+  d: Pick<AppDeps, 'config' | 'logger' | 'notify'>,
 ) => {
   const deliver = makeDeliver(d);
 

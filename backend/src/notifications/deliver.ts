@@ -3,11 +3,11 @@
 // Channel selection + shared formatting for customer-facing transactional
 // notifications. One rule everywhere: EMAIL when the customer has one
 // (durable, free), else SMS, else the notification is skipped with a log
-// line. Delivery is fire-and-forget through the shared dispatch helper — a
-// send failure never surfaces into the request/job that triggered it.
+// line. Delivery goes through the injected NotifyClient (the durable BullMQ
+// queue in production — see src/notifications/notify.ts); from the caller's
+// view it is enqueue-and-forget, so a send can never block or fail the
+// request/job that triggered it.
 import { type AppDeps } from '#services/deps.js';
-
-import { makeDispatch } from './dispatch.js';
 
 /** The contact slice a notification needs — decoupled from Prisma rows. */
 export interface CustomerContact {
@@ -53,22 +53,20 @@ export const formatDateTime = (date: Date): string =>
 
 /** Builds the email-first / SMS-fallback sender for a module's deps. */
 export const makeDeliver = (
-  d: Pick<AppDeps, 'logger' | 'mail' | 'sms'>,
+  d: Pick<AppDeps, 'logger' | 'notify'>,
 ): Deliver => {
-  const dispatch = makeDispatch(d.logger);
-
   return (to, message, what) => {
     if (to.email) {
-      dispatch(
-        d.mail.send({
+      d.notify.email(
+        {
           subject: message.subject,
           text: message.emailText,
           to: to.email,
-        }),
+        },
         what,
       );
     } else if (to.phone) {
-      dispatch(d.sms.send({ message: message.sms, to: to.phone }), what);
+      d.notify.sms({ message: message.sms, to: to.phone }, what);
     } else {
       d.logger.warn(
         { what },

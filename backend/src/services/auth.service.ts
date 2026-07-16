@@ -49,7 +49,6 @@ import {
   TooManyRequestsError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
-import { makeDispatch } from '#notifications/dispatch.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import {
   AccessTokenPayload,
@@ -257,7 +256,7 @@ export interface TwoFactorStatus {
 
 type AuthDeps = Pick<
   AppDeps,
-  'clock' | 'config' | 'google' | 'logger' | 'mail' | 'prisma' | 'sms'
+  'clock' | 'config' | 'google' | 'logger' | 'notify' | 'prisma'
 >;
 
 /** The password-free customer shape plus tokenVersion, so the registration
@@ -282,7 +281,7 @@ export type RegisteredUser = Prisma.UserGetPayload<{
 }>;
 
 export const makeAuthService = (d: AuthDeps) => {
-  const { clock, config, google, logger, mail, prisma, sms } = d;
+  const { clock, config, google, logger, notify, prisma } = d;
 
   /** The security-token FK column for a principal — exactly one is ever set
    * per row (DB CHECK + this being the only writer). */
@@ -724,11 +723,6 @@ export const makeAuthService = (d: AuthDeps) => {
 
   // ---- Passwordless OTP login, password reset, Google sign-in ----
 
-  /** Fire-and-forget delivery: a slow/failed send never blocks or fails the
-   * request (and keeps request-OTP / forgot-password timing uniform). Shared
-   * with the notification modules — see src/notifications/dispatch.ts. */
-  const dispatch = makeDispatch(logger);
-
   /** Resolves the CUSTOMER an OTP request/verify identifies (email or phone).
    * OTP login is a customer-only surface — staff use passwords. */
   const findCustomerByContact = (
@@ -877,16 +871,16 @@ export const makeAuthService = (d: AuthDeps) => {
 
     const message = `Your TravelTrek login code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
     if (contact.email && customer.email) {
-      dispatch(
-        mail.send({
+      notify.email(
+        {
           subject: 'Your TravelTrek login code',
           text: message,
           to: customer.email,
-        }),
+        },
         'OTP email',
       );
     } else if (contact.phone && customer.phone) {
-      dispatch(sms.send({ message, to: customer.phone }), 'OTP SMS');
+      notify.sms({ message, to: customer.phone }, 'OTP SMS');
     }
   };
 
@@ -960,15 +954,15 @@ export const makeAuthService = (d: AuthDeps) => {
     );
 
     const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${token}`;
-    dispatch(
-      mail.send({
+    notify.email(
+      {
         subject: 'Reset your TravelTrek password',
         text:
           `Hi ${account.name},\n\nWe received a request to reset your password. ` +
           `Use the link below within ${PASSWORD_RESET_TTL_MINUTES} minutes:\n\n` +
           `${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
         to: account.email,
-      }),
+      },
       'Password-reset email',
     );
     logger.info(
@@ -1126,16 +1120,16 @@ export const makeAuthService = (d: AuthDeps) => {
     const row = principalRow(principal);
     const message = `Your TravelTrek verification code is ${code}. It expires in ${String(TWO_FACTOR_TTL_MINUTES)} minutes.`;
     if (row.email) {
-      dispatch(
-        mail.send({
+      notify.email(
+        {
           subject: 'Your TravelTrek verification code',
           text: message,
           to: row.email,
-        }),
+        },
         '2FA email',
       );
     } else if (row.phone) {
-      dispatch(sms.send({ message, to: row.phone }), '2FA SMS');
+      notify.sms({ message, to: row.phone }, '2FA SMS');
     } else {
       // Unreachable in practice: enabling requires a channel and profile
       // updates never null contacts out. Fail closed (no session either way).
@@ -1615,8 +1609,8 @@ export const makeAuthService = (d: AuthDeps) => {
     );
 
     const confirmUrl = `${config.FRONTEND_URL}/confirm-email-change?token=${token}`;
-    dispatch(
-      mail.send({
+    notify.email(
+      {
         subject: 'Confirm your new TravelTrek email address',
         text:
           `Hi ${row.name},\n\n` +
@@ -1626,7 +1620,7 @@ export const makeAuthService = (d: AuthDeps) => {
           `Until you confirm, your account keeps its current email. ` +
           `If you didn't request this change, you can ignore this message.`,
         to: input.newEmail,
-      }),
+      },
       'Email-change confirmation email',
     );
     logger.info({ kind, principalId }, 'Email change requested');
@@ -1738,11 +1732,11 @@ export const makeAuthService = (d: AuthDeps) => {
       code,
       PHONE_CHANGE_TTL_MINUTES,
     );
-    dispatch(
-      sms.send({
+    notify.sms(
+      {
         message: `Your TravelTrek verification code is ${code}. It expires in ${PHONE_CHANGE_TTL_MINUTES} minutes.`,
         to: input.newPhone,
-      }),
+      },
       'Phone-change OTP SMS',
     );
     logger.info({ kind, principalId }, 'Phone change requested');

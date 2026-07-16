@@ -20,7 +20,7 @@ export interface PaymentNoticeInput {
 }
 
 export const makePaymentNotifications = (
-  d: Pick<AppDeps, 'config' | 'logger' | 'mail' | 'sms'>,
+  d: Pick<AppDeps, 'config' | 'logger' | 'notify'>,
 ) => {
   const deliver = makeDeliver(d);
 

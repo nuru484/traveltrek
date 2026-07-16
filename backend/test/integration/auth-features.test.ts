@@ -415,9 +415,8 @@ const makeGoogleService = (google: GoogleAuthClient) => {
     config,
     google,
     logger,
-    mail: { send: vi.fn(() => Promise.resolve()) },
+    notify: { email: vi.fn(), sms: vi.fn() },
     prisma,
-    sms: { send: vi.fn(() => Promise.resolve()) },
   });
 };
 

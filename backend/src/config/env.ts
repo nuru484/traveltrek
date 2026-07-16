@@ -22,6 +22,12 @@ interface IENV {
   MAIL_FROM_EMAIL: string;
   MAIL_FROM_NAME: string;
   NODE_ENV: string;
+  /**
+   * true sends email/SMS directly (fire-and-forget, no retries) instead of
+   * through the durable BullMQ notification queue. For tests and Redis-less
+   * local runs only — production should keep the queued default.
+   */
+  NOTIFICATIONS_INLINE: boolean;
   PAYSTACK_CALLBACK_URL?: string;
   PAYSTACK_SECRET_KEY: string;
   PORT: number;
@@ -88,6 +94,7 @@ const ENV: IENV = {
   MAIL_FROM_EMAIL: process.env.MAIL_FROM_EMAIL ?? 'no-reply@traveltrek.local',
   MAIL_FROM_NAME: process.env.MAIL_FROM_NAME ?? 'TravelTrek',
   NODE_ENV: process.env.NODE_ENV ?? 'development',
+  NOTIFICATIONS_INLINE: process.env.NOTIFICATIONS_INLINE === 'true',
   PAYSTACK_CALLBACK_URL: process.env.PAYSTACK_CALLBACK_URL,
   PAYSTACK_SECRET_KEY: assertEnv(
     process.env.PAYSTACK_SECRET_KEY,

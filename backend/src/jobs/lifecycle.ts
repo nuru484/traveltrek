@@ -32,31 +32,46 @@ export async function startWorkers(): Promise<void> {
     { bookingDeadlineWorker },
     { flightStatusWorker },
     { tourStatusWorker },
+    { notificationWorker },
     { bookingDeadlineQueue },
     { flightStatusQueue },
     { tourStatusQueue },
+    { notificationQueue },
     { setupJobSchedulers },
   ] = await Promise.all([
     import('#jobs/bookingWorker.js'),
     import('#jobs/flightWorker.js'),
     import('#jobs/tourWorker.js'),
+    import('#jobs/notificationWorker.js'),
     import('#jobs/bookingQueue.js'),
     import('#jobs/flightQueue.js'),
     import('#jobs/tourQueue.js'),
+    import('#jobs/notificationQueue.js'),
     import('#jobs/schedulers.js'),
   ]);
 
   await setupJobSchedulers();
 
   running = {
-    queues: [bookingDeadlineQueue, flightStatusQueue, tourStatusQueue],
-    workers: [bookingDeadlineWorker, flightStatusWorker, tourStatusWorker],
+    queues: [
+      bookingDeadlineQueue,
+      flightStatusQueue,
+      tourStatusQueue,
+      notificationQueue,
+    ],
+    workers: [
+      bookingDeadlineWorker,
+      flightStatusWorker,
+      tourStatusWorker,
+      notificationWorker,
+    ],
   };
 
   logger.info('✅ All workers started and listening for jobs...');
   logger.info('📧 Booking Deadline Worker: Active');
   logger.info('✈️  Flight Status Worker: Active');
   logger.info('🗺️  Tour Status Worker: Active');
+  logger.info('✉️  Notification Worker: Active');
 }
 
 /**

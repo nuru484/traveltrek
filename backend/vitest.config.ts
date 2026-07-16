@@ -18,7 +18,13 @@ export default defineConfig({
       // the cookie jar on authenticated requests.
       COOKIE_DOMAIN: '',
       DATABASE_URL: testDbUrl,
+      // Empty so the "responds 503 when GOOGLE_CLIENT_ID is not set" test is
+      // hermetic even when the local .env carries a (placeholder) value.
+      GOOGLE_CLIENT_ID: '',
       NODE_ENV: 'test',
+      // Send email/SMS directly through the (mocked) sendMail/sendSms so
+      // tests read messages synchronously and never need Redis.
+      NOTIFICATIONS_INLINE: 'true',
       // A known secret so webhook-signature tests can sign payloads deterministically.
       PAYSTACK_SECRET_KEY: 'sk_test_vitest',
     },

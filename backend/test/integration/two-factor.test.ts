@@ -405,9 +405,8 @@ describe('2FA bypasses (documented): OTP login and Google sign-in', () => {
       },
       google,
       logger,
-      mail: { send: vi.fn(() => Promise.resolve()) },
+      notify: { email: vi.fn(), sms: vi.fn() },
       prisma,
-      sms: { send: vi.fn(() => Promise.resolve()) },
     });
 
     // The account resolves directly — the controller mints a session from

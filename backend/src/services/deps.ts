@@ -20,6 +20,11 @@ import {
   verifyPaystackTransaction,
 } from '#lib/paystack.js';
 import { sendSms } from '#lib/sms.js';
+import {
+  makeInlineNotify,
+  makeQueuedNotify,
+  type NotifyClient,
+} from '#notifications/notify.js';
 import loggerInstance from '#utils/logger.js';
 
 /** Config values services read; injected so tests can vary them. */
@@ -41,6 +46,8 @@ export interface AppDeps {
   google: GoogleAuthClient;
   logger: Logger;
   mail: MailClient;
+  /** Durable outbound notifications (queued with retries in production). */
+  notify: NotifyClient;
   paystack: PaystackClient;
   prisma: DbClient;
   sms: SmsClient;
@@ -96,6 +103,13 @@ export const defaultDeps: AppDeps = {
   google: { verifyIdToken: verifyGoogleIdToken },
   logger: loggerInstance,
   mail: { send: sendMail },
+  notify: ENV.NOTIFICATIONS_INLINE
+    ? makeInlineNotify({
+        logger: loggerInstance,
+        mail: { send: sendMail },
+        sms: { send: sendSms },
+      })
+    : makeQueuedNotify(loggerInstance),
   paystack: {
     initialize: initializePaystackTransaction,
     refund: refundPaystackTransaction,
