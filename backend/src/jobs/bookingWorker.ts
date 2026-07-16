@@ -1,33 +1,34 @@
 // src/jobs/bookingWorker.ts
 import { Worker } from 'bullmq';
-import prisma from '../config/prismaClient';
 import pMap from 'p-map';
+
+import prisma from '../config/prismaClient';
 import { createRedisConnection } from '../config/redisConnection';
 import logger from '../utils/logger';
 
 export const bookingDeadlineWorker = new Worker(
   'bookingDeadlineQueue',
-  async (job) => {
+  async (_job) => {
     logger.info('🔍 Checking for expired booking payment deadlines...');
 
     const now = new Date();
 
     const expiredBookings = await prisma.booking.findMany({
-      where: {
-        status: 'PENDING',
-        paymentDeadline: {
-          lte: now,
-        },
-      },
       include: {
-        user: true,
-        tour: true,
+        flight: true,
         room: {
           include: {
             hotel: true,
           },
         },
-        flight: true,
+        tour: true,
+        user: true,
+      },
+      where: {
+        paymentDeadline: {
+          lte: now,
+        },
+        status: 'PENDING',
       },
     });
 
@@ -49,29 +50,29 @@ export const bookingDeadlineWorker = new Worker(
       async (booking) => {
         try {
           await prisma.booking.update({
-            where: { id: booking.id },
             data: { status: 'CANCELLED' },
+            where: { id: booking.id },
           });
 
           if (booking.tourId && booking.tour) {
             await prisma.tour.update({
-              where: { id: booking.tourId },
               data: {
                 guestsBooked: {
                   decrement: booking.numberOfGuests,
                 },
               },
+              where: { id: booking.tourId },
             });
           }
 
           if (booking.flightId && booking.flight) {
             await prisma.flight.update({
-              where: { id: booking.flightId },
               data: {
                 seatsAvailable: {
                   increment: booking.numberOfGuests,
                 },
               },
+              where: { id: booking.flightId },
             });
           }
 
@@ -81,7 +82,9 @@ export const bookingDeadlineWorker = new Worker(
           );
         } catch (err) {
           failureCount++;
-          logger.error(`⚠️  Failed to cancel booking #${booking.id}: ${err}`);
+          logger.error(
+            `⚠️  Failed to cancel booking #${booking.id}: ${String(err)}`,
+          );
         }
       },
       { concurrency: 10 },

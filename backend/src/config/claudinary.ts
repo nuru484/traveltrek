@@ -1,34 +1,35 @@
 // src/config/claudinary.ts
 import {
   v2 as cloudinaryBase,
-  UploadApiResponse,
   UploadApiErrorResponse,
+  UploadApiResponse,
 } from 'cloudinary';
-import logger from '../utils/logger';
-import { assertEnv } from './env';
-import ENV from './env';
+
 import {
-  ValidationError,
-  InternalServerError,
-  CustomError,
-} from '../middlewares/error-handler';
-import { isValidBase64Image } from '../utils/validate-base64-image';
-import {
-  ICloudinaryUploadService,
-  IUploadedFile,
   ICloudinaryConfig,
+  ICloudinaryDeletionResponse,
   ICloudinaryUploadOptions,
   ICloudinaryUploadResult,
-  ICloudinaryDeletionResponse,
+  ICloudinaryUploadService,
+  IUploadedFile,
 } from '../../types/cloudinary.types';
+import {
+  CustomError,
+  InternalServerError,
+  ValidationError,
+} from '../middlewares/error-handler';
+import logger from '../utils/logger';
+import { isValidBase64Image } from '../utils/validate-base64-image';
+import { assertEnv } from './env';
+import ENV from './env';
 
 const MAX_UPLOAD_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
 export const defaultCloudinaryConfig: ICloudinaryConfig = {
-  cloud_name: assertEnv(ENV.CLOUDINARY_CLOUD_NAME, 'CLOUDINARY_CLOUD_NAME'),
   api_key: assertEnv(ENV.CLOUDINARY_API_KEY, 'CLOUDINARY_API_KEY'),
   api_secret: assertEnv(ENV.CLOUDINARY_API_SECRET, 'CLOUDINARY_API_SECRET'),
+  cloud_name: assertEnv(ENV.CLOUDINARY_CLOUD_NAME, 'CLOUDINARY_CLOUD_NAME'),
 };
 
 export const extractPublicIdFromUrl = (url: string): string => {
@@ -37,7 +38,7 @@ export const extractPublicIdFromUrl = (url: string): string => {
     const parts = urlPath.split('/');
     const filename = parts[parts.length - 1];
     return filename.split('.')[0];
-  } catch (error) {
+  } catch (_error) {
     return url.split('/').slice(-1)[0].split('.')[0];
   }
 };
@@ -74,7 +75,10 @@ export const uploadToCloudinary = async (
     throw new ValidationError(
       'Invalid Base64 image format. Must be a valid data URI.',
     );
-  } else if (typeof file !== 'string' && (!file || !file.buffer)) {
+  } else if (
+    typeof file !== 'string' &&
+    !(file as Partial<IUploadedFile>).buffer
+  ) {
     throw new ValidationError(
       'Invalid file object. Ensure the file is provided and has a buffer property.',
     );
@@ -91,16 +95,16 @@ export const uploadToCloudinary = async (
       let result: UploadApiResponse;
       if (typeof file === 'string') {
         result = await new Promise<UploadApiResponse>((resolve, reject) => {
-          cloudinary.uploader.upload(
+          void cloudinary.uploader.upload(
             file,
             uploadOptions,
             (
-              error: UploadApiErrorResponse | undefined,
-              uploadResult: UploadApiResponse | undefined,
+              error: undefined | UploadApiErrorResponse,
+              uploadResult: undefined | UploadApiResponse,
             ) => {
               if (error || !uploadResult) {
                 reject(
-                  new Error(error?.message || 'Unknown error during upload'),
+                  new Error(error?.message ?? 'Unknown error during upload'),
                 );
               } else {
                 resolve(uploadResult);
@@ -113,12 +117,12 @@ export const uploadToCloudinary = async (
           const uploadStream = cloudinary.uploader.upload_stream(
             uploadOptions,
             (
-              error: UploadApiErrorResponse | undefined,
-              uploadResult: UploadApiResponse | undefined,
+              error: undefined | UploadApiErrorResponse,
+              uploadResult: undefined | UploadApiResponse,
             ) => {
               if (error || !uploadResult) {
                 reject(
-                  new Error(error?.message || 'Unknown error during upload'),
+                  new Error(error?.message ?? 'Unknown error during upload'),
                 );
               } else {
                 resolve(uploadResult);
@@ -133,11 +137,11 @@ export const uploadToCloudinary = async (
         `File uploaded successfully to Cloudinary: ${result.public_id}`,
       );
       return {
-        public_id: result.public_id,
-        secure_url: result.secure_url,
-        asset_id: result.asset_id,
+        asset_id: result.asset_id as string,
         format: result.format,
+        public_id: result.public_id,
         resource_type: result.resource_type,
+        secure_url: result.secure_url,
       };
     } catch (error) {
       attempts++;
@@ -180,12 +184,14 @@ export const deleteFromCloudinary = async (
 
   while (attempts < MAX_UPLOAD_RETRIES) {
     try {
-      const result = await cloudinary.uploader.destroy(publicId);
+      const result = (await cloudinary.uploader.destroy(
+        publicId,
+      )) as ICloudinaryDeletionResponse;
       logger.info(`Cloudinary deletion result: ${JSON.stringify(result)}`);
       if (result.result !== 'ok') {
         throw new Error(`Deletion failed with result: ${result.result}`);
       }
-      return result as ICloudinaryDeletionResponse;
+      return result;
     } catch (error) {
       attempts++;
       const errorMessage = (error as Error).message;
@@ -213,7 +219,7 @@ export const uploadMultipleToCloudinary = async (
   options: Partial<ICloudinaryUploadOptions> = {},
   config: ICloudinaryConfig,
 ): Promise<ICloudinaryUploadResult[]> => {
-  if (!files || !Array.isArray(files) || files.length === 0) {
+  if (!Array.isArray(files) || files.length === 0) {
     throw new ValidationError('No valid files provided for upload');
   }
 
@@ -234,15 +240,15 @@ export const uploadMultipleToCloudinary = async (
 export class CloudinaryUploadService implements ICloudinaryUploadService {
   constructor(private config: ICloudinaryConfig) {}
 
+  async deleteImage(publicId: string): Promise<ICloudinaryDeletionResponse> {
+    return deleteFromCloudinary(publicId, this.config);
+  }
+
   async uploadImage(
-    image: string | IUploadedFile,
+    image: IUploadedFile | string,
     options: Partial<ICloudinaryUploadOptions> = {},
   ): Promise<ICloudinaryUploadResult> {
     return uploadToCloudinary(image, options, this.config);
-  }
-
-  async deleteImage(publicId: string): Promise<ICloudinaryDeletionResponse> {
-    return deleteFromCloudinary(publicId, this.config);
   }
 }
 

@@ -1,3 +1,14 @@
+import * as bcrypt from 'bcrypt';
+
+import {
+  BookingStatus,
+  FlightStatus,
+  PaymentMethod,
+  PaymentStatus,
+  Role,
+  TourStatus,
+  TourType,
+} from '../generated/prisma/client';
 // Optimal dev dataset: realistic content at sensible lengths, 25–50 rows per
 // module with a heavier spread of bookings and payments for the reports.
 //
@@ -5,16 +16,6 @@
 //
 // Wipes every module (except the admin login from .env) and reseeds it.
 import prisma from '../src/config/prismaClient';
-import {
-  Role,
-  BookingStatus,
-  PaymentStatus,
-  PaymentMethod,
-  TourType,
-  TourStatus,
-  FlightStatus,
-} from '../generated/prisma/client';
-import * as bcrypt from 'bcrypt';
 
 // Deterministic PRNG so re-runs produce the same dataset.
 function mulberry32(seed: number) {
@@ -77,54 +78,231 @@ const FLIGHT_PHOTOS = [
 
 // [name, country, city, description]
 const DESTINATIONS: [string, string, string, string][] = [
-  ['Accra', 'Ghana', 'Accra', 'The busy Atlantic capital where Jamestown fishing boats, Makola market and a fast-growing food scene sit minutes apart.'],
-  ['Kumasi', 'Ghana', 'Kumasi', 'Heart of the Ashanti kingdom, home to the Manhyia Palace, kente weaving villages and the vast Kejetia market.'],
-  ['Cape Coast', 'Ghana', 'Cape Coast', 'A historic coastline of castles and fishing harbours, gateway to the Kakum canopy walkway.'],
-  ['Busua Beach', 'Ghana', 'Busua', 'A laid-back surf town with palm-lined sands, beginner-friendly waves and fresh lobster shacks.'],
-  ['Mole National Park', 'Ghana', 'Larabanga', "Ghana's largest wildlife refuge, where elephants amble past the escarpment-top lodges at dawn."],
-  ['Ada Foah', 'Ghana', 'Ada Foah', 'Where the Volta river meets the sea — estuary islands, stilt lodges and weekend sailing.'],
-  ['Akosombo', 'Ghana', 'Akosombo', 'Lake Volta cruises, kayaking below the dam and quiet hillside resorts an easy drive from Accra.'],
-  ['Wli Waterfalls', 'Ghana', 'Hohoe', 'The highest waterfall in West Africa, reached by a butterfly-lined trail through the Agumatsa reserve.'],
-  ['Tamale', 'Ghana', 'Tamale', 'The northern crossroads city known for smocked textiles, shea butter cooperatives and moto-taxi energy.'],
-  ['Lagos', 'Nigeria', 'Lagos', 'West Africa’s megacity of art galleries, nightlife, beach clubs and relentless creative hustle.'],
-  ['Abuja', 'Nigeria', 'Abuja', 'A planned capital of wide boulevards, Aso Rock views and calm weekend resorts.'],
-  ['Dakar', 'Senegal', 'Dakar', 'Atlantic surf, Gorée Island history and a music scene that spills into the streets after dark.'],
-  ['Saint-Louis', 'Senegal', 'Saint-Louis', 'A faded-grand island city of colonial balconies, jazz festivals and pelican-filled river parks.'],
-  ['Abidjan', "Côte d'Ivoire", 'Abidjan', 'Lagoon-side skyline, grilled-fish maquis and day trips to the beach town of Grand-Bassam.'],
-  ['Lomé', 'Togo', 'Lomé', 'A compact seaside capital famous for its grand market, fetish market and coastal boulevard.'],
-  ['Cotonou', 'Benin', 'Cotonou', 'Gateway to the stilt village of Ganvié and the voodoo heritage route through Ouidah.'],
-  ['Marrakech', 'Morocco', 'Marrakech', 'Medina lanes, riad courtyards and the nightly food theatre of Jemaa el-Fnaa square.'],
-  ['Cairo', 'Egypt', 'Cairo', 'The pyramids at its edge and a thousand years of mosques, museums and Nile-side cafés within.'],
-  ['Zanzibar', 'Tanzania', 'Stone Town', 'Spice-farm tours, carved doorways and dhow sails against turquoise Indian Ocean flats.'],
-  ['Serengeti', 'Tanzania', 'Seronera', 'Endless plains crossed by the great migration, with balloon safaris drifting over at first light.'],
-  ['Maasai Mara', 'Kenya', 'Narok', 'Big-cat country along the Mara river, best in the river-crossing months of the migration.'],
-  ['Cape Town', 'South Africa', 'Cape Town', 'Table Mountain hikes, winelands an hour away and penguins on the beach at Boulders.'],
-  ['Victoria Falls', 'Zimbabwe', 'Victoria Falls', 'The smoke that thunders — rainforest viewpoints, gorge swings and sunset river cruises.'],
-  ['Paris', 'France', 'Paris', 'Museums, markets and café terraces along the Seine — the classic first stop in Europe.'],
-  ['Barcelona', 'Spain', 'Barcelona', 'Gaudí rooftops, beach afternoons and late dinners in the Gothic Quarter.'],
-  ['Rome', 'Italy', 'Rome', 'Layered ruins, trattoria lunches and fountains around every second corner.'],
-  ['Istanbul', 'Türkiye', 'Istanbul', 'Two continents, one skyline of minarets — bazaars, Bosphorus ferries and meze nights.'],
-  ['Dubai', 'United Arab Emirates', 'Dubai', 'Desert dunes and record-breaking towers, with old-town souks along the creek.'],
-  ['Bali', 'Indonesia', 'Ubud', 'Rice-terrace mornings, temple ceremonies and surf beaches ringing the island.'],
-  ['Santorini', 'Greece', 'Oia', 'White-washed villages stacked on a volcanic caldera above deep-blue water.'],
+  [
+    'Accra',
+    'Ghana',
+    'Accra',
+    'The busy Atlantic capital where Jamestown fishing boats, Makola market and a fast-growing food scene sit minutes apart.',
+  ],
+  [
+    'Kumasi',
+    'Ghana',
+    'Kumasi',
+    'Heart of the Ashanti kingdom, home to the Manhyia Palace, kente weaving villages and the vast Kejetia market.',
+  ],
+  [
+    'Cape Coast',
+    'Ghana',
+    'Cape Coast',
+    'A historic coastline of castles and fishing harbours, gateway to the Kakum canopy walkway.',
+  ],
+  [
+    'Busua Beach',
+    'Ghana',
+    'Busua',
+    'A laid-back surf town with palm-lined sands, beginner-friendly waves and fresh lobster shacks.',
+  ],
+  [
+    'Mole National Park',
+    'Ghana',
+    'Larabanga',
+    "Ghana's largest wildlife refuge, where elephants amble past the escarpment-top lodges at dawn.",
+  ],
+  [
+    'Ada Foah',
+    'Ghana',
+    'Ada Foah',
+    'Where the Volta river meets the sea — estuary islands, stilt lodges and weekend sailing.',
+  ],
+  [
+    'Akosombo',
+    'Ghana',
+    'Akosombo',
+    'Lake Volta cruises, kayaking below the dam and quiet hillside resorts an easy drive from Accra.',
+  ],
+  [
+    'Wli Waterfalls',
+    'Ghana',
+    'Hohoe',
+    'The highest waterfall in West Africa, reached by a butterfly-lined trail through the Agumatsa reserve.',
+  ],
+  [
+    'Tamale',
+    'Ghana',
+    'Tamale',
+    'The northern crossroads city known for smocked textiles, shea butter cooperatives and moto-taxi energy.',
+  ],
+  [
+    'Lagos',
+    'Nigeria',
+    'Lagos',
+    'West Africa’s megacity of art galleries, nightlife, beach clubs and relentless creative hustle.',
+  ],
+  [
+    'Abuja',
+    'Nigeria',
+    'Abuja',
+    'A planned capital of wide boulevards, Aso Rock views and calm weekend resorts.',
+  ],
+  [
+    'Dakar',
+    'Senegal',
+    'Dakar',
+    'Atlantic surf, Gorée Island history and a music scene that spills into the streets after dark.',
+  ],
+  [
+    'Saint-Louis',
+    'Senegal',
+    'Saint-Louis',
+    'A faded-grand island city of colonial balconies, jazz festivals and pelican-filled river parks.',
+  ],
+  [
+    'Abidjan',
+    "Côte d'Ivoire",
+    'Abidjan',
+    'Lagoon-side skyline, grilled-fish maquis and day trips to the beach town of Grand-Bassam.',
+  ],
+  [
+    'Lomé',
+    'Togo',
+    'Lomé',
+    'A compact seaside capital famous for its grand market, fetish market and coastal boulevard.',
+  ],
+  [
+    'Cotonou',
+    'Benin',
+    'Cotonou',
+    'Gateway to the stilt village of Ganvié and the voodoo heritage route through Ouidah.',
+  ],
+  [
+    'Marrakech',
+    'Morocco',
+    'Marrakech',
+    'Medina lanes, riad courtyards and the nightly food theatre of Jemaa el-Fnaa square.',
+  ],
+  [
+    'Cairo',
+    'Egypt',
+    'Cairo',
+    'The pyramids at its edge and a thousand years of mosques, museums and Nile-side cafés within.',
+  ],
+  [
+    'Zanzibar',
+    'Tanzania',
+    'Stone Town',
+    'Spice-farm tours, carved doorways and dhow sails against turquoise Indian Ocean flats.',
+  ],
+  [
+    'Serengeti',
+    'Tanzania',
+    'Seronera',
+    'Endless plains crossed by the great migration, with balloon safaris drifting over at first light.',
+  ],
+  [
+    'Maasai Mara',
+    'Kenya',
+    'Narok',
+    'Big-cat country along the Mara river, best in the river-crossing months of the migration.',
+  ],
+  [
+    'Cape Town',
+    'South Africa',
+    'Cape Town',
+    'Table Mountain hikes, winelands an hour away and penguins on the beach at Boulders.',
+  ],
+  [
+    'Victoria Falls',
+    'Zimbabwe',
+    'Victoria Falls',
+    'The smoke that thunders — rainforest viewpoints, gorge swings and sunset river cruises.',
+  ],
+  [
+    'Paris',
+    'France',
+    'Paris',
+    'Museums, markets and café terraces along the Seine — the classic first stop in Europe.',
+  ],
+  [
+    'Barcelona',
+    'Spain',
+    'Barcelona',
+    'Gaudí rooftops, beach afternoons and late dinners in the Gothic Quarter.',
+  ],
+  [
+    'Rome',
+    'Italy',
+    'Rome',
+    'Layered ruins, trattoria lunches and fountains around every second corner.',
+  ],
+  [
+    'Istanbul',
+    'Türkiye',
+    'Istanbul',
+    'Two continents, one skyline of minarets — bazaars, Bosphorus ferries and meze nights.',
+  ],
+  [
+    'Dubai',
+    'United Arab Emirates',
+    'Dubai',
+    'Desert dunes and record-breaking towers, with old-town souks along the creek.',
+  ],
+  [
+    'Bali',
+    'Indonesia',
+    'Ubud',
+    'Rice-terrace mornings, temple ceremonies and surf beaches ringing the island.',
+  ],
+  [
+    'Santorini',
+    'Greece',
+    'Oia',
+    'White-washed villages stacked on a volcanic caldera above deep-blue water.',
+  ],
 ];
 
 const HOTEL_NAMES = [
-  'Harbourlight Hotel', 'The Baobab House', 'Palm & Anchor Resort',
-  'Savannah View Lodge', 'The Weavers Court', 'Lagoon Terrace Hotel',
-  'Old Coast Guesthouse', 'The Meridian Palms', 'Riverstone Suites',
-  'The Kapok Tree Hotel', 'Driftwood Beach Resort', 'Highland Crest Hotel',
-  'The Caravan Serai', 'Marina Bay Residences', 'The Acacia Collection',
-  'Sunbird Boutique Hotel', 'The Printworks Hotel', 'Coral Gate Resort',
-  'The Observatory Hotel', 'Garden City Lodge', 'The Tidewater Inn',
-  'Ironwood Manor', 'The Lantern House', 'Bluewater Sands Resort',
-  'The Courtyard at Osu', 'Stonebridge Hotel', 'The Dhow & Spice Inn',
+  'Harbourlight Hotel',
+  'The Baobab House',
+  'Palm & Anchor Resort',
+  'Savannah View Lodge',
+  'The Weavers Court',
+  'Lagoon Terrace Hotel',
+  'Old Coast Guesthouse',
+  'The Meridian Palms',
+  'Riverstone Suites',
+  'The Kapok Tree Hotel',
+  'Driftwood Beach Resort',
+  'Highland Crest Hotel',
+  'The Caravan Serai',
+  'Marina Bay Residences',
+  'The Acacia Collection',
+  'Sunbird Boutique Hotel',
+  'The Printworks Hotel',
+  'Coral Gate Resort',
+  'The Observatory Hotel',
+  'Garden City Lodge',
+  'The Tidewater Inn',
+  'Ironwood Manor',
+  'The Lantern House',
+  'Bluewater Sands Resort',
+  'The Courtyard at Osu',
+  'Stonebridge Hotel',
+  'The Dhow & Spice Inn',
   'Vineyard Terrace Hotel',
 ];
 const HOTEL_AMENITIES = [
-  'Free wifi', 'Outdoor pool', 'Airport shuttle', 'Restaurant and bar',
-  'Fitness centre', 'Spa and sauna', 'Conference rooms', '24-hour front desk',
-  'Beach access', 'Rooftop terrace', 'Kids play area', 'Laundry service',
+  'Free wifi',
+  'Outdoor pool',
+  'Airport shuttle',
+  'Restaurant and bar',
+  'Fitness centre',
+  'Spa and sauna',
+  'Conference rooms',
+  '24-hour front desk',
+  'Beach access',
+  'Rooftop terrace',
+  'Kids play area',
+  'Laundry service',
 ];
 const ROOM_TYPES = [
   ['Standard Room', 350, 900, 2],
@@ -134,8 +312,15 @@ const ROOM_TYPES = [
   ['Presidential Suite', 3000, 6500, 6],
 ] as const;
 const ROOM_AMENITIES = [
-  'King-size bed', 'Ocean view', 'Air conditioning', 'Mini bar',
-  'Work desk', 'Rain shower', 'Balcony', 'Smart TV', 'Coffee machine',
+  'King-size bed',
+  'Ocean view',
+  'Air conditioning',
+  'Mini bar',
+  'Work desk',
+  'Rain shower',
+  'Balcony',
+  'Smart TV',
+  'Coffee machine',
 ];
 
 const AIRLINES = [
@@ -150,47 +335,177 @@ const AIRLINES = [
   ['Turkish Airlines', 'TK'],
   ['Air France', 'AF'],
 ] as const;
-const FLIGHT_CLASSES = ['Economy', 'Economy', 'Economy', 'Premium Economy', 'Business', 'First'];
+const FLIGHT_CLASSES = [
+  'Economy',
+  'Economy',
+  'Economy',
+  'Premium Economy',
+  'Business',
+  'First',
+];
 
 const TOUR_TEMPLATES: [string, TourType, string][] = [
-  ['Castles & Canopy Walk Weekend', 'CULTURAL', 'Cape Coast and Elmina castle tours with a morning on the Kakum rainforest walkway and a beach evening at Brenu.'],
-  ['Ashanti Heritage Trail', 'CULTURAL', 'Manhyia Palace, the Prempeh II museum and hands-on days in the kente and adinkra craft villages around Kumasi.'],
-  ['Elephant Safari Express', 'WILDLIFE', 'Two game drives a day in Mole National Park with a guided walk to the Larabanga mosque and escarpment sundowners.'],
-  ['Surf & Chill Week', 'BEACH', 'Daily surf coaching at Busua with bonfire nights, a canoe trip to Butre and plenty of hammock time.'],
-  ['Volta Lake Explorer', 'ADVENTURE', 'Kayaking below the Akosombo dam, a full-day lake cruise and the hike to Wli falls with a night in Hohoe.'],
-  ['Estuary Island Getaway', 'BEACH', 'Stilt-lodge nights at Ada Foah, sailing on the estuary and beach barbecues where the Volta meets the sea.'],
-  ['City Lights & Street Food', 'CITY', 'A guided crawl through the best chop bars, night markets and rooftop bars, with a day of galleries in between.'],
-  ['Sahara Gateway Circuit', 'ADVENTURE', 'Marrakech medina days, a High Atlas pass drive and two nights under canvas in the dune camps of the south.'],
-  ['Nile & Pyramids Classic', 'CULTURAL', 'Giza at sunrise, the Egyptian Museum with an Egyptologist and a felucca sail before the sleeper south.'],
-  ['Spice Island Escape', 'BEACH', 'Stone Town walking tours, a spice farm lunch and four nights on the powder-white north coast beaches.'],
-  ['Great Migration Safari', 'WILDLIFE', 'Full days tracking the herds with a private guide, sundowner drives and an optional dawn balloon flight.'],
-  ['Cape Peninsula & Winelands', 'CITY', 'Table Mountain, the Boulders penguin colony and two unhurried tasting days in Stellenbosch and Franschhoek.'],
-  ['Falls & Gorge Adrenaline', 'ADVENTURE', 'Rainforest viewpoints, white-water rafting below Victoria Falls and a sunset cruise on the Zambezi.'],
-  ['Mediterranean Duo', 'CRUISE', 'A relaxed island-hopping sail between Santorini and neighbouring Cyclades with village dinners ashore.'],
-  ['Bosphorus & Bazaars', 'CITY', 'Istanbul across two continents: mosque mornings, ferry crossings, hammam afternoons and meze-table evenings.'],
+  [
+    'Castles & Canopy Walk Weekend',
+    'CULTURAL',
+    'Cape Coast and Elmina castle tours with a morning on the Kakum rainforest walkway and a beach evening at Brenu.',
+  ],
+  [
+    'Ashanti Heritage Trail',
+    'CULTURAL',
+    'Manhyia Palace, the Prempeh II museum and hands-on days in the kente and adinkra craft villages around Kumasi.',
+  ],
+  [
+    'Elephant Safari Express',
+    'WILDLIFE',
+    'Two game drives a day in Mole National Park with a guided walk to the Larabanga mosque and escarpment sundowners.',
+  ],
+  [
+    'Surf & Chill Week',
+    'BEACH',
+    'Daily surf coaching at Busua with bonfire nights, a canoe trip to Butre and plenty of hammock time.',
+  ],
+  [
+    'Volta Lake Explorer',
+    'ADVENTURE',
+    'Kayaking below the Akosombo dam, a full-day lake cruise and the hike to Wli falls with a night in Hohoe.',
+  ],
+  [
+    'Estuary Island Getaway',
+    'BEACH',
+    'Stilt-lodge nights at Ada Foah, sailing on the estuary and beach barbecues where the Volta meets the sea.',
+  ],
+  [
+    'City Lights & Street Food',
+    'CITY',
+    'A guided crawl through the best chop bars, night markets and rooftop bars, with a day of galleries in between.',
+  ],
+  [
+    'Sahara Gateway Circuit',
+    'ADVENTURE',
+    'Marrakech medina days, a High Atlas pass drive and two nights under canvas in the dune camps of the south.',
+  ],
+  [
+    'Nile & Pyramids Classic',
+    'CULTURAL',
+    'Giza at sunrise, the Egyptian Museum with an Egyptologist and a felucca sail before the sleeper south.',
+  ],
+  [
+    'Spice Island Escape',
+    'BEACH',
+    'Stone Town walking tours, a spice farm lunch and four nights on the powder-white north coast beaches.',
+  ],
+  [
+    'Great Migration Safari',
+    'WILDLIFE',
+    'Full days tracking the herds with a private guide, sundowner drives and an optional dawn balloon flight.',
+  ],
+  [
+    'Cape Peninsula & Winelands',
+    'CITY',
+    'Table Mountain, the Boulders penguin colony and two unhurried tasting days in Stellenbosch and Franschhoek.',
+  ],
+  [
+    'Falls & Gorge Adrenaline',
+    'ADVENTURE',
+    'Rainforest viewpoints, white-water rafting below Victoria Falls and a sunset cruise on the Zambezi.',
+  ],
+  [
+    'Mediterranean Duo',
+    'CRUISE',
+    'A relaxed island-hopping sail between Santorini and neighbouring Cyclades with village dinners ashore.',
+  ],
+  [
+    'Bosphorus & Bazaars',
+    'CITY',
+    'Istanbul across two continents: mosque mornings, ferry crossings, hammam afternoons and meze-table evenings.',
+  ],
 ];
 
 const FIRST_NAMES = [
-  'Amina', 'Kwabena', 'Efua', 'Yaw', 'Zeinab', 'Kofi', 'Abena', 'Selorm',
-  'Nana', 'Adjoa', 'Tunde', 'Chiamaka', 'Fatou', 'Moussa', 'Awa', 'Sekou',
-  'Mariam', 'Kojo', 'Esi', 'Kwame', 'Akosua', 'Ibrahim', 'Salma', 'Yusuf',
-  'Naa', 'Delali', 'Femi', 'Amara', 'Binta', 'Elikem',
+  'Amina',
+  'Kwabena',
+  'Efua',
+  'Yaw',
+  'Zeinab',
+  'Kofi',
+  'Abena',
+  'Selorm',
+  'Nana',
+  'Adjoa',
+  'Tunde',
+  'Chiamaka',
+  'Fatou',
+  'Moussa',
+  'Awa',
+  'Sekou',
+  'Mariam',
+  'Kojo',
+  'Esi',
+  'Kwame',
+  'Akosua',
+  'Ibrahim',
+  'Salma',
+  'Yusuf',
+  'Naa',
+  'Delali',
+  'Femi',
+  'Amara',
+  'Binta',
+  'Elikem',
 ];
 const LAST_NAMES = [
-  'Fuseini', 'Mensah', 'Owusu-Ansah', 'Darko', 'Alhassan', 'Boateng',
-  'Asante', 'Agyeman', 'Adjei', 'Quartey', 'Okafor', 'Diallo', 'Ndiaye',
-  'Touré', 'Traoré', 'Keita', 'Sowah', 'Tetteh', 'Amoah', 'Baah',
-  'Ankrah', 'Sarpong', 'Gyasi', 'Addo', 'Dogbe', 'Nkrumah', 'Bello',
-  'Chukwu', 'Sissoko', 'Camara',
+  'Fuseini',
+  'Mensah',
+  'Owusu-Ansah',
+  'Darko',
+  'Alhassan',
+  'Boateng',
+  'Asante',
+  'Agyeman',
+  'Adjei',
+  'Quartey',
+  'Okafor',
+  'Diallo',
+  'Ndiaye',
+  'Touré',
+  'Traoré',
+  'Keita',
+  'Sowah',
+  'Tetteh',
+  'Amoah',
+  'Baah',
+  'Ankrah',
+  'Sarpong',
+  'Gyasi',
+  'Addo',
+  'Dogbe',
+  'Nkrumah',
+  'Bello',
+  'Chukwu',
+  'Sissoko',
+  'Camara',
 ];
 const AREAS = [
-  'Osu, Accra', 'Ahodwo, Kumasi', 'Airport City, Accra', 'Sagnarigu, Tamale',
-  'East Legon, Accra', 'Cantonments, Accra', 'Asokwa, Kumasi',
-  'Community 25, Tema', 'Takoradi Harbour Area', 'Cape Coast Pedu Estate',
-  'Lekki Phase 1, Lagos', 'Plateau, Dakar', 'Cocody, Abidjan',
+  'Osu, Accra',
+  'Ahodwo, Kumasi',
+  'Airport City, Accra',
+  'Sagnarigu, Tamale',
+  'East Legon, Accra',
+  'Cantonments, Accra',
+  'Asokwa, Kumasi',
+  'Community 25, Tema',
+  'Takoradi Harbour Area',
+  'Cape Coast Pedu Estate',
+  'Lekki Phase 1, Lagos',
+  'Plateau, Dakar',
+  'Cocody, Abidjan',
 ];
 const SPECIAL_REQUESTS = [
-  null, null, null, null,
+  null,
+  null,
+  null,
+  null,
   'Two vegetarian meals please, and a window seat if available.',
   'Celebrating our anniversary — a quiet table at dinner would be lovely.',
   'Travelling with an infant; we will need a cot in the room.',
@@ -199,20 +514,8 @@ const SPECIAL_REQUESTS = [
   null,
 ];
 
-async function wipe(adminEmail: string) {
-  await prisma.payment.deleteMany();
-  await prisma.booking.deleteMany();
-  await prisma.room.deleteMany();
-  await prisma.hotel.deleteMany();
-  await prisma.flight.deleteMany();
-  await prisma.tour.deleteMany();
-  await prisma.destination.deleteMany();
-  await prisma.user.deleteMany({ where: { email: { not: adminEmail } } });
-  console.log('wiped existing module data (admin kept)');
-}
-
 async function main() {
-  const adminEmail = process.env.ADMIN_EMAIL || '';
+  const adminEmail = process.env.ADMIN_EMAIL ?? '';
   await wipe(adminEmail);
 
   // ---------- Destinations (30)
@@ -222,10 +525,10 @@ async function main() {
     destinations.push(
       await prisma.destination.create({
         data: {
-          name,
-          country,
           city,
+          country,
           description,
+          name,
           photo: unsplash(DEST_PHOTOS[i % DEST_PHOTOS.length]),
         },
       }),
@@ -240,17 +543,17 @@ async function main() {
     const dest = destinations[i % destinations.length];
     const hotel = await prisma.hotel.create({
       data: {
-        name: HOTEL_NAMES[i],
         address: `${between(1, 250)} ${pick(['Beach Road', 'High Street', 'Harbour Lane', 'Independence Avenue', 'Palm Grove', 'Market Circle'])}, ${dest.city}`,
-        phone: `23330${String(2000000 + i * 7411).slice(0, 7)}`,
-        starRating: between(3, 5),
         amenities: Array.from(
           { length: between(4, 7) },
           (_, k) => HOTEL_AMENITIES[(i + k * 3) % HOTEL_AMENITIES.length],
         ),
         description: `A well-run ${['boutique', 'family-owned', 'business-friendly', 'beachfront', 'garden'][i % 5]} hotel a short ride from the centre of ${dest.city}, with helpful staff and a generous breakfast.`,
         destinationId: dest.id,
+        name: HOTEL_NAMES[i],
+        phone: `23330${String(2000000 + i * 7411).slice(0, 7)}`,
         photo: unsplash(HOTEL_PHOTOS[i % HOTEL_PHOTOS.length]),
+        starRating: between(3, 5),
       },
     });
     hotels.push(hotel);
@@ -261,17 +564,17 @@ async function main() {
       rooms.push(
         await prisma.room.create({
           data: {
-            hotelId: hotel.id,
-            roomType: type,
-            pricePerNight: money(minP, maxP),
-            capacity: between(1, cap),
-            totalRooms: between(2, 10),
-            description: `${type} with ${pick(['garden', 'pool', 'city', 'ocean'])} views and a private bathroom.`,
             amenities: Array.from(
               { length: between(3, 5) },
               (_, k) => ROOM_AMENITIES[(i + r + k * 2) % ROOM_AMENITIES.length],
             ),
+            capacity: between(1, cap),
+            description: `${type} with ${pick(['garden', 'pool', 'city', 'ocean'])} views and a private bathroom.`,
+            hotelId: hotel.id,
             photo: unsplash(ROOM_PHOTOS[(i + r) % ROOM_PHOTOS.length]),
+            pricePerNight: money(minP, maxP),
+            roomType: type,
+            totalRooms: between(2, 10),
           },
         }),
       );
@@ -288,31 +591,33 @@ async function main() {
     if (destinations[destIdx].id === origin.id)
       destIdx = (destIdx + 1) % destinations.length;
     // spread departures from 10 days ago to ~2 months out
-    const departure = new Date(NOW + (i * 2 - 10) * DAY + between(6, 20) * 3600000);
+    const departure = new Date(
+      NOW + (i * 2 - 10) * DAY + between(6, 20) * 3600000,
+    );
     const durationMin = between(55, 620);
     const capacity = pick([72, 118, 160, 189, 254]);
     const departed = departure.getTime() < NOW;
     flights.push(
       await prisma.flight.create({
         data: {
-          flightNumber: `${code}-${200 + i * 3}`,
           airline,
-          departure,
           arrival: new Date(departure.getTime() + durationMin * 60000),
-          originId: origin.id,
+          capacity,
+          departure,
           destinationId: destinations[destIdx].id,
-          price: money(650, 9200),
+          duration: durationMin,
           flightClass: FLIGHT_CLASSES[i % FLIGHT_CLASSES.length],
+          flightNumber: `${code}-${200 + i * 3}`,
+          originId: origin.id,
+          photo: unsplash(FLIGHT_PHOTOS[i % FLIGHT_PHOTOS.length]),
+          price: money(650, 9200),
+          seatsAvailable: between(4, capacity - 10),
           status: departed
             ? pick([FlightStatus.LANDED, FlightStatus.DEPARTED])
             : i % 9 === 8
               ? FlightStatus.DELAYED
               : FlightStatus.SCHEDULED,
-          duration: durationMin,
           stops: pick([0, 0, 0, 1, 1, 2]),
-          capacity,
-          seatsAvailable: between(4, capacity - 10),
-          photo: unsplash(FLIGHT_PHOTOS[i % FLIGHT_PHOTOS.length]),
         },
       }),
     );
@@ -340,17 +645,17 @@ async function main() {
     tours.push(
       await prisma.tour.create({
         data: {
-          name: `${dest.name} ${tpl}`,
           description,
-          type,
-          status,
-          duration,
-          price: money(900, 14500),
-          maxGuests,
-          guestsBooked: between(0, Math.floor(maxGuests * 0.8)),
-          startDate: start,
-          endDate: end,
           destinationId: dest.id,
+          duration,
+          endDate: end,
+          guestsBooked: between(0, Math.floor(maxGuests * 0.8)),
+          maxGuests,
+          name: `${dest.name} ${tpl}`,
+          price: money(900, 14500),
+          startDate: start,
+          status,
+          type,
         },
       }),
     );
@@ -365,12 +670,12 @@ async function main() {
     users.push(
       await prisma.user.create({
         data: {
-          name,
-          email: `${FIRST_NAMES[i].toLowerCase()}.${LAST_NAMES[i].toLowerCase().replace(/[^a-z]/g, '')}@example.com`,
-          password,
-          role: i < 26 ? Role.CUSTOMER : Role.AGENT,
-          phone: `2335400${String(10000 + i * 13).slice(0, 5)}`,
           address: pick(AREAS),
+          email: `${FIRST_NAMES[i].toLowerCase()}.${LAST_NAMES[i].toLowerCase().replace(/[^a-z]/g, '')}@example.com`,
+          name,
+          password,
+          phone: `2335400${String(10000 + i * 13).slice(0, 5)}`,
+          role: i < 26 ? Role.CUSTOMER : Role.AGENT,
         },
       }),
     );
@@ -385,11 +690,18 @@ async function main() {
   const bookedTourPairs = new Set<string>();
   const bookedFlightPairs = new Set<string>();
 
-  const createPayment = async (
-    booking: { id: number; userId: number; totalPrice: number; status: BookingStatus; bookingDate: Date },
-  ) => {
+  const createPayment = async (booking: {
+    bookingDate: Date;
+    id: number;
+    status: BookingStatus;
+    totalPrice: number;
+    userId: number;
+  }) => {
     let status: PaymentStatus;
-    if (booking.status === BookingStatus.CONFIRMED || booking.status === BookingStatus.COMPLETED) {
+    if (
+      booking.status === BookingStatus.CONFIRMED ||
+      booking.status === BookingStatus.COMPLETED
+    ) {
       status = PaymentStatus.COMPLETED;
     } else if (booking.status === BookingStatus.PENDING) {
       if (rand() < 0.5) return; // pending bookings often unpaid
@@ -400,11 +712,15 @@ async function main() {
     }
     await prisma.payment.create({
       data: {
-        bookingId: booking.id,
-        userId: booking.userId,
         amount: booking.totalPrice,
+        bookingId: booking.id,
         currency: 'GHS',
-        status,
+        paymentDate:
+          status === PaymentStatus.PENDING
+            ? null
+            : new Date(
+                booking.bookingDate.getTime() + between(1, 48) * 3600000,
+              ),
         paymentMethod: pick([
           PaymentMethod.MOBILE_MONEY,
           PaymentMethod.MOBILE_MONEY,
@@ -412,11 +728,9 @@ async function main() {
           PaymentMethod.DEBIT_CARD,
           PaymentMethod.BANK_TRANSFER,
         ]),
-        paymentDate:
-          status === PaymentStatus.PENDING
-            ? null
-            : new Date(booking.bookingDate.getTime() + between(1, 48) * 3600000),
+        status,
         transactionReference: `TT-PAY-2026-${payRef++}`,
+        userId: booking.userId,
       },
     });
     payments++;
@@ -424,7 +738,8 @@ async function main() {
 
   const statusFor = (when: Date): BookingStatus => {
     const ageDays = (NOW - when.getTime()) / DAY;
-    if (ageDays > 45) return rand() < 0.15 ? BookingStatus.CANCELLED : BookingStatus.COMPLETED;
+    if (ageDays > 45)
+      return rand() < 0.15 ? BookingStatus.CANCELLED : BookingStatus.COMPLETED;
     if (ageDays > 7)
       return pick([
         BookingStatus.CONFIRMED,
@@ -432,11 +747,16 @@ async function main() {
         BookingStatus.COMPLETED,
         BookingStatus.CANCELLED,
       ]);
-    return pick([BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.CONFIRMED]);
+    return pick([
+      BookingStatus.PENDING,
+      BookingStatus.CONFIRMED,
+      BookingStatus.CONFIRMED,
+    ]);
   };
 
   // spread booking dates across the last ~7 months
-  const bookingDate = () => new Date(NOW - between(0, 200) * DAY - between(0, 20) * 3600000);
+  const bookingDate = () =>
+    new Date(NOW - between(0, 200) * DAY - between(0, 20) * 3600000);
 
   // Tour bookings (40)
   for (let i = 0; i < 40; i++) {
@@ -450,13 +770,13 @@ async function main() {
     const status = statusFor(when);
     const b = await prisma.booking.create({
       data: {
-        userId: user.id,
-        tourId: tour.id,
-        status,
-        numberOfGuests: guests,
-        totalPrice: tour.price * guests,
-        specialRequests: pick(SPECIAL_REQUESTS),
         bookingDate: when,
+        numberOfGuests: guests,
+        specialRequests: pick(SPECIAL_REQUESTS),
+        status,
+        totalPrice: tour.price * guests,
+        tourId: tour.id,
+        userId: user.id,
         ...(status === BookingStatus.PENDING
           ? { paymentDeadline: new Date(NOW + between(1, 5) * DAY) }
           : {}),
@@ -478,13 +798,13 @@ async function main() {
     const status = statusFor(when);
     const b = await prisma.booking.create({
       data: {
-        userId: user.id,
-        flightId: flight.id,
-        status,
-        numberOfGuests: guests,
-        totalPrice: flight.price * guests,
-        specialRequests: pick(SPECIAL_REQUESTS),
         bookingDate: when,
+        flightId: flight.id,
+        numberOfGuests: guests,
+        specialRequests: pick(SPECIAL_REQUESTS),
+        status,
+        totalPrice: flight.price * guests,
+        userId: user.id,
       },
     });
     bookings++;
@@ -502,17 +822,17 @@ async function main() {
     const status = statusFor(when);
     const b = await prisma.booking.create({
       data: {
-        userId: user.id,
-        roomId: room.id,
-        status,
-        numberOfGuests: between(1, room.capacity),
-        numberOfRooms,
-        numberOfNights: nights,
-        startDate: checkIn,
-        endDate: new Date(checkIn.getTime() + nights * DAY),
-        totalPrice: room.pricePerNight * nights * numberOfRooms,
-        specialRequests: pick(SPECIAL_REQUESTS),
         bookingDate: when,
+        endDate: new Date(checkIn.getTime() + nights * DAY),
+        numberOfGuests: between(1, room.capacity),
+        numberOfNights: nights,
+        numberOfRooms,
+        roomId: room.id,
+        specialRequests: pick(SPECIAL_REQUESTS),
+        startDate: checkIn,
+        status,
+        totalPrice: room.pricePerNight * nights * numberOfRooms,
+        userId: user.id,
       },
     });
     bookings++;
@@ -523,8 +843,20 @@ async function main() {
   console.log('SEEDED optimal dataset');
 }
 
+async function wipe(adminEmail: string) {
+  await prisma.payment.deleteMany();
+  await prisma.booking.deleteMany();
+  await prisma.room.deleteMany();
+  await prisma.hotel.deleteMany();
+  await prisma.flight.deleteMany();
+  await prisma.tour.deleteMany();
+  await prisma.destination.deleteMany();
+  await prisma.user.deleteMany({ where: { email: { not: adminEmail } } });
+  console.log('wiped existing module data (admin kept)');
+}
+
 main()
-  .catch((e) => {
+  .catch((e: unknown) => {
     console.error(e);
     process.exit(1);
   })

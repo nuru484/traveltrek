@@ -6,14 +6,13 @@ import { CustomError, ErrorSeverity } from './error-handler';
  * Prisma-specific error codes mapping to user-friendly messages
  */
 const PRISMA_ERROR_MESSAGES: Record<string, string> = {
-  P2002: 'A record with this information already exists',
-  P2003: 'Related record not found',
-  P2025: 'Record not found',
-  P2014: 'The change would violate a required relation',
   P2000: 'Value is too long for the column',
   P2001: 'Record does not exist',
+  P2002: 'A record with this information already exists',
+  P2003: 'Related record not found',
   P2011: 'Null constraint violation',
   P2012: 'Missing required value',
+  P2014: 'The change would violate a required relation',
   P2015: 'Related record not found',
   P2016: 'Query interpretation error',
   P2017: 'Records for relation are not connected',
@@ -24,6 +23,7 @@ const PRISMA_ERROR_MESSAGES: Record<string, string> = {
   P2022: 'Column does not exist',
   P2023: 'Inconsistent column data',
   P2024: 'Timed out fetching connection',
+  P2025: 'Record not found',
   P2026: 'Unsupported database feature',
   P2027: 'Multiple database errors occurred',
 };
@@ -95,9 +95,7 @@ const formatFieldName = (field: string): string => {
 const handleUniqueConstraintError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(
-    error.meta as Record<string, unknown> | undefined,
-  );
+  const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   let message = 'A record with this information already exists';
@@ -117,13 +115,13 @@ const handleUniqueConstraintError = (
   }
 
   return new CustomError(409, message, {
-    layer: 'database',
-    severity: ErrorSeverity.LOW,
     code: 'DUPLICATE_RECORD',
     context: {
       fields: fields,
       prismaCode: error.code,
     },
+    layer: 'database',
+    severity: ErrorSeverity.LOW,
   });
 };
 
@@ -133,9 +131,7 @@ const handleUniqueConstraintError = (
 const handleForeignKeyError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(
-    error.meta as Record<string, unknown> | undefined,
-  );
+  const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
@@ -144,13 +140,13 @@ const handleForeignKeyError = (
       : 'Referenced record not found';
 
   return new CustomError(400, message, {
-    layer: 'database',
-    severity: ErrorSeverity.LOW,
     code: 'INVALID_REFERENCE',
     context: {
       fields: fields,
       prismaCode: error.code,
     },
+    layer: 'database',
+    severity: ErrorSeverity.LOW,
   });
 };
 
@@ -162,17 +158,17 @@ const handleRecordNotFoundError = (
 ): CustomError => {
   const message = 'The requested record was not found';
 
-  const meta = error.meta as Record<string, unknown> | undefined;
+  const meta = error.meta;
   const cause = meta && hasProperty(meta, 'cause') ? meta.cause : undefined;
 
   return new CustomError(404, message, {
-    layer: 'database',
-    severity: ErrorSeverity.LOW,
     code: 'RECORD_NOT_FOUND',
     context: {
-      prismaCode: error.code,
       cause: cause,
+      prismaCode: error.code,
     },
+    layer: 'database',
+    severity: ErrorSeverity.LOW,
   });
 };
 
@@ -182,9 +178,7 @@ const handleRecordNotFoundError = (
 const handleNullConstraintError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(
-    error.meta as Record<string, unknown> | undefined,
-  );
+  const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
@@ -193,13 +187,13 @@ const handleNullConstraintError = (
       : 'A required field is missing';
 
   return new CustomError(400, message, {
-    layer: 'database',
-    severity: ErrorSeverity.LOW,
     code: 'REQUIRED_FIELD_MISSING',
     context: {
       fields: fields,
       prismaCode: error.code,
     },
+    layer: 'database',
+    severity: ErrorSeverity.LOW,
   });
 };
 
@@ -209,9 +203,7 @@ const handleNullConstraintError = (
 const handleValueTooLongError = (
   error: Prisma.PrismaClientKnownRequestError,
 ): CustomError => {
-  const fields = extractFieldNames(
-    error.meta as Record<string, unknown> | undefined,
-  );
+  const fields = extractFieldNames(error.meta);
   const formattedFields = fields.map(formatFieldName).join(', ');
 
   const message =
@@ -220,13 +212,13 @@ const handleValueTooLongError = (
       : 'One or more values exceed the maximum length';
 
   return new CustomError(400, message, {
-    layer: 'database',
-    severity: ErrorSeverity.LOW,
     code: 'VALUE_TOO_LONG',
     context: {
       fields: fields,
       prismaCode: error.code,
     },
+    layer: 'database',
+    severity: ErrorSeverity.LOW,
   });
 };
 
@@ -238,30 +230,31 @@ export const handlePrismaError = (error: unknown): CustomError => {
   // Handle known Prisma errors
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     switch (error.code) {
+      case 'P2000':
+        return handleValueTooLongError(error);
       case 'P2002':
         return handleUniqueConstraintError(error);
       case 'P2003':
         return handleForeignKeyError(error);
-      case 'P2025':
-        return handleRecordNotFoundError(error);
       case 'P2011':
       case 'P2012':
         return handleNullConstraintError(error);
-      case 'P2000':
-        return handleValueTooLongError(error);
-      default:
+      case 'P2025':
+        return handleRecordNotFoundError(error);
+      default: {
         // Generic known error handler
         const message =
           PRISMA_ERROR_MESSAGES[error.code] || 'Database operation failed';
         return new CustomError(400, message, {
-          layer: 'database',
-          severity: ErrorSeverity.MEDIUM,
           code: 'DATABASE_ERROR',
           context: {
-            prismaCode: error.code,
             meta: error.meta,
+            prismaCode: error.code,
           },
+          layer: 'database',
+          severity: ErrorSeverity.MEDIUM,
         });
+      }
     }
   }
 
@@ -269,35 +262,35 @@ export const handlePrismaError = (error: unknown): CustomError => {
   if (error instanceof Prisma.PrismaClientValidationError) {
     console.log(error);
     return new CustomError(400, 'Invalid data provided', {
+      code: 'VALIDATION_ERROR',
       layer: 'database',
       severity: ErrorSeverity.LOW,
-      code: 'VALIDATION_ERROR',
     });
   }
 
   // Handle initialization errors
   if (error instanceof Prisma.PrismaClientInitializationError) {
     return new CustomError(503, 'Database connection failed', {
+      code: 'DB_CONNECTION_ERROR',
       layer: 'database',
       severity: ErrorSeverity.CRITICAL,
-      code: 'DB_CONNECTION_ERROR',
     });
   }
 
   // Handle Rust panic errors
   if (error instanceof Prisma.PrismaClientRustPanicError) {
     return new CustomError(500, 'A critical database error occurred', {
+      code: 'DB_CRITICAL_ERROR',
       layer: 'database',
       severity: ErrorSeverity.CRITICAL,
-      code: 'DB_CRITICAL_ERROR',
     });
   }
 
   // Fallback for unhandled Prisma errors - still return CustomError
   return new CustomError(500, 'An unexpected database error occurred', {
+    code: 'UNKNOWN_DB_ERROR',
     layer: 'database',
     severity: ErrorSeverity.HIGH,
-    code: 'UNKNOWN_DB_ERROR',
   });
 };
 

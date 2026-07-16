@@ -1,9 +1,22 @@
 // worker.ts
 import { bookingDeadlineWorker } from './src/jobs/bookingWorker';
 import { flightStatusWorker } from './src/jobs/flightWorker';
-import { tourStatusWorker } from './src/jobs/tourWorker';
 import { setupJobSchedulers } from './src/jobs/schedulers';
+import { tourStatusWorker } from './src/jobs/tourWorker';
 import logger from './src/utils/logger';
+
+async function shutdownWorkers(signal: string) {
+  logger.info(`🛑 Received ${signal}, shutting down workers...`);
+
+  await Promise.all([
+    bookingDeadlineWorker.close(),
+    flightStatusWorker.close(),
+    tourStatusWorker.close(),
+  ]);
+
+  logger.info('✅ All workers closed gracefully');
+  process.exit(0);
+}
 
 async function startWorker() {
   logger.info('🚀 Starting background workers...');
@@ -17,34 +30,16 @@ async function startWorker() {
 }
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-  logger.info('🛑 Shutting down workers...');
-
-  await Promise.all([
-    bookingDeadlineWorker.close(),
-    flightStatusWorker.close(),
-    tourStatusWorker.close(),
-  ]);
-
-  logger.info('✅ All workers closed gracefully');
-  process.exit(0);
+process.on('SIGINT', () => {
+  void shutdownWorkers('SIGINT');
 });
 
-process.on('SIGTERM', async () => {
-  logger.info('🛑 Received SIGTERM, shutting down workers...');
-
-  await Promise.all([
-    bookingDeadlineWorker.close(),
-    flightStatusWorker.close(),
-    tourStatusWorker.close(),
-  ]);
-
-  logger.info('✅ All workers closed gracefully');
-  process.exit(0);
+process.on('SIGTERM', () => {
+  void shutdownWorkers('SIGTERM');
 });
 
 // Start the worker
-startWorker().catch((err) => {
-  logger.error('❌ Failed to start worker:', err);
+startWorker().catch((err: unknown) => {
+  logger.error({ err }, '❌ Failed to start worker');
   process.exit(1);
 });

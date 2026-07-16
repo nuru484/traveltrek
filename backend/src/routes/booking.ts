@@ -1,15 +1,16 @@
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
 import {
   createBooking,
-  getBooking,
-  updateBooking,
+  deleteAllBookings,
   deleteBooking,
   getAllBookings,
+  getBooking,
   getUserBookings,
-  deleteAllBookings,
+  updateBooking,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const bookingRoutes = Router();
 

@@ -1,23 +1,24 @@
 // src/middlewares/validation-middleware.ts
-import { Request, Response, NextFunction } from 'express';
-import { validationResult, ValidationError } from 'express-validator';
+import { NextFunction, Request, Response } from 'express';
+import { ValidationError, validationResult } from 'express-validator';
+
 import { ValidationError as CustomValidationError } from './error-handler';
 
 /**
  * Middleware to check validation results and pass errors to error handler
  */
 
+function isLegacyValidationError(
+  error: ValidationError,
+): error is ValidationError & { msg: string; param: string } {
+  return 'param' in error;
+}
+
 // Type guards
 function isStandardValidationError(
   error: ValidationError,
-): error is ValidationError & { path: string; msg: string } {
+): error is ValidationError & { msg: string; path: string } {
   return 'path' in error;
-}
-
-function isLegacyValidationError(
-  error: ValidationError,
-): error is ValidationError & { param: string; msg: string } {
-  return 'param' in error;
 }
 
 export const validateRequest = (
@@ -39,13 +40,14 @@ export const validateRequest = (
     });
 
     const validationError = new CustomValidationError('Validation Error', {
-      layer: 'Request Validation',
       code: 'VALIDATION_ERROR',
       context: {
         errors: formattedErrors,
       },
+      layer: 'Request Validation',
     });
-    return next(validationError);
+    next(validationError);
+    return;
   }
 
   next();
@@ -57,14 +59,14 @@ export const validationMiddleware = {
   // Create a middleware with the provided validators
   create: (validators: any[]) => [...validators, validateRequest],
 
-  // Create a middleware for update operations
-  update: (validators: any[]) => [...validators, validateRequest],
+  // Create a middleware for custom operations
+  custom: (validators: any[]) => [...validators, validateRequest],
 
   // Create a middleware for delete operations
   delete: (validators: any[]) => [...validators, validateRequest],
 
-  // Create a middleware for custom operations
-  custom: (validators: any[]) => [...validators, validateRequest],
+  // Create a middleware for update operations
+  update: (validators: any[]) => [...validators, validateRequest],
 };
 
 export default validationMiddleware;

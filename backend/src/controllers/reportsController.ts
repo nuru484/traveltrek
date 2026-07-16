@@ -1,31 +1,32 @@
 // src/controllers/reportsController.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
-import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
-import { asyncHandler } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import {
   IMonthlyBookingsResponse,
   IPaymentsSummaryResponse,
-  ITopToursResponse,
   IReportsQueryParams,
+  ITopToursResponse,
 } from 'types/reports.types';
+
+import { HTTP_STATUS_CODES } from '../config/constants';
+import prisma from '../config/prismaClient';
+import { asyncHandler } from '../middlewares/error-handler';
+import validationMiddleware from '../middlewares/validation';
 import {
   monthlyBookingsValidation,
-  topToursValidation,
   paymentsSummaryValidation,
+  topToursValidation,
 } from '../validations/reports-validations';
 
 const handleGetMonthlyBookingsSummary = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const {
-      year = new Date().getFullYear(),
+      endDate,
       month,
       startDate,
-      endDate,
+      status,
       tourId,
       userId,
-      status,
+      year = new Date().getFullYear(),
     }: IReportsQueryParams = req.query;
 
     let dateFilter: any = {};
@@ -33,8 +34,8 @@ const handleGetMonthlyBookingsSummary = asyncHandler(
     if (startDate && endDate) {
       dateFilter = {
         bookingDate: {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string),
+          gte: new Date(startDate),
+          lte: new Date(endDate),
         },
       };
     } else if (year && month) {
@@ -74,12 +75,11 @@ const handleGetMonthlyBookingsSummary = asyncHandler(
     }
 
     const bookings = await prisma.booking.findMany({
-      where,
       select: {
-        id: true,
-        totalPrice: true,
         bookingDate: true,
+        id: true,
         status: true,
+        totalPrice: true,
         tour: {
           select: {
             id: true,
@@ -88,12 +88,13 @@ const handleGetMonthlyBookingsSummary = asyncHandler(
         },
         user: {
           select: {
+            email: true,
             id: true,
             name: true,
-            email: true,
           },
         },
       },
+      where,
     });
 
     const totalBookings = bookings.length;
@@ -104,15 +105,15 @@ const handleGetMonthlyBookingsSummary = asyncHandler(
     const averageBookingValue =
       totalBookings > 0 ? totalRevenue / totalBookings : 0;
 
-    const monthlyBreakdown = bookings.reduce((acc, booking) => {
+    const monthlyBreakdown = bookings.reduce<any>((acc, booking) => {
       const monthKey = booking.bookingDate.toISOString().slice(0, 7);
 
       if (!acc[monthKey]) {
         acc[monthKey] = {
-          month: monthKey,
-          bookingCount: 0,
-          revenue: 0,
           averageValue: 0,
+          bookingCount: 0,
+          month: monthKey,
+          revenue: 0,
         };
       }
 
@@ -122,31 +123,31 @@ const handleGetMonthlyBookingsSummary = asyncHandler(
         acc[monthKey].revenue / acc[monthKey].bookingCount;
 
       return acc;
-    }, {} as any);
+    }, {});
 
-    const statusBreakdown = bookings.reduce((acc, booking) => {
+    const statusBreakdown = bookings.reduce<any>((acc, booking) => {
       acc[booking.status] = (acc[booking.status] || 0) + 1;
       return acc;
-    }, {} as any);
+    }, {});
 
     const response: IMonthlyBookingsResponse = {
-      message: 'Monthly bookings summary retrieved successfully',
       data: {
-        summary: {
-          totalBookings,
-          totalRevenue,
-          averageBookingValue: Math.round(averageBookingValue * 100) / 100,
-          period: {
-            year: Number(year),
-            month: month ? Number(month) : null,
-            startDate: startDate as string,
-            endDate: endDate as string,
-          },
-        },
+        bookings: bookings.slice(0, 10),
         monthlyBreakdown: Object.values(monthlyBreakdown),
         statusBreakdown,
-        bookings: bookings.slice(0, 10),
+        summary: {
+          averageBookingValue: Math.round(averageBookingValue * 100) / 100,
+          period: {
+            endDate: endDate!,
+            month: month ? Number(month) : null,
+            startDate: startDate!,
+            year: Number(year),
+          },
+          totalBookings,
+          totalRevenue,
+        },
       },
+      message: 'Monthly bookings summary retrieved successfully',
     };
 
     res.status(HTTP_STATUS_CODES.OK).json(response);
@@ -159,16 +160,16 @@ export const getMonthlyBookingsSummary: RequestHandler[] = [
 ];
 
 const handleGetPaymentsSummary = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const {
-      year = new Date().getFullYear(),
-      month,
-      startDate,
+      currency = 'GHS',
       endDate,
+      month,
       paymentMethod,
+      startDate,
       status,
       userId,
-      currency = 'GHS',
+      year = new Date().getFullYear(),
     }: IReportsQueryParams = req.query;
 
     let dateFilter: any = {};
@@ -176,8 +177,8 @@ const handleGetPaymentsSummary = asyncHandler(
     if (startDate && endDate) {
       dateFilter = {
         paymentDate: {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string),
+          gte: new Date(startDate),
+          lte: new Date(endDate),
         },
       };
     } else if (year && month) {
@@ -221,22 +222,8 @@ const handleGetPaymentsSummary = asyncHandler(
     }
 
     const payments = await prisma.payment.findMany({
-      where,
       select: {
-        id: true,
         amount: true,
-        currency: true,
-        status: true,
-        paymentMethod: true,
-        paymentDate: true,
-        transactionReference: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
         booking: {
           select: {
             id: true,
@@ -249,7 +236,21 @@ const handleGetPaymentsSummary = asyncHandler(
             },
           },
         },
+        currency: true,
+        id: true,
+        paymentDate: true,
+        paymentMethod: true,
+        status: true,
+        transactionReference: true,
+        user: {
+          select: {
+            email: true,
+            id: true,
+            name: true,
+          },
+        },
       },
+      where,
     });
 
     const totalPayments = payments.length;
@@ -266,40 +267,40 @@ const handleGetPaymentsSummary = asyncHandler(
       .filter((p) => p.status === 'REFUNDED')
       .reduce((sum, payment) => sum + payment.amount, 0);
 
-    const statusBreakdown = payments.reduce((acc, payment) => {
+    const statusBreakdown = payments.reduce<any>((acc, payment) => {
       if (!acc[payment.status]) {
         acc[payment.status] = {
-          count: 0,
           amount: 0,
+          count: 0,
         };
       }
       acc[payment.status].count += 1;
       acc[payment.status].amount += payment.amount;
       return acc;
-    }, {} as any);
+    }, {});
 
-    const methodBreakdown = payments.reduce((acc, payment) => {
+    const methodBreakdown = payments.reduce<any>((acc, payment) => {
       if (!acc[payment.paymentMethod]) {
         acc[payment.paymentMethod] = {
-          count: 0,
           amount: 0,
+          count: 0,
         };
       }
       acc[payment.paymentMethod].count += 1;
       acc[payment.paymentMethod].amount += payment.amount;
       return acc;
-    }, {} as any);
+    }, {});
 
     // Monthly breakdown
-    const monthlyBreakdown = payments.reduce((acc, payment) => {
+    const monthlyBreakdown = payments.reduce<any>((acc, payment) => {
       if (!payment.paymentDate) return acc;
 
       const monthKey = payment.paymentDate.toISOString().slice(0, 7);
 
       if (!acc[monthKey]) {
         acc[monthKey] = {
-          month: monthKey,
           count: 0,
+          month: monthKey,
           revenue: 0,
         };
       }
@@ -310,26 +311,10 @@ const handleGetPaymentsSummary = asyncHandler(
       }
 
       return acc;
-    }, {} as any);
+    }, {});
 
     const response: IPaymentsSummaryResponse = {
-      message: 'Payments summary retrieved successfully',
       data: {
-        summary: {
-          totalPayments,
-          totalRevenue,
-          pendingAmount,
-          failedAmount,
-          refundedAmount,
-          currency: currency as string,
-          period: {
-            year: Number(year),
-            month: month ? Number(month) : null,
-            startDate: startDate as string,
-            endDate: endDate as string,
-          },
-        },
-        statusBreakdown,
         methodBreakdown,
         monthlyBreakdown: Object.values(monthlyBreakdown),
         recentPayments: payments
@@ -338,7 +323,23 @@ const handleGetPaymentsSummary = asyncHandler(
               (b.paymentDate?.getTime() || 0) - (a.paymentDate?.getTime() || 0),
           )
           .slice(0, 10),
+        statusBreakdown,
+        summary: {
+          currency: currency,
+          failedAmount,
+          pendingAmount,
+          period: {
+            endDate: endDate!,
+            month: month ? Number(month) : null,
+            startDate: startDate!,
+            year: Number(year),
+          },
+          refundedAmount,
+          totalPayments,
+          totalRevenue,
+        },
       },
+      message: 'Payments summary retrieved successfully',
     };
 
     res.status(HTTP_STATUS_CODES.OK).json(response);
@@ -351,16 +352,16 @@ export const getPaymentsSummary: RequestHandler[] = [
 ];
 
 const handleGetTopToursByBookings = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const {
-      year = new Date().getFullYear(),
-      month,
-      startDate,
       endDate,
-      tourType,
-      tourStatus,
       limit = 5,
       minBookings = 1,
+      month,
+      startDate,
+      tourStatus,
+      tourType,
+      year = new Date().getFullYear(),
     }: IReportsQueryParams = req.query;
 
     let bookingDateFilter: any = {};
@@ -368,8 +369,8 @@ const handleGetTopToursByBookings = asyncHandler(
     if (startDate && endDate) {
       bookingDateFilter = {
         bookingDate: {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string),
+          gte: new Date(startDate),
+          lte: new Date(endDate),
         },
       };
     } else if (year && month) {
@@ -401,36 +402,36 @@ const handleGetTopToursByBookings = asyncHandler(
     }
 
     const toursWithBookings = await prisma.tour.findMany({
-      where: tourWhere,
       select: {
-        id: true,
-        name: true,
+        bookings: {
+          select: {
+            bookingDate: true,
+            id: true,
+            status: true,
+            totalPrice: true,
+          },
+          where: bookingDateFilter,
+        },
         description: true,
-        type: true,
-        status: true,
-        price: true,
-        duration: true,
-        startDate: true,
-        endDate: true,
-        maxGuests: true,
         destination: {
           select: {
-            id: true,
-            name: true,
             city: true,
             country: true,
-          },
-        },
-        bookings: {
-          where: bookingDateFilter,
-          select: {
             id: true,
-            totalPrice: true,
-            status: true,
-            bookingDate: true,
+            name: true,
           },
         },
+        duration: true,
+        endDate: true,
+        id: true,
+        maxGuests: true,
+        name: true,
+        price: true,
+        startDate: true,
+        status: true,
+        type: true,
       },
+      where: tourWhere,
     });
 
     const tourStats = toursWithBookings
@@ -445,23 +446,23 @@ const handleGetTopToursByBookings = asyncHandler(
         );
 
         return {
-          tour: {
-            id: tour.id,
-            name: tour.name,
-            description: tour.description,
-            type: tour.type,
-            status: tour.status,
-            price: tour.price,
-            duration: tour.duration,
-            destination: tour.destination,
-            startDate: tour.startDate,
-            endDate: tour.endDate,
-            maxGuests: tour.maxGuests,
-          },
           statistics: {
-            totalBookings,
             confirmedBookings,
+            totalBookings,
             totalRevenue,
+          },
+          tour: {
+            description: tour.description,
+            destination: tour.destination,
+            duration: tour.duration,
+            endDate: tour.endDate,
+            id: tour.id,
+            maxGuests: tour.maxGuests,
+            name: tour.name,
+            price: tour.price,
+            startDate: tour.startDate,
+            status: tour.status,
+            type: tour.type,
           },
         };
       })
@@ -487,27 +488,27 @@ const handleGetTopToursByBookings = asyncHandler(
     );
 
     const response: ITopToursResponse = {
-      message: `Top ${tourStats.length} tours by booking count retrieved successfully`,
       data: {
         summary: {
-          totalToursAnalyzed,
+          filters: {
+            limit: Number(limit),
+            minBookings: Number(minBookings),
+            tourStatus: tourStatus,
+            tourType: tourType,
+          },
+          period: {
+            endDate: endDate!,
+            month: month ? Number(month) : null,
+            startDate: startDate!,
+            year: Number(year),
+          },
           totalBookingsAnalyzed,
           totalRevenueAnalyzed,
-          period: {
-            year: Number(year),
-            month: month ? Number(month) : null,
-            startDate: startDate as string,
-            endDate: endDate as string,
-          },
-          filters: {
-            tourType: tourType,
-            tourStatus: tourStatus,
-            minBookings: Number(minBookings),
-            limit: Number(limit),
-          },
+          totalToursAnalyzed,
         },
         topTours: tourStats,
       },
+      message: `Top ${tourStats.length} tours by booking count retrieved successfully`,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json(response);

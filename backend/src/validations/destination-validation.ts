@@ -1,42 +1,43 @@
+import { ValidationChain } from 'express-validator';
+
+import prisma from '../config/prismaClient';
 // src/validations/destination-validation.ts
 import { validator } from '../validations/validation-factory';
-import { ValidationChain } from 'express-validator';
-import prisma from '../config/prismaClient';
 
 // Validation for creating a new destination
 export const createDestinationValidation: ValidationChain[] = [
   // Name validation
   validator.string('name', {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
     customMessage: 'Destination name must be between 2 and 100 characters',
+    maxLength: 100,
+    minLength: 2,
+    required: true,
   }),
 
   // Description validation (optional)
   validator.string('description', {
-    required: false,
-    maxLength: 1000,
     customMessage: 'Description must not exceed 1000 characters',
+    maxLength: 1000,
+    required: false,
   }),
 
   // Country validation
   validator.string('country', {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'Country must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: true,
   }),
 
   // City validation (optional)
   validator.string('city', {
-    required: false,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'City must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   // Custom validation to ensure name is unique (case-insensitive)
@@ -45,23 +46,23 @@ export const createDestinationValidation: ValidationChain[] = [
     async (value, req) => {
       if (!value) return true;
 
-      const { country, city } = req.body;
+      const { city, country } = req.body;
       const existingDestination = await prisma.destination.findFirst({
         where: {
-          name: {
-            equals: value,
-            mode: 'insensitive',
-          },
-          country: {
-            equals: country,
-            mode: 'insensitive',
-          },
           city: city
             ? {
                 equals: city,
                 mode: 'insensitive',
               }
             : undefined,
+          country: {
+            equals: country,
+            mode: 'insensitive',
+          },
+          name: {
+            equals: value,
+            mode: 'insensitive',
+          },
         },
       });
 
@@ -76,36 +77,36 @@ export const createDestinationValidation: ValidationChain[] = [
 export const updateDestinationValidation: ValidationChain[] = [
   // Name validation (optional for updates)
   validator.string('name', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
     customMessage: 'Destination name must be between 2 and 100 characters',
+    maxLength: 100,
+    minLength: 2,
+    required: false,
   }),
 
   // Description validation (optional)
   validator.string('description', {
-    required: false,
-    maxLength: 1000,
     customMessage: 'Description must not exceed 1000 characters',
+    maxLength: 1000,
+    required: false,
   }),
 
   // Country validation (optional for updates)
   validator.string('country', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'Country must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   // City validation (optional)
   validator.string('city', {
-    required: false,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'City must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   // Custom validation to ensure updated name is unique (excluding current destination)
@@ -117,12 +118,12 @@ export const updateDestinationValidation: ValidationChain[] = [
       const destinationId = req.params?.id;
       if (!destinationId) return true;
 
-      const { country, city } = req.body;
+      const { city, country } = req.body;
 
       // Get current destination data for comparison
       const currentDestination = await prisma.destination.findUnique({
+        select: { city: true, country: true },
         where: { id: parseInt(destinationId) },
-        select: { country: true, city: true },
       });
 
       if (!currentDestination) return true;
@@ -133,21 +134,21 @@ export const updateDestinationValidation: ValidationChain[] = [
 
       const existingDestination = await prisma.destination.findFirst({
         where: {
-          id: { not: parseInt(destinationId) },
-          name: {
-            equals: value,
-            mode: 'insensitive',
-          },
-          country: {
-            equals: targetCountry,
-            mode: 'insensitive',
-          },
           city: targetCity
             ? {
                 equals: targetCity,
                 mode: 'insensitive',
               }
             : undefined,
+          country: {
+            equals: targetCountry,
+            mode: 'insensitive',
+          },
+          id: { not: parseInt(destinationId) },
+          name: {
+            equals: value,
+            mode: 'insensitive',
+          },
         },
       });
 
@@ -161,7 +162,7 @@ export const updateDestinationValidation: ValidationChain[] = [
   validator.custom(
     'updateFields',
     (value, req) => {
-      const { name, description, country, city } = req.body;
+      const { city, country, description, name } = req.body;
       const hasFile = req.file || req.body.destinationPhoto;
 
       return !!(name || description || country || city || hasFile);
@@ -174,22 +175,22 @@ export const updateDestinationValidation: ValidationChain[] = [
 // Validation for destination ID parameter
 export const destinationIdParamValidation: ValidationChain[] = [
   validator.integer('id', {
-    required: true,
     min: 1,
+    required: true,
   }),
 ];
 
 // Validation for pagination query parameters
 export const paginationQueryValidation: ValidationChain[] = [
   validator.integer('page', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('limit', {
-    required: false,
-    min: 1,
     max: 100, // Prevent excessive limit values
+    min: 1,
+    required: false,
   }),
 ];
 
@@ -197,30 +198,30 @@ export const paginationQueryValidation: ValidationChain[] = [
 export const destinationSearchValidation: ValidationChain[] = [
   // Search by name (optional)
   validator.string('search', {
-    required: false,
-    minLength: 1,
-    maxLength: 100,
     customMessage: 'Search term must be between 1 and 100 characters',
+    maxLength: 100,
+    minLength: 1,
+    required: false,
   }),
 
   // Filter by country (optional)
   validator.string('country', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'Country filter must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   // Filter by city (optional)
   validator.string('city', {
-    required: false,
-    minLength: 1,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'City filter must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 1,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   // Sort order validation
@@ -246,10 +247,10 @@ export const getDestinationsValidation: ValidationChain[] = [
 // Validation for bulk operations
 export const bulkDestinationValidation: ValidationChain[] = [
   validator.array('destinationIds', {
-    required: true,
-    minLength: 1,
-    maxLength: 50, // Limit bulk operations
     itemType: 'number',
+    maxLength: 50, // Limit bulk operations
+    minLength: 1,
+    required: true,
     unique: true,
   }),
 

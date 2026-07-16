@@ -3,11 +3,11 @@ import { query } from 'express-validator';
 export const monthlyBookingsValidation = [
   query('year')
     .optional()
-    .isInt({ min: 2020, max: 2030 })
+    .isInt({ max: 2030, min: 2020 })
     .withMessage('Year must be between 2020 and 2030'),
   query('month')
     .optional()
-    .isInt({ min: 1, max: 12 })
+    .isInt({ max: 12, min: 1 })
     .withMessage('Month must be between 1 and 12'),
   query('startDate')
     .optional()
@@ -34,11 +34,11 @@ export const monthlyBookingsValidation = [
 export const paymentsSummaryValidation = [
   query('year')
     .optional()
-    .isInt({ min: 2020, max: 2030 })
+    .isInt({ max: 2030, min: 2020 })
     .withMessage('Year must be between 2020 and 2030'),
   query('month')
     .optional()
-    .isInt({ min: 1, max: 12 })
+    .isInt({ max: 12, min: 1 })
     .withMessage('Month must be between 1 and 12'),
   query('startDate')
     .optional()
@@ -62,18 +62,18 @@ export const paymentsSummaryValidation = [
     .withMessage('User ID must be a positive integer'),
   query('currency')
     .optional()
-    .isLength({ min: 3, max: 3 })
+    .isLength({ max: 3, min: 3 })
     .withMessage('Currency must be a 3-letter code'),
 ];
 
 export const topToursValidation = [
   query('year')
     .optional()
-    .isInt({ min: 2020, max: 2030 })
+    .isInt({ max: 2030, min: 2020 })
     .withMessage('Year must be between 2020 and 2030'),
   query('month')
     .optional()
-    .isInt({ min: 1, max: 12 })
+    .isInt({ max: 12, min: 1 })
     .withMessage('Month must be between 1 and 12'),
   query('startDate')
     .optional()
@@ -93,7 +93,7 @@ export const topToursValidation = [
     .withMessage('Invalid tour status'),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 20 })
+    .isInt({ max: 20, min: 1 })
     .withMessage('Limit must be between 1 and 20'),
   query('minBookings')
     .optional()

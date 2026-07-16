@@ -7,7 +7,7 @@ export function createRedisConnection() {
   return {
     url: ENV.REDIS_URL,
     ...(isTLS ? { tls: {} } : {}),
-    maxRetriesPerRequest: null,
     enableReadyCheck: false,
+    maxRetriesPerRequest: null,
   };
 }

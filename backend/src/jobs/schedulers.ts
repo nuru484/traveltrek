@@ -1,8 +1,8 @@
+import logger from '../utils/logger';
 // src/jobs/schedulers.ts
 import { bookingDeadlineQueue } from './bookingQueue';
 import { flightStatusQueue } from './flightQueue';
 import { tourStatusQueue } from './tourQueue';
-import logger from '../utils/logger';
 
 export async function setupJobSchedulers() {
   // Schedule booking deadline check - runs every 5 minutes

@@ -1,22 +1,18 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
+import { IRoom, IRoomInput, IRoomQueryParams } from 'types/room.types';
+
+import { cloudinaryService } from '../config/claudinary';
+import { HTTP_STATUS_CODES } from '../config/constants';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import multerUpload from '../config/multer';
 import prisma from '../config/prismaClient';
+import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
 import {
   asyncHandler,
-  NotFoundError,
   BadRequestError,
   CustomError,
+  NotFoundError,
 } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import {
-  IRoomInput,
-  IRoom,
-  IRoomQueryParams,
-  IRoomResponse,
-} from 'types/room.types';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
-import { cloudinaryService } from '../config/claudinary';
 import logger from '../utils/logger';
 
 /**
@@ -28,23 +24,23 @@ const getAvailableRoomsCount = async (
   endDate: Date,
 ): Promise<{ availableRooms: number; bookedRooms: number }> => {
   const room = await prisma.room.findUnique({
-    where: { id: roomId },
     select: { totalRooms: true },
+    where: { id: roomId },
   });
 
   if (!room) return { availableRooms: 0, bookedRooms: 0 };
 
   // Get overlapping bookings that are CONFIRMED or PENDING
   const overlappingBookings = await prisma.booking.findMany({
+    select: {
+      numberOfRooms: true,
+    },
     where: {
+      AND: [{ startDate: { lt: endDate } }, { endDate: { gt: startDate } }],
       roomId: roomId,
       status: {
         in: ['CONFIRMED', 'PENDING'],
       },
-      AND: [{ startDate: { lt: endDate } }, { endDate: { gt: startDate } }],
-    },
-    select: {
-      numberOfRooms: true,
     },
   });
 
@@ -67,21 +63,21 @@ const handleCreateRoom = asyncHandler(
   async (
     req: Request<{}, {}, IRoomInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const {
-      hotelId,
-      roomType,
-      pricePerNight,
-      capacity,
-      totalRooms,
-      description,
       amenities,
+      capacity,
+      description,
+      hotelId,
+      pricePerNight,
+      roomType,
+      totalRooms,
     } = req.body;
 
     const hotel = await prisma.hotel.findUnique({
+      select: { description: true, id: true, name: true },
       where: { id: Number(hotelId) },
-      select: { id: true, name: true, description: true },
     });
 
     if (!hotel) {
@@ -106,21 +102,21 @@ const handleCreateRoom = asyncHandler(
 
     const room = await prisma.room.create({
       data: {
-        hotel: { connect: { id: Number(hotelId) } },
-        roomType: roomType.trim(),
-        pricePerNight: Number(pricePerNight),
-        capacity: Number(capacity),
-        totalRooms: Number(totalRooms),
-        description: description?.trim() || null,
         amenities: amenities || [],
+        capacity: Number(capacity),
+        description: description?.trim() || null,
+        hotel: { connect: { id: Number(hotelId) } },
         photo: typeof photoUrl === 'string' ? photoUrl : null,
+        pricePerNight: Number(pricePerNight),
+        roomType: roomType.trim(),
+        totalRooms: Number(totalRooms),
       },
       include: {
         hotel: {
           select: {
+            description: true,
             id: true,
             name: true,
-            description: true,
           },
         },
       },
@@ -137,25 +133,25 @@ const handleCreateRoom = asyncHandler(
     );
 
     const response: IRoom = {
-      id: room.id,
-      roomType: room.roomType,
-      pricePerNight: room.pricePerNight,
+      amenities: room.amenities,
       capacity: room.capacity,
-      totalRooms: room.totalRooms,
+      createdAt: room.createdAt,
+      description: room.description,
+      hotel: room.hotel,
+      id: room.id,
+      photo: room.photo,
+      pricePerNight: room.pricePerNight,
       roomsAvailable: availableRooms,
       roomsBooked: bookedRooms,
-      description: room.description,
-      amenities: room.amenities,
-      photo: room.photo,
-      hotel: room.hotel,
-      createdAt: room.createdAt,
+      roomType: room.roomType,
+      totalRooms: room.totalRooms,
       updatedAt: room.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
-      message: 'Room created successfully',
       data: response,
-    } as IRoomResponse);
+      message: 'Room created successfully',
+    });
   },
 );
 
@@ -172,21 +168,21 @@ const createRoom: RequestHandler[] = [
  * Get a single room by ID
  */
 const getRoom = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
-    const { startDate, endDate } = req.query;
+    const { endDate, startDate } = req.query;
 
     const room = await prisma.room.findUnique({
-      where: { id: parseInt(id) },
       include: {
         hotel: {
           select: {
+            description: true,
             id: true,
             name: true,
-            description: true,
           },
         },
       },
+      where: { id: parseInt(id) },
     });
 
     if (!room) {
@@ -218,24 +214,24 @@ const getRoom = asyncHandler(
     );
 
     const response: IRoom = {
-      id: room.id,
-      roomType: room.roomType,
-      pricePerNight: room.pricePerNight,
+      amenities: room.amenities,
       capacity: room.capacity,
-      totalRooms: room.totalRooms,
+      createdAt: room.createdAt,
+      description: room.description,
+      hotel: room.hotel,
+      id: room.id,
+      photo: room.photo,
+      pricePerNight: room.pricePerNight,
       roomsAvailable: availableRooms,
       roomsBooked: bookedRooms,
-      description: room.description,
-      amenities: room.amenities,
-      photo: room.photo,
-      hotel: room.hotel,
-      createdAt: room.createdAt,
+      roomType: room.roomType,
+      totalRooms: room.totalRooms,
       updatedAt: room.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Room retrieved successfully',
       data: response,
+      message: 'Room retrieved successfully',
     });
   },
 );
@@ -251,13 +247,13 @@ const handleUpdateRoom = asyncHandler(
   ): Promise<void> => {
     const { id } = req.params;
     const {
-      hotelId,
-      roomType,
-      pricePerNight,
-      capacity,
-      totalRooms,
-      description,
       amenities,
+      capacity,
+      description,
+      hotelId,
+      pricePerNight,
+      roomType,
+      totalRooms,
     } = req.body;
 
     // Validate room ID
@@ -272,23 +268,23 @@ const handleUpdateRoom = asyncHandler(
     }
 
     let uploadedImageUrl: string | undefined;
-    let oldPhoto: string | null = null;
+    let oldPhoto: null | string = null;
 
     try {
       const existingRoom = await prisma.room.findUnique({
-        where: { id: parsedId },
         include: {
           bookings: {
+            select: {
+              id: true,
+              numberOfRooms: true,
+              status: true,
+            },
             where: {
               OR: [{ status: 'PENDING' }, { status: 'CONFIRMED' }],
             },
-            select: {
-              id: true,
-              status: true,
-              numberOfRooms: true,
-            },
           },
         },
+        where: { id: parsedId },
       });
 
       if (!existingRoom) {
@@ -312,8 +308,8 @@ const handleUpdateRoom = asyncHandler(
 
         // Verify new hotel exists
         const hotel = await prisma.hotel.findUnique({
+          select: { description: true, id: true, name: true },
           where: { id: Number(hotelId) },
-          select: { id: true, name: true, description: true },
         });
 
         if (!hotel) {
@@ -334,8 +330,8 @@ const handleUpdateRoom = asyncHandler(
           where: {
             hotelId:
               hotelId !== undefined ? Number(hotelId) : existingRoom.hotelId,
-            roomType: roomType.trim(),
             id: { not: parsedId },
+            roomType: roomType.trim(),
           },
         });
 
@@ -410,17 +406,17 @@ const handleUpdateRoom = asyncHandler(
       }
 
       const updatedRoom = await prisma.room.update({
-        where: { id: parsedId },
         data: updateData,
         include: {
           hotel: {
             select: {
+              description: true,
               id: true,
               name: true,
-              description: true,
             },
           },
         },
+        where: { id: parsedId },
       });
 
       if (uploadedImageUrl && oldPhoto && oldPhoto !== uploadedImageUrl) {
@@ -442,25 +438,25 @@ const handleUpdateRoom = asyncHandler(
       );
 
       const response: IRoom = {
-        id: updatedRoom.id,
-        roomType: updatedRoom.roomType,
-        pricePerNight: updatedRoom.pricePerNight,
+        amenities: updatedRoom.amenities,
         capacity: updatedRoom.capacity,
-        totalRooms: updatedRoom.totalRooms,
+        createdAt: updatedRoom.createdAt,
+        description: updatedRoom.description,
+        hotel: updatedRoom.hotel,
+        id: updatedRoom.id,
+        photo: updatedRoom.photo,
+        pricePerNight: updatedRoom.pricePerNight,
         roomsAvailable: availableRooms,
         roomsBooked: bookedRooms,
-        description: updatedRoom.description,
-        amenities: updatedRoom.amenities,
-        photo: updatedRoom.photo,
-        hotel: updatedRoom.hotel,
-        createdAt: updatedRoom.createdAt,
+        roomType: updatedRoom.roomType,
+        totalRooms: updatedRoom.totalRooms,
         updatedAt: updatedRoom.updatedAt,
       };
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Room updated successfully',
         data: response,
-      } as IRoomResponse);
+        message: 'Room updated successfully',
+      });
     } catch (error) {
       if (uploadedImageUrl) {
         try {
@@ -487,21 +483,21 @@ const updateRoom: RequestHandler[] = [
  * Get all rooms with pagination and filtering
  */
 const getAllRooms = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const {
-      page = 1,
-      limit = 10,
+      amenities,
+      endDate,
       hotelId,
-      roomType,
-      minPrice,
+      limit = 10,
+      maxCapacity,
       maxPrice,
       minCapacity,
-      maxCapacity,
-      amenities,
+      minPrice,
+      page = 1,
+      roomType,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       startDate,
-      endDate,
     }: IRoomQueryParams = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -553,19 +549,19 @@ const getAllRooms = asyncHandler(
 
     const [rooms, total] = await Promise.all([
       prisma.room.findMany({
-        where,
-        skip,
-        take: Number(limit),
-        orderBy,
         include: {
           hotel: {
             select: {
+              description: true,
               id: true,
               name: true,
-              description: true,
             },
           },
         },
+        orderBy,
+        skip,
+        take: Number(limit),
+        where,
       }),
       prisma.room.count({ where }),
     ]);
@@ -576,8 +572,8 @@ const getAllRooms = asyncHandler(
     end.setDate(start.getDate() + 1);
 
     if (startDate && endDate) {
-      start = new Date(startDate as string);
-      end = new Date(endDate as string);
+      start = new Date(startDate);
+      end = new Date(endDate);
 
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         throw new BadRequestError('Invalid date format');
@@ -596,30 +592,30 @@ const getAllRooms = asyncHandler(
           end,
         );
         return {
-          id: room.id,
-          roomType: room.roomType,
-          pricePerNight: room.pricePerNight,
+          amenities: room.amenities,
           capacity: room.capacity,
-          totalRooms: room.totalRooms,
+          createdAt: room.createdAt,
+          description: room.description,
+          hotel: room.hotel,
+          id: room.id,
+          photo: room.photo,
+          pricePerNight: room.pricePerNight,
           roomsAvailable: availableRooms,
           roomsBooked: bookedRooms,
-          description: room.description,
-          amenities: room.amenities,
-          photo: room.photo,
-          hotel: room.hotel,
-          createdAt: room.createdAt,
+          roomType: room.roomType,
+          totalRooms: room.totalRooms,
           updatedAt: room.updatedAt,
         };
       }),
     );
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Rooms retrieved successfully',
       data: response,
+      message: 'Rooms retrieved successfully',
       meta: {
-        total,
-        page: Number(page),
         limit: Number(limit),
+        page: Number(page),
+        total,
         totalPages: Math.ceil(total / Number(limit)),
       },
     });
@@ -630,9 +626,9 @@ const getAllRooms = asyncHandler(
  * Check room availability for a specific date range
  */
 const checkRoomAvailability = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
-    const { startDate, endDate } = req.query;
+    const { endDate, startDate } = req.query;
 
     if (!startDate || !endDate) {
       throw new BadRequestError('Start date and end date are required');
@@ -661,8 +657,8 @@ const checkRoomAvailability = asyncHandler(
     );
 
     const room = await prisma.room.findUnique({
+      select: { roomType: true, totalRooms: true },
       where: { id: parsedId },
-      select: { totalRooms: true, roomType: true },
     });
 
     if (!room) {
@@ -670,17 +666,17 @@ const checkRoomAvailability = asyncHandler(
     }
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Room availability checked successfully',
       data: {
-        roomId: parsedId,
-        roomType: room.roomType,
-        totalRooms: room.totalRooms,
         availableRooms,
         bookedRooms,
-        startDate: start,
         endDate: end,
         isAvailable: availableRooms > 0,
+        roomId: parsedId,
+        roomType: room.roomType,
+        startDate: start,
+        totalRooms: room.totalRooms,
       },
+      message: 'Room availability checked successfully',
     });
   },
 );
@@ -707,15 +703,14 @@ const deleteRoom = asyncHandler(
 
     try {
       const room = await prisma.room.findUnique({
-        where: { id: parsedId },
         include: {
           bookings: {
             include: {
               payment: {
                 select: {
+                  amount: true,
                   id: true,
                   status: true,
-                  amount: true,
                 },
               },
             },
@@ -727,6 +722,7 @@ const deleteRoom = asyncHandler(
             },
           },
         },
+        where: { id: parsedId },
       });
 
       if (!room) {
@@ -848,14 +844,14 @@ const deleteRoom = asyncHandler(
       );
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Room deleted successfully',
         data: {
-          id: room.id,
-          roomType: room.roomType,
-          hotelName: room.hotel.name,
           deletedAt: new Date().toISOString(),
           historicalBookingsCount: completedBookings.length,
+          hotelName: room.hotel.name,
+          id: room.id,
+          roomType: room.roomType,
         },
+        message: 'Room deleted successfully',
       });
     } catch (error) {
       next(error);
@@ -867,7 +863,7 @@ const deleteRoom = asyncHandler(
  * Delete all rooms with photo cleanup and comprehensive validations
  */
 const deleteAllRooms = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const now = new Date();
 
     const rooms = await prisma.room.findMany({
@@ -898,8 +894,8 @@ const deleteAllRooms = asyncHandler(
     // Categorize rooms and identify issues
     const deletableRooms: typeof rooms = [];
     const roomsWithIssues: {
-      room: (typeof rooms)[0];
       reasons: string[];
+      room: (typeof rooms)[0];
     }[] = [];
 
     for (const room of rooms) {
@@ -955,7 +951,7 @@ const deleteAllRooms = asyncHandler(
       if (issues.length === 0) {
         deletableRooms.push(room);
       } else {
-        roomsWithIssues.push({ room, reasons: issues });
+        roomsWithIssues.push({ reasons: issues, room });
       }
     }
 
@@ -964,7 +960,7 @@ const deleteAllRooms = asyncHandler(
       const issuesSummary = roomsWithIssues
         .slice(0, 5)
         .map(
-          ({ room, reasons }) =>
+          ({ reasons, room }) =>
             `Room ${room.id} (${room.roomType} at ${room.hotel.name}): ${reasons.join(', ')}`,
         )
         .join('; ');
@@ -1030,36 +1026,36 @@ const deleteAllRooms = asyncHandler(
     );
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${deletableRooms.length} room(s)`,
       data: {
         deleted: deletableRooms.length,
+        hotelsAffected: new Set(deletableRooms.map((r) => r.hotel.name)).size,
         skipped: roomsWithIssues.length,
         total: rooms.length,
-        hotelsAffected: new Set(deletableRooms.map((r) => r.hotel.name)).size,
         ...(hotelsLosingAllRooms.length > 0 && {
           warning: `The following hotels now have no rooms: ${hotelsLosingAllRooms.join(', ')}`,
         }),
         ...(roomsWithIssues.length > 0 && {
           skippedDetails: roomsWithIssues
             .slice(0, 10)
-            .map(({ room, reasons }) => ({
-              roomId: room.id,
-              roomType: room.roomType,
+            .map(({ reasons, room }) => ({
               hotel: room.hotel.name,
               reasons,
+              roomId: room.id,
+              roomType: room.roomType,
             })),
         }),
       },
+      message: `Successfully deleted ${deletableRooms.length} room(s)`,
     });
   },
 );
 
 export {
+  checkRoomAvailability,
   createRoom,
-  getRoom,
-  updateRoom,
+  deleteAllRooms,
   deleteRoom,
   getAllRooms,
-  deleteAllRooms,
-  checkRoomAvailability,
+  getRoom,
+  updateRoom,
 };

@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { asyncHandler } from './error-handler';
+import { NextFunction, Request, Response } from 'express';
 import { UserRole } from 'types/user-profile.types';
+
 import { ForbiddenError } from './error-handler';
 
 /**
@@ -10,25 +10,19 @@ import { ForbiddenError } from './error-handler';
  * @returns Express middleware function that validates user roles
  * @throws ForbiddenError if user's role is not in the allowed roles
  */
-export const authorizeRole = (allowedRoles: UserRole[]) =>
-  asyncHandler(
-    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      // Verify user object exists
-      if (!req.user) {
-        throw new ForbiddenError('Unauthorized: User not authenticated');
-      }
+export const authorizeRole =
+  (allowedRoles: UserRole[]) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    // Verify user object exists
+    if (!req.user) {
+      throw new ForbiddenError('Unauthorized: User not authenticated');
+    }
 
-      // Verify role exists
-      if (!req.user.role) {
-        throw new ForbiddenError('Unauthorized: User role not defined');
-      }
+    // Check if user has required role (a missing role never matches)
+    if (!allowedRoles.includes(req.user.role)) {
+      throw new ForbiddenError();
+    }
 
-      // Check if user has required role
-      if (!allowedRoles.includes(req.user.role as UserRole)) {
-        throw new ForbiddenError();
-      }
-
-      // User is authorized
-      next();
-    },
-  );
+    // User is authorized
+    next();
+  };

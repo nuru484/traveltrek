@@ -1,18 +1,19 @@
 // src/controllers/authentication/refreshJwtToken.ts
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import jwt, { TokenExpiredError } from 'jsonwebtoken';
-import ENV from '../../config/env';
-import { verifyJwtToken } from '../../utils/verify-jwt-token';
-import {
-  CustomError,
-  UnauthorizedError,
-  asyncHandler,
-  NotFoundError,
-} from '../../middlewares/error-handler';
 import { IUser } from 'types/user-profile.types';
+
+import ENV from '../../config/env';
 import { assertEnv } from '../../config/env';
-import { CookieManager } from '../../utils/CookieManager';
 import prisma from '../../config/prismaClient';
+import {
+  asyncHandler,
+  CustomError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../../middlewares/error-handler';
+import { CookieManager } from '../../utils/CookieManager';
+import { verifyJwtToken } from '../../utils/verify-jwt-token';
 
 /**
  * Refreshes access token using a valid refresh token
@@ -25,7 +26,7 @@ const refreshToken: (
   res: Response,
   next: NextFunction,
 ) => Promise<void> = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const currentRefreshToken = CookieManager.getRefreshToken(req);
 
     if (!currentRefreshToken) {
@@ -37,7 +38,7 @@ const refreshToken: (
     // Verify token and decode user
     let decodedUser: IUser;
     try {
-      decodedUser = await verifyJwtToken<IUser>(
+      decodedUser = await verifyJwtToken(
         currentRefreshToken,
         assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
       );
@@ -80,11 +81,11 @@ const refreshToken: (
       throw new NotFoundError('Invalid credentials');
     }
 
-    const { password: userPassWord, ...userWithoutPassword } = user;
+    const { password: _password, ...userWithoutPassword } = user;
 
     res.status(200).json({
-      message: 'Token refreshed successfully',
       data: userWithoutPassword,
+      message: 'Token refreshed successfully',
     });
   },
 );

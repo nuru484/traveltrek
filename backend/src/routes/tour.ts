@@ -1,15 +1,16 @@
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
 import {
   createTour,
-  getTour,
-  updateTour,
+  deleteAllTours,
   deleteTour,
   getAllTours,
-  deleteAllTours,
+  getTour,
+  updateTour,
   updateTourStatus,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const tourRoutes = Router();
 

@@ -1,21 +1,18 @@
-// src/controllers/authentication/login.ts
-import { Response, NextFunction } from 'express';
 import { compare } from 'bcrypt';
+// src/controllers/authentication/login.ts
+import { NextFunction, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { ILoginRequest } from 'types/auth.types';
+
 import ENV from '../../config/env';
+import { assertEnv } from '../../config/env';
 import prisma from '../../config/prismaClient';
 import {
   asyncHandler,
   NotFoundError,
   UnauthorizedError,
 } from '../../middlewares/error-handler';
-import { assertEnv } from '../../config/env';
 import { CookieManager } from '../../utils/CookieManager';
-import {
-  ILoginRequest,
-  ITokenPayload,
-  IRefreshTokenPayload,
-} from 'types/auth.types';
 
 const login = asyncHandler(
   async (
@@ -24,23 +21,23 @@ const login = asyncHandler(
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { password, email } = req.body;
+      const { email, password } = req.body;
 
       const user = await prisma.user.findUnique({
-        where: {
-          email,
-        },
         select: {
+          address: true,
+          createdAt: true,
+          email: true,
           id: true,
           name: true,
-          email: true,
-          role: true,
-          phone: true,
-          address: true,
-          profilePicture: true,
-          createdAt: true,
-          updatedAt: true,
           password: true,
+          phone: true,
+          profilePicture: true,
+          role: true,
+          updatedAt: true,
+        },
+        where: {
+          email,
         },
       });
 
@@ -55,13 +52,13 @@ const login = asyncHandler(
       }
 
       const accessToken = jwt.sign(
-        { id: user.id, role: user.role } as ITokenPayload,
+        { id: user.id, role: user.role },
         assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
         { expiresIn: '30m' },
       );
 
       const refreshToken = jwt.sign(
-        { id: user.id, role: user.role } as IRefreshTokenPayload,
+        { id: user.id, role: user.role },
         assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
         {
           expiresIn: '7d',
@@ -72,9 +69,9 @@ const login = asyncHandler(
       CookieManager.setAccessToken(res, accessToken);
       CookieManager.setRefreshToken(res, refreshToken);
 
-      const { password: userPassWord, ...userWithoutPassword } = user;
+      const { password: _password, ...userWithoutPassword } = user;
 
-      res.json({ message: 'Login successful', data: userWithoutPassword });
+      res.json({ data: userWithoutPassword, message: 'Login successful' });
     } catch (error) {
       next(error);
     }

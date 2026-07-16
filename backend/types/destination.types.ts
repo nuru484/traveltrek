@@ -1,46 +1,46 @@
 // types/destination.types.ts
 
 export interface IDestinationInput {
-  name: string;
-  description?: string;
+  city?: string;
   country: string;
-  city?: string;
-  destinationPhoto?: string | Express.Multer.File;
-}
-
-export interface IDestinationUpdateInput {
-  name?: string;
   description?: string;
-  country?: string;
-  city?: string;
-  destinationPhoto?: string | Express.Multer.File;
+  destinationPhoto?: Express.Multer.File | string;
+  name: string;
 }
 
 export interface IDestinationResponse {
+  city: null | string;
+  country: string;
+  createdAt: Date;
+  description: null | string;
   id: number;
   name: string;
-  description: string | null;
-  country: string;
-  city: string | null;
-  photo: string | null;
-  createdAt: Date;
+  photo: null | string;
   updatedAt: Date;
 }
 
 export interface IDestinationsPaginatedResponse {
-  message: string;
   data: IDestinationResponse[];
+  message: string;
   meta: {
-    total: number;
-    page: number;
     limit: number;
+    page: number;
+    total: number;
     totalPages: number;
   };
 }
 
 export interface IDestinationSummary {
+  city: null | string;
+  country: string;
   id: number;
   name: string;
-  city: string | null;
-  country: string;
+}
+
+export interface IDestinationUpdateInput {
+  city?: string;
+  country?: string;
+  description?: string;
+  destinationPhoto?: Express.Multer.File | string;
+  name?: string;
 }

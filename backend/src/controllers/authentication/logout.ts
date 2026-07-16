@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+
 import { CookieManager } from '../../utils/CookieManager';
 
 const logout = (req: Request, res: Response): void => {

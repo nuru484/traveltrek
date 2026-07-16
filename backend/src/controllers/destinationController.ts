@@ -1,29 +1,30 @@
 // src/controllers/destination/destination-controller.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { param } from 'express-validator';
-import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
-import {
-  asyncHandler,
-  NotFoundError,
-  UnauthorizedError,
-  BadRequestError,
-} from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
 import {
   IDestinationInput,
   IDestinationResponse,
   IDestinationUpdateInput,
 } from 'types/destination.types';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+
 import { cloudinaryService } from '../config/claudinary';
+import { HTTP_STATUS_CODES } from '../config/constants';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import multerUpload from '../config/multer';
+import prisma from '../config/prismaClient';
+import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+import {
+  asyncHandler,
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../middlewares/error-handler';
+import validationMiddleware from '../middlewares/validation';
 import {
   createDestinationValidation,
-  updateDestinationValidation,
-  getDestinationsValidation,
   destinationPhotoValidation,
+  getDestinationsValidation,
+  updateDestinationValidation,
 } from '../validations/destination-validation';
 
 /**
@@ -33,9 +34,9 @@ const handleCreateDestination = asyncHandler(
   async (
     req: Request<{}, {}, IDestinationInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    const { name, description, country, city } = req.body;
+    const { city, country, description, name } = req.body;
     const user = req.user;
 
     if (!user) {
@@ -52,28 +53,28 @@ const handleCreateDestination = asyncHandler(
 
     const destination = await prisma.destination.create({
       data: {
-        name,
-        description,
-        country,
         city,
+        country,
+        description,
+        name,
         photo: typeof photoUrl === 'string' ? photoUrl : null,
       },
     });
 
     const response: IDestinationResponse = {
+      city: destination.city,
+      country: destination.country,
+      createdAt: destination.createdAt,
+      description: destination.description,
       id: destination.id,
       name: destination.name,
-      description: destination.description,
-      country: destination.country,
-      city: destination.city,
       photo: destination.photo,
-      createdAt: destination.createdAt,
       updatedAt: destination.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
-      message: 'Destination created successfully',
       data: response,
+      message: 'Destination created successfully',
     });
   },
 );
@@ -82,7 +83,7 @@ const handleCreateDestination = asyncHandler(
  * Get a single destination by ID
  */
 const handleGetDestination = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
 
     const destination = await prisma.destination.findUnique({
@@ -94,19 +95,19 @@ const handleGetDestination = asyncHandler(
     }
 
     const response: IDestinationResponse = {
+      city: destination.city,
+      country: destination.country,
+      createdAt: destination.createdAt,
+      description: destination.description,
       id: destination.id,
       name: destination.name,
-      description: destination.description,
-      country: destination.country,
-      city: destination.city,
       photo: destination.photo,
-      createdAt: destination.createdAt,
       updatedAt: destination.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Destination retrieved successfully',
       data: response,
+      message: 'Destination retrieved successfully',
     });
   },
 );
@@ -121,7 +122,7 @@ const handleUpdateDestination = asyncHandler(
     next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
-    const { name, description, country, city } = req.body;
+    const { city, country, description, name } = req.body;
     const user = req.user;
 
     if (!user) {
@@ -140,13 +141,13 @@ const handleUpdateDestination = asyncHandler(
 
     // Track the uploaded image URL for cleanup if needed
     let uploadedImageUrl: string | undefined;
-    let oldPhoto: string | null = null;
+    let oldPhoto: null | string = null;
 
     try {
       // First, get the current destination to check for existing photo
       const existingDestination = await prisma.destination.findUnique({
-        where: { id: parseInt(id) },
         select: { photo: true },
+        where: { id: parseInt(id) },
       });
 
       if (!existingDestination) {
@@ -183,8 +184,8 @@ const handleUpdateDestination = asyncHandler(
 
       // Update destination in database
       const updatedDestination = await prisma.destination.update({
-        where: { id: parseInt(id) },
         data: updateData,
+        where: { id: parseInt(id) },
       });
 
       // If we successfully updated with a new photo, clean up the old one
@@ -201,19 +202,19 @@ const handleUpdateDestination = asyncHandler(
       }
 
       const response: IDestinationResponse = {
+        city: updatedDestination.city,
+        country: updatedDestination.country,
+        createdAt: updatedDestination.createdAt,
+        description: updatedDestination.description,
         id: updatedDestination.id,
         name: updatedDestination.name,
-        description: updatedDestination.description,
-        country: updatedDestination.country,
-        city: updatedDestination.city,
         photo: updatedDestination.photo,
-        createdAt: updatedDestination.createdAt,
         updatedAt: updatedDestination.updatedAt,
       };
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Destination updated successfully',
         data: response,
+        message: 'Destination updated successfully',
       });
     } catch (error) {
       // If Cloudinary upload succeeded but DB update failed, clean up uploaded image
@@ -236,7 +237,7 @@ const handleDeleteDestination = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const user = req.user;
@@ -258,13 +259,13 @@ const handleDeleteDestination = asyncHandler(
     const destinationId = parseInt(id);
 
     const destination = await prisma.destination.findUnique({
-      where: { id: destinationId },
       include: {
-        hotels: true,
-        tours: true,
-        originFlights: true,
         destinationFlights: true,
+        hotels: true,
+        originFlights: true,
+        tours: true,
       },
+      where: { id: destinationId },
     });
 
     if (!destination) {
@@ -317,7 +318,7 @@ const handleDeleteDestination = asyncHandler(
  * Get all destinations with pagination and filtering
  */
 const handleGetAllDestinations = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
@@ -355,42 +356,42 @@ const handleGetAllDestinations = asyncHandler(
 
     const [destinations, total] = await Promise.all([
       prisma.destination.findMany({
-        where,
+        orderBy,
         skip,
         take: limit,
-        orderBy,
+        where,
       }),
       prisma.destination.count({ where }),
     ]);
 
     const response: IDestinationResponse[] = destinations.map(
       (destination) => ({
+        city: destination.city,
+        country: destination.country,
+        createdAt: destination.createdAt,
+        description: destination.description,
         id: destination.id,
         name: destination.name,
-        description: destination.description,
-        country: destination.country,
-        city: destination.city,
         photo: destination.photo,
-        createdAt: destination.createdAt,
         updatedAt: destination.updatedAt,
       }),
     );
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Destinations retrieved successfully',
       data: response,
+      message: 'Destinations retrieved successfully',
       meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
         filters: {
-          search,
-          country,
           city,
+          country,
+          search,
           sortBy,
           sortOrder,
         },
+        limit,
+        page,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   },
@@ -400,7 +401,7 @@ const handleGetAllDestinations = asyncHandler(
  * Delete all destinations with photo cleanup
  */
 const handleDeleteAllDestinations = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -413,10 +414,10 @@ const handleDeleteAllDestinations = asyncHandler(
 
     const destinations = await prisma.destination.findMany({
       include: {
-        hotels: true,
-        tours: true,
-        originFlights: true,
         destinationFlights: true,
+        hotels: true,
+        originFlights: true,
+        tours: true,
       },
     });
 
@@ -427,7 +428,7 @@ const handleDeleteAllDestinations = asyncHandler(
       return;
     }
 
-    const blocked: { name: string; id: number; deps: string[] }[] = [];
+    const blocked: { deps: string[]; id: number; name: string }[] = [];
 
     for (const dest of destinations) {
       const deps: string[] = [];
@@ -437,7 +438,7 @@ const handleDeleteAllDestinations = asyncHandler(
         deps.push('Flights');
       }
       if (deps.length > 0) {
-        blocked.push({ name: dest.name, id: dest.id, deps });
+        blocked.push({ deps, id: dest.id, name: dest.name });
       }
     }
 

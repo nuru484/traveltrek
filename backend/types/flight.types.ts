@@ -1,69 +1,69 @@
+import { FlightStatus } from '../generated/prisma/client';
 // types/flight.types.ts
 import { IDestinationSummary } from './destination.types';
-import { FlightStatus } from '../generated/prisma/client';
-
-export interface IFlightInput {
-  flightNumber: string;
-  airline: string;
-  departure: string | Date;
-  arrival: string | Date;
-  originId: number;
-  destinationId: number;
-  price: number;
-  flightClass: string;
-  stops?: number;
-  flightPhoto?: string | Express.Multer.File;
-  capacity: number;
-}
-
-export interface IFlightUpdateInput {
-  flightNumber?: string;
-  airline?: string;
-  departure?: string | Date;
-  arrival?: string | Date;
-  originId?: number;
-  destinationId?: number;
-  price?: number;
-  flightClass?: string;
-  stops?: number;
-  flightPhoto?: string | Express.Multer.File;
-  capacity?: number;
-  status?: FlightStatus; 
-}
 
 export interface IFlight {
-  id: number;
-  flightNumber: string;
   airline: string;
-  departure: Date;
   arrival: Date;
-  origin: IDestinationSummary;
-  destination: IDestinationSummary;
-  price: number;
-  status: FlightStatus;
-  flightClass: string;
-  duration: number;
-  stops: number;
-  photo: string | null;
-  seatsAvailable: number;
   capacity: number;
   createdAt: Date;
+  departure: Date;
+  destination: IDestinationSummary;
+  duration: number;
+  flightClass: string;
+  flightNumber: string;
+  id: number;
+  origin: IDestinationSummary;
+  photo: null | string;
+  price: number;
+  seatsAvailable: number;
+  status: FlightStatus;
+  stops: number;
   updatedAt: Date;
 }
 
+export interface IFlightInput {
+  airline: string;
+  arrival: Date | string;
+  capacity: number;
+  departure: Date | string;
+  destinationId: number;
+  flightClass: string;
+  flightNumber: string;
+  flightPhoto?: Express.Multer.File | string;
+  originId: number;
+  price: number;
+  stops?: number;
+}
+
 export interface IFlightResponse {
-  message: string;
   data: IFlight;
+  message: string;
 }
 
 export interface IFlightsPaginatedResponse {
-  message: string;
   data: IFlight[];
+  message: string;
   meta: {
-    total: number;
-    page: number;
+    filters?: Record<string, unknown>;
     limit: number;
+    page: number;
+    total: number;
     totalPages: number;
-    filters?: any;
   };
+}
+
+export interface IFlightUpdateInput {
+  airline?: string;
+  arrival?: Date | string;
+  capacity?: number;
+  departure?: Date | string;
+  destinationId?: number;
+  flightClass?: string;
+  flightNumber?: string;
+  flightPhoto?: Express.Multer.File | string;
+  originId?: number;
+  price?: number;
+  status?: FlightStatus;
+  stops?: number;
 }

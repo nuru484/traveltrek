@@ -1,15 +1,16 @@
 import { Router } from 'express';
+
 import {
   createPayment,
+  deleteAllPayments,
+  deletePayment,
+  getAllPayments,
+  getPayment,
+  getUserPayments,
   handleCallback,
   handleWebhook,
-  getPayment,
-  getAllPayments,
-  updatePaymentStatus,
-  deletePayment,
-  deleteAllPayments,
   refundPayment,
-  getUserPayments,
+  updatePaymentStatus,
 } from '../controllers/index';
 import authenticateJWT from '../middlewares/authenticate-jwt';
 

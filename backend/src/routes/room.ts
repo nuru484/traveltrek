@@ -1,14 +1,15 @@
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
 import {
   createRoom,
-  getRoom,
-  updateRoom,
+  deleteAllRooms,
   deleteRoom,
   getAllRooms,
-  deleteAllRooms,
+  getRoom,
+  updateRoom,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const roomRoutes = Router();
 

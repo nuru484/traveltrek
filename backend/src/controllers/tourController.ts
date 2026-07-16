@@ -1,40 +1,41 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { param } from 'express-validator';
+import { body } from 'express-validator';
+import { ITourInput, ITourResponse } from 'types/tour.types';
+
+import { TourStatus } from '../../generated/prisma/client';
+import { HTTP_STATUS_CODES } from '../config/constants';
 import prisma from '../config/prismaClient';
 import {
   asyncHandler,
-  NotFoundError,
   BadRequestError,
-  UnauthorizedError,
   CustomError,
+  NotFoundError,
+  UnauthorizedError,
 } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { ITourInput, ITourResponse } from 'types/tour.types';
-import {
-  createTourValidation,
-  updateTourValidation,
-  getAllToursValidation,
-} from '../validations/tour-validation';
 import validationMiddleware from '../middlewares/validation';
 import logger from '../utils/logger';
-import { TourStatus } from '../../generated/prisma/client';
-import { body } from 'express-validator';
+import {
+  createTourValidation,
+  getAllToursValidation,
+  updateTourValidation,
+} from '../validations/tour-validation';
 
 const handleCreateTour = asyncHandler(
   async (
     req: Request<{}, {}, ITourInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const {
-      name,
       description,
-      type,
-      price,
-      maxGuests,
-      startDate,
-      endDate,
       destinationId,
+      endDate,
+      maxGuests,
+      name,
+      price,
+      startDate,
+      type,
     } = req.body;
 
     const destination = await prisma.destination.findUnique({
@@ -53,48 +54,48 @@ const handleCreateTour = asyncHandler(
 
     const tour = await prisma.tour.create({
       data: {
-        name,
         description,
-        type,
-        duration: durationInDays,
-        price,
-        maxGuests,
-        startDate: start,
-        endDate: end,
         destinationId,
+        duration: durationInDays,
+        endDate: end,
+        maxGuests,
+        name,
+        price,
+        startDate: start,
+        type,
       },
       include: {
         destination: {
           select: {
+            city: true,
+            country: true,
             id: true,
             name: true,
-            country: true,
-            city: true,
           },
         },
       },
     });
 
     const response: ITourResponse = {
-      id: tour.id,
-      name: tour.name,
-      description: tour.description,
-      type: tour.type,
-      status: tour.status,
-      duration: tour.duration,
-      price: tour.price,
-      maxGuests: tour.maxGuests,
-      guestsBooked: tour.guestsBooked,
-      startDate: tour.startDate,
-      endDate: tour.endDate,
-      destination: tour.destination,
       createdAt: tour.createdAt,
+      description: tour.description,
+      destination: tour.destination,
+      duration: tour.duration,
+      endDate: tour.endDate,
+      guestsBooked: tour.guestsBooked,
+      id: tour.id,
+      maxGuests: tour.maxGuests,
+      name: tour.name,
+      price: tour.price,
+      startDate: tour.startDate,
+      status: tour.status,
+      type: tour.type,
       updatedAt: tour.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
-      message: 'Tour created successfully',
       data: response,
+      message: 'Tour created successfully',
     });
   },
 );
@@ -106,21 +107,21 @@ export const createTour: RequestHandler[] = [
 
 // GET SINGLE TOUR
 const handleGetTour = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
 
     const tour = await prisma.tour.findUnique({
-      where: { id: parseInt(id) },
       include: {
         destination: {
           select: {
+            city: true,
+            country: true,
             id: true,
             name: true,
-            country: true,
-            city: true,
           },
         },
       },
+      where: { id: parseInt(id) },
     });
 
     if (!tour) {
@@ -132,25 +133,25 @@ const handleGetTour = asyncHandler(
     }
 
     const response: ITourResponse = {
-      id: tour.id,
-      name: tour.name,
-      description: tour.description,
-      type: tour.type,
-      status: tour.status,
-      duration: tour.duration,
-      price: tour.price,
-      maxGuests: tour.maxGuests,
-      guestsBooked: tour.guestsBooked,
-      startDate: tour.startDate,
-      endDate: tour.endDate,
-      destination: tour.destination,
       createdAt: tour.createdAt,
+      description: tour.description,
+      destination: tour.destination,
+      duration: tour.duration,
+      endDate: tour.endDate,
+      guestsBooked: tour.guestsBooked,
+      id: tour.id,
+      maxGuests: tour.maxGuests,
+      name: tour.name,
+      price: tour.price,
+      startDate: tour.startDate,
+      status: tour.status,
+      type: tour.type,
       updatedAt: tour.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Tour retrieved successfully',
       data: response,
+      message: 'Tour retrieved successfully',
     });
   },
 );
@@ -172,14 +173,14 @@ const handleUpdateTour = asyncHandler(
   ): Promise<void> => {
     const { id } = req.params;
     const {
-      name,
       description,
-      type,
-      price,
-      maxGuests,
-      startDate,
-      endDate,
       destinationId,
+      endDate,
+      maxGuests,
+      name,
+      price,
+      startDate,
+      type,
     } = req.body;
 
     if (!id) {
@@ -193,7 +194,6 @@ const handleUpdateTour = asyncHandler(
 
     try {
       const existingTour = await prisma.tour.findUnique({
-        where: { id: parsedId },
         include: {
           bookings: {
             select: { id: true },
@@ -202,6 +202,7 @@ const handleUpdateTour = asyncHandler(
             select: { id: true },
           },
         },
+        where: { id: parsedId },
       });
 
       if (!existingTour) {
@@ -304,40 +305,40 @@ const handleUpdateTour = asyncHandler(
       }
 
       const updatedTour = await prisma.tour.update({
-        where: { id: parsedId },
         data: updateData,
         include: {
           destination: {
             select: {
+              city: true,
+              country: true,
               id: true,
               name: true,
-              country: true,
-              city: true,
             },
           },
         },
+        where: { id: parsedId },
       });
 
       const response: ITourResponse = {
-        id: updatedTour.id,
-        name: updatedTour.name,
-        description: updatedTour.description,
-        type: updatedTour.type,
-        status: updatedTour.status,
-        duration: updatedTour.duration,
-        price: updatedTour.price,
-        maxGuests: updatedTour.maxGuests,
-        guestsBooked: updatedTour.guestsBooked,
-        startDate: updatedTour.startDate,
-        endDate: updatedTour.endDate,
-        destination: updatedTour.destination,
         createdAt: updatedTour.createdAt,
+        description: updatedTour.description,
+        destination: updatedTour.destination,
+        duration: updatedTour.duration,
+        endDate: updatedTour.endDate,
+        guestsBooked: updatedTour.guestsBooked,
+        id: updatedTour.id,
+        maxGuests: updatedTour.maxGuests,
+        name: updatedTour.name,
+        price: updatedTour.price,
+        startDate: updatedTour.startDate,
+        status: updatedTour.status,
+        type: updatedTour.type,
         updatedAt: updatedTour.updatedAt,
       };
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Tour updated successfully',
         data: response,
+        message: 'Tour updated successfully',
       });
     } catch (error) {
       next(error);
@@ -358,7 +359,7 @@ const handleDeleteTour = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const user = req.user;
@@ -381,8 +382,8 @@ const handleDeleteTour = asyncHandler(
     }
 
     const tour = await prisma.tour.findUnique({
-      where: { id: parsedId },
       include: { bookings: true },
+      where: { id: parsedId },
     });
 
     if (!tour) {
@@ -439,7 +440,7 @@ export const deleteTour: RequestHandler[] = [
 
 // GET ALL TOURS
 const handleGetAllTours = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
@@ -597,50 +598,50 @@ const handleGetAllTours = asyncHandler(
 
     const [tours, total] = await Promise.all([
       prisma.tour.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: orderByClause,
         include: {
           destination: {
             select: {
+              city: true,
+              country: true,
               id: true,
               name: true,
-              country: true,
-              city: true,
             },
           },
         },
+        orderBy: orderByClause,
+        skip,
+        take: limit,
+        where: whereClause,
       }),
       prisma.tour.count({ where: whereClause }),
     ]);
 
     const response: ITourResponse[] = tours.map((tour) => {
       return {
-        id: tour.id,
-        name: tour.name,
-        description: tour.description,
-        type: tour.type,
-        status: tour.status,
-        duration: tour.duration,
-        price: tour.price,
-        maxGuests: tour.maxGuests,
-        guestsBooked: tour.guestsBooked,
-        startDate: tour.startDate,
-        endDate: tour.endDate,
-        destination: tour.destination,
         createdAt: tour.createdAt,
+        description: tour.description,
+        destination: tour.destination,
+        duration: tour.duration,
+        endDate: tour.endDate,
+        guestsBooked: tour.guestsBooked,
+        id: tour.id,
+        maxGuests: tour.maxGuests,
+        name: tour.name,
+        price: tour.price,
+        startDate: tour.startDate,
+        status: tour.status,
+        type: tour.type,
         updatedAt: tour.updatedAt,
       };
     });
 
     const paginatedResponse = {
-      message: 'Tours retrieved successfully',
       data: response,
+      message: 'Tours retrieved successfully',
       meta: {
-        total,
-        page,
         limit,
+        page,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     };
@@ -655,7 +656,7 @@ export const getAllTours: RequestHandler[] = [
 ];
 
 export const deleteAllTours = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -756,10 +757,10 @@ export const deleteAllTours = asyncHandler(
     });
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${tours.length} tour${tours.length > 1 ? 's' : ''}`,
       data: {
         deletedCount: tours.length,
       },
+      message: `Successfully deleted ${tours.length} tour${tours.length > 1 ? 's' : ''}`,
     });
   },
 );
@@ -768,7 +769,7 @@ const handleUpdateTourStatus = asyncHandler(
   async (
     req: Request<{ id?: string }, {}, { status: TourStatus }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const { status: newStatus } = req.body;
@@ -782,12 +783,12 @@ const handleUpdateTourStatus = asyncHandler(
     if (isNaN(tourId)) throw new BadRequestError('Invalid tour ID');
 
     const tour = await prisma.tour.findUnique({
-      where: { id: tourId },
       include: {
         bookings: {
           include: { payment: true },
         },
       },
+      where: { id: tourId },
     });
     if (!tour) throw new NotFoundError('Tour not found');
 
@@ -799,7 +800,7 @@ const handleUpdateTourStatus = asyncHandler(
     const now = new Date();
 
     let allow = false;
-    let updateData: any = { status: newStatus };
+    const updateData: any = { status: newStatus };
 
     if (current === 'UPCOMING') {
       if (newStatus === 'ONGOING') {
@@ -850,19 +851,19 @@ const handleUpdateTourStatus = asyncHandler(
       );
 
     const updated = await prisma.tour.update({
-      where: { id: tourId },
       data: updateData,
       include: {
         destination: {
-          select: { id: true, name: true, country: true, city: true },
+          select: { city: true, country: true, id: true, name: true },
         },
       },
+      where: { id: tourId },
     });
 
     if (newStatus === 'CANCELLED') {
       await prisma.booking.updateMany({
-        where: { tourId, status: { in: ['PENDING', 'CONFIRMED'] } },
         data: { status: 'CANCELLED' },
+        where: { status: { in: ['PENDING', 'CONFIRMED'] }, tourId },
       });
     }
 
@@ -871,15 +872,15 @@ const handleUpdateTourStatus = asyncHandler(
     );
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Tour status updated successfully',
       data: {
+        destination: updated.destination,
+        endDate: updated.endDate,
         id: updated.id,
         name: updated.name,
-        status: updated.status,
         startDate: updated.startDate,
-        endDate: updated.endDate,
-        destination: updated.destination,
+        status: updated.status,
       },
+      message: 'Tour status updated successfully',
     });
   },
 );

@@ -1,8 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
+
 import ENV from '../config/env';
 import { assertEnv } from '../config/env';
-import { verifyJwtToken } from '../utils/verify-jwt-token';
 import { CookieManager } from '../utils/CookieManager';
+import { verifyJwtToken } from '../utils/verify-jwt-token';
 
 export const verifyAccessToken = async (
   req: Request,
@@ -12,7 +13,8 @@ export const verifyAccessToken = async (
   const accessToken = CookieManager.getAccessToken(req);
 
   if (!accessToken) {
-    return next();
+    next();
+    return;
   }
 
   try {
@@ -22,7 +24,7 @@ export const verifyAccessToken = async (
     );
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch (_error) {
     next();
   }
 };

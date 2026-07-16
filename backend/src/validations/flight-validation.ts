@@ -1,53 +1,54 @@
+import { ValidationChain } from 'express-validator';
+
+import { FlightStatus } from '../../generated/prisma/client';
+import prisma from '../config/prismaClient';
 // src/validations/flight-validation.ts
 import { validator } from './validation-factory';
-import { ValidationChain } from 'express-validator';
-import prisma from '../config/prismaClient';
-import { FlightStatus } from '../../generated/prisma/client';
 
 export const createFlightValidation: ValidationChain[] = [
   validator.string('flightNumber', {
-    required: true,
-    minLength: 3,
-    maxLength: 15,
-    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
     customMessage: 'Flight number must be in format like AA123, BA1234, etc.',
+    maxLength: 15,
+    minLength: 3,
+    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
+    required: true,
   }),
 
   validator.string('airline', {
-    required: true,
-    minLength: 2,
-    maxLength: 60,
-    pattern: /^[a-zA-Z\s\-&.()]+$/,
     customMessage:
       'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
+    maxLength: 60,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-&.()]+$/,
+    required: true,
   }),
 
   validator.date('departure', {
-    required: true,
     minDate: new Date(),
+    required: true,
   }),
 
   validator.date('arrival', {
-    required: true,
     compareDateField: 'departure',
     compareDateOperation: 'after',
+    required: true,
   }),
 
   validator.number('originId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 
   validator.number('destinationId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 
   validator.number('price', {
-    required: true,
-    min: 0,
-    max: 10_000_000,
     allowDecimals: true,
+    max: 10_000_000,
+    min: 0,
+    required: true,
   }),
 
   validator.enum(
@@ -59,15 +60,15 @@ export const createFlightValidation: ValidationChain[] = [
   ),
 
   validator.number('stops', {
-    required: false,
-    min: 0,
     max: 5,
+    min: 0,
+    required: false,
   }),
 
   validator.number('capacity', {
-    required: true,
-    min: 1,
     max: 850,
+    min: 1,
+    required: true,
   }),
 
   validator.custom(
@@ -99,47 +100,47 @@ export const createFlightValidation: ValidationChain[] = [
 
 export const updateFlightValidation: ValidationChain[] = [
   validator.string('flightNumber', {
-    required: false,
-    minLength: 3,
-    maxLength: 15,
-    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
     customMessage: 'Flight number must be in format like AA123, BA1234, etc.',
+    maxLength: 15,
+    minLength: 3,
+    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
+    required: false,
   }),
 
   validator.string('airline', {
-    required: false,
-    minLength: 2,
-    maxLength: 60,
-    pattern: /^[a-zA-Z\s\-&.()]+$/,
     customMessage:
       'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
+    maxLength: 60,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-&.()]+$/,
+    required: false,
   }),
 
   validator.date('departure', {
-    required: false,
     minDate: new Date(),
+    required: false,
   }),
 
   validator.date('arrival', {
-    required: false,
     compareDateField: 'departure',
     compareDateOperation: 'after',
+    required: false,
   }),
 
   validator.number('originId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('destinationId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('price', {
-    required: false,
-    min: 1,
     allowDecimals: true,
+    min: 1,
+    required: false,
   }),
 
   validator.enum(
@@ -151,15 +152,15 @@ export const updateFlightValidation: ValidationChain[] = [
   ),
 
   validator.integer('stops', {
-    required: false,
-    min: 0,
     max: 5,
+    min: 0,
+    required: false,
   }),
 
   validator.number('capacity', {
-    required: false,
-    min: 0,
     max: 850,
+    min: 0,
+    required: false,
   }),
 
   validator.custom(
@@ -175,8 +176,8 @@ export const updateFlightValidation: ValidationChain[] = [
 
       if (flightId && (!originId || !value)) {
         const currentFlight = await prisma.flight.findUnique({
+          select: { destinationId: true, originId: true },
           where: { id: parseInt(flightId) },
-          select: { originId: true, destinationId: true },
         });
 
         if (currentFlight) {
@@ -203,8 +204,8 @@ export const updateFlightValidation: ValidationChain[] = [
 
       if (!departureTime && flightId) {
         const currentFlight = await prisma.flight.findUnique({
-          where: { id: parseInt(flightId) },
           select: { departure: true },
+          where: { id: parseInt(flightId) },
         });
 
         if (currentFlight) {
@@ -228,17 +229,17 @@ export const updateFlightValidation: ValidationChain[] = [
     'updateFields',
     (value, req) => {
       const {
-        flightNumber,
         airline,
-        departure,
         arrival,
-        originId,
+        departure,
         destinationId,
-        price,
-        flightClass,
         duration,
-        stops,
+        flightClass,
+        flightNumber,
+        originId,
+        price,
         seatsAvailable,
+        stops,
       } = req.body;
       const hasFile = req.file || req.body.flightPhoto;
 
@@ -264,38 +265,38 @@ export const updateFlightValidation: ValidationChain[] = [
 
 export const flightSearchValidation: ValidationChain[] = [
   validator.number('page', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('limit', {
-    required: false,
-    min: 1,
     max: 100,
+    min: 1,
+    required: false,
   }),
 
   validator.string('search', {
-    required: false,
-    minLength: 1,
-    maxLength: 100,
     customMessage: 'Search term must be between 1 and 100 characters',
+    maxLength: 100,
+    minLength: 1,
+    required: false,
   }),
 
   validator.string('airline', {
-    required: false,
-    minLength: 2,
-    maxLength: 60,
     customMessage: 'Airline filter must be between 2 and 100 characters',
+    maxLength: 60,
+    minLength: 2,
+    required: false,
   }),
 
   validator.number('originId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('destinationId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.enum(
@@ -311,39 +312,39 @@ export const flightSearchValidation: ValidationChain[] = [
   }),
 
   validator.date('departureTo', {
-    required: false,
     compareDateField: 'departureFrom',
     compareDateOperation: 'after-or-same',
+    required: false,
   }),
 
   validator.number('minPrice', {
-    required: false,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: false,
   }),
 
   validator.number('maxPrice', {
-    required: false,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: false,
   }),
 
   validator.number('maxDuration', {
-    required: false,
-    min: 30,
     max: 1440,
+    min: 30,
+    required: false,
   }),
 
   validator.number('maxStops', {
-    required: false,
-    min: 0,
     max: 5,
+    min: 0,
+    required: false,
   }),
 
   validator.number('minSeats', {
-    required: false,
-    min: 1,
     max: 850,
+    min: 1,
+    required: false,
   }),
 
   validator.enum(

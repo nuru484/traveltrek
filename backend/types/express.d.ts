@@ -1,5 +1,6 @@
 // types/express.d.ts
 import 'express';
+
 import { IUser } from './user-profile.types';
 
 declare module 'express' {
@@ -7,4 +8,3 @@ declare module 'express' {
     user?: IUser;
   }
 }
-

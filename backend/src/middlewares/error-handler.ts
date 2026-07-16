@@ -1,51 +1,50 @@
-import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger';
+import { NextFunction, Request, Response } from 'express';
+
 import ENV from '../config/env';
+import logger from '../utils/logger';
 import { handlePrismaError, isPrismaError } from './prismaErrorHandler';
 
 /**
  * Error severity levels for better logging and monitoring
  */
 export enum ErrorSeverity {
+  CRITICAL = 'critical',
+  HIGH = 'high',
   LOW = 'low',
   MEDIUM = 'medium',
-  HIGH = 'high',
-  CRITICAL = 'critical',
 }
 
 /**
  * Enhanced CustomError class with additional context for better debugging
  */
 export class CustomError extends Error {
-  readonly status: number;
-  readonly layer: string;
-  readonly severity: ErrorSeverity;
-  readonly timestamp: Date;
   readonly code?: string;
   readonly context?: Record<string, unknown>;
+  readonly layer: string;
+  readonly severity: ErrorSeverity;
+  readonly status: number;
+  readonly timestamp: Date;
 
   constructor(
     status: number,
     message: string,
     options: {
-      layer?: string;
-      severity?: ErrorSeverity;
       code?: string;
       context?: Record<string, unknown>;
+      layer?: string;
+      severity?: ErrorSeverity;
     } = {},
   ) {
     super(message);
     this.name = this.constructor.name;
     this.status = status;
-    this.layer = options.layer || 'unknown';
-    this.severity = options.severity || ErrorSeverity.MEDIUM;
+    this.layer = options.layer ?? 'unknown';
+    this.severity = options.severity ?? ErrorSeverity.MEDIUM;
     this.timestamp = new Date();
     this.code = options.code;
     this.context = options.context;
 
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
-    }
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -60,11 +59,11 @@ const isCustomError = (error: unknown): error is CustomError => {
  * Error response interface for consistent API responses
  */
 interface ErrorResponse {
-  status: string;
-  message: string;
-  errorId?: string;
   code?: string;
   details?: Record<string, unknown>;
+  errorId?: string;
+  message: string;
+  status: string;
 }
 
 /**
@@ -82,7 +81,7 @@ const generateErrorId = (): string => {
 const sanitizeErrorData = (data: unknown): unknown => {
   if (!data) return data;
 
-  if (typeof data === 'object' && data !== null) {
+  if (typeof data === 'object') {
     const sanitized: Record<string, unknown> = {};
 
     Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
@@ -109,16 +108,16 @@ const sanitizeErrorData = (data: unknown): unknown => {
  * Error handler middleware with full type safety
  */
 export const errorHandler = (
-  error: Error | CustomError,
+  error: CustomError | Error,
   req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ): void => {
   const isProduction = ENV.NODE_ENV === 'production';
   const errorId = generateErrorId();
 
   // Convert Prisma errors first
-  let processedError: Error | CustomError = error;
+  let processedError: CustomError | Error = error;
 
   if (isPrismaError(error)) {
     processedError = handlePrismaError(error);
@@ -144,20 +143,20 @@ export const errorHandler = (
 
   // Logging details
   const logDetails = {
-    errorId,
-    message: processedError.message,
-    path: req.path,
-    method: req.method,
-    ip: req.ip,
     body: sanitizedBody,
+    code,
+    context,
+    errorId,
+    ip: req.ip,
+    layer,
+    message: processedError.message,
+    method: req.method,
     params: req.params,
+    path: req.path,
     query: req.query,
     severity,
     stack: !isProduction ? processedError.stack : undefined,
     timestamp: new Date().toISOString(),
-    layer,
-    code,
-    context,
   };
 
   // Log at the appropriate level
@@ -166,11 +165,11 @@ export const errorHandler = (
     case ErrorSeverity.HIGH:
       logger.error(logDetails);
       break;
-    case ErrorSeverity.MEDIUM:
-      logger.warn(logDetails);
-      break;
     case ErrorSeverity.LOW:
       logger.info(logDetails);
+      break;
+    case ErrorSeverity.MEDIUM:
+      logger.warn(logDetails);
       break;
     default:
       logger.error(logDetails);
@@ -178,11 +177,11 @@ export const errorHandler = (
 
   // Client response
   const errorResponse: ErrorResponse = {
-    status: 'error',
     message:
       isProduction && status === 500
         ? 'Internal Server Error'
         : processedError.message || 'Internal Server Error',
+    status: 'error',
   };
 
   if (context && code === 'VALIDATION_ERROR') {
@@ -209,6 +208,45 @@ export const asyncHandler = <T>(
   };
 };
 
+export class BadRequestError extends CustomError {
+  constructor(
+    message = 'Bad request',
+    options?: {
+      code?: string;
+      context?: Record<string, unknown>;
+      layer?: string;
+    },
+  ) {
+    super(400, message, { ...options, severity: ErrorSeverity.LOW });
+  }
+}
+
+export class ForbiddenError extends CustomError {
+  constructor(
+    message = 'Access forbidden, you are not allowed to access this resource',
+    options?: {
+      code?: string;
+      context?: Record<string, unknown>;
+      layer?: string;
+    },
+  ) {
+    super(403, message, { ...options, severity: ErrorSeverity.MEDIUM });
+  }
+}
+
+export class InternalServerError extends CustomError {
+  constructor(
+    message = 'Internal server error',
+    options?: {
+      code?: string;
+      context?: Record<string, unknown>;
+      layer?: string;
+    },
+  ) {
+    super(500, message, { ...options, severity: ErrorSeverity.HIGH });
+  }
+}
+
 /**
  * Common custom error subclasses
  */
@@ -216,9 +254,9 @@ export class NotFoundError extends CustomError {
   constructor(
     message = 'Resource not found',
     options?: {
-      layer?: string;
       code?: string;
       context?: Record<string, unknown>;
+      layer?: string;
     },
   ) {
     super(404, message, { ...options, severity: ErrorSeverity.LOW });
@@ -229,25 +267,12 @@ export class UnauthorizedError extends CustomError {
   constructor(
     message = 'Unauthorized access',
     options?: {
-      layer?: string;
       code?: string;
       context?: Record<string, unknown>;
+      layer?: string;
     },
   ) {
     super(401, message, { ...options, severity: ErrorSeverity.MEDIUM });
-  }
-}
-
-export class ForbiddenError extends CustomError {
-  constructor(
-    message = 'Access forbidden, you are not allowed to access this resource',
-    options?: {
-      layer?: string;
-      code?: string;
-      context?: Record<string, unknown>;
-    },
-  ) {
-    super(403, message, { ...options, severity: ErrorSeverity.MEDIUM });
   }
 }
 
@@ -255,35 +280,9 @@ export class ValidationError extends CustomError {
   constructor(
     message = 'Validation failed',
     options?: {
-      layer?: string;
       code?: string;
       context?: Record<string, unknown>;
-    },
-  ) {
-    super(400, message, { ...options, severity: ErrorSeverity.LOW });
-  }
-}
-
-export class InternalServerError extends CustomError {
-  constructor(
-    message = 'Internal server error',
-    options?: {
       layer?: string;
-      code?: string;
-      context?: Record<string, unknown>;
-    },
-  ) {
-    super(500, message, { ...options, severity: ErrorSeverity.HIGH });
-  }
-}
-
-export class BadRequestError extends CustomError {
-  constructor(
-    message = 'Bad request',
-    options?: {
-      layer?: string;
-      code?: string;
-      context?: Record<string, unknown>;
     },
   ) {
     super(400, message, { ...options, severity: ErrorSeverity.LOW });

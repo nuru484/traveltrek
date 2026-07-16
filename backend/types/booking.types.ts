@@ -1,120 +1,120 @@
 // types/booking.types.ts
 import { IDestinationSummary } from './destination.types';
-// types/booking.types.ts
-export interface IBookingInput {
-  userId: number;
-  tourId?: number | null;
-  roomId?: number | null;
-  flightId?: number | null;
+export type IBooking = IFlightBooking | IRoomBooking | ITourBooking;
+
+export interface IBookingBase {
+  bookingDate: Date;
+  createdAt: Date;
+  id: number;
+  numberOfGuests: number;
+  payment: IBookingPayment | null;
+  paymentDeadline: Date;
+  specialRequests: string;
+  status: 'CANCELLED' | 'COMPLETED' | 'CONFIRMED' | 'PENDING';
   totalPrice: number;
-  status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
-
-  // Room-specific fields
-  startDate?: string; // ISO date string, required for room bookings
-  endDate?: string; // ISO date string, required for room bookings
-  numberOfRooms?: number; // Optional, defaults to 1
-
-  // Common fields
-  numberOfGuests?: number; // Optional for all booking types, defaults to 1
-  specialRequests?: string | null; // Optional for all booking types
-}
-
-export interface IBookingUser {
-  id: number;
-  name: string;
-  email: string;
-}
-
-export interface IBookingRoom {
-  id: number;
-  roomType: string;
-  description: string | null;
-  numberOfRooms: number;
-  numberOfNights: number;
-  startDate: Date;
-  endDate: Date;
-  hotel: {
-    id: number;
-    name: string;
-    description: string | null;
-    destination: {
-      id: number;
-      city: string;
-      country: string;
-      name: string;
-    };
-  };
-}
-
-export interface IBookingTour {
-  id: number;
-  name: string;
-  description: string | null;
-  destination: IDestinationSummary;
+  updatedAt: Date;
+  user: IBookingUser;
+  userId: number;
 }
 
 export interface IBookingFlight {
-  id: number;
-  flightNumber: string;
   airline: string;
-  origin: {
-    id: number;
-    name: string;
-    city: string | null;
-    country: string;
-  };
   destination: {
+    city: null | string;
+    country: string;
     id: number;
     name: string;
-    city: string | null;
-    country: string;
   };
+  flightNumber: string;
+  id: number;
+  origin: {
+    city: null | string;
+    country: string;
+    id: number;
+    name: string;
+  };
+}
+
+// types/booking.types.ts
+export interface IBookingInput {
+  endDate?: string; // ISO date string, required for room bookings
+  flightId?: null | number;
+  // Common fields
+  numberOfGuests?: number; // Optional for all booking types, defaults to 1
+  numberOfRooms?: number; // Optional, defaults to 1
+  roomId?: null | number;
+  specialRequests?: null | string; // Optional for all booking types
+
+  // Room-specific fields
+  startDate?: string; // ISO date string, required for room bookings
+  status?: 'CANCELLED' | 'COMPLETED' | 'CONFIRMED' | 'PENDING';
+  totalPrice: number;
+
+  tourId?: null | number;
+  userId: number;
 }
 
 export interface IBookingPayment {
-  id: number;
   amount: number;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+  id: number;
   paymentMethod:
+    | 'BANK_TRANSFER'
     | 'CREDIT_CARD'
     | 'DEBIT_CARD'
-    | 'MOBILE_MONEY'
-    | 'BANK_TRANSFER';
+    | 'MOBILE_MONEY';
+  status: 'COMPLETED' | 'FAILED' | 'PENDING' | 'REFUNDED';
 }
-export interface IBookingBase {
+
+export interface IBookingRoom {
+  description: null | string;
+  endDate: Date;
+  hotel: {
+    description: null | string;
+    destination: {
+      city: string;
+      country: string;
+      id: number;
+      name: string;
+    };
+    id: number;
+    name: string;
+  };
   id: number;
-  userId: number;
-  user: IBookingUser;
-  numberOfGuests: number;
-  specialRequests: string;
-  paymentDeadline: Date
-  payment: IBookingPayment | null;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
-  totalPrice: number;
-  bookingDate: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  numberOfNights: number;
+  numberOfRooms: number;
+  roomType: string;
+  startDate: Date;
+}
+export interface IBookingTour {
+  description: null | string;
+  destination: IDestinationSummary;
+  id: number;
+  name: string;
 }
 
-export interface ITourBooking extends IBookingBase {
-  type: 'TOUR';
-  tour: IBookingTour;
-  room: null;
-  flight: null;
-}
-
-export interface IRoomBooking extends IBookingBase {
-  type: 'ROOM';
-  room: IBookingRoom | null;
-  tour: null;
-  flight: null;
+export interface IBookingUser {
+  email: string;
+  id: number;
+  name: string;
 }
 
 export interface IFlightBooking extends IBookingBase {
-  type: 'FLIGHT';
   flight: IBookingFlight;
-  tour: null;
   room: null;
+  tour: null;
+  type: 'FLIGHT';
 }
 
-export type IBooking = ITourBooking | IRoomBooking | IFlightBooking;
+export interface IRoomBooking extends IBookingBase {
+  flight: null;
+  room: IBookingRoom | null;
+  tour: null;
+  type: 'ROOM';
+}
+
+export interface ITourBooking extends IBookingBase {
+  flight: null;
+  room: null;
+  tour: IBookingTour;
+  type: 'TOUR';
+}

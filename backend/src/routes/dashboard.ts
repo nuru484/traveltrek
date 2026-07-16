@@ -1,7 +1,8 @@
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
 import { getDashboardStats } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const dashboardRoutes = Router();
 

@@ -1,31 +1,32 @@
 // src/controllers/hotelController.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { param } from 'express-validator';
-import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
-import {
-  asyncHandler,
-  NotFoundError,
-  BadRequestError,
-  CustomError,
-  UnauthorizedError,
-} from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
 import {
   IHotelInput,
+  IHotelQueryParams,
   IHotelResponse,
   IHotelsPaginatedResponse,
-  IHotelQueryParams,
 } from 'types/hotel.types';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+
 import { cloudinaryService } from '../config/claudinary';
+import { HTTP_STATUS_CODES } from '../config/constants';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import multerUpload from '../config/multer';
+import prisma from '../config/prismaClient';
+import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+import {
+  asyncHandler,
+  BadRequestError,
+  CustomError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../middlewares/error-handler';
+import validationMiddleware from '../middlewares/validation';
 import {
   createHotelValidation,
-  updateHotelValidation,
   getHotelsValidation,
   hotelPhotoValidation,
+  updateHotelValidation,
 } from '../validations/hotel-validation';
 
 /**
@@ -35,16 +36,16 @@ const handleCreateHotel = asyncHandler(
   async (
     req: Request<{}, {}, IHotelInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const {
-      name,
-      description,
       address,
+      amenities,
+      description,
+      destinationId,
+      name,
       phone,
       starRating,
-      amenities,
-      destinationId,
     } = req.body;
 
     const destination = await prisma.destination.findUnique({
@@ -61,60 +62,60 @@ const handleCreateHotel = asyncHandler(
 
     const hotel = await prisma.hotel.create({
       data: {
-        name,
-        description,
         address,
-        phone,
-        starRating: parsedStarRating,
         amenities: amenities || [],
-        photo: typeof photoUrl === 'string' ? photoUrl : null,
+        description,
         destination: { connect: { id: Number(destinationId) } },
+        name,
+        phone,
+        photo: typeof photoUrl === 'string' ? photoUrl : null,
+        starRating: parsedStarRating,
       },
 
       include: {
         destination: {
           select: {
+            city: true,
+            country: true,
+            description: true,
             id: true,
             name: true,
-            description: true,
-            country: true,
-            city: true,
           },
         },
         rooms: {
           select: {
-            id: true,
-            roomType: true,
             description: true,
+            id: true,
             photo: true,
             pricePerNight: true,
+            roomType: true,
           },
         },
       },
     });
 
     const response: IHotelResponse = {
-      message: 'Hotel created successfully',
       data: {
-        id: hotel.id,
-        name: hotel.name,
-        description: hotel.description,
         address: hotel.address,
-        phone: hotel.phone,
-        starRating: hotel.starRating,
         amenities: hotel.amenities,
-        photo: hotel.photo,
-        rooms: hotel.rooms,
+        createdAt: hotel.createdAt,
+        description: hotel.description,
         destination: {
+          city: hotel.destination?.city,
+          country: hotel.destination?.country,
+          description: hotel.destination?.description,
           id: hotel.destination?.id,
           name: hotel.destination?.name,
-          description: hotel.destination?.description,
-          country: hotel.destination?.country,
-          city: hotel.destination?.city,
         },
-        createdAt: hotel.createdAt,
+        id: hotel.id,
+        name: hotel.name,
+        phone: hotel.phone,
+        photo: hotel.photo,
+        rooms: hotel.rooms,
+        starRating: hotel.starRating,
         updatedAt: hotel.updatedAt,
       },
+      message: 'Hotel created successfully',
     };
 
     res.status(HTTP_STATUS_CODES.CREATED).json(response);
@@ -142,13 +143,13 @@ const handleUpdateHotel = asyncHandler(
   ): Promise<void> => {
     const { id } = req.params;
     const {
-      name,
-      description,
       address,
+      amenities,
+      description,
+      destinationId,
+      name,
       phone,
       starRating,
-      amenities,
-      destinationId,
     } = req.body;
 
     if (!id) {
@@ -156,12 +157,12 @@ const handleUpdateHotel = asyncHandler(
     }
 
     let uploadedImageUrl: string | undefined;
-    let oldPhoto: string | null = null;
+    let oldPhoto: null | string = null;
 
     try {
       const existingHotel = await prisma.hotel.findUnique({
-        where: { id: Number(id) },
         select: { photo: true },
+        where: { id: Number(id) },
       });
 
       if (!existingHotel) {
@@ -234,28 +235,28 @@ const handleUpdateHotel = asyncHandler(
       }
 
       const updatedHotel = await prisma.hotel.update({
-        where: { id: Number(id) },
         data: updateData,
         include: {
           destination: {
             select: {
+              city: true,
+              country: true,
+              description: true,
               id: true,
               name: true,
-              description: true,
-              country: true,
-              city: true,
             },
           },
           rooms: {
             select: {
-              id: true,
-              roomType: true,
-              photo: true,
               description: true,
+              id: true,
+              photo: true,
               pricePerNight: true,
+              roomType: true,
             },
           },
         },
+        where: { id: Number(id) },
       });
 
       if (uploadedImageUrl && oldPhoto && oldPhoto !== uploadedImageUrl) {
@@ -267,21 +268,21 @@ const handleUpdateHotel = asyncHandler(
       }
 
       const response: IHotelResponse = {
-        message: 'Hotel updated successfully',
         data: {
+          address: updatedHotel.address,
+          amenities: updatedHotel.amenities,
+          createdAt: updatedHotel.createdAt,
+          description: updatedHotel.description,
+          destination: updatedHotel.destination,
           id: updatedHotel.id,
           name: updatedHotel.name,
-          description: updatedHotel.description,
-          address: updatedHotel.address,
           phone: updatedHotel.phone,
-          starRating: updatedHotel.starRating,
-          amenities: updatedHotel.amenities,
           photo: updatedHotel.photo,
           rooms: updatedHotel.rooms,
-          destination: updatedHotel.destination,
-          createdAt: updatedHotel.createdAt,
+          starRating: updatedHotel.starRating,
           updatedAt: updatedHotel.updatedAt,
         },
+        message: 'Hotel updated successfully',
       };
 
       res.status(HTTP_STATUS_CODES.OK).json(response);
@@ -315,31 +316,31 @@ export const updateHotel: RequestHandler[] = [
  * Get a single hotel by ID
  */
 const handleGetHotel = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
 
     const hotel = await prisma.hotel.findUnique({
-      where: { id: parseInt(id) },
       include: {
         destination: {
           select: {
+            city: true,
+            country: true,
+            description: true,
             id: true,
             name: true,
-            description: true,
-            country: true,
-            city: true,
           },
         },
         rooms: {
           select: {
-            id: true,
-            roomType: true,
             description: true,
+            id: true,
             photo: true,
             pricePerNight: true,
+            roomType: true,
           },
         },
       },
+      where: { id: parseInt(id) },
     });
 
     if (!hotel) {
@@ -347,21 +348,21 @@ const handleGetHotel = asyncHandler(
     }
 
     const response: IHotelResponse = {
-      message: 'Hotel retrieved successfully',
       data: {
+        address: hotel.address,
+        amenities: hotel.amenities,
+        createdAt: hotel.createdAt,
+        description: hotel.description,
+        destination: hotel.destination,
         id: hotel.id,
         name: hotel.name,
-        description: hotel.description,
-        address: hotel.address,
         phone: hotel.phone,
-        starRating: hotel.starRating,
-        amenities: hotel.amenities,
         photo: hotel.photo,
         rooms: hotel.rooms,
-        destination: hotel.destination,
-        createdAt: hotel.createdAt,
+        starRating: hotel.starRating,
         updatedAt: hotel.updatedAt,
       },
+      message: 'Hotel retrieved successfully',
     };
 
     res.status(HTTP_STATUS_CODES.OK).json(response);
@@ -380,20 +381,20 @@ export const getHotel: RequestHandler[] = [
  * Get all hotels with pagination and filtering
  */
 const handleGetAllHotels = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const {
-      page = 1,
-      limit = 10,
-      search,
-      destinationId,
+      amenities,
       city,
       country,
-      starRating,
-      minStarRating,
+      destinationId,
+      limit = 10,
       maxStarRating,
-      amenities,
+      minStarRating,
+      page = 1,
+      search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      starRating,
     }: IHotelQueryParams = req.query;
 
     const pageNum = Number(page);
@@ -452,56 +453,56 @@ const handleGetAllHotels = asyncHandler(
 
     const [hotels, total] = await Promise.all([
       prisma.hotel.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy,
         include: {
           destination: {
             select: {
+              city: true,
+              country: true,
+              description: true,
               id: true,
               name: true,
-              description: true,
-              country: true,
-              city: true,
             },
           },
           rooms: {
             select: {
-              id: true,
-              roomType: true,
               description: true,
+              id: true,
               photo: true,
               pricePerNight: true,
+              roomType: true,
             },
           },
         },
+        orderBy,
+        skip,
+        take: limitNum,
+        where,
       }),
       prisma.hotel.count({ where }),
     ]);
 
     const hotelData = hotels.map((hotel) => ({
+      address: hotel.address,
+      amenities: hotel.amenities,
+      createdAt: hotel.createdAt,
+      description: hotel.description,
+      destination: hotel.destination,
       id: hotel.id,
       name: hotel.name,
-      description: hotel.description,
-      address: hotel.address,
       phone: hotel.phone,
-      starRating: hotel.starRating,
-      amenities: hotel.amenities,
       photo: hotel.photo,
       rooms: hotel.rooms,
-      destination: hotel.destination,
-      createdAt: hotel.createdAt,
+      starRating: hotel.starRating,
       updatedAt: hotel.updatedAt,
     }));
 
     const response: IHotelsPaginatedResponse = {
-      message: 'Hotels retrieved successfully',
       data: hotelData,
+      message: 'Hotels retrieved successfully',
       meta: {
-        total,
-        page: pageNum,
         limit: limitNum,
+        page: pageNum,
+        total,
         totalPages: Math.ceil(total / limitNum),
       },
     };
@@ -519,7 +520,7 @@ export const getAllHotels: RequestHandler[] = [
  * Get hotels by destination
  */
 const handleGetHotelsByDestination = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { destinationId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -535,30 +536,30 @@ const handleGetHotelsByDestination = asyncHandler(
 
     const [hotels, total] = await Promise.all([
       prisma.hotel.findMany({
-        where: { destinationId: parseInt(destinationId) },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
         include: {
           destination: {
             select: {
+              city: true,
+              country: true,
+              description: true,
               id: true,
               name: true,
-              description: true,
-              country: true,
-              city: true,
             },
           },
           rooms: {
             select: {
-              id: true,
-              roomType: true,
               description: true,
+              id: true,
               photo: true,
               pricePerNight: true,
+              roomType: true,
             },
           },
         },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        where: { destinationId: parseInt(destinationId) },
       }),
       prisma.hotel.count({
         where: { destinationId: parseInt(destinationId) },
@@ -566,27 +567,27 @@ const handleGetHotelsByDestination = asyncHandler(
     ]);
 
     const hotelData = hotels.map((hotel) => ({
+      address: hotel.address,
+      amenities: hotel.amenities,
+      createdAt: hotel.createdAt,
+      description: hotel.description,
+      destination: hotel.destination,
       id: hotel.id,
       name: hotel.name,
-      description: hotel.description,
-      address: hotel.address,
       phone: hotel.phone,
-      starRating: hotel.starRating,
-      amenities: hotel.amenities,
       photo: hotel.photo,
       rooms: hotel.rooms,
-      destination: hotel.destination,
-      createdAt: hotel.createdAt,
+      starRating: hotel.starRating,
       updatedAt: hotel.updatedAt,
     }));
 
     const response: IHotelsPaginatedResponse = {
-      message: 'Hotels retrieved successfully',
       data: hotelData,
+      message: 'Hotels retrieved successfully',
       meta: {
-        total,
-        page,
         limit,
+        page,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     };
@@ -602,7 +603,7 @@ const handleDeleteHotel = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
 
@@ -611,11 +612,11 @@ const handleDeleteHotel = asyncHandler(
     }
 
     const hotel = await prisma.hotel.findUnique({
-      where: { id: parseInt(id) },
       include: {
-        rooms: true,
         destination: true,
+        rooms: true,
       },
+      where: { id: parseInt(id) },
     });
 
     if (!hotel) {
@@ -661,7 +662,7 @@ export const deleteHotel: RequestHandler[] = [
  * Delete all hotels with photo cleanup
  */
 export const deleteAllHotels = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -680,6 +681,7 @@ export const deleteAllHotels = asyncHandler(
 
     const hotels = await prisma.hotel.findMany({
       include: {
+        destination: true,
         rooms: {
           include: {
             bookings: {
@@ -691,7 +693,6 @@ export const deleteAllHotels = asyncHandler(
             },
           },
         },
-        destination: true,
       },
     });
 
@@ -747,10 +748,10 @@ export const deleteAllHotels = asyncHandler(
     await Promise.allSettled(cleanupPromises);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${hotels.length} hotel${hotels.length > 1 ? 's' : ''}`,
       data: {
         deletedCount: hotels.length,
       },
+      message: `Successfully deleted ${hotels.length} hotel${hotels.length > 1 ? 's' : ''}`,
     });
   },
 );

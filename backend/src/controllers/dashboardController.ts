@@ -1,43 +1,44 @@
 // src/controllers/dashboardController.ts
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
+
+import { HTTP_STATUS_CODES } from '../config/constants';
 import prisma from '../config/prismaClient';
 import { asyncHandler } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
+
+interface IDashboardResponse {
+  data: IDashboardStats;
+  message: string;
+}
 
 interface IDashboardStats {
-  tours: {
+  bookings?: {
+    completed: number;
+    confirmed: number;
+    pending: number;
     total: number;
-    upcoming: number;
-    ongoing: number;
-  };
-  hotels: {
-    total: number;
-    availableRooms: number;
-  };
-  flights: {
-    total: number;
-    availableSeats: number;
   };
   destinations: {
     total: number;
   };
-  bookings?: {
+  flights: {
+    availableSeats: number;
     total: number;
-    pending: number;
-    confirmed: number;
-    completed: number;
+  };
+  hotels: {
+    availableRooms: number;
+    total: number;
+  };
+  tours: {
+    ongoing: number;
+    total: number;
+    upcoming: number;
   };
   users?: {
-    total: number;
-    customers: number;
-    agents: number;
     admins: number;
+    agents: number;
+    customers: number;
+    total: number;
   };
-}
-
-interface IDashboardResponse {
-  message: string;
-  data: IDashboardStats;
 }
 
 /**
@@ -85,21 +86,21 @@ const getDashboardStats = asyncHandler(
       ]);
 
       const dashboardStats: IDashboardStats = {
-        tours: {
-          total: totalTours,
-          upcoming: upcomingTours,
-          ongoing: ongoingTours,
-        },
-        hotels: {
-          total: totalHotels,
-          availableRooms: availableRooms,
-        },
-        flights: {
-          total: totalFlights,
-          availableSeats: totalSeatsAvailable._sum.seatsAvailable || 0,
-        },
         destinations: {
           total: totalDestinations,
+        },
+        flights: {
+          availableSeats: totalSeatsAvailable._sum.seatsAvailable || 0,
+          total: totalFlights,
+        },
+        hotels: {
+          availableRooms: availableRooms,
+          total: totalHotels,
+        },
+        tours: {
+          ongoing: ongoingTours,
+          total: totalTours,
+          upcoming: upcomingTours,
         },
       };
 
@@ -141,23 +142,23 @@ const getDashboardStats = asyncHandler(
         ]);
 
         dashboardStats.bookings = {
-          total: totalBookings,
-          pending: pendingBookings,
-          confirmed: confirmedBookings,
           completed: completedBookings,
+          confirmed: confirmedBookings,
+          pending: pendingBookings,
+          total: totalBookings,
         };
 
         dashboardStats.users = {
-          total: totalUsers,
-          customers: totalCustomers,
-          agents: totalAgents,
           admins: totalAdmins,
+          agents: totalAgents,
+          customers: totalCustomers,
+          total: totalUsers,
         };
       }
 
       const response: IDashboardResponse = {
-        message: 'Dashboard statistics retrieved successfully',
         data: dashboardStats,
+        message: 'Dashboard statistics retrieved successfully',
       };
 
       res.status(HTTP_STATUS_CODES.OK).json(response);

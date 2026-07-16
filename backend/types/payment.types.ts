@@ -1,116 +1,112 @@
+export interface IBookedItem {
+  description: null | string;
+  id: number;
+  name: string;
+  type: 'FLIGHT' | 'HOTEL' | 'ROOM' | 'TOUR';
+}
+
+export interface IDeleteAllPaymentsParams {
+  beforeDate?: string;
+  paymentMethod?: IPaymentMethod;
+  status?: 'FAILED' | 'PENDING' | 'REFUNDED';
+  userId?: number;
+}
+
+export interface IDeleteAllPaymentsResponse {
+  data: {
+    bookingsAffected: number;
+    deletedCount: number;
+  };
+  message: string;
+}
+
+export interface IDeletePaymentResponse {
+  data: {
+    bookingId: number;
+    paymentId: number;
+  };
+  message: string;
+}
+
+export interface IPayment {
+  amount: number;
+  bookedItem: IBookedItem;
+  bookingId: number;
+  createdAt: Date;
+  currency: string;
+  id: number;
+  paymentDate: Date | null;
+  paymentMethod: string;
+  status: IPaymentStatus;
+  transactionReference: string;
+  updatedAt: Date;
+  user: IPaymentUser;
+  userId: number;
+}
+
+export interface IPaymentInitializeResponse {
+  data: {
+    authorization_url: string;
+    paymentId: number;
+    transactionReference: string;
+  };
+  message: string;
+}
+
 export interface IPaymentInput {
   bookingId: number;
   paymentMethod: IPaymentMethod;
 }
 
 export type IPaymentMethod =
+  | 'BANK_TRANSFER'
   | 'CREDIT_CARD'
   | 'DEBIT_CARD'
-  | 'MOBILE_MONEY'
-  | 'BANK_TRANSFER';
+  | 'MOBILE_MONEY';
 
-export type IPaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-
-export interface IBookedItem {
-  id: number;
-  name: string;
-  description: string | null;
-  type: 'TOUR' | 'HOTEL' | 'ROOM' | 'FLIGHT';
-}
-
-export interface IPaymentUser {
-  id: number;
-  name: string;
-  email: string;
-}
-
-export interface IPayment {
-  id: number;
-  bookingId: number;
-  userId: number;
-  amount: number;
-  currency: string;
-  paymentMethod: string;
-  status: IPaymentStatus;
-  transactionReference: string;
-  paymentDate: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  bookedItem: IBookedItem;
-  user: IPaymentUser;
+export interface IPaymentResponse {
+  data: IPayment;
+  message: string;
 }
 
 export interface IPaymentsPaginatedResponse {
-  message: string;
   data: IPayment[];
+  message: string;
   meta: {
-    total: number;
-    page: number;
     limit: number;
+    page: number;
+    total: number;
     totalPages: number;
   };
 }
 
-export interface IPaymentResponse {
-  message: string;
-  data: IPayment;
+export interface IPaymentsQueryParams {
+  bookingType?: 'FLIGHT' | 'HOTEL' | 'ROOM' | 'TOUR';
+  limit?: number;
+  page?: number;
+  paymentMethod?: IPaymentMethod;
+  search?: string;
+  status?: IPaymentStatus;
+  userId?: number;
 }
 
-export interface IPaymentInitializeResponse {
-  message: string;
-  data: {
-    authorization_url: string;
-    paymentId: number;
-    transactionReference: string;
-  };
+export type IPaymentStatus = 'COMPLETED' | 'FAILED' | 'PENDING' | 'REFUNDED';
+
+export interface IPaymentUser {
+  email: string;
+  id: number;
+  name: string;
 }
 
 export interface IPaymentVerificationResponse {
-  success: boolean;
-  message: string;
   data?: {
     amount: number;
-    reference: string;
+    bookingId: number;
     paymentStatus: IPaymentStatus;
-    bookingId: number;
+    reference: string;
   };
-}
-
-export interface IUpdatePaymentStatusInput {
-  status: IPaymentStatus;
-}
-
-export interface IUpdatePaymentStatusResponse {
   message: string;
-  data: {
-    paymentId: number;
-    status: IPaymentStatus;
-    bookingStatus: string;
-    updatedAt: Date;
-  };
-}
-
-export interface IDeletePaymentResponse {
-  message: string;
-  data: {
-    paymentId: number;
-    bookingId: number;
-  };
-}
-
-export interface IDeleteAllPaymentsParams {
-  status?: 'PENDING' | 'FAILED' | 'REFUNDED';
-  paymentMethod?: IPaymentMethod;
-  userId?: number;
-  beforeDate?: string;
-}
-
-export interface IDeleteAllPaymentsResponse {
-  message: string;
-  data: {
-    deletedCount: number;
-    bookingsAffected: number;
-  };
+  success: boolean;
 }
 
 export interface IRefundPaymentInput {
@@ -118,23 +114,27 @@ export interface IRefundPaymentInput {
 }
 
 export interface IRefundPaymentResponse {
-  message: string;
   data: {
-    paymentId: number;
-    status: IPaymentStatus;
     bookingStatus: string;
-    refundAmount: number;
+    paymentId: number;
     reason: string;
+    refundAmount: number;
+    status: IPaymentStatus;
     updatedAt: Date;
   };
+  message: string;
 }
 
-export interface IPaymentsQueryParams {
-  page?: number;
-  limit?: number;
-  status?: IPaymentStatus;
-  paymentMethod?: IPaymentMethod;
-  userId?: number;
-  bookingType?: 'TOUR' | 'HOTEL' | 'ROOM' | 'FLIGHT';
-  search?: string;
+export interface IUpdatePaymentStatusInput {
+  status: IPaymentStatus;
+}
+
+export interface IUpdatePaymentStatusResponse {
+  data: {
+    bookingStatus: string;
+    paymentId: number;
+    status: IPaymentStatus;
+    updatedAt: Date;
+  };
+  message: string;
 }

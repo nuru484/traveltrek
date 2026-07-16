@@ -1,70 +1,69 @@
 // Enum
 export enum UserRole {
   ADMIN = 'ADMIN',
-  CUSTOMER = 'CUSTOMER',
   AGENT = 'AGENT',
+  CUSTOMER = 'CUSTOMER',
 }
 
 export interface IUser {
-  id: number;
-  name: string;
-  email: string;
-  role: UserRole;
-  phone: string;
-  profilePicture?: string;
   address?: string;
   createdAt: Date;
+  email: string;
+  id: number;
+  name: string;
+  phone: string;
+  profilePicture?: string;
+  role: UserRole;
   updatedAt: Date;
-  [key: string]: any;
 }
 
 export interface IUserRegistrationInput {
+  address?: string;
   email: string;
-  password: string;
   name: string;
-  role: UserRole;
+  password: string;
   phone: string;
   profilePicture?: string;
-  address?: string;
+  role: UserRole;
 }
 
 export interface IUserResponseData {
+  address?: string;
+  createdAt: Date;
+  email: string;
   id: number;
   name: string;
-  email: string;
-  role: UserRole;
   phone?: string;
-  address?: string;
   profilePicture?: string;
-  createdAt: Date;
+  role: UserRole;
   updatedAt: Date;
 }
 
-export interface IUserUpdateInput {
-  name?: string;
-  email?: string;
-  password?: string;
-  phone?: string;
-  address?: string;
-  profilePicture?: string | Express.Multer.File;
+export interface IUsersPaginatedResponse {
+  data: IUserResponseData[];
+  message: string;
+  meta: {
+    limit: number;
+    page: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface IUserUpdateData {
-  name?: string;
+  address?: string;
   email?: string;
+  name?: string;
   password?: string;
   phone?: string;
-  address?: string;
   profilePicture?: string;
 }
 
-export interface IUsersPaginatedResponse {
-  message: string;
-  data: IUserResponseData[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+export interface IUserUpdateInput {
+  address?: string;
+  email?: string;
+  name?: string;
+  password?: string;
+  phone?: string;
+  profilePicture?: Express.Multer.File | string;
 }

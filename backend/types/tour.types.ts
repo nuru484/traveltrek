@@ -1,28 +1,28 @@
 import { IDestinationSummary } from './destination.types';
 export interface ITourInput {
-  name: string;
-  description?: string | null;
-  type: 'ADVENTURE' | 'CULTURAL' | 'BEACH' | 'CITY' | 'WILDLIFE' | 'CRUISE';
-  price: number;
-  maxGuests: number;
-  startDate: string | Date;
-  endDate: string | Date;
+  description?: null | string;
   destinationId: number;
+  endDate: Date | string;
+  maxGuests: number;
+  name: string;
+  price: number;
+  startDate: Date | string;
+  type: 'ADVENTURE' | 'BEACH' | 'CITY' | 'CRUISE' | 'CULTURAL' | 'WILDLIFE';
 }
 
 export interface ITourResponse {
-  id: number;
-  name: string;
-  description: string | null;
-  type: 'ADVENTURE' | 'CULTURAL' | 'BEACH' | 'CITY' | 'WILDLIFE' | 'CRUISE';
-  status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
-  duration: number;
-  price: number;
-  maxGuests: number;
-  guestsBooked: number;
-  startDate: Date;
-  endDate: Date;
-  destination: IDestinationSummary;
   createdAt: Date;
+  description: null | string;
+  destination: IDestinationSummary;
+  duration: number;
+  endDate: Date;
+  guestsBooked: number;
+  id: number;
+  maxGuests: number;
+  name: string;
+  price: number;
+  startDate: Date;
+  status: 'CANCELLED' | 'COMPLETED' | 'ONGOING' | 'UPCOMING';
+  type: 'ADVENTURE' | 'BEACH' | 'CITY' | 'CRUISE' | 'CULTURAL' | 'WILDLIFE';
   updatedAt: Date;
 }

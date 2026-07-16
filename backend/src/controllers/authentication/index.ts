@@ -1,6 +1,6 @@
-import { registerUser } from './register';
 import login from './login';
-import refreshToken from './refresh-jwt-token';
 import logout from './logout';
+import refreshToken from './refresh-jwt-token';
+import { registerUser } from './register';
 
-export { registerUser, login, logout, refreshToken };
+export { login, logout, refreshToken, registerUser };

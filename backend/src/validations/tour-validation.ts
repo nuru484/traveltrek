@@ -1,87 +1,88 @@
+import { ValidationChain } from 'express-validator';
+
+import { TourStatus, TourType } from '../../generated/prisma/client';
+import prisma from '../config/prismaClient';
 // src/validations/tour-validation.ts
 import { validator } from '../validations/validation-factory';
-import { ValidationChain } from 'express-validator';
-import prisma from '../config/prismaClient';
-import { TourType, TourStatus } from '../../generated/prisma/client';
 
 export const createTourValidation: ValidationChain[] = [
   validator.string('name', {
-    required: true,
-    minLength: 3,
-    maxLength: 200,
     customMessage: 'Tour name must be between 3 and 200 characters',
+    maxLength: 200,
+    minLength: 3,
+    required: true,
   }),
 
   validator.string('description', {
-    required: false,
-    maxLength: 5000,
     customMessage: 'Description must not exceed 5000 characters',
+    maxLength: 5000,
+    required: false,
   }),
 
   validator.enum('type', Object.values(TourType), { required: true }),
 
   validator.number('price', {
-    required: true,
-    min: 0,
-    max: 10_000_000,
     allowDecimals: true,
+    max: 10_000_000,
+    min: 0,
+    required: true,
   }),
 
   validator.integer('maxGuests', {
-    required: true,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: true,
   }),
 
   validator.date('startDate', {
-    required: true,
     minDate: new Date(),
+    required: true,
   }),
 
   validator.date('endDate', {
-    required: true,
     compareDateField: 'startDate',
     compareDateOperation: 'after',
+    required: true,
   }),
 
   validator.number('destinationId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 ];
 
 export const updateTourValidation: ValidationChain[] = [
   validator.string('name', {
-    required: false,
-    minLength: 3,
-    maxLength: 200,
     customMessage: 'Tour name must be between 3 and 200 characters',
+    maxLength: 200,
+    minLength: 3,
+    required: false,
   }),
 
   validator.string('description', {
-    required: false,
-    maxLength: 5000,
     customMessage: 'Description must not exceed 5000 characters',
+    maxLength: 5000,
+    required: false,
   }),
 
   validator.enum('type', Object.values(TourType), { required: false }),
 
   validator.number('price', {
-    required: false,
-    min: 0,
-    max: 10_000_000,
     allowDecimals: true,
+    max: 10_000_000,
+    min: 0,
+    required: false,
   }),
 
   validator.integer('maxGuests', {
-    required: false,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: false,
   }),
 
   validator.date('startDate', {
-    required: false,
     minDate: new Date(),
+    required: false,
   }),
 
   validator.date('endDate', {
@@ -107,37 +108,37 @@ export const updateTourValidation: ValidationChain[] = [
   ),
 
   validator.number('destinationId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 ];
 
 export const tourIdParamValidation: ValidationChain[] = [
   validator.integer('id', {
-    required: true,
     min: 1,
+    required: true,
   }),
 ];
 
 export const paginationQueryValidation: ValidationChain[] = [
   validator.integer('page', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('limit', {
-    required: false,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: false,
   }),
 ];
 
 export const tourSearchValidation: ValidationChain[] = [
   validator.string('search', {
-    required: false,
-    minLength: 1,
-    maxLength: 200,
     customMessage: 'Search term must be between 1 and 200 characters',
+    maxLength: 200,
+    minLength: 1,
+    required: false,
   }),
 
   validator.enum('type', Object.values(TourType), { required: false }),
@@ -145,15 +146,15 @@ export const tourSearchValidation: ValidationChain[] = [
   validator.enum('status', Object.values(TourStatus), { required: false }),
 
   validator.number('minPrice', {
-    required: false,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: false,
   }),
 
   validator.number('maxPrice', {
-    required: false,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: false,
   }),
 
   validator.custom(
@@ -169,13 +170,13 @@ export const tourSearchValidation: ValidationChain[] = [
   ),
 
   validator.integer('minDuration', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('maxDuration', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.custom(
@@ -191,14 +192,14 @@ export const tourSearchValidation: ValidationChain[] = [
   ),
 
   validator.integer('minGuests', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('maxGuests', {
-    required: false,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: false,
   }),
 
   validator.custom(
@@ -253,10 +254,10 @@ export const getAllToursValidation: ValidationChain[] = [
 
 export const bulkTourValidation: ValidationChain[] = [
   validator.array('tourIds', {
-    required: true,
-    minLength: 1,
-    maxLength: 100,
     itemType: 'number',
+    maxLength: 100,
+    minLength: 1,
+    required: true,
     unique: true,
   }),
 
@@ -273,8 +274,8 @@ export const bulkTourValidation: ValidationChain[] = [
 
 export const tourAvailabilityValidation: ValidationChain[] = [
   validator.integer('tourId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 
   validator.custom(
@@ -293,9 +294,9 @@ export const tourAvailabilityValidation: ValidationChain[] = [
   ),
 
   validator.integer('guests', {
-    required: true,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: true,
   }),
 
   validator.custom(
@@ -305,8 +306,8 @@ export const tourAvailabilityValidation: ValidationChain[] = [
       if (!value || !tourId) return true;
 
       const tour = await prisma.tour.findUnique({
+        select: { guestsBooked: true, maxGuests: true },
         where: { id: Number(tourId) },
-        select: { maxGuests: true, guestsBooked: true },
       });
 
       if (!tour) return true;
@@ -325,9 +326,9 @@ export const tourDateRangeValidation: ValidationChain[] = [
   }),
 
   validator.date('toDate', {
-    required: true,
     compareDateField: 'fromDate',
     compareDateOperation: 'after-or-same',
+    required: true,
   }),
 ];
 

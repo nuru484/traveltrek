@@ -1,14 +1,15 @@
 // src/jobs/flightWorker.ts
 import { Worker } from 'bullmq';
-import prisma from '../config/prismaClient';
 import pMap from 'p-map';
-import { createRedisConnection } from '../config/redisConnection';
+
 import { FlightStatus } from '../../generated/prisma/client';
+import prisma from '../config/prismaClient';
+import { createRedisConnection } from '../config/redisConnection';
 import logger from '../utils/logger';
 
 export const flightStatusWorker = new Worker(
   'flightStatusQueue',
-  async (job) => {
+  async (_job) => {
     logger.info('✈️  Checking and updating flight statuses...');
 
     const now = new Date();
@@ -56,8 +57,8 @@ export const flightStatusWorker = new Worker(
           // Update if status has changed
           if (newStatus && newStatus !== flight.status) {
             await prisma.flight.update({
-              where: { id: flight.id },
               data: { status: newStatus },
+              where: { id: flight.id },
             });
 
             updatedCount++;
@@ -68,7 +69,7 @@ export const flightStatusWorker = new Worker(
         } catch (err) {
           failureCount++;
           logger.error(
-            `⚠️  Failed to update flight ${flight.flightNumber}: ${err}`,
+            `⚠️  Failed to update flight ${flight.flightNumber}: ${String(err)}`,
           );
         }
       },
@@ -79,7 +80,7 @@ export const flightStatusWorker = new Worker(
       `✅ Flight status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
     );
 
-    return { updatedCount, failureCount };
+    return { failureCount, updatedCount };
   },
   {
     connection: createRedisConnection(),

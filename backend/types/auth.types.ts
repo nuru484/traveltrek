@@ -1,16 +1,16 @@
 import { Request } from 'express';
+
 import { UserRole } from './user-profile.types';
 
 export interface ILoginRequest extends Request {
   body: {
-    password: string;
     email: string;
+    password: string;
   };
 }
 
-export interface IUserLoginInput {
-  password: string;
-  email: string;
+export interface IRefreshTokenPayload {
+  id: number;
 }
 
 export interface ITokenPayload {
@@ -18,6 +18,7 @@ export interface ITokenPayload {
   role: UserRole;
 }
 
-export interface IRefreshTokenPayload {
-  id: number;
+export interface IUserLoginInput {
+  email: string;
+  password: string;
 }

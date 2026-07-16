@@ -1,43 +1,44 @@
+import { ValidationChain } from 'express-validator';
+
 // src/validations/bookingValidations.ts
 import { validator } from './validation-factory';
-import { ValidationChain } from 'express-validator';
 
 export const createBookingValidation: ValidationChain[] = [
   validator.integer('userId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 
   validator.integer('tourId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('hotelId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('roomId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('flightId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('totalPrice', {
-    required: true,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: true,
   }),
 
   validator.custom(
     'bookingType',
     (value, req) => {
-      const { tourId, hotelId, roomId, flightId } = req.body;
+      const { flightId, hotelId, roomId, tourId } = req.body;
       return !!(tourId || hotelId || roomId || flightId);
     },
     'At least one of tourId, hotelId, roomId, or flightId must be provided',
@@ -60,34 +61,34 @@ export const createBookingValidation: ValidationChain[] = [
 
 export const updateBookingValidation: ValidationChain[] = [
   validator.integer('userId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('tourId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('hotelId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('roomId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('flightId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.number('totalPrice', {
-    required: false,
-    min: 0,
     allowDecimals: true,
+    min: 0,
+    required: false,
   }),
 
   validator.enum('status', ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'], {
@@ -110,21 +111,21 @@ export const updateBookingValidation: ValidationChain[] = [
 
 export const bookingIdParamValidation: ValidationChain[] = [
   validator.integer('id', {
-    required: true,
     min: 1,
+    required: true,
   }),
 ];
 
 export const paginationQueryValidation: ValidationChain[] = [
   validator.integer('page', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('limit', {
-    required: false,
-    min: 1,
     max: 100,
+    min: 1,
+    required: false,
   }),
 ];
 
@@ -136,14 +137,14 @@ export const bookingStatusFilterValidation: ValidationChain[] = [
 
 export const dateRangeFilterValidation: ValidationChain[] = [
   validator.date('startDate', {
-    required: false,
     maxDate: new Date(),
+    required: false,
   }),
 
   validator.date('endDate', {
-    required: false,
     compareDateField: 'startDate',
     compareDateOperation: 'after-or-same',
+    required: false,
   }),
 ];
 

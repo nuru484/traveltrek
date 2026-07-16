@@ -1,14 +1,15 @@
 // src/jobs/tourWorker.ts
 import { Worker } from 'bullmq';
-import prisma from '../config/prismaClient';
 import pMap from 'p-map';
-import { createRedisConnection } from '../config/redisConnection';
+
 import { TourStatus } from '../../generated/prisma/client';
+import prisma from '../config/prismaClient';
+import { createRedisConnection } from '../config/redisConnection';
 import logger from '../utils/logger';
 
 export const tourStatusWorker = new Worker(
   'tourStatusQueue',
-  async (job) => {
+  async (_job) => {
     logger.info('🗺️  Checking and updating tour statuses...');
 
     const now = new Date();
@@ -35,7 +36,7 @@ export const tourStatusWorker = new Worker(
       tours,
       async (tour) => {
         try {
-          let newStatus: TourStatus | null = null;
+          let newStatus: null | TourStatus = null;
 
           if (now >= tour.endDate) {
             // Tour has ended
@@ -56,8 +57,8 @@ export const tourStatusWorker = new Worker(
           // Update if status has changed
           if (newStatus && newStatus !== tour.status) {
             await prisma.tour.update({
-              where: { id: tour.id },
               data: { status: newStatus },
+              where: { id: tour.id },
             });
 
             updatedCount++;
@@ -67,7 +68,9 @@ export const tourStatusWorker = new Worker(
           }
         } catch (err) {
           failureCount++;
-          logger.error(`⚠️  Failed to update tour ${tour.name}: ${err}`);
+          logger.error(
+            `⚠️  Failed to update tour ${tour.name}: ${String(err)}`,
+          );
         }
       },
       { concurrency: 10 },
@@ -77,7 +80,7 @@ export const tourStatusWorker = new Worker(
       `✅ Tour status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
     );
 
-    return { updatedCount, failureCount };
+    return { failureCount, updatedCount };
   },
   {
     connection: createRedisConnection(),

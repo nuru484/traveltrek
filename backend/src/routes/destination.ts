@@ -1,14 +1,15 @@
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
 import {
   createDestination,
-  getDestination,
-  updateDestination,
+  deleteAllDestinations,
   deleteDestination,
   getAllDestinations,
-  deleteAllDestinations,
+  getDestination,
+  updateDestination,
 } from '../controllers/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const destinationRoutes = Router();
 

@@ -1,31 +1,30 @@
-// src/controllers/authentication/register.ts
-import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import prisma from '../../config/prismaClient';
-import validationMiddleware from '../../middlewares/validation';
-import { registerUserValidation } from '../../validations/auth-validations';
+// src/controllers/authentication/register.ts
+import { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+
 import {
   IUserRegistrationInput,
   IUserResponseData,
   UserRole,
 } from '../../../types/user-profile.types';
-import conditionalCloudinaryUpload from '../../middlewares/conditional-cloudinary-upload';
-import multerUpload from '../../config/multer';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../../config/constants';
 import { cloudinaryService } from '../../config/claudinary';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '../../config/constants';
 import { HTTP_STATUS_CODES } from '../../config/constants';
 import { BCRYPT_SALT_ROUNDS } from '../../config/constants';
 import { assertEnv } from '../../config/env';
-import { CookieManager } from '../../utils/CookieManager';
-import { ITokenPayload, IRefreshTokenPayload } from 'types/auth.types';
-import jwt from 'jsonwebtoken';
 import ENV from '../../config/env';
-import logger from '../../utils/logger';
+import multerUpload from '../../config/multer';
+import prisma from '../../config/prismaClient';
+import conditionalCloudinaryUpload from '../../middlewares/conditional-cloudinary-upload';
 import {
-  CustomError,
   BadRequestError,
   UnauthorizedError,
 } from '../../middlewares/error-handler';
+import validationMiddleware from '../../middlewares/validation';
+import { CookieManager } from '../../utils/CookieManager';
+import logger from '../../utils/logger';
+import { registerUserValidation } from '../../validations/auth-validations';
 
 /**
  * Controller function for user registration
@@ -78,17 +77,17 @@ const handleRegisterUser = async (
       data: userCreationData,
     });
 
-    const { password, ...userWithoutPassword } = user;
+    const { password: _password, ...userWithoutPassword } = user;
 
     if (!isAdminCreatingUser) {
       const accessToken = jwt.sign(
-        { id: user.id, role: user.role } as ITokenPayload,
+        { id: user.id, role: user.role },
         assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
         { expiresIn: '30m' },
       );
 
       const refreshToken = jwt.sign(
-        { id: user.id, role: user.role } as IRefreshTokenPayload,
+        { id: user.id, role: user.role },
         assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
         {
           expiresIn: '7d',
@@ -101,10 +100,10 @@ const handleRegisterUser = async (
     }
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
+      data: userWithoutPassword as IUserResponseData,
       message: isAdminCreatingUser
         ? 'User created successfully.'
         : 'Registration successful.',
-      data: userWithoutPassword as IUserResponseData,
     });
   } catch (error) {
     if (uploadedImageUrl) {

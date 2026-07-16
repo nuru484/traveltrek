@@ -1,9 +1,10 @@
+import * as bcrypt from 'bcrypt';
+
 // prisma/seed.ts
 import { Role } from '../generated/prisma/client';
-import prisma from '../src/config/prismaClient';
-import * as bcrypt from 'bcrypt';
-import logger from '../src/utils/logger';
 import ENV from '../src/config/env';
+import prisma from '../src/config/prismaClient';
+import logger from '../src/utils/logger';
 
 async function main() {
   logger.info('🌱 Starting database seeding...');
@@ -16,36 +17,36 @@ async function main() {
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      name: adminName,
-      password: hashedPassword,
-      role: Role.ADMIN,
-      phone: adminPhone,
-      updatedAt: new Date(),
-    },
     create: {
       email: adminEmail,
       name: adminName,
       password: hashedPassword,
-      role: Role.ADMIN,
       phone: adminPhone,
+      role: Role.ADMIN,
     },
+    update: {
+      name: adminName,
+      password: hashedPassword,
+      phone: adminPhone,
+      role: Role.ADMIN,
+      updatedAt: new Date(),
+    },
+    where: { email: adminEmail },
   });
 
   logger.info({
-    message: '✅ Admin user seeded successfully',
     admin: {
-      id: admin.id,
       email: admin.email,
+      id: admin.id,
       name: admin.name,
       role: admin.role,
     },
+    message: '✅ Admin user seeded successfully',
   });
 }
 
 main()
-  .catch((e) => {
+  .catch((e: unknown) => {
     // pino takes the merge object first — (msg, err) silently drops the error
     logger.error({ err: e }, '❌ Error seeding database');
     process.exit(1);

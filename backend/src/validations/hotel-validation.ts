@@ -1,28 +1,29 @@
+import { ValidationChain } from 'express-validator';
+
+import prisma from '../config/prismaClient';
 // src/validations/hotel-validation.ts
 import { validator } from '../validations/validation-factory';
-import { ValidationChain } from 'express-validator';
-import prisma from '../config/prismaClient';
 
 // Validation for creating a new hotel
 export const createHotelValidation: ValidationChain[] = [
   validator.string('name', {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
     customMessage: 'Hotel name must be between 2 and 100 characters',
+    maxLength: 100,
+    minLength: 2,
+    required: true,
   }),
 
   validator.string('description', {
-    required: false,
-    maxLength: 2000,
     customMessage: 'Description must not exceed 2000 characters',
+    maxLength: 2000,
+    required: false,
   }),
 
   validator.string('address', {
-    required: true,
-    minLength: 5,
-    maxLength: 255,
     customMessage: 'Address must be between 5 and 255 characters',
+    maxLength: 255,
+    minLength: 5,
+    required: true,
   }),
 
   validator.phone('phone', {
@@ -30,15 +31,15 @@ export const createHotelValidation: ValidationChain[] = [
   }),
 
   validator.integer('starRating', {
-    required: false,
-    min: 1,
     max: 5,
+    min: 1,
+    required: false,
   }),
 
   validator.array('amenities', {
-    required: false,
-    maxLength: 20,
     itemType: 'string',
+    maxLength: 20,
+    required: false,
     unique: true,
   }),
 
@@ -60,8 +61,8 @@ export const createHotelValidation: ValidationChain[] = [
   ),
 
   validator.integer('destinationId', {
-    required: true,
     min: 1,
+    required: true,
   }),
 
   validator.custom(
@@ -82,23 +83,23 @@ export const createHotelValidation: ValidationChain[] = [
 
 export const updateHotelValidation: ValidationChain[] = [
   validator.string('name', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
     customMessage: 'Hotel name must be between 2 and 100 characters',
+    maxLength: 100,
+    minLength: 2,
+    required: false,
   }),
 
   validator.string('description', {
-    required: false,
-    maxLength: 2000,
     customMessage: 'Description must not exceed 2000 characters',
+    maxLength: 2000,
+    required: false,
   }),
 
   validator.string('address', {
-    required: false,
-    minLength: 5,
-    maxLength: 255,
     customMessage: 'Address must be between 5 and 255 characters',
+    maxLength: 255,
+    minLength: 5,
+    required: false,
   }),
 
   validator.phone('phone', {
@@ -106,15 +107,15 @@ export const updateHotelValidation: ValidationChain[] = [
   }),
 
   validator.integer('starRating', {
-    required: false,
-    min: 1,
     max: 5,
+    min: 1,
+    required: false,
   }),
 
   validator.array('amenities', {
-    required: false,
-    maxLength: 20,
     itemType: 'string',
+    maxLength: 20,
+    required: false,
     unique: true,
   }),
 
@@ -136,8 +137,8 @@ export const updateHotelValidation: ValidationChain[] = [
   ),
 
   validator.integer('destinationId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.custom(
@@ -158,71 +159,71 @@ export const updateHotelValidation: ValidationChain[] = [
 
 export const hotelIdParamValidation: ValidationChain[] = [
   validator.integer('id', {
-    required: true,
     min: 1,
+    required: true,
   }),
 ];
 
 export const paginationQueryValidation: ValidationChain[] = [
   validator.integer('page', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.integer('limit', {
-    required: false,
-    min: 1,
     max: 1000,
+    min: 1,
+    required: false,
   }),
 ];
 
 export const hotelSearchValidation: ValidationChain[] = [
   validator.string('search', {
-    required: false,
-    minLength: 1,
-    maxLength: 100,
     customMessage: 'Search term must be between 1 and 100 characters',
+    maxLength: 100,
+    minLength: 1,
+    required: false,
   }),
 
   validator.integer('destinationId', {
-    required: false,
     min: 1,
+    required: false,
   }),
 
   validator.string('city', {
-    required: false,
-    minLength: 1,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'City filter must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 1,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   validator.string('country', {
-    required: false,
-    minLength: 2,
-    maxLength: 100,
-    pattern: /^[a-zA-Z\s\-']+$/,
     customMessage:
       'Country filter must contain only letters, spaces, hyphens, and apostrophes',
+    maxLength: 100,
+    minLength: 2,
+    pattern: /^[a-zA-Z\s\-']+$/,
+    required: false,
   }),
 
   validator.integer('starRating', {
-    required: false,
-    min: 1,
     max: 5,
+    min: 1,
+    required: false,
   }),
 
   validator.integer('minStarRating', {
-    required: false,
-    min: 1,
     max: 5,
+    min: 1,
+    required: false,
   }),
 
   validator.integer('maxStarRating', {
-    required: false,
-    min: 1,
     max: 5,
+    min: 1,
+    required: false,
   }),
 
   validator.custom(
@@ -238,9 +239,9 @@ export const hotelSearchValidation: ValidationChain[] = [
   ),
 
   validator.array('amenities', {
-    required: false,
-    maxLength: 10,
     itemType: 'string',
+    maxLength: 10,
+    required: false,
   }),
 
   validator.enum(
@@ -263,10 +264,10 @@ export const getHotelsValidation: ValidationChain[] = [
 
 export const bulkHotelValidation: ValidationChain[] = [
   validator.array('hotelIds', {
-    required: true,
-    minLength: 1,
-    maxLength: 50,
     itemType: 'number',
+    maxLength: 50,
+    minLength: 1,
+    required: true,
     unique: true,
   }),
 

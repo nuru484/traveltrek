@@ -1,16 +1,17 @@
 // src/routes/user.ts
 import { Router } from 'express';
+
+import { UserRole } from '../../types/user-profile.types';
+import { registerUser } from '../controllers/authentication/index';
 import {
-  updateUserProfile,
+  changeUserRole,
+  deleteAllUsers,
+  deleteUser,
   getAllUsers,
   getUserById,
-  changeUserRole,
-  deleteUser,
-  deleteAllUsers,
+  updateUserProfile,
 } from '../controllers/index';
-import { registerUser } from '../controllers/authentication/index';
 import { authorizeRole } from '../middlewares/authorize-roles';
-import { UserRole } from '../../types/user-profile.types';
 
 const userRoutes = Router();
 

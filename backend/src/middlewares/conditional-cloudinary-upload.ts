@@ -1,5 +1,6 @@
 // src/middlewares/conditional-cloudinary-upload.ts
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
+
 import { handleCloudinaryUpload } from './handle-cloudinary-upload';
 
 const conditionalCloudinaryUpload = (
@@ -24,7 +25,8 @@ const conditionalCloudinaryUpload = (
     if (hasFile) {
       return uploadMiddleware(req, res, next);
     } else {
-      return next();
+      next();
+      return;
     }
   };
 };

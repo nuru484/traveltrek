@@ -1,31 +1,32 @@
-// src/controllers/userController.ts
-import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
-import { updateUserProfileValidation } from '../validations/user-validations';
-import { cloudinaryService } from '../config/claudinary';
-import {
-  asyncHandler,
-  ValidationError,
-  CustomError,
-  BadRequestError,
-  UnauthorizedError,
-  NotFoundError,
-  ForbiddenError,
-} from '../middlewares/error-handler';
+// src/controllers/userController.ts
+import { NextFunction, Request, Response } from 'express';
+
 import {
   IUserResponseData,
-  IUserUpdateInput,
-  IUserUpdateData,
-  UserRole,
   IUsersPaginatedResponse,
+  IUserUpdateData,
+  IUserUpdateInput,
+  UserRole,
 } from '../../types/user-profile.types';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import multerUpload from '../config/multer';
-import { HTTP_STATUS_CODES, BCRYPT_SALT_ROUNDS } from '../config/constants';
+import { cloudinaryService } from '../config/claudinary';
+import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '../config/constants';
 import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import multerUpload from '../config/multer';
+import prisma from '../config/prismaClient';
+import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+import {
+  asyncHandler,
+  BadRequestError,
+  CustomError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '../middlewares/error-handler';
+import validationMiddleware from '../middlewares/validation';
 import logger from '../utils/logger';
+import { updateUserProfileValidation } from '../validations/user-validations';
 
 /**
  * Controller function for updating user profile
@@ -54,12 +55,12 @@ const handleUpdateUserProfile = asyncHandler(
     }
 
     let uploadedImageUrl: string | undefined;
-    let oldProfilePicture: string | null = null;
+    let oldProfilePicture: null | string = null;
 
     try {
       const existingUser = await prisma.user.findUnique({
+        select: { email: true, phone: true, profilePicture: true },
         where: { id: targetUserId },
-        select: { profilePicture: true, email: true, phone: true },
       });
 
       if (!existingUser) {
@@ -118,8 +119,8 @@ const handleUpdateUserProfile = asyncHandler(
       }
 
       const updatedUser = await prisma.user.update({
-        where: { id: targetUserId },
         data: updateData,
+        where: { id: targetUserId },
       });
 
       if (
@@ -134,11 +135,11 @@ const handleUpdateUserProfile = asyncHandler(
         }
       }
 
-      const { password, ...userWithoutPassword } = updatedUser;
+      const { password: _password, ...userWithoutPassword } = updatedUser;
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Profile updated successfully.',
         data: userWithoutPassword as IUserResponseData,
+        message: 'Profile updated successfully.',
       });
     } catch (error) {
       if (uploadedImageUrl) {
@@ -168,7 +169,7 @@ export const updateUserProfile = [
  * Get single user by ID
  */
 export const getUserById = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { userId } = req.params;
     const currentUserId = req.user?.id;
     const currentUserRole = req.user?.role;
@@ -192,18 +193,18 @@ export const getUserById = asyncHandler(
 
     // Get user from database
     const user = await prisma.user.findUnique({
-      where: { id: targetUserId },
       select: {
+        address: true,
+        createdAt: true,
+        email: true,
         id: true,
         name: true,
-        email: true,
-        role: true,
         phone: true,
-        address: true,
         profilePicture: true,
-        createdAt: true,
+        role: true,
         updatedAt: true,
       },
+      where: { id: targetUserId },
     });
 
     if (!user) {
@@ -211,20 +212,20 @@ export const getUserById = asyncHandler(
     }
 
     const response: IUserResponseData = {
+      address: user.address ?? undefined,
+      createdAt: user.createdAt,
+      email: user.email,
       id: user.id,
       name: user.name,
-      email: user.email,
-      role: user.role as UserRole,
       phone: user.phone ?? undefined,
-      address: user.address ?? undefined,
       profilePicture: user.profilePicture ?? undefined,
-      createdAt: user.createdAt,
+      role: user.role as UserRole,
       updatedAt: user.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'User retrieved successfully',
       data: response,
+      message: 'User retrieved successfully',
     });
   },
 );
@@ -233,12 +234,12 @@ export const getUserById = asyncHandler(
  * Get all users with pagination
  */
 export const getAllUsers = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    const role = req.query.role as UserRole | undefined;
+    const role = req.query.role as undefined | UserRole;
     const search = req.query.search as string | undefined;
 
     const whereClause: any = {};
@@ -257,44 +258,44 @@ export const getAllUsers = asyncHandler(
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
+          address: true,
+          createdAt: true,
+          email: true,
           id: true,
           name: true,
-          email: true,
-          role: true,
           phone: true,
-          address: true,
           profilePicture: true,
-          createdAt: true,
+          role: true,
           updatedAt: true,
         },
+        skip,
+        take: limit,
+        where: whereClause,
       }),
       prisma.user.count({ where: whereClause }),
     ]);
 
     const response: IUserResponseData[] = users.map((user) => ({
+      address: user.address ?? undefined,
+      createdAt: user.createdAt,
+      email: user.email,
       id: user.id,
       name: user.name,
-      email: user.email,
-      role: user.role as UserRole,
       phone: user.phone ?? undefined,
-      address: user.address ?? undefined,
       profilePicture: user.profilePicture ?? undefined,
-      createdAt: user.createdAt,
+      role: user.role as UserRole,
       updatedAt: user.updatedAt,
     }));
 
     const paginatedResponse: IUsersPaginatedResponse = {
-      message: 'Users retrieved successfully',
       data: response,
+      message: 'Users retrieved successfully',
       meta: {
-        total,
-        page,
         limit,
+        page,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     };
@@ -307,7 +308,7 @@ export const getAllUsers = asyncHandler(
  * Change user role - Admin only
  */
 export const changeUserRole = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { userId } = req.params;
     const { role } = req.body;
     const currentUserId = req.user?.id;
@@ -325,8 +326,8 @@ export const changeUserRole = asyncHandler(
     }
 
     const existingUser = await prisma.user.findUnique({
+      select: { email: true, id: true, name: true, role: true },
       where: { id: parseInt(userId) },
-      select: { id: true, name: true, email: true, role: true },
     });
 
     if (!existingUser) {
@@ -338,36 +339,36 @@ export const changeUserRole = asyncHandler(
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: parseInt(userId) },
       data: { role },
       select: {
+        address: true,
+        createdAt: true,
+        email: true,
         id: true,
         name: true,
-        email: true,
-        role: true,
         phone: true,
-        address: true,
         profilePicture: true,
-        createdAt: true,
+        role: true,
         updatedAt: true,
       },
+      where: { id: parseInt(userId) },
     });
 
     const response: IUserResponseData = {
+      address: updatedUser.address ?? undefined,
+      createdAt: updatedUser.createdAt,
+      email: updatedUser.email,
       id: updatedUser.id,
       name: updatedUser.name,
-      email: updatedUser.email,
-      role: updatedUser.role as UserRole,
       phone: updatedUser.phone ?? undefined,
-      address: updatedUser.address ?? undefined,
       profilePicture: updatedUser.profilePicture ?? undefined,
-      createdAt: updatedUser.createdAt,
+      role: updatedUser.role as UserRole,
       updatedAt: updatedUser.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `User role updated successfully to ${role}`,
       data: response,
+      message: `User role updated successfully to ${role}`,
     });
   },
 );
@@ -376,7 +377,7 @@ export const changeUserRole = asyncHandler(
  * Delete a single user - Admin only
  */
 export const deleteUser = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { userId } = req.params;
     const currentUserId = req.user?.id;
     const currentUserRole = req.user?.role;
@@ -400,14 +401,14 @@ export const deleteUser = asyncHandler(
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
       select: {
+        email: true,
         id: true,
         name: true,
-        email: true,
-        role: true,
         profilePicture: true,
+        role: true,
       },
+      where: { id: targetUserId },
     });
 
     if (!existingUser) {
@@ -416,10 +417,10 @@ export const deleteUser = asyncHandler(
 
     const activePayments = await prisma.payment.count({
       where: {
-        userId: targetUserId,
         status: {
           not: 'REFUNDED',
         },
+        userId: targetUserId,
       },
     });
 
@@ -456,7 +457,7 @@ export const deleteUser = asyncHandler(
  * Delete all users - Super Admin only (dangerous operation)
  */
 export const deleteAllUsers = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const currentUserId = req.user?.id;
     const confirmDelete = req.body.confirmDelete;
 
@@ -467,35 +468,35 @@ export const deleteAllUsers = asyncHandler(
     }
 
     const usersToDelete = await prisma.user.findMany({
-      where: {
-        id: { not: parseInt(currentUserId?.toString() || '0') },
-      },
       select: {
+        email: true,
         id: true,
         name: true,
-        email: true,
         profilePicture: true,
+      },
+      where: {
+        id: { not: parseInt(currentUserId?.toString() || '0') },
       },
     });
 
     if (usersToDelete.length === 0) {
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'No users to delete',
         deletedCount: 0,
+        message: 'No users to delete',
       });
       return;
     }
 
     const usersWithActivePayments = await prisma.payment.findMany({
+      select: { userId: true },
       where: {
-        userId: {
-          in: usersToDelete.map((u) => u.id),
-        },
         status: {
           not: 'REFUNDED',
         },
+        userId: {
+          in: usersToDelete.map((u) => u.id),
+        },
       },
-      select: { userId: true },
     });
 
     const blockedUserIds = new Set(
@@ -534,7 +535,7 @@ export const deleteAllUsers = asyncHandler(
         },
       );
 
-      Promise.allSettled(cleanupPromises).then((results) => {
+      void Promise.allSettled(cleanupPromises).then((results) => {
         const failed = results.filter(
           (result) => result.status === 'rejected',
         ).length;
@@ -547,8 +548,8 @@ export const deleteAllUsers = asyncHandler(
     }
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${deleteResult.count} users`,
       deletedCount: deleteResult.count,
+      message: `Successfully deleted ${deleteResult.count} users`,
     });
   },
 );

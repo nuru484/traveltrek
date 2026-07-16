@@ -1,30 +1,31 @@
 // src/controllers/flight/flight-controller.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { param } from 'express-validator';
+import { IFlight, IFlightInput, IFlightUpdateInput } from 'types/flight.types';
+
+import { FlightStatus } from '../../generated/prisma/client';
+import { cloudinaryService } from '../config/claudinary';
+import { HTTP_STATUS_CODES } from '../config/constants';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import multerUpload from '../config/multer';
 import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
+import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
 import {
   asyncHandler,
-  NotFoundError,
-  UnauthorizedError,
   BadRequestError,
   CustomError,
+  NotFoundError,
+  UnauthorizedError,
 } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { IFlightInput, IFlight, IFlightUpdateInput } from 'types/flight.types';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
-import { cloudinaryService } from '../config/claudinary';
+import validationMiddleware from '../middlewares/validation';
+import logger from '../utils/logger';
 import {
   createFlightValidation,
-  updateFlightValidation,
-  getFlightsValidation,
   flightPhotoValidation,
+  getFlightsValidation,
   updateFlightStatusValidation,
+  updateFlightValidation,
 } from '../validations/flight-validation';
-import logger from '../utils/logger';
-import { FlightStatus } from '../../generated/prisma/client';
 
 /**
  * Create a new flight
@@ -33,19 +34,19 @@ const handleCreateFlight = asyncHandler(
   async (
     req: Request<{}, {}, IFlightInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const {
-      flightNumber,
       airline,
-      departure,
       arrival,
-      originId,
-      destinationId,
-      price,
-      flightClass,
-      stops,
       capacity,
+      departure,
+      destinationId,
+      flightClass,
+      flightNumber,
+      originId,
+      price,
+      stops,
     } = req.body;
 
     const parsedOriginId = parseInt(String(originId), 10);
@@ -93,19 +94,19 @@ const handleCreateFlight = asyncHandler(
 
     const flight = await prisma.flight.create({
       data: {
-        flightNumber,
         airline,
-        departure: departureDate,
         arrival: arrivalDate,
-        origin: { connect: { id: parsedOriginId } },
-        destination: { connect: { id: parsedDestinationId } },
-        price: parsedPrice,
-        flightClass,
-        duration: durationInMinutes,
-        stops: parsedStops,
-        photo: typeof photoUrl === 'string' ? photoUrl : null,
-        seatsAvailable: parsedCapacity,
         capacity: parsedCapacity,
+        departure: departureDate,
+        destination: { connect: { id: parsedDestinationId } },
+        duration: durationInMinutes,
+        flightClass,
+        flightNumber,
+        origin: { connect: { id: parsedOriginId } },
+        photo: typeof photoUrl === 'string' ? photoUrl : null,
+        price: parsedPrice,
+        seatsAvailable: parsedCapacity,
+        stops: parsedStops,
       },
       include: {
         destination: true,
@@ -114,28 +115,28 @@ const handleCreateFlight = asyncHandler(
     });
 
     const response: IFlight = {
-      id: flight.id,
-      flightNumber: flight.flightNumber,
       airline: flight.airline,
-      departure: flight.departure,
       arrival: flight.arrival,
-      origin: flight.origin,
-      destination: flight.destination,
-      price: flight.price,
-      flightClass: flight.flightClass,
-      duration: flight.duration,
-      stops: flight.stops,
-      status: flight.status,
-      photo: flight.photo,
-      seatsAvailable: flight.seatsAvailable,
       capacity: flight.capacity,
       createdAt: flight.createdAt,
+      departure: flight.departure,
+      destination: flight.destination,
+      duration: flight.duration,
+      flightClass: flight.flightClass,
+      flightNumber: flight.flightNumber,
+      id: flight.id,
+      origin: flight.origin,
+      photo: flight.photo,
+      price: flight.price,
+      seatsAvailable: flight.seatsAvailable,
+      status: flight.status,
+      stops: flight.stops,
       updatedAt: flight.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
-      message: 'Flight created successfully',
       data: response,
+      message: 'Flight created successfully',
     });
   },
 );
@@ -154,29 +155,29 @@ export const createFlight: RequestHandler[] = [
  * Get a single flight by ID
  */
 const handleGetFlight = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
 
     const flight = await prisma.flight.findUnique({
-      where: { id: parseInt(id) },
       include: {
-        origin: {
-          select: {
-            id: true,
-            name: true,
-            country: true,
-            city: true,
-          },
-        },
         destination: {
           select: {
+            city: true,
+            country: true,
             id: true,
             name: true,
-            country: true,
+          },
+        },
+        origin: {
+          select: {
             city: true,
+            country: true,
+            id: true,
+            name: true,
           },
         },
       },
+      where: { id: parseInt(id) },
     });
 
     if (!flight) {
@@ -184,30 +185,30 @@ const handleGetFlight = asyncHandler(
     }
 
     const response = {
-      id: flight.id,
-      flightNumber: flight.flightNumber,
       airline: flight.airline,
-      departure: flight.departure,
       arrival: flight.arrival,
-      originId: flight.originId,
-      destinationId: flight.destinationId,
-      origin: flight.origin,
-      destination: flight.destination,
-      price: flight.price,
-      flightClass: flight.flightClass,
-      duration: flight.duration,
-      status: flight.status,
-      stops: flight.stops,
-      photo: flight.photo,
-      seatsAvailable: flight.seatsAvailable,
       capacity: flight.capacity,
       createdAt: flight.createdAt,
+      departure: flight.departure,
+      destination: flight.destination,
+      destinationId: flight.destinationId,
+      duration: flight.duration,
+      flightClass: flight.flightClass,
+      flightNumber: flight.flightNumber,
+      id: flight.id,
+      origin: flight.origin,
+      originId: flight.originId,
+      photo: flight.photo,
+      price: flight.price,
+      seatsAvailable: flight.seatsAvailable,
+      status: flight.status,
+      stops: flight.stops,
       updatedAt: flight.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flight retrieved successfully',
       data: response,
+      message: 'Flight retrieved successfully',
     });
   },
 );
@@ -230,17 +231,17 @@ const handleUpdateFlight = asyncHandler(
   ): Promise<void> => {
     const { id } = req.params;
     const {
-      flightNumber,
       airline,
-      departure,
       arrival,
-      originId,
-      destinationId,
-      price,
-      flightClass,
-      stops,
       capacity,
+      departure,
+      destinationId,
+      flightClass,
+      flightNumber,
+      originId,
+      price,
       status,
+      stops,
     } = req.body;
 
     const parsedId = parseInt(id!, 10);
@@ -295,12 +296,12 @@ const handleUpdateFlight = asyncHandler(
     }
 
     let uploadedImageUrl: string | undefined;
-    let oldPhoto: string | null = null;
+    let oldPhoto: null | string = null;
 
     try {
       const existingFlight = await prisma.flight.findUnique({
-        where: { id: parsedId },
         include: { bookings: { select: { id: true, status: true } } },
+        where: { id: parsedId },
       });
 
       if (!existingFlight) {
@@ -456,12 +457,12 @@ const handleUpdateFlight = asyncHandler(
       }
 
       const updatedFlight = await prisma.flight.update({
-        where: { id: parsedId },
         data: updateData,
         include: {
-          origin: true,
           destination: true,
+          origin: true,
         },
+        where: { id: parsedId },
       });
 
       if (uploadedImageUrl && oldPhoto && oldPhoto !== uploadedImageUrl) {
@@ -473,28 +474,28 @@ const handleUpdateFlight = asyncHandler(
       }
 
       const response: IFlight = {
-        id: updatedFlight.id,
-        flightNumber: updatedFlight.flightNumber,
         airline: updatedFlight.airline,
-        departure: updatedFlight.departure,
         arrival: updatedFlight.arrival,
-        origin: updatedFlight.origin,
-        destination: updatedFlight.destination,
-        price: updatedFlight.price,
-        flightClass: updatedFlight.flightClass,
-        duration: updatedFlight.duration,
-        status: updatedFlight.status,
-        stops: updatedFlight.stops,
-        photo: updatedFlight.photo,
-        seatsAvailable: updatedFlight.seatsAvailable,
         capacity: updatedFlight.capacity,
         createdAt: updatedFlight.createdAt,
+        departure: updatedFlight.departure,
+        destination: updatedFlight.destination,
+        duration: updatedFlight.duration,
+        flightClass: updatedFlight.flightClass,
+        flightNumber: updatedFlight.flightNumber,
+        id: updatedFlight.id,
+        origin: updatedFlight.origin,
+        photo: updatedFlight.photo,
+        price: updatedFlight.price,
+        seatsAvailable: updatedFlight.seatsAvailable,
+        status: updatedFlight.status,
+        stops: updatedFlight.stops,
         updatedAt: updatedFlight.updatedAt,
       };
 
       res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'Flight updated successfully',
         data: response,
+        message: 'Flight updated successfully',
       });
     } catch (error) {
       if (uploadedImageUrl) {
@@ -526,24 +527,24 @@ export const updateFlight: RequestHandler[] = [
  * Get all flights with advanced filtering and search
  */
 const handleGetAllFlights = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
     const {
-      search,
       airline,
-      originId,
-      destinationId,
-      flightClass,
       departureFrom,
       departureTo,
-      minPrice,
-      maxPrice,
+      destinationId,
+      flightClass,
       maxDuration,
+      maxPrice,
       maxStops,
+      minPrice,
       minSeats,
+      originId,
+      search,
       sortBy = 'departure',
       sortOrder = 'asc',
     } = req.query;
@@ -610,82 +611,82 @@ const handleGetAllFlights = asyncHandler(
 
     const [flights, total] = await Promise.all([
       prisma.flight.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
         include: {
-          origin: {
-            select: {
-              id: true,
-              name: true,
-              country: true,
-              city: true,
-            },
-          },
           destination: {
             select: {
+              city: true,
+              country: true,
               id: true,
               name: true,
-              country: true,
+            },
+          },
+          origin: {
+            select: {
               city: true,
+              country: true,
+              id: true,
+              name: true,
             },
           },
         },
+        orderBy,
+        skip,
+        take: limit,
+        where,
       }),
       prisma.flight.count({ where }),
     ]);
 
     const response = flights.map((flight) => ({
-      id: flight.id,
-      flightNumber: flight.flightNumber,
       airline: flight.airline,
-      departure: flight.departure,
       arrival: flight.arrival,
-      originId: flight.originId,
-      destinationId: flight.destinationId,
-      origin: flight.origin,
-      destination: flight.destination,
-      price: flight.price,
-      status: flight.status,
-      flightClass: flight.flightClass,
-      duration: flight.duration,
-      stops: flight.stops,
-      photo: flight.photo,
-      seatsAvailable: flight.seatsAvailable,
       createdAt: flight.createdAt,
+      departure: flight.departure,
+      destination: flight.destination,
+      destinationId: flight.destinationId,
+      duration: flight.duration,
+      flightClass: flight.flightClass,
+      flightNumber: flight.flightNumber,
+      id: flight.id,
+      origin: flight.origin,
+      originId: flight.originId,
+      photo: flight.photo,
+      price: flight.price,
+      seatsAvailable: flight.seatsAvailable,
+      status: flight.status,
+      stops: flight.stops,
       updatedAt: flight.updatedAt,
     }));
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flights retrieved successfully',
       data: response,
+      message: 'Flights retrieved successfully',
       meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
         filters: {
-          search,
           airline,
-          originId: originId ? parseInt(originId as string) : undefined,
+          departureFrom,
+          departureTo,
           destinationId: destinationId
             ? parseInt(destinationId as string)
             : undefined,
           flightClass,
-          departureFrom,
-          departureTo,
-          minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
-          maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
           maxDuration: maxDuration
             ? parseInt(maxDuration as string)
             : undefined,
+          maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
           maxStops:
             maxStops !== undefined ? parseInt(maxStops as string) : undefined,
+          minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
           minSeats: minSeats ? parseInt(minSeats as string) : undefined,
+          originId: originId ? parseInt(originId as string) : undefined,
+          search,
           sortBy,
           sortOrder,
         },
+        limit,
+        page,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   },
@@ -700,7 +701,7 @@ export const deleteFlight = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const user = req.user;
@@ -724,22 +725,22 @@ export const deleteFlight = asyncHandler(
     }
 
     const flight = await prisma.flight.findUnique({
-      where: { id: flightId },
       include: {
         bookings: {
           select: {
             id: true,
-            status: true,
             payment: {
               select: {
+                amount: true,
                 id: true,
                 status: true,
-                amount: true,
               },
             },
+            status: true,
           },
         },
       },
+      where: { id: flightId },
     });
 
     if (!flight) {
@@ -828,13 +829,13 @@ export const deleteFlight = asyncHandler(
     );
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flight deleted successfully',
       data: {
-        id: flight.id,
-        flightNumber: flight.flightNumber,
-        status: flight.status,
         deletedAt: new Date().toISOString(),
+        flightNumber: flight.flightNumber,
+        id: flight.id,
+        status: flight.status,
       },
+      message: 'Flight deleted successfully',
     });
   },
 );
@@ -843,7 +844,7 @@ export const deleteFlight = asyncHandler(
  * Delete all flights with photo cleanup
  */
 export const deleteAllFlights = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -876,7 +877,6 @@ export const deleteAllFlights = asyncHandler(
     const flightsWithCompletedPayments: number[] = [];
     const flightsWithPendingPayments: number[] = [];
 
-    const now = new Date();
     const nonDeletableStatuses: FlightStatus[] = [
       'DEPARTED',
       'LANDED',
@@ -981,10 +981,10 @@ export const deleteAllFlights = asyncHandler(
     await Promise.allSettled(cleanupPromises);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${flights.length} flight${flights.length > 1 ? 's' : ''}`,
       data: {
         deletedCount: flights.length,
       },
+      message: `Successfully deleted ${flights.length} flight${flights.length > 1 ? 's' : ''}`,
     });
   },
 );
@@ -993,7 +993,7 @@ export const deleteAllFlights = asyncHandler(
  * Get flight statistics (for admin dashboard)
  */
 export const getFlightStats = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -1046,8 +1046,8 @@ export const getFlightStats = asyncHandler(
       }),
 
       prisma.flight.groupBy({
-        by: ['flightClass'],
         _count: true,
+        by: ['flightClass'],
         orderBy: {
           _count: {
             flightClass: 'desc',
@@ -1056,8 +1056,8 @@ export const getFlightStats = asyncHandler(
       }),
 
       prisma.flight.groupBy({
-        by: ['airline'],
         _count: true,
+        by: ['airline'],
         orderBy: {
           _count: {
             airline: 'desc',
@@ -1067,12 +1067,12 @@ export const getFlightStats = asyncHandler(
       }),
 
       prisma.flight.groupBy({
-        by: ['status'],
         _count: true,
         _sum: {
-          seatsAvailable: true,
           capacity: true,
+          seatsAvailable: true,
         },
+        by: ['status'],
       }),
 
       prisma.flight.count({
@@ -1097,23 +1097,23 @@ export const getFlightStats = asyncHandler(
 
       prisma.flight.count({
         where: {
-          status: 'SCHEDULED',
           departure: {
             gte: now,
           },
+          status: 'SCHEDULED',
         },
       }),
 
       prisma.booking.aggregate({
+        _sum: {
+          totalPrice: true,
+        },
         where: {
           flightId: { not: null },
-          status: { in: ['CONFIRMED', 'COMPLETED'] },
           payment: {
             status: 'COMPLETED',
           },
-        },
-        _sum: {
-          totalPrice: true,
+          status: { in: ['CONFIRMED', 'COMPLETED'] },
         },
       }),
 
@@ -1144,70 +1144,32 @@ export const getFlightStats = asyncHandler(
         capacity > 0 ? ((booked / capacity) * 100).toFixed(2) : '0.00';
 
       return {
-        status: item.status,
         count: item._count,
-        totalCapacity: capacity,
-        seatsBooked: booked,
-        seatsAvailable: available,
         occupancyRate: `${rate}%`,
+        seatsAvailable: available,
+        seatsBooked: booked,
+        status: item.status,
+        totalCapacity: capacity,
       };
     });
 
     const stats = {
-      overview: {
-        totalFlights,
-        totalCapacity,
-        totalSeatsBooked: totalBooked,
-        totalSeatsAvailable: totalAvailable,
-        occupancyRate: `${occupancyRate}%`,
-        averagePrice: Math.round((averagePrice._avg.price || 0) * 100) / 100,
-        totalRevenue:
-          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
-        flightsWithBookings,
-      },
-
-      byStatus: {
-        scheduled: scheduledFlights,
-        departed: departedFlights,
-        landed: landedFlights,
-        delayed: delayedFlights,
-        cancelled: cancelledFlights,
-        upcoming: upcomingFlights,
-        detailed: statusBreakdown,
-      },
-
       byClass: flightsByClass.map((item) => ({
         class: item.flightClass,
         count: item._count,
       })),
 
-      topAirlines: flightsByAirline.map((item) => ({
-        airline: item.airline,
-        count: item._count,
-      })),
-
-      operationalMetrics: {
-        onTimeFlights: scheduledFlights + departedFlights,
-        delayedFlights,
-        cancelledFlights,
-        completedFlights: landedFlights,
-        delayRate:
-          totalFlights > 0
-            ? ((delayedFlights / totalFlights) * 100).toFixed(2) + '%'
-            : '0.00%',
-        cancellationRate:
-          totalFlights > 0
-            ? ((cancelledFlights / totalFlights) * 100).toFixed(2) + '%'
-            : '0.00%',
-        completionRate:
-          totalFlights > 0
-            ? ((landedFlights / totalFlights) * 100).toFixed(2) + '%'
-            : '0.00%',
+      byStatus: {
+        cancelled: cancelledFlights,
+        delayed: delayedFlights,
+        departed: departedFlights,
+        detailed: statusBreakdown,
+        landed: landedFlights,
+        scheduled: scheduledFlights,
+        upcoming: upcomingFlights,
       },
 
       financialMetrics: {
-        totalRevenue:
-          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
         averageBookingValue:
           flightsWithBookings > 0
             ? Math.round(
@@ -1221,12 +1183,50 @@ export const getFlightStats = asyncHandler(
                 ((totalRevenue._sum.totalPrice || 0) / totalBooked) * 100,
               ) / 100
             : 0,
+        totalRevenue:
+          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
       },
+
+      operationalMetrics: {
+        cancellationRate:
+          totalFlights > 0
+            ? ((cancelledFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+        cancelledFlights,
+        completedFlights: landedFlights,
+        completionRate:
+          totalFlights > 0
+            ? ((landedFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+        delayedFlights,
+        delayRate:
+          totalFlights > 0
+            ? ((delayedFlights / totalFlights) * 100).toFixed(2) + '%'
+            : '0.00%',
+        onTimeFlights: scheduledFlights + departedFlights,
+      },
+
+      overview: {
+        averagePrice: Math.round((averagePrice._avg.price || 0) * 100) / 100,
+        flightsWithBookings,
+        occupancyRate: `${occupancyRate}%`,
+        totalCapacity,
+        totalFlights,
+        totalRevenue:
+          Math.round((totalRevenue._sum.totalPrice || 0) * 100) / 100,
+        totalSeatsAvailable: totalAvailable,
+        totalSeatsBooked: totalBooked,
+      },
+
+      topAirlines: flightsByAirline.map((item) => ({
+        airline: item.airline,
+        count: item._count,
+      })),
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flight statistics retrieved successfully',
       data: stats,
+      message: 'Flight statistics retrieved successfully',
     });
   },
 );
@@ -1239,13 +1239,13 @@ const handleUpdateFlightStatus = asyncHandler(
     req: Request<
       { id?: string },
       {},
-      { status: FlightStatus; departure?: string; arrival?: string }
+      { arrival?: string; departure?: string; status: FlightStatus }
     >,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
-    const { status, departure, arrival } = req.body;
+    const { arrival, departure, status } = req.body;
     const user = req.user;
 
     if (!user) {
@@ -1265,7 +1265,6 @@ const handleUpdateFlightStatus = asyncHandler(
     }
 
     const existingFlight = await prisma.flight.findUnique({
-      where: { id: parsedId },
       include: {
         bookings: {
           include: {
@@ -1273,6 +1272,7 @@ const handleUpdateFlightStatus = asyncHandler(
           },
         },
       },
+      where: { id: parsedId },
     });
 
     if (!existingFlight) {
@@ -1474,12 +1474,12 @@ const handleUpdateFlightStatus = asyncHandler(
     }
 
     const updatedFlight = await prisma.flight.update({
-      where: { id: parsedId },
       data: updateData,
       include: {
-        origin: true,
         destination: true,
+        origin: true,
       },
+      where: { id: parsedId },
     });
 
     logger.info(
@@ -1488,14 +1488,14 @@ const handleUpdateFlightStatus = asyncHandler(
 
     if (newStatus === 'CANCELLED') {
       await prisma.booking.updateMany({
+        data: {
+          status: 'CANCELLED',
+        },
         where: {
           flightId: parsedId,
           status: {
             in: ['PENDING', 'CONFIRMED'],
           },
-        },
-        data: {
-          status: 'CANCELLED',
         },
       });
 
@@ -1505,28 +1505,28 @@ const handleUpdateFlightStatus = asyncHandler(
     }
 
     const response: IFlight = {
-      id: updatedFlight.id,
-      flightNumber: updatedFlight.flightNumber,
       airline: updatedFlight.airline,
-      departure: updatedFlight.departure,
       arrival: updatedFlight.arrival,
-      origin: updatedFlight.origin,
-      destination: updatedFlight.destination,
-      price: updatedFlight.price,
-      flightClass: updatedFlight.flightClass,
-      duration: updatedFlight.duration,
-      status: updatedFlight.status,
-      stops: updatedFlight.stops,
-      photo: updatedFlight.photo,
-      seatsAvailable: updatedFlight.seatsAvailable,
       capacity: updatedFlight.capacity,
       createdAt: updatedFlight.createdAt,
+      departure: updatedFlight.departure,
+      destination: updatedFlight.destination,
+      duration: updatedFlight.duration,
+      flightClass: updatedFlight.flightClass,
+      flightNumber: updatedFlight.flightNumber,
+      id: updatedFlight.id,
+      origin: updatedFlight.origin,
+      photo: updatedFlight.photo,
+      price: updatedFlight.price,
+      seatsAvailable: updatedFlight.seatsAvailable,
+      status: updatedFlight.status,
+      stops: updatedFlight.stops,
       updatedAt: updatedFlight.updatedAt,
     };
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Flight status updated successfully',
       data: response,
+      message: 'Flight status updated successfully',
     });
   },
 );

@@ -1,11 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
-import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+import { NextFunction, Request, Response } from 'express';
+import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+
 import ENV from '../config/env';
-import { asyncHandler, UnauthorizedError } from '../middlewares/error-handler';
-import { IUser } from 'types/user-profile.types';
 import { assertEnv } from '../config/env';
-import { verifyJwtToken } from '../utils/verify-jwt-token';
+import { asyncHandler, UnauthorizedError } from '../middlewares/error-handler';
 import { CookieManager } from '../utils/CookieManager';
+import { verifyJwtToken } from '../utils/verify-jwt-token';
 
 const authenticateJWT = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -13,14 +13,14 @@ const authenticateJWT = asyncHandler(
 
     if (!token) {
       throw new UnauthorizedError('Access token not found', {
-        layer: 'jwt',
         code: 'MISSING_TOKEN',
         context: { token },
+        layer: 'jwt',
       });
     }
 
     try {
-      const decodedUser = await verifyJwtToken<IUser>(
+      const decodedUser = await verifyJwtToken(
         token,
         assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
       );
@@ -31,9 +31,9 @@ const authenticateJWT = asyncHandler(
     } catch (tokenError) {
       if (tokenError instanceof TokenExpiredError) {
         throw new UnauthorizedError('Access token expired.', {
-          layer: 'jwt',
           code: 'EXPIRED_TOKEN',
           context: { token },
+          layer: 'jwt',
         });
       }
 
@@ -41,9 +41,9 @@ const authenticateJWT = asyncHandler(
         throw new UnauthorizedError(
           'Invalid access token. Please login again',
           {
-            layer: 'jwt',
             code: 'INVALID_TOKEN',
             context: { token },
+            layer: 'jwt',
           },
         );
       }

@@ -1,105 +1,105 @@
 // src/controllers/bookingController.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { param } from 'express-validator';
+import { IBooking, IBookingInput, IBookingRoom } from 'types/booking.types';
+
+import { HTTP_STATUS_CODES } from '../config/constants';
 import prisma from '../config/prismaClient';
-import validationMiddleware from '../middlewares/validation';
 import {
   asyncHandler,
-  NotFoundError,
-  UnauthorizedError,
   BadRequestError,
   CustomError,
+  NotFoundError,
+  UnauthorizedError,
 } from '../middlewares/error-handler';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { IBookingInput, IBooking, IBookingRoom } from 'types/booking.types';
+import validationMiddleware from '../middlewares/validation';
+import {
+  calculateNights,
+  calculatePaymentDeadline,
+  calculateRoomBookingPrice,
+  checkRoomAvailability,
+  validateBookingDates,
+} from '../utils/bookingHelpers';
 import {
   createBookingValidation,
-  updateBookingValidation,
   getBookingsValidation,
+  updateBookingValidation,
 } from '../validations/bookingValidations';
-import logger from '../utils/logger';
-import {
-  calculatePaymentDeadline,
-  calculateNights,
-  calculateRoomBookingPrice,
-  validateBookingDates,
-  checkRoomAvailability,
-} from '../utils/bookingHelpers';
 
 /**
  * Shared include object for booking queries
  */
 const bookingInclude = {
-  user: {
-    select: { id: true, name: true, email: true },
-  },
-  tour: {
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      destination: {
-        select: {
-          id: true,
-          name: true,
-          city: true,
-          country: true,
-        },
-      },
-    },
-  },
-  room: {
-    select: {
-      id: true,
-      roomType: true,
-      description: true,
-      hotel: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          destination: {
-            select: {
-              id: true,
-              name: true,
-              city: true,
-              country: true,
-            },
-          },
-        },
-      },
-    },
-  },
   flight: {
     select: {
-      id: true,
-      flightNumber: true,
       airline: true,
-      origin: {
-        select: {
-          id: true,
-          name: true,
-          city: true,
-          country: true,
-        },
-      },
       destination: {
         select: {
-          id: true,
-          name: true,
           city: true,
           country: true,
+          id: true,
+          name: true,
+        },
+      },
+      flightNumber: true,
+      id: true,
+      origin: {
+        select: {
+          city: true,
+          country: true,
+          id: true,
+          name: true,
         },
       },
     },
   },
   payment: {
     select: {
-      id: true,
       amount: true,
-      status: true,
+      id: true,
       paymentMethod: true,
+      status: true,
     },
+  },
+  room: {
+    select: {
+      description: true,
+      hotel: {
+        select: {
+          description: true,
+          destination: {
+            select: {
+              city: true,
+              country: true,
+              id: true,
+              name: true,
+            },
+          },
+          id: true,
+          name: true,
+        },
+      },
+      id: true,
+      roomType: true,
+    },
+  },
+  tour: {
+    select: {
+      description: true,
+      destination: {
+        select: {
+          city: true,
+          country: true,
+          id: true,
+          name: true,
+        },
+      },
+      id: true,
+      name: true,
+    },
+  },
+  user: {
+    select: { email: true, id: true, name: true },
   },
 };
 
@@ -108,54 +108,54 @@ const bookingInclude = {
  */
 const formatBookingResponse = (booking: any): IBooking => {
   const baseResponse = {
-    id: booking.id,
-    userId: booking.userId,
-    user: booking.user,
-    payment: booking.payment,
-    numberOfGuests: booking.numberOfGuests,
-    specialRequests: booking.specialRequests,
-    paymentDeadline: booking.paymentDeadline,
-    status: booking.status,
-    totalPrice: booking.totalPrice,
     bookingDate: booking.bookingDate,
     createdAt: booking.createdAt,
+    id: booking.id,
+    numberOfGuests: booking.numberOfGuests,
+    payment: booking.payment,
+    paymentDeadline: booking.paymentDeadline,
+    specialRequests: booking.specialRequests,
+    status: booking.status,
+    totalPrice: booking.totalPrice,
     updatedAt: booking.updatedAt,
+    user: booking.user,
+    userId: booking.userId,
   };
 
   if (booking.tour) {
     return {
       ...baseResponse,
-      type: 'TOUR',
-      tour: booking.tour,
-      room: null,
       flight: null,
+      room: null,
+      tour: booking.tour,
+      type: 'TOUR',
     };
   } else if (booking.room) {
     const roomData: IBookingRoom = {
-      id: booking.room.id,
-      roomType: booking.room.roomType,
       description: booking.room.description,
-      numberOfRooms: booking.numberOfRooms,
-      numberOfNights: booking.numberOfNights,
-      startDate: booking.startDate,
       endDate: booking.endDate,
       hotel: booking.room.hotel,
+      id: booking.room.id,
+      numberOfNights: booking.numberOfNights,
+      numberOfRooms: booking.numberOfRooms,
+      roomType: booking.room.roomType,
+      startDate: booking.startDate,
     };
 
     return {
       ...baseResponse,
-      type: 'ROOM',
+      flight: null,
       room: roomData,
       tour: null,
-      flight: null,
+      type: 'ROOM',
     };
   } else if (booking.flight) {
     return {
       ...baseResponse,
-      type: 'FLIGHT',
       flight: booking.flight,
-      tour: null,
       room: null,
+      tour: null,
+      type: 'FLIGHT',
     };
   }
 
@@ -168,19 +168,19 @@ const handleCreateBooking = asyncHandler(
   async (
     req: Request<{}, {}, IBookingInput>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const {
-      userId,
-      tourId,
-      roomId,
-      flightId,
-      totalPrice,
-      startDate,
       endDate,
-      numberOfRooms,
+      flightId,
       numberOfGuests,
+      numberOfRooms,
+      roomId,
       specialRequests,
+      startDate,
+      totalPrice,
+      tourId,
+      userId,
     } = req.body;
 
     const user = req.user;
@@ -252,7 +252,7 @@ const handleCreateBooking = asyncHandler(
       const dateValidation = validateBookingDates(checkInDate, checkOutDate);
 
       if (!dateValidation.valid) {
-        throw new BadRequestError(dateValidation.error!);
+        throw new BadRequestError(dateValidation.error);
       }
 
       room = await prisma.room.findUnique({ where: { id: roomId } });
@@ -330,36 +330,36 @@ const handleCreateBooking = asyncHandler(
       if (tourId && tour) {
         const guestsToBook = numberOfGuests || 1;
         await tx.tour.update({
-          where: { id: tourId },
           data: { guestsBooked: { increment: guestsToBook } },
+          where: { id: tourId },
         });
       }
 
       if (flightId && flight) {
         const seatsNeeded = numberOfGuests || 1;
         await tx.flight.update({
-          where: { id: flightId },
           data: { seatsAvailable: { decrement: seatsNeeded } },
+          where: { id: flightId },
         });
       }
 
       return await tx.booking.create({
         data: {
-          user: { connect: { id: userId } },
-          tour: tourId ? { connect: { id: tourId } } : undefined,
-          room: roomId ? { connect: { id: roomId } } : undefined,
-          flight: flightId ? { connect: { id: flightId } } : undefined,
-          totalPrice: calculatedTotalPrice,
-          status: 'PENDING',
-          numberOfGuests: numberOfGuests || 1,
-          specialRequests: specialRequests || null,
-
-          startDate: roomId ? new Date(startDate!) : null,
           endDate: roomId ? new Date(endDate!) : null,
-          numberOfRooms: roomId ? numberOfRooms || 1 : 1,
+          flight: flightId ? { connect: { id: flightId } } : undefined,
+          numberOfGuests: numberOfGuests || 1,
           numberOfNights: roomId ? numberOfNights : 1,
+          numberOfRooms: roomId ? numberOfRooms || 1 : 1,
           paymentDeadline: paymentDeadline,
           requiresImmediatePayment: requiresImmediatePayment,
+          room: roomId ? { connect: { id: roomId } } : undefined,
+
+          specialRequests: specialRequests || null,
+          startDate: roomId ? new Date(startDate!) : null,
+          status: 'PENDING',
+          totalPrice: calculatedTotalPrice,
+          tour: tourId ? { connect: { id: tourId } } : undefined,
+          user: { connect: { id: userId } },
         },
         include: bookingInclude,
       });
@@ -369,18 +369,18 @@ const handleCreateBooking = asyncHandler(
     const response = formatBookingResponse(booking);
 
     res.status(HTTP_STATUS_CODES.CREATED).json({
-      message: 'Booking created successfully',
       data: {
         ...response,
         bookingDetails: {
+          calculatedPrice: calculatedTotalPrice,
           paymentDeadline,
           requiresImmediatePayment,
-          calculatedPrice: calculatedTotalPrice,
           ...(roomId && { numberOfNights }),
-          ...(tourId && { tourStartDate: tour!.startDate }),
-          ...(flightId && { flightDeparture: flight!.departure }),
+          ...(tourId && tour && { tourStartDate: tour.startDate }),
+          ...(flightId && flight && { flightDeparture: flight.departure }),
         },
       },
+      message: 'Booking created successfully',
     });
   },
 );
@@ -394,7 +394,7 @@ export const createBooking: RequestHandler[] = [
  * Get a single booking by ID
  */
 const handleGetBooking = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const { id } = req.params;
     const user = req.user;
 
@@ -403,8 +403,8 @@ const handleGetBooking = asyncHandler(
     }
 
     const booking = await prisma.booking.findUnique({
-      where: { id: parseInt(id) },
       include: bookingInclude,
+      where: { id: parseInt(id) },
     });
 
     if (!booking) {
@@ -418,8 +418,8 @@ const handleGetBooking = asyncHandler(
     const response = formatBookingResponse(booking);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Booking retrieved successfully',
       data: response,
+      message: 'Booking retrieved successfully',
     });
   },
 );
@@ -439,21 +439,21 @@ const handleUpdateBooking = asyncHandler(
   async (
     req: Request<{ id?: string }, {}, Partial<IBookingInput>>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const {
-      userId,
-      tourId,
-      roomId,
-      flightId,
-      totalPrice,
-      status,
-      startDate,
       endDate,
-      numberOfRooms,
+      flightId,
       numberOfGuests,
+      numberOfRooms,
+      roomId,
       specialRequests,
+      startDate,
+      status,
+      totalPrice,
+      tourId,
+      userId,
     } = req.body;
 
     if (!id) {
@@ -466,13 +466,13 @@ const handleUpdateBooking = asyncHandler(
     }
 
     const existingBooking = await prisma.booking.findUnique({
-      where: { id: bookingId },
       include: {
+        flight: true,
         payment: true,
         room: true,
         tour: true,
-        flight: true,
       },
+      where: { id: bookingId },
     });
 
     if (!existingBooking) {
@@ -509,10 +509,10 @@ const handleUpdateBooking = asyncHandler(
 
     if (status && status !== existingBooking.status) {
       const validTransitions: Record<string, string[]> = {
-        PENDING: ['CONFIRMED', 'CANCELLED'],
-        CONFIRMED: ['COMPLETED', 'CANCELLED'],
         CANCELLED: [],
         COMPLETED: [],
+        CONFIRMED: ['COMPLETED', 'CANCELLED'],
+        PENDING: ['CONFIRMED', 'CANCELLED'],
       };
 
       const allowedStatuses = validTransitions[existingBooking.status] || [];
@@ -575,10 +575,10 @@ const handleUpdateBooking = asyncHandler(
 
         if (existingBooking.tourId && tourId !== existingBooking.tourId) {
           await tx.tour.update({
-            where: { id: existingBooking.tourId },
             data: {
               guestsBooked: { decrement: existingBooking.numberOfGuests },
             },
+            where: { id: existingBooking.tourId },
           });
         }
 
@@ -586,19 +586,19 @@ const handleUpdateBooking = asyncHandler(
           const guestDifference = guestsToBook - existingBooking.numberOfGuests;
           if (guestDifference !== 0) {
             await tx.tour.update({
-              where: { id: tourId },
               data: {
                 guestsBooked:
                   guestDifference > 0
                     ? { increment: guestDifference }
                     : { decrement: Math.abs(guestDifference) },
               },
+              where: { id: tourId },
             });
           }
         } else {
           await tx.tour.update({
-            where: { id: tourId },
             data: { guestsBooked: { increment: guestsToBook } },
+            where: { id: tourId },
           });
         }
 
@@ -628,13 +628,13 @@ const handleUpdateBooking = asyncHandler(
         const guestDifference = guestsToBook - existingBooking.numberOfGuests;
         if (guestDifference !== 0) {
           await tx.tour.update({
-            where: { id: existingBooking.tourId },
             data: {
               guestsBooked:
                 guestDifference > 0
                   ? { increment: guestDifference }
                   : { decrement: Math.abs(guestDifference) },
             },
+            where: { id: existingBooking.tourId },
           });
         }
 
@@ -666,7 +666,7 @@ const handleUpdateBooking = asyncHandler(
 
         const dateValidation = validateBookingDates(checkInDate, checkOutDate);
         if (!dateValidation.valid) {
-          throw new BadRequestError(dateValidation.error!);
+          throw new BadRequestError(dateValidation.error);
         }
 
         const roomsNeeded = numberOfRooms ?? existingBooking.numberOfRooms;
@@ -742,10 +742,10 @@ const handleUpdateBooking = asyncHandler(
 
         if (existingBooking.flightId && flightId !== existingBooking.flightId) {
           await tx.flight.update({
-            where: { id: existingBooking.flightId },
             data: {
               seatsAvailable: { increment: existingBooking.numberOfGuests },
             },
+            where: { id: existingBooking.flightId },
           });
         }
 
@@ -753,19 +753,19 @@ const handleUpdateBooking = asyncHandler(
           const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
           if (seatDifference !== 0) {
             await tx.flight.update({
-              where: { id: flightId },
               data: {
                 seatsAvailable:
                   seatDifference > 0
                     ? { decrement: seatDifference }
                     : { increment: Math.abs(seatDifference) },
               },
+              where: { id: flightId },
             });
           }
         } else {
           await tx.flight.update({
-            where: { id: flightId },
             data: { seatsAvailable: { decrement: seatsNeeded } },
+            where: { id: flightId },
           });
         }
 
@@ -795,13 +795,13 @@ const handleUpdateBooking = asyncHandler(
         const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
         if (seatDifference !== 0) {
           await tx.flight.update({
-            where: { id: existingBooking.flightId },
             data: {
               seatsAvailable:
                 seatDifference > 0
                   ? { decrement: seatDifference }
                   : { increment: Math.abs(seatDifference) },
             },
+            where: { id: existingBooking.flightId },
           });
         }
 
@@ -809,15 +809,15 @@ const handleUpdateBooking = asyncHandler(
       }
 
       return await tx.booking.update({
-        where: { id: bookingId },
         data: {
-          user: userId ? { connect: { id: userId } } : undefined,
-          tour: tourId ? { connect: { id: tourId } } : undefined,
-          room: roomId ? { connect: { id: roomId } } : undefined,
+          endDate: endDate ? new Date(endDate) : existingBooking.endDate,
           flight: flightId ? { connect: { id: flightId } } : undefined,
-          totalPrice: calculatedTotalPrice ?? existingBooking.totalPrice,
-          status: status ?? existingBooking.status,
           numberOfGuests: numberOfGuests ?? existingBooking.numberOfGuests,
+          numberOfNights: numberOfNights,
+          numberOfRooms: numberOfRooms ?? existingBooking.numberOfRooms,
+          paymentDeadline: paymentDeadline,
+          requiresImmediatePayment: requiresImmediatePayment,
+          room: roomId ? { connect: { id: roomId } } : undefined,
           specialRequests:
             specialRequests !== undefined
               ? specialRequests
@@ -825,21 +825,21 @@ const handleUpdateBooking = asyncHandler(
           startDate: startDate
             ? new Date(startDate)
             : existingBooking.startDate,
-          endDate: endDate ? new Date(endDate) : existingBooking.endDate,
-          numberOfRooms: numberOfRooms ?? existingBooking.numberOfRooms,
-          numberOfNights: numberOfNights,
-          paymentDeadline: paymentDeadline,
-          requiresImmediatePayment: requiresImmediatePayment,
+          status: status ?? existingBooking.status,
+          totalPrice: calculatedTotalPrice ?? existingBooking.totalPrice,
+          tour: tourId ? { connect: { id: tourId } } : undefined,
+          user: userId ? { connect: { id: userId } } : undefined,
         },
         include: bookingInclude,
+        where: { id: bookingId },
       });
     });
 
     const response = formatBookingResponse(updatedBooking);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Booking updated successfully',
       data: response,
+      message: 'Booking updated successfully',
     });
   },
 );
@@ -859,7 +859,7 @@ export const deleteBooking = asyncHandler(
   async (
     req: Request<{ id?: string }>,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
     const { id } = req.params;
     const user = req.user;
@@ -882,13 +882,13 @@ export const deleteBooking = asyncHandler(
     }
 
     const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
       include: {
         payment: true,
         user: {
-          select: { id: true, name: true, email: true },
+          select: { email: true, id: true, name: true },
         },
       },
+      where: { id: bookingId },
     });
 
     if (!booking) {
@@ -940,8 +940,8 @@ export const deleteBooking = asyncHandler(
 
         if (tour && tour.guestsBooked > 0) {
           await tx.tour.update({
-            where: { id: booking.tourId },
             data: { guestsBooked: { decrement: booking.numberOfGuests } },
+            where: { id: booking.tourId },
           });
         }
       }
@@ -953,15 +953,15 @@ export const deleteBooking = asyncHandler(
 
         if (flight && flight.seatsAvailable < flight.capacity) {
           await tx.flight.update({
-            where: { id: booking.flightId },
             data: { seatsAvailable: { increment: booking.numberOfGuests } },
+            where: { id: booking.flightId },
           });
         }
       }
 
       if (
         booking.payment &&
-        ['PENDING', 'FAILED', 'CANCELLED'].includes(booking.payment.status)
+        ['CANCELLED', 'FAILED', 'PENDING'].includes(booking.payment.status)
       ) {
         await tx.payment.delete({
           where: { id: booking.payment.id },
@@ -975,19 +975,19 @@ export const deleteBooking = asyncHandler(
     });
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Booking deleted successfully',
       data: {
         deletedBookingId: bookingId,
         restoredAvailability: {
-          tour: booking.tourId ? true : false,
-          room: booking.roomId ? 'date-based' : false,
           flight: booking.flightId ? true : false,
+          room: booking.roomId ? 'date-based' : false,
+          tour: booking.tourId ? true : false,
         },
         restoredQuantities: {
-          tourGuests: booking.tourId ? booking.numberOfGuests : 0,
           flightSeats: booking.flightId ? booking.numberOfGuests : 0,
+          tourGuests: booking.tourId ? booking.numberOfGuests : 0,
         },
       },
+      message: 'Booking deleted successfully',
     });
   },
 );
@@ -1023,13 +1023,13 @@ export const getUserBookings = asyncHandler(
     const status = req.query.status as string | undefined;
     if (
       status &&
-      !['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'].includes(status)
+      !['CANCELLED', 'COMPLETED', 'CONFIRMED', 'PENDING'].includes(status)
     ) {
       throw new BadRequestError('Invalid booking status');
     }
 
     const bookingType = req.query.type as string | undefined;
-    if (bookingType && !['TOUR', 'ROOM', 'FLIGHT'].includes(bookingType)) {
+    if (bookingType && !['FLIGHT', 'ROOM', 'TOUR'].includes(bookingType)) {
       throw new BadRequestError('Invalid booking type');
     }
 
@@ -1186,11 +1186,11 @@ export const getUserBookings = asyncHandler(
 
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
-        where: whereClause,
+        include: bookingInclude,
+        orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: bookingInclude,
+        where: whereClause,
       }),
       prisma.booking.count({ where: whereClause }),
     ]);
@@ -1198,12 +1198,12 @@ export const getUserBookings = asyncHandler(
     const response: IBooking[] = bookings.map(formatBookingResponse);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Bookings for user ${parsedUserId} retrieved successfully`,
       data: response,
+      message: `Bookings for user ${parsedUserId} retrieved successfully`,
       meta: {
-        total,
-        page,
         limit,
+        page,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     });
@@ -1214,7 +1214,7 @@ export const getUserBookings = asyncHandler(
  * Get all bookings with pagination
  */
 const handleGetAllBookings = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -1344,11 +1344,11 @@ const handleGetAllBookings = asyncHandler(
 
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
-        where: whereClause,
+        include: bookingInclude,
+        orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: bookingInclude,
+        where: whereClause,
       }),
       prisma.booking.count({ where: whereClause }),
     ]);
@@ -1356,12 +1356,12 @@ const handleGetAllBookings = asyncHandler(
     const response: IBooking[] = bookings.map(formatBookingResponse);
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Bookings retrieved successfully',
       data: response,
+      message: 'Bookings retrieved successfully',
       meta: {
-        total,
-        page,
         limit,
+        page,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     });
@@ -1377,7 +1377,7 @@ export const getAllBookings: RequestHandler[] = [
  * Delete all bookings
  */
 export const deleteAllBookings = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     const user = req.user;
 
     if (!user) {
@@ -1396,10 +1396,10 @@ export const deleteAllBookings = asyncHandler(
 
     const bookings = await prisma.booking.findMany({
       include: {
-        payment: true,
-        tour: true,
-        room: true,
         flight: true,
+        payment: true,
+        room: true,
+        tour: true,
       },
     });
 
@@ -1435,7 +1435,7 @@ export const deleteAllBookings = asyncHandler(
       }
 
       // Check for future active bookings (PENDING or CONFIRMED with future dates)
-      if (['PENDING', 'CONFIRMED'].includes(booking.status)) {
+      if (['CONFIRMED', 'PENDING'].includes(booking.status)) {
         let isFutureBooking = false;
 
         if (booking.tour && booking.tour.startDate > now) {
@@ -1509,8 +1509,8 @@ export const deleteAllBookings = asyncHandler(
           const guestsToRestore = booking.numberOfGuests || 1;
           if (booking.tour.guestsBooked >= guestsToRestore) {
             await tx.tour.update({
-              where: { id: booking.tourId },
               data: { guestsBooked: { decrement: guestsToRestore } },
+              where: { id: booking.tourId },
             });
             totalRestoredGuests += guestsToRestore;
           }
@@ -1524,8 +1524,8 @@ export const deleteAllBookings = asyncHandler(
             booking.flight.capacity
           ) {
             await tx.flight.update({
-              where: { id: booking.flightId },
               data: { seatsAvailable: { increment: seatsToRestore } },
+              where: { id: booking.flightId },
             });
             totalRestoredSeats += seatsToRestore;
           }
@@ -1537,12 +1537,12 @@ export const deleteAllBookings = asyncHandler(
     });
 
     res.status(HTTP_STATUS_CODES.OK).json({
-      message: `Successfully deleted ${bookings.length} booking${bookings.length > 1 ? 's' : ''}`,
       data: {
         deletedCount: bookings.length,
         restoredGuests: totalRestoredGuests,
         restoredSeats: totalRestoredSeats,
       },
+      message: `Successfully deleted ${bookings.length} booking${bookings.length > 1 ? 's' : ''}`,
     });
   },
 );

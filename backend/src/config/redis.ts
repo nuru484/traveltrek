@@ -1,12 +1,13 @@
+import { NextFunction, Request, Response } from 'express';
 // src/config/redis.ts
 import Redis from 'ioredis';
-import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger';
+
 import ENV from '../config/env';
+import logger from '../utils/logger';
 
 // Factory function to create and configure Redis client
 const redisClient = () => {
-  const redisUrl = process.env.REDIS_URL || ENV.REDIS_URL;
+  const redisUrl = process.env.REDIS_URL ?? ENV.REDIS_URL;
 
   const client = new Redis(redisUrl);
 
@@ -36,7 +37,7 @@ const cacheMiddleware =
       if (data) {
         logger.info('Cache hit');
 
-        client.expire(cacheKey, 3600); // Extend TTL on access
+        void client.expire(cacheKey, 3600); // Extend TTL on access (fire-and-forget)
 
         return res.status(200).json({
           ...JSON.parse(data),
@@ -55,8 +56,8 @@ const cacheMiddleware =
     }
   };
 
-const saveToCache = (key: string, value: any, ttl: number = 3600): void => {
-  client.setex(key, ttl, JSON.stringify(value));
+const saveToCache = (key: string, value: unknown, ttl = 3600): void => {
+  void client.setex(key, ttl, JSON.stringify(value));
 };
 
 const invalidateCache = async (client: Redis, patterns: string | string[]) => {
@@ -68,17 +69,21 @@ const invalidateCache = async (client: Redis, patterns: string | string[]) => {
     patternArray.map(async (pattern) => {
       try {
         const stream = client.scanStream({
-          match: pattern,
           count: 100,
+          match: pattern,
         });
 
         stream.on('data', (keys: string[]) => {
           keys.forEach((key) => allKeys.add(key));
         });
 
-        return new Promise<void>((resolve, reject) => {
-          stream.on('end', () => resolve());
-          stream.on('error', (error) => reject(error));
+        await new Promise<void>((resolve, reject) => {
+          stream.on('end', () => {
+            resolve();
+          });
+          stream.on('error', (error) => {
+            reject(error);
+          });
         });
       } catch (error) {
         console.error(`Error scanning pattern ${pattern}:`, error);
@@ -101,4 +106,4 @@ const invalidateCache = async (client: Redis, patterns: string | string[]) => {
   return 0;
 };
 
-export { invalidateCache, cacheMiddleware, saveToCache, client };
+export { cacheMiddleware, client, invalidateCache, saveToCache };
