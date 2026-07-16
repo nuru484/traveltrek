@@ -143,6 +143,59 @@ export const twoFactorCodeFormSchema = z.object({
 
 export type ITwoFactorCodeFormSchema = z.infer<typeof twoFactorCodeFormSchema>;
 
+/**
+ * Secure contact changes (mirror backend `changeEmailSchema` /
+ * `changePhoneSchema`): a new contact plus exactly ONE re-auth proof. The
+ * form carries the chosen method and a single `secret` field; the submit
+ * handler maps it onto {currentPassword} | {code} (contact-change-logic).
+ */
+const reauthProofRule = (
+  data: { method: "password" | "code"; secret: string },
+  ctx: z.RefinementCtx
+) => {
+  if (data.method === "password") {
+    if (data.secret.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter your current password",
+        path: ["secret"],
+      });
+    }
+  } else if (!/^\d{6}$/.test(data.secret)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Enter the 6-digit code we sent you",
+      path: ["secret"],
+    });
+  }
+};
+
+export const changeEmailFormSchema = z
+  .object({
+    newEmail: z
+      .email("Email must be a valid email address")
+      .max(255, "Email must be 255 characters or less"),
+    method: z.enum(["password", "code"]),
+    secret: z.string().max(255),
+  })
+  .superRefine(reauthProofRule);
+
+export type IChangeEmailFormSchema = z.infer<typeof changeEmailFormSchema>;
+
+export const changePhoneFormSchema = z
+  .object({
+    newPhone: z
+      .string()
+      .refine((val) => phoneRegex.test(val), {
+        message: "Phone must be a valid number (10-15 digits)",
+      }),
+    method: z.enum(["password", "code"]),
+    secret: z.string().max(255),
+  })
+  .superRefine(reauthProofRule);
+
+export type IChangePhoneFormSchema = z.infer<typeof changePhoneFormSchema>;
+
 /** Shared helper: split a contact string into the backend's email|phone pair. */
 export const contactToPayload = (
   contact: string

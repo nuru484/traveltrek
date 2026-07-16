@@ -54,6 +54,8 @@ const getPaymentStatusColor = (status: string) => {
       return "bg-red-100 text-red-800 border-red-200";
     case "REFUNDED":
       return "bg-orange-100 text-orange-800 border-orange-200";
+    case "REFUND_REQUESTED":
+      return "bg-purple-100 text-purple-800 border-purple-200";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -578,7 +580,7 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                   variant="secondary"
                   className={getPaymentStatusColor(booking.payment.status)}
                 >
-                  {booking.payment.status}
+                  {booking.payment.status.replace(/_/g, " ")}
                 </Badge>
               </div>
               <div className="space-y-1">

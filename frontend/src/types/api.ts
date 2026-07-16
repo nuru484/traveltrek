@@ -25,6 +25,8 @@ export const apiSliceTags = [
   "ToursReport",
   "PaymentsReport",
   "BookingsReport",
+  "MyReport",
+  "AgentActivity",
   "Review",
   "Reviews",
   "MyReviews",

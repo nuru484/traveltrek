@@ -14,10 +14,18 @@ export const getStatusVariant = (status: IPayment["status"]) => {
       return "destructive";
     case "REFUNDED":
       return "secondary";
+    // A customer cancelled a paid booking — money is waiting on an admin
+    // refund. Rendered destructive so the row reads as "needs action".
+    case "REFUND_REQUESTED":
+      return "destructive";
     default:
       return "outline";
   }
 };
+
+/** "REFUND_REQUESTED" -> "REFUND REQUESTED" — the badge label for a status. */
+export const getPaymentStatusLabel = (status: IPayment["status"]): string =>
+  status.replace(/_/g, " ");
 
 /** "MOBILE_MONEY" -> "MOBILE MONEY" — the human label for a payment method. */
 export const getPaymentMethodLabel = (method: string) => {

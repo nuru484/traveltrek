@@ -2,6 +2,7 @@
 import { apiSlice } from "./apiSlice";
 import {
   IBookingResponse,
+  IBookingCancelResponse,
   IBookingsPaginatedResponse,
   IBookingInput,
   IUpdateBookingInput,
@@ -131,6 +132,33 @@ export const bookingApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Cancel a booking (customer own / staff any). A paid booking parks its
+    // payment on REFUND_REQUESTED, so payment caches must refresh too; item
+    // tags mirror updateBooking (availability counters are restored).
+    cancelBooking: builder.mutation<IBookingCancelResponse, number>({
+      query: (bookingId) => ({
+        url: `/bookings/${bookingId}/cancel`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, bookingId) => [
+        { type: "Booking", id: bookingId },
+        "Bookings",
+        "CustomerBookings",
+        "Payment",
+        "Payments",
+        "CustomerPayments",
+        "Hotels",
+        "Flight",
+        "Flights",
+        "Tours",
+        "Tour",
+        "Dashboard",
+        "NeedsAttention",
+        "MyReport",
+        "AgentActivity",
+      ],
+    }),
+
     // Delete a booking
     deleteBooking: builder.mutation<{ message: string }, number>({
       query: (bookingId) => ({
@@ -200,6 +228,7 @@ export const {
   useGetBookingQuery,
   useCreateBookingMutation,
   useUpdateBookingMutation,
+  useCancelBookingMutation,
   useDeleteBookingMutation,
   useDeleteAllBookingsMutation,
   useSearchBookingsQuery,

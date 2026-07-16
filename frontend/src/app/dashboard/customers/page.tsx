@@ -1,29 +1,36 @@
 // src/app/dashboard/customers/page.tsx
 "use client";
-import React, { useState, useCallback } from "react";
+import React from "react";
 import Link from "next/link";
 import { CustomersDataTable } from "@/components/customers/table/customers-data-table";
 import { DataTableSkeleton } from "@/components/ui/DataTableSkeleton";
 import { useGetAllCustomersQuery } from "@/redux/customerApi";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { ICustomersQueryParams } from "@/types/customer.types";
+import { useTableQueryState } from "@/hooks/use-table-query-state";
+import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
+
+// A type alias (not interface) so it satisfies the hook's Record constraint.
+type ICustomersTableFilters = {
+  search?: string;
+};
+
+const FILTERS_SPEC: TableFiltersSpec<ICustomersTableFilters> = {
+  search: { kind: "string" },
+};
 
 const CustomersManagePage = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const [filters, setFilters] = useState<
-    Omit<ICustomersQueryParams, "page" | "limit">
-  >({
-    search: undefined,
-  });
-
-  const queryParams: ICustomersQueryParams = {
+  // URL + session table state: deep links win, and navigating to a detail
+  // and back restores the page/filters you left.
+  const {
     page,
-    limit: pageSize,
-    ...(filters.search ? { search: filters.search } : {}),
-  };
+    pageSize,
+    filters,
+    queryParams,
+    handlePageChange,
+    handlePageSizeChange,
+    handleFiltersChange,
+  } = useTableQueryState<ICustomersTableFilters>({ spec: FILTERS_SPEC });
 
   const {
     data: customersData,
@@ -34,24 +41,6 @@ const CustomersManagePage = () => {
   } = useGetAllCustomersQuery(queryParams);
 
   const customers = customersData?.data;
-
-  const handlePageChange = (newPage: number) => setPage(newPage);
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize);
-    setPage(1);
-  };
-
-  const handleFiltersChange = useCallback(
-    (newFilters: Partial<typeof filters>) => {
-      setFilters((prev) => ({
-        ...prev,
-        ...newFilters,
-      }));
-      setPage(1);
-    },
-    []
-  );
 
   if (isLoading && !customers) {
     return <DataTableSkeleton />;

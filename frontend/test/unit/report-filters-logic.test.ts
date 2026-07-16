@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import {
   countActiveFilters,
+  INLINE_FILTER_THRESHOLD,
+  isInlineFilterBar,
   periodToParams,
   presetRange,
 } from "@/components/reports/report-filters-logic";
@@ -112,5 +114,17 @@ describe("countActiveFilters", () => {
     expect(countActiveFilters("LAST_MONTH", [])).toBe(1);
     expect(countActiveFilters("CUSTOM", ["CONFIRMED"])).toBe(2);
     expect(countActiveFilters("THIS_MONTH", [])).toBe(0);
+  });
+});
+
+describe("isInlineFilterBar", () => {
+  it("renders inline at or under the threshold, panel above it", () => {
+    // Rule: more than 2 controls earns the collapsed Filters panel;
+    // 1-2 controls render inline in the toolbar.
+    expect(INLINE_FILTER_THRESHOLD).toBe(2);
+    expect(isInlineFilterBar(1)).toBe(true); // Overview / my-report tabs
+    expect(isInlineFilterBar(2)).toBe(true); // Bookings, Payments
+    expect(isInlineFilterBar(3)).toBe(false); // Tours keeps the panel
+    expect(isInlineFilterBar(4)).toBe(false);
   });
 });

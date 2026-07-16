@@ -52,6 +52,9 @@ export const getPaymentStatusVariant = (
       return "destructive";
     case "REFUNDED":
       return "secondary";
+    // Awaiting an admin refund after a customer cancelled a paid booking.
+    case "REFUND_REQUESTED":
+      return "destructive";
     default:
       return "outline";
   }

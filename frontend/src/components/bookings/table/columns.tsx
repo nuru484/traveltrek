@@ -15,6 +15,7 @@ import {
   getPaymentStatusVariant,
   getStatusVariant,
 } from "./bookings-table-logic";
+import { getPaymentStatusLabel } from "@/components/payments/table/payments-table-logic";
 
 const getBookingTypeIcon = (type: IBooking["type"]) => {
   switch (type) {
@@ -153,7 +154,7 @@ export const createBookingColumns = (
               variant={getPaymentStatusVariant(payment.status)}
               className="text-xs"
             >
-              {payment.status}
+              {getPaymentStatusLabel(payment.status)}
             </Badge>
             <div className="text-xs text-muted-foreground">
               {payment.paymentMethod.replace("_", " ")}

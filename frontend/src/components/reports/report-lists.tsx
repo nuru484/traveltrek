@@ -34,7 +34,7 @@ const paymentStatusVariant = (
     ? "default"
     : status === "PENDING"
       ? "secondary"
-      : status === "FAILED"
+      : status === "FAILED" || status === "REFUND_REQUESTED"
         ? "destructive"
         : "outline";
 

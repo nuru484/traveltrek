@@ -3,6 +3,7 @@
 // averageBookingValue, averageValue) is integer minor units (pesewas):
 // GH₵ 1.00 = 100. Averages may carry 2-dp fractions of a pesewa.
 // types/reports.types.ts
+import { IBooking } from "./booking.types";
 import { IDestinationSummary } from "./tour.types";
 
 /**
@@ -52,7 +53,7 @@ export interface IPaymentSummary {
   id: number;
   amount: number;
   currency: string;
-  status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+  status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "REFUND_REQUESTED";
   paymentMethod:
     | "CREDIT_CARD"
     | "DEBIT_CARD"
@@ -191,6 +192,67 @@ export interface IPaymentsSummaryResponse {
       revenue: number;
     }>;
     recentPayments: IPaymentSummary[];
+  };
+}
+
+/** The summary.period echo shared by every report endpoint. */
+export interface IReportPeriodEcho {
+  year: number;
+  month: number | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+/**
+ * GET /reports/me — the authenticated customer's own travel activity
+ * (mirrors backend CustomerSelfReport; recentBookings are full booking DTOs).
+ */
+export interface ICustomerSelfReportResponse {
+  message: string;
+  data: {
+    summary: {
+      /** COMPLETED bookings in the period. */
+      totalTrips: number;
+      /** PENDING/CONFIRMED bookings whose trip start is still ahead. */
+      upcomingTrips: number;
+      cancelledBookings: number;
+      /** COMPLETED payments in the period (integer pesewas). */
+      totalSpent: number;
+      /** Average booking totalPrice (pesewas, 2dp fractions possible). */
+      averageBookingValue: number;
+      period: IReportPeriodEcho;
+    };
+    /** Zero-filled month buckets spanning the period. */
+    monthlySpend: Array<{ month: string; amount: number; bookings: number }>;
+    /** Only item types that occurred are present (backend Partial<Record>). */
+    byType: Partial<
+      Record<"TOUR" | "ROOM" | "FLIGHT", { count: number; amount: number }>
+    >;
+    recentBookings: IBooking[];
+  };
+}
+
+/**
+ * GET /reports/agent-activity — a staff member's recorded-booking activity
+ * (mirrors backend AgentActivityReport; agents are pinned to themselves,
+ * ADMIN may pass ?userId=).
+ */
+export interface IAgentActivityResponse {
+  message: string;
+  data: {
+    summary: {
+      bookingsRecorded: number;
+      /** COMPLETED payments of the recorded bookings (pesewas). */
+      revenueFromRecorded: number;
+      /** Pipeline: totalPrice of recorded bookings still PENDING (pesewas). */
+      pendingFromRecorded: number;
+      /** Distinct customers among the recorded bookings. */
+      customersServed: number;
+      period: IReportPeriodEcho;
+    };
+    /** Zero-filled month buckets spanning the period. */
+    monthly: Array<{ month: string; bookings: number; revenue: number }>;
+    recentBookings: IBooking[];
   };
 }
 

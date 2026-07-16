@@ -1,6 +1,8 @@
 // src/redux/reportsApi.ts
 import { apiSlice } from "./apiSlice";
 import {
+  IAgentActivityResponse,
+  ICustomerSelfReportResponse,
   IMonthlyBookingsResponse,
   IPaymentsSummaryResponse,
   ITopToursResponse,
@@ -48,6 +50,30 @@ export const reportsApi = apiSlice.injectEndpoints({
       providesTags: ["PaymentsReport"],
     }),
 
+    // CUSTOMER-only self report (period params only).
+    getMyReport: builder.query<
+      ICustomerSelfReportResponse,
+      IReportsQueryParams
+    >({
+      query: (params = {}) => ({
+        url: buildReportsUrl("/reports/me", params),
+        method: "GET",
+      }),
+      providesTags: ["MyReport"],
+    }),
+
+    // Staff activity report; agents self-only, ADMIN may pass ?userId=.
+    getAgentActivity: builder.query<
+      IAgentActivityResponse,
+      IReportsQueryParams & { userId?: number }
+    >({
+      query: (params = {}) => ({
+        url: buildReportsUrl("/reports/agent-activity", params),
+        method: "GET",
+      }),
+      providesTags: ["AgentActivity"],
+    }),
+
     getTopToursByBookings: builder.query<
       ITopToursResponse,
       IReportsQueryParams
@@ -65,6 +91,8 @@ export const {
   useGetMonthlyBookingsSummaryQuery,
   useGetPaymentsSummaryQuery,
   useGetTopToursByBookingsQuery,
+  useGetMyReportQuery,
+  useGetAgentActivityQuery,
 
   // Lazy hooks
   useLazyGetMonthlyBookingsSummaryQuery,

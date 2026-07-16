@@ -131,6 +131,11 @@ const agentNavigationItems = [
     path: "/dashboard/reviews",
     icon: Star,
   },
+  {
+    name: "My Activity",
+    path: "/dashboard/reports",
+    icon: BarChart3,
+  },
 ];
 
 // Navigation items for customers
@@ -169,6 +174,11 @@ const customerNavigationItems = [
     name: "My Reviews",
     path: "/dashboard/reviews",
     icon: Star,
+  },
+  {
+    name: "My Reports",
+    path: "/dashboard/reports",
+    icon: BarChart3,
   },
 ];
 

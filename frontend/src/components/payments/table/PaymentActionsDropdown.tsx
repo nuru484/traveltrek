@@ -113,6 +113,7 @@ export function PaymentActionsDropdown({
       case "FAILED":
         return <XCircle className="mr-2 h-4 w-4" />;
       case "REFUNDED":
+      case "REFUND_REQUESTED":
         return <RefreshCw className="mr-2 h-4 w-4" />;
     }
   };
@@ -124,11 +125,15 @@ export function PaymentActionsDropdown({
     { value: "REFUNDED", label: "Refunded" },
   ];
 
-  // Check if payment can be deleted (only non-completed payments)
-  const canDelete = payment.status !== "COMPLETED";
+  // Check if payment can be deleted (only non-completed payments; a
+  // REFUND_REQUESTED payment holds real money awaiting a refund).
+  const canDelete =
+    payment.status !== "COMPLETED" && payment.status !== "REFUND_REQUESTED";
 
-  // Check if payment can be refunded (only completed payments)
-  const canRefund = payment.status === "COMPLETED";
+  // Refund applies to COMPLETED payments and REFUND_REQUESTED ones (a
+  // customer self-cancelled a paid booking) — mirrors the backend rule.
+  const canRefund =
+    payment.status === "COMPLETED" || payment.status === "REFUND_REQUESTED";
 
   return (
     <>

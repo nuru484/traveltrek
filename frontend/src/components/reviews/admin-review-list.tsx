@@ -5,7 +5,7 @@
 // delete (with confirmation); AGENTs read. Reviews are moderated PENDING →
 // PUBLISHED before they appear anywhere public.
 "use client";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { Eye, EyeOff, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -29,14 +29,27 @@ import {
   useGetAllReviewsQuery,
   useUpdateReviewStatusMutation,
 } from "@/redux/reviewApi";
-import type {
-  IReview,
-  IReviewsQueryParams,
-  ReviewStatus,
-} from "@/types/review.types";
+import type { IReview, ReviewStatus } from "@/types/review.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { useTableQueryState } from "@/hooks/use-table-query-state";
+import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
 import { ReviewFilters } from "./ReviewFilters";
 import { reviewTargetHref, reviewTargetLabel } from "./review-logic";
+
+const REVIEW_STATUSES = ["PENDING", "PUBLISHED", "HIDDEN"] as const;
+
+// A type alias (not interface) so it satisfies the hook's Record constraint.
+type IReviewsTableFilters = {
+  search?: string;
+  status?: ReviewStatus;
+  rating?: number;
+};
+
+const FILTERS_SPEC: TableFiltersSpec<IReviewsTableFilters> = {
+  search: { kind: "string" },
+  status: { kind: "enum", values: REVIEW_STATUSES },
+  rating: { kind: "number" },
+};
 
 const STATUS_VARIANT: Record<
   ReviewStatus,
@@ -48,28 +61,18 @@ const STATUS_VARIANT: Record<
 };
 
 export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<
-    Omit<IReviewsQueryParams, "page" | "limit">
-  >({});
   const [deleteTarget, setDeleteTarget] = useState<IReview | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useGetAllReviewsQuery({
-    page,
-    limit: 10,
-    ...filters,
-  });
+  // URL + session table state: deep links win, and navigating away and back
+  // restores the page/filters you left.
+  const { filters, queryParams, handlePageChange, handleFiltersChange } =
+    useTableQueryState<IReviewsTableFilters>({ spec: FILTERS_SPEC });
+
+  const { data, isLoading, isError, error, refetch } =
+    useGetAllReviewsQuery(queryParams);
 
   const [updateStatus] = useUpdateReviewStatusMutation();
   const [deleteReview, { isLoading: isDeleting }] = useDeleteReviewMutation();
-
-  const handleFiltersChange = useCallback(
-    (newFilters: Partial<typeof filters>) => {
-      setFilters((prev) => ({ ...prev, ...newFilters }));
-      setPage(1);
-    },
-    []
-  );
 
   const handleStatusChange = async (review: IReview, status: ReviewStatus) => {
     try {
@@ -231,7 +234,7 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
         </ul>
       )}
 
-      <Pagination meta={meta} onPageChange={setPage} />
+      <Pagination meta={meta} onPageChange={handlePageChange} />
 
       <ConfirmationDialog
         open={deleteTarget !== null}

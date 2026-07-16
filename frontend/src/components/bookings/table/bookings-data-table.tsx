@@ -40,17 +40,23 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Money } from "@/components/ui/Money";
 import {
+  FilteredEmpty,
   ROW_BADGE,
   RowCard,
-  RowCardEmpty,
   RowCardList,
   SkeletonRowCards,
 } from "@/components/ui/table-bits";
+import {
+  clearAllFiltersPatch,
+  hasActiveTableFilters,
+  tableEmptyMode,
+} from "@/components/ui/table-empty-logic";
 import {
   bookingServiceName,
   getPaymentStatusVariant,
   getStatusVariant,
 } from "./bookings-table-logic";
+import { getPaymentStatusLabel } from "@/components/payments/table/payments-table-logic";
 
 interface BookingsDataTableProps extends IBookingsDataTableProps {
   showFilters?: boolean;
@@ -196,6 +202,16 @@ export function BookingsDataTable({
   const hasData = !loading && table.getRowModel().rows?.length > 0;
   const isEmpty = !loading && table.getRowModel().rows?.length === 0;
 
+  // Empty-state semantics (dms/website pattern): no data + no filters means
+  // the whole table scaffold gives way to a single EmptyState; an empty
+  // FILTERED result keeps the toolbar and offers a clear action.
+  const emptyMode = tableEmptyMode(
+    loading,
+    table.getRowModel().rows?.length ?? 0,
+    hasActiveTableFilters(filters)
+  );
+  const handleClearFilters = () => onFiltersChange(clearAllFiltersPatch(filters));
+
   // Enhanced empty state for recents view
   if (isRecentsView && isEmpty) {
     return (
@@ -205,6 +221,18 @@ export function BookingsDataTable({
           eyebrow="No activity"
           title="No recent bookings."
           description="This user hasn't made any bookings yet."
+        />
+      </div>
+    );
+  }
+
+  if (emptyMode === "no-data") {
+    return (
+      <div className="w-full max-w-full">
+        <EmptyState
+          className="rounded-lg border border-foreground/15"
+          title="No bookings yet."
+          description="Once a trip is booked it will show up here."
         />
       </div>
     );
@@ -289,7 +317,7 @@ export function BookingsDataTable({
                           )}
                           className={ROW_BADGE}
                         >
-                          {booking.payment.status}
+                          {getPaymentStatusLabel(booking.payment.status)}
                         </Badge>
                       )}
                     </span>
@@ -298,10 +326,12 @@ export function BookingsDataTable({
               );
             })
           ) : (
-            <RowCardEmpty
-              title="No bookings found"
-              hint="Try adjusting your search or filter criteria"
-            />
+            <li>
+              <FilteredEmpty
+                entityLabel="bookings"
+                onClear={handleClearFilters}
+              />
+            </li>
           )}
         </RowCardList>
 
@@ -389,18 +419,11 @@ export function BookingsDataTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="text-muted-foreground">
-                        No bookings found
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Try adjusting your search or filter criteria
-                      </div>
-                    </div>
+                  <TableCell colSpan={columns.length}>
+                    <FilteredEmpty
+                      entityLabel="bookings"
+                      onClear={handleClearFilters}
+                    />
                   </TableCell>
                 </TableRow>
               )}

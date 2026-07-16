@@ -8,8 +8,11 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  XCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,10 +29,15 @@ import { IBooking, BookingStatus } from "@/types/booking.types";
 import {
   useUpdateBookingMutation,
   useDeleteBookingMutation,
+  useCancelBookingMutation,
 } from "@/redux/bookingApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { PaymentButton } from "@/components/payments/PaymentButton";
+import {
+  canCancelBooking,
+  cancelDialogDescription,
+} from "@/components/bookings/booking-cancel-logic";
 
 interface BookingActionsDropdownProps {
   booking: IBooking;
@@ -41,9 +49,28 @@ export function BookingActionsDropdown({
   userRole = "CUSTOMER",
 }: BookingActionsDropdownProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
+  const user = useSelector((state: RootState) => state.auth.user);
 
   const [updateBooking] = useUpdateBookingMutation();
   const [deleteBooking] = useDeleteBookingMutation();
+  const [cancelBooking] = useCancelBookingMutation();
+
+  const handleCancelBooking = async () => {
+    const toastId = toast.loading("Cancelling booking...");
+
+    try {
+      const result = await cancelBooking(booking.id).unwrap();
+      toast.dismiss(toastId);
+      toast.success(result.message);
+    } catch (error) {
+      const { message } = extractApiErrorMessage(error);
+      toast.dismiss(toastId);
+      toast.error(message);
+    } finally {
+      setCancelDialogOpen(false);
+    }
+  };
 
   const handleDeleteBooking = async () => {
     const toastId = toast.loading("Deleting booking...");
@@ -100,6 +127,13 @@ export function BookingActionsDropdown({
   ];
 
   const needsPayment = booking.status === "PENDING" && !booking.payment;
+
+  // Customer rows only offer self-cancellation of the customer's OWN
+  // PENDING/CONFIRMED bookings (staff cancel from the booking detail page,
+  // where the same rules apply without the ownership check).
+  const canCancel =
+    userRole === "CUSTOMER" &&
+    canCancelBooking(booking, { isStaff: false, userId: user?.id });
 
   return (
     <>
@@ -170,6 +204,19 @@ export function BookingActionsDropdown({
             </>
           )}
 
+          {canCancel && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-600 hover:cursor-pointer"
+                onClick={() => setCancelDialogOpen(true)}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancel Booking
+              </DropdownMenuItem>
+            </>
+          )}
+
           {userRole === "ADMIN" && (
             <>
               <DropdownMenuSeparator />
@@ -184,6 +231,17 @@ export function BookingActionsDropdown({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ConfirmationDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        title="Cancel Booking"
+        description={cancelDialogDescription(booking)}
+        onConfirm={handleCancelBooking}
+        confirmText="Cancel booking"
+        cancelText="Keep booking"
+        isDestructive={true}
+      />
 
       <ConfirmationDialog
         open={deleteDialogOpen}

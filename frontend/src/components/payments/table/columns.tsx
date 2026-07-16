@@ -14,7 +14,11 @@ import { IPayment } from "@/types/payment.types";
 import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
 import { Money } from "@/components/ui/Money";
-import { getPaymentMethodLabel, getStatusVariant } from "./payments-table-logic";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  getStatusVariant,
+} from "./payments-table-logic";
 
 const getPaymentMethodIcon = (method: string) => {
   switch (method) {
@@ -154,7 +158,7 @@ export const createPaymentColumns = (
         const status = row.getValue("status") as IPayment["status"];
         return (
           <Badge variant={getStatusVariant(status)} className="text-xs">
-            {status}
+            {getPaymentStatusLabel(status)}
           </Badge>
         );
       } },

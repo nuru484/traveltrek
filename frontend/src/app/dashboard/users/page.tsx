@@ -1,34 +1,41 @@
 // src/app/dashboard/users/page.tsx
 "use client";
-import React, { useState, useCallback } from "react";
+import React from "react";
 import Link from "next/link";
 import { UsersDataTable } from "@/components/users/table/users-data-table";
 import { DataTableSkeleton } from "@/components/ui/DataTableSkeleton";
 import { useGetAllUsersQuery } from "@/redux/userApi";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { IUsersQueryParams } from "@/types/user.types";
+import { StaffRole } from "@/types/user.types";
+import { useTableQueryState } from "@/hooks/use-table-query-state";
+import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
+
+const STAFF_ROLES = ["ADMIN", "AGENT"] as const;
+
+// A type alias (not interface) so it satisfies the hook's Record constraint.
+type IUsersTableFilters = {
+  search?: string;
+  role?: StaffRole;
+};
+
+const FILTERS_SPEC: TableFiltersSpec<IUsersTableFilters> = {
+  search: { kind: "string" },
+  role: { kind: "enum", values: STAFF_ROLES },
+};
 
 const UsersManagePage = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Filter states
-  const [filters, setFilters] = useState<
-    Omit<IUsersQueryParams, "page" | "limit">
-  >({
-    search: undefined,
-    role: undefined,
-  });
-
-  // Build query parameters
-  const queryParams: IUsersQueryParams = {
+  // URL + session table state: deep links win, and navigating to a detail
+  // and back restores the page/filters you left.
+  const {
     page,
-    limit: pageSize,
-    ...Object.fromEntries(
-      Object.entries(filters).filter(([, value]) => value !== undefined)
-    ),
-  };
+    pageSize,
+    filters,
+    queryParams,
+    handlePageChange,
+    handlePageSizeChange,
+    handleFiltersChange,
+  } = useTableQueryState<IUsersTableFilters>({ spec: FILTERS_SPEC });
 
   const {
     data: usersData,
@@ -39,24 +46,6 @@ const UsersManagePage = () => {
   } = useGetAllUsersQuery(queryParams);
 
   const users = usersData?.data;
-
-  const handlePageChange = (newPage: number) => setPage(newPage);
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize);
-    setPage(1);
-  };
-
-  const handleFiltersChange = useCallback(
-    (newFilters: Partial<typeof filters>) => {
-      setFilters((prev) => ({
-        ...prev,
-        ...newFilters,
-      }));
-      setPage(1);
-    },
-    []
-  );
 
   const handleRefresh = () => refetch();
 

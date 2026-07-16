@@ -61,6 +61,7 @@ export function BookingsSection() {
   return (
     <div className="space-y-4">
       <ReportFilterBar
+        controlCount={2}
         filterColumns={2}
         filterCount={filterCount}
         hasFiltersApplied={filterCount > 0}

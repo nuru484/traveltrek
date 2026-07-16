@@ -40,13 +40,22 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Money } from "@/components/ui/Money";
 import {
+  FilteredEmpty,
   ROW_BADGE,
   RowCard,
-  RowCardEmpty,
   RowCardList,
   SkeletonRowCards,
 } from "@/components/ui/table-bits";
-import { getPaymentMethodLabel, getStatusVariant } from "./payments-table-logic";
+import {
+  clearAllFiltersPatch,
+  hasActiveTableFilters,
+  tableEmptyMode,
+} from "@/components/ui/table-empty-logic";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  getStatusVariant,
+} from "./payments-table-logic";
 
 interface PaymentsDataTableProps extends IPaymentsDataTableProps {
   showFilters?: boolean;
@@ -195,6 +204,16 @@ export function PaymentsDataTable({
   const hasData = !loading && table.getRowModel().rows?.length > 0;
   const isEmpty = !loading && table.getRowModel().rows?.length === 0;
 
+  // Empty-state semantics (dms/website pattern): no data + no filters means
+  // the whole table scaffold gives way to a single EmptyState; an empty
+  // FILTERED result keeps the toolbar and offers a clear action.
+  const emptyMode = tableEmptyMode(
+    loading,
+    table.getRowModel().rows?.length ?? 0,
+    hasActiveTableFilters(filters)
+  );
+  const handleClearFilters = () => onFiltersChange(clearAllFiltersPatch(filters));
+
   // Enhanced empty state for recents view
   if (isRecentsView && isEmpty) {
     return (
@@ -204,6 +223,18 @@ export function PaymentsDataTable({
           eyebrow="No activity"
           title="No recent payments."
           description="This user hasn't made any payments yet."
+        />
+      </div>
+    );
+  }
+
+  if (emptyMode === "no-data") {
+    return (
+      <div className="w-full max-w-full">
+        <EmptyState
+          className="rounded-lg border border-foreground/15"
+          title="No payments yet."
+          description="Payments show up here once a booking is paid for."
         />
       </div>
     );
@@ -277,7 +308,7 @@ export function PaymentsDataTable({
                         variant={getStatusVariant(payment.status)}
                         className={ROW_BADGE}
                       >
-                        {payment.status}
+                        {getPaymentStatusLabel(payment.status)}
                       </Badge>
                     </span>
                   </div>
@@ -285,10 +316,12 @@ export function PaymentsDataTable({
               );
             })
           ) : (
-            <RowCardEmpty
-              title="No payments found"
-              hint="Try adjusting your search or filter criteria"
-            />
+            <li>
+              <FilteredEmpty
+                entityLabel="payments"
+                onClear={handleClearFilters}
+              />
+            </li>
           )}
         </RowCardList>
 
@@ -384,18 +417,11 @@ export function PaymentsDataTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="text-muted-foreground">
-                        No payments found
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Try adjusting your search or filter criteria
-                      </div>
-                    </div>
+                  <TableCell colSpan={columns.length}>
+                    <FilteredEmpty
+                      entityLabel="payments"
+                      onClear={handleClearFilters}
+                    />
                   </TableCell>
                 </TableRow>
               )}

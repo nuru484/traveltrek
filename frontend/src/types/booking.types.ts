@@ -60,7 +60,7 @@ export interface IBookingPayment {
   id: number;
   /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   amount: number;
-  status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+  status: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "REFUND_REQUESTED";
   paymentMethod:
     | "CREDIT_CARD"
     | "DEBIT_CARD"
@@ -122,6 +122,15 @@ export interface IBookingResponse {
       tourStartDate?: string;
       flightDeparture?: string;
     };
+  };
+}
+
+/** POST /bookings/:id/cancel — the booking DTO plus the refund flag. */
+export interface IBookingCancelResponse {
+  message: string;
+  data: IBooking & {
+    /** True when a COMPLETED payment moved to REFUND_REQUESTED. */
+    refundRequested: boolean;
   };
 }
 

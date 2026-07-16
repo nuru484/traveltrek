@@ -1,9 +1,13 @@
 // src/components/reports/ReportFilterBar.tsx
 //
-// The collapsed reports filter bar (dms pattern): a Filters button with an
-// active-count badge and clear-all. On lg+ the button rolls out an inline
-// panel; below lg the fields open in a bottom sheet. Replaces the old
-// 320px always-visible filter sidebar.
+// The reports filter bar. Two renderings, decided by how many controls a tab
+// has (isInlineFilterBar threshold):
+//
+// - ≤2 controls: the controls render INLINE in the toolbar — no Filters
+//   button, no collapsed panel, no sheet (period-only tabs shouldn't hide
+//   their one select behind a click).
+// - >2 controls (dms pattern): a Filters button with an active-count badge;
+//   on lg+ it rolls out an inline panel, below lg a bottom sheet.
 "use client";
 
 import * as React from "react";
@@ -18,10 +22,17 @@ import {
 } from "@/components/ui/sheet";
 import { useIsBelowLg } from "@/hooks/use-below-lg";
 import { cn } from "@/lib/utils";
+import { isInlineFilterBar } from "./report-filters-logic";
 
 interface ReportFilterBarProps {
-  /** The filter controls, rendered in the desktop panel and the sheet. */
+  /** The filter controls, rendered inline, in the desktop panel or the sheet. */
   filterFields: React.ReactNode;
+  /**
+   * How many filter controls `filterFields` contains (period included).
+   * At or under the inline threshold the controls render directly in the
+   * toolbar; above it they collapse behind the Filters button.
+   */
+  controlCount?: number;
   /** Columns in the lg+ panel grid (one per single-cell control). */
   filterColumns?: 2 | 3 | 4;
   filterCount: number;
@@ -40,6 +51,7 @@ const LG_COLS: Record<number, string> = {
 
 export function ReportFilterBar({
   filterFields,
+  controlCount = 4,
   filterColumns = 4,
   filterCount,
   hasFiltersApplied,
@@ -48,6 +60,30 @@ export function ReportFilterBar({
 }: ReportFilterBarProps) {
   const [showFilters, setShowFilters] = React.useState(false);
   const isBelowLg = useIsBelowLg();
+
+  // Few controls: render them straight into the toolbar, no button/panel.
+  if (isInlineFilterBar(controlCount)) {
+    return (
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="grid min-w-0 flex-1 basis-64 grid-cols-1 gap-3 sm:grid-cols-2">
+          {filterFields}
+        </div>
+        <div className="flex flex-none items-center gap-2">
+          {hasFiltersApplied && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearAll}
+              className="cursor-pointer text-destructive hover:bg-destructive/10"
+            >
+              Clear
+            </Button>
+          )}
+          {actions}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

@@ -7,12 +7,35 @@ import {
   useGetAllBookingsQuery,
   useGetAllCustomerBookingsQuery,
 } from "@/redux/bookingApi";
-import { IBookingsQueryParams } from "@/types/booking.types";
+import { BookingStatus } from "@/types/booking.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { isAdmin as isAdminUser, isAgent as isAgentUser } from "@/utils/roles";
+import { useTableQueryState } from "@/hooks/use-table-query-state";
+import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
+
+const BOOKING_STATUSES = [
+  "PENDING",
+  "CONFIRMED",
+  "CANCELLED",
+  "COMPLETED",
+] as const;
+
+// A type alias (not interface) so it satisfies the hook's Record constraint.
+type IBookingsTableFilters = {
+  search?: string;
+  status?: BookingStatus;
+};
+
+// URL params are the source of truth on load, so ?status= deep links (e.g.
+// the dashboard's needs-attention tiles) land pre-filtered; garbage values
+// are dropped by the enum spec.
+const FILTERS_SPEC: TableFiltersSpec<IBookingsTableFilters> = {
+  search: { kind: "string" },
+  status: { kind: "enum", values: BOOKING_STATUSES },
+};
 
 const BookingsPage = () => {
   const searchParams = useSearchParams();
@@ -23,18 +46,17 @@ const BookingsPage = () => {
 
   const urlCustomerId = Number(searchParams.get("customerId"));
 
-  // ?status= deep links (e.g. the dashboard's needs-attention tiles) land
-  // pre-filtered; unknown values are ignored.
-  const urlStatus = searchParams.get("status");
-  const initialStatus = (
-    ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"] as const
-  ).find((status) => status === urlStatus);
-
-  const [params, setParams] = React.useState<IBookingsQueryParams>({
-    page: 1,
-    limit: 10,
-    status: initialStatus,
-  });
+  // URL + session table state: deep links win, and navigating to a detail
+  // and back restores the page/filters you left.
+  const {
+    page,
+    pageSize,
+    filters,
+    queryParams,
+    handlePageChange,
+    handlePageSizeChange,
+    handleFiltersChange,
+  } = useTableQueryState<IBookingsTableFilters>({ spec: FILTERS_SPEC });
 
   // Queries
   const {
@@ -43,7 +65,7 @@ const BookingsPage = () => {
     isError: isAdminError,
     isLoading: isAdminLoading,
     refetch: adminRefetch,
-  } = useGetAllBookingsQuery(params, {
+  } = useGetAllBookingsQuery(queryParams, {
     skip: !canViewAllBookings || !!urlCustomerId,
   });
 
@@ -56,7 +78,7 @@ const BookingsPage = () => {
   } = useGetAllCustomerBookingsQuery(
     {
       customerId: urlCustomerId || user?.id || 0,
-      params,
+      params: queryParams,
     },
     {
       // Used for an explicit ?customerId (staff drill-down) or for a
@@ -87,30 +109,6 @@ const BookingsPage = () => {
     isLoading = isAdminLoading;
     refetch = adminRefetch;
   }
-
-  // Memoize all callback functions
-  const handlePageChange = React.useCallback((page: number) => {
-    setParams((prev) => ({ ...prev, page }));
-  }, []);
-
-  const handlePageSizeChange = React.useCallback((pageSize: number) => {
-    setParams((prev) => ({ ...prev, limit: pageSize, page: 1 }));
-  }, []);
-
-  const handleFiltersChange = React.useCallback(
-    (filters: Partial<Omit<IBookingsQueryParams, "page" | "limit">>) => {
-      setParams((prev) => ({ ...prev, ...filters, page: 1 }));
-    },
-    []
-  );
-
-  const filters = React.useMemo(
-    () => ({
-      search: params.search,
-      status: params.status,
-    }),
-    [params.search, params.status]
-  );
 
   const errorMessage = extractApiErrorMessage(error).message;
 
@@ -146,8 +144,8 @@ const BookingsPage = () => {
         data={bookings}
         loading={isLoading}
         totalCount={meta?.total || 0}
-        page={meta?.page || 1}
-        pageSize={meta?.limit || 10}
+        page={page}
+        pageSize={pageSize}
         filters={filters}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}

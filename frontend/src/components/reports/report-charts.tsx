@@ -43,6 +43,7 @@ const LABELS: Record<string, string> = {
   // Payment statuses
   FAILED: "Failed",
   REFUNDED: "Refunded",
+  REFUND_REQUESTED: "Refund requested",
   // Payment methods
   CREDIT_CARD: "Credit card",
   DEBIT_CARD: "Debit card",
@@ -57,6 +58,10 @@ const LABELS: Record<string, string> = {
   CRUISE: "Cruise",
   UPCOMING: "Upcoming",
   ONGOING: "Ongoing",
+  // Booked-item types (my-report byType breakdown)
+  TOUR: "Tours",
+  ROOM: "Hotel rooms",
+  FLIGHT: "Flights",
 };
 export const label = (key: string) => LABELS[key] ?? key;
 

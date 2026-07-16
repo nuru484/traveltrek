@@ -43,6 +43,12 @@ const titleize = (value: string) =>
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+/** "Booking status" -> "booking statuses"; "Tour type" -> "tour types". */
+const pluralize = (label: string) => {
+  const lower = label.toLowerCase();
+  return lower.endsWith("s") ? `${lower}es` : `${lower}s`;
+};
+
 /** "All …" + enum options select; emits "all" for the cleared state. */
 export function LabeledSelect({
   label,
@@ -63,7 +69,7 @@ export function LabeledSelect({
           <SelectValue placeholder={label} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All {label.toLowerCase()}s</SelectItem>
+          <SelectItem value="all">All {pluralize(label)}</SelectItem>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
               {titleize(option)}

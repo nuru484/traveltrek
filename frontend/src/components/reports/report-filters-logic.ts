@@ -119,6 +119,18 @@ export function periodToParams(
 }
 
 /**
+ * Filter bars with few controls skip the collapsed Filters button/panel and
+ * render their controls inline in the toolbar. With more than this many
+ * controls (period included) the collapsed panel earns its place.
+ */
+export const INLINE_FILTER_THRESHOLD = 2;
+
+/** True when `controlCount` filter controls should render inline. */
+export function isInlineFilterBar(controlCount: number): boolean {
+  return controlCount <= INLINE_FILTER_THRESHOLD;
+}
+
+/**
  * Active-filter badge count: each set entity filter counts, plus the period
  * when it deviates from the default preset.
  */

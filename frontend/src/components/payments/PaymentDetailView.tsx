@@ -5,6 +5,10 @@ import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { IPayment } from "@/types/payment.types";
 import { formatMoney } from "@/utils/format-money";
+import {
+  getPaymentStatusLabel,
+  getStatusVariant,
+} from "@/components/payments/table/payments-table-logic";
 
 interface PaymentDetailViewProps {
   payment: IPayment;
@@ -93,7 +97,9 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
             {formatMoney(payment.amount, { exact: true })}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{payment.status}</Badge>
+            <Badge variant={getStatusVariant(payment.status)}>
+              {getPaymentStatusLabel(payment.status)}
+            </Badge>
             <span className="text-xs text-muted-foreground">
               {payment.paymentDate
                 ? `Paid on ${formatDate(payment.paymentDate)}`

@@ -80,7 +80,7 @@ export default function EditCustomerPage() {
         backLabel={isOwnProfile ? "Back to Profile" : "Back to Customers"}
       />
 
-      <CustomerForm mode="edit" customer={customer} />
+      <CustomerForm mode="edit" customer={customer} isSelf={isOwnProfile} />
     </div>
   );
 }

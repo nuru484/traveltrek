@@ -38,12 +38,18 @@ import { IUsersDataTableProps } from "@/types/user.types";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  FilteredEmpty,
   ROW_BADGE,
   RowCard,
-  RowCardEmpty,
   RowCardList,
   SkeletonRowCards,
 } from "@/components/ui/table-bits";
+import {
+  clearAllFiltersPatch,
+  hasActiveTableFilters,
+  tableEmptyMode,
+} from "@/components/ui/table-empty-logic";
+import EmptyState from "@/components/ui/EmptyState";
 
 export function UsersDataTable({
   data,
@@ -95,6 +101,16 @@ export function UsersDataTable({
     manualFiltering: true,
     pageCount: Math.ceil(totalCount / pageSize),
   });
+
+  // Empty-state semantics (dms/website pattern): no data + no filters means
+  // the whole table scaffold gives way to a single EmptyState; an empty
+  // FILTERED result keeps the toolbar and offers a clear action.
+  const emptyMode = tableEmptyMode(
+    loading,
+    table.getRowModel().rows?.length ?? 0,
+    hasActiveTableFilters(filters)
+  );
+  const handleClearFilters = () => onFiltersChange(clearAllFiltersPatch(filters));
 
   const handleDeleteSelected = () => {
     const selectedRows = table.getSelectedRowModel().rows;
@@ -158,6 +174,18 @@ export function UsersDataTable({
 
   const selectedCount = table.getSelectedRowModel().rows.length;
 
+  if (emptyMode === "no-data") {
+    return (
+      <div className="w-full max-w-full">
+        <EmptyState
+          className="rounded-lg border border-foreground/15"
+          title="No staff accounts yet."
+          description="Add your first staff account to get started."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-full space-y-6">
       {/* Filters with integrated actions */}
@@ -220,10 +248,12 @@ export function UsersDataTable({
               );
             })
           ) : (
-            <RowCardEmpty
-              title="No staff found"
-              hint="Try adjusting your search or filter criteria"
-            />
+            <li>
+              <FilteredEmpty
+                entityLabel="staff accounts"
+                onClear={handleClearFilters}
+              />
+            </li>
           )}
         </RowCardList>
 
@@ -295,18 +325,11 @@ export function UsersDataTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="text-muted-foreground">
-                        No staff found
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Try adjusting your search or filter criteria
-                      </div>
-                    </div>
+                  <TableCell colSpan={columns.length}>
+                    <FilteredEmpty
+                      entityLabel="staff accounts"
+                      onClear={handleClearFilters}
+                    />
                   </TableCell>
                 </TableRow>
               )}

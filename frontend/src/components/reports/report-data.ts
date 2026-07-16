@@ -4,10 +4,14 @@
 // segment/point arrays the chart primitives render. Kept free of React so
 // they're unit-testable. All amounts are integer pesewas.
 import {
+  IAgentActivityResponse,
   IBreakdownSegment,
+  IBookingSummary,
+  ICustomerSelfReportResponse,
   IMonthlyBookingsResponse,
   IPaymentsSummaryResponse,
 } from "@/types/reports.types";
+import type { IBooking } from "@/types/booking.types";
 import type { TrendPoint } from "./report-charts";
 
 const pct = (value: number, total: number): number =>
@@ -75,6 +79,54 @@ export function bookingsTrendPoints(
       amount: bucket.revenue,
       count: bucket.bookingCount,
     }));
+}
+
+/** GET /reports/me monthlySpend → spend-over-time points. */
+export function selfSpendTrendPoints(
+  monthlySpend: ICustomerSelfReportResponse["data"]["monthlySpend"],
+): TrendPoint[] {
+  return [...monthlySpend]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((bucket) => ({
+      period: monthLabel(bucket.month),
+      amount: bucket.amount,
+      count: bucket.bookings,
+    }));
+}
+
+/** GET /reports/me byType → money-valued segments (TOUR/ROOM/FLIGHT). */
+export function selfByTypeSegments(
+  byType: ICustomerSelfReportResponse["data"]["byType"],
+): IBreakdownSegment[] {
+  return amountSegments(byType);
+}
+
+/** GET /reports/agent-activity monthly → recorded-revenue points. */
+export function agentActivityTrendPoints(
+  monthly: IAgentActivityResponse["data"]["monthly"],
+): TrendPoint[] {
+  return [...monthly]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((bucket) => ({
+      period: monthLabel(bucket.month),
+      amount: bucket.revenue,
+      count: bucket.bookings,
+    }));
+}
+
+/**
+ * The self/agent reports return FULL booking DTOs for recentBookings;
+ * RecentBookingsCard renders the reports' slimmer IBookingSummary shape.
+ */
+export function toBookingSummaries(bookings: IBooking[]): IBookingSummary[] {
+  return bookings.map((booking) => ({
+    id: booking.id,
+    totalPrice: booking.totalPrice,
+    bookingDate: new Date(booking.bookingDate),
+    status: booking.status,
+    tour: booking.tour ? { id: booking.tour.id, name: booking.tour.name } : null,
+    customer: booking.customer,
+  }));
 }
 
 export function paymentsTrendPoints(

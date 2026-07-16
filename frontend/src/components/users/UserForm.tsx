@@ -7,6 +7,10 @@
 // Customers are managed by CustomerForm.
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
+import { isStaff } from "@/utils/roles";
 import { Resolver, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -50,6 +54,12 @@ interface IUserFormProps {
 
 export default function UserForm({ mode, user }: IUserFormProps) {
   const router = useRouter();
+  const actor = useSelector((state: RootState) => state.auth.user);
+  // Email/phone are login identifiers: a staff member editing their OWN
+  // account changes them via Settings -> Contact (the backend 400s the
+  // direct write). An admin editing ANOTHER account keeps the fields.
+  const isSelf =
+    mode === "edit" && isStaff(actor) && actor?.id === user?.id;
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     user?.profilePicture || null
@@ -125,9 +135,11 @@ export default function UserForm({ mode, user }: IUserFormProps) {
     try {
       const formData = new FormData();
       formData.append("name", values.name);
-      formData.append("email", values.email);
+      // Self-service edits never write the login identifiers - the backend
+      // 400s changed values; Settings -> Contact is the verified path.
+      if (!isSelf) formData.append("email", values.email);
       if (mode === "create") formData.append("role", values.role);
-      if (values.phone) formData.append("phone", values.phone);
+      if (!isSelf && values.phone) formData.append("phone", values.phone);
       if (values.address) formData.append("address", values.address);
       if (pictureFile) formData.append("profilePicture", pictureFile);
 
@@ -181,23 +193,39 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="staff@example.com"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {isSelf && (
+                <p className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                  Your email and phone number are how you sign in, so they
+                  can&apos;t be edited here. Change them securely under{" "}
+                  <Link
+                    href="/dashboard/settings/contact"
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    Settings &rarr; Contact
+                  </Link>
+                  .
+                </p>
+              )}
+
+              {!isSelf && (
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="staff@example.com"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {mode === "create" && (
                 <FormField
@@ -226,23 +254,25 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                 />
               )}
 
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="+233 54 648 8115"
-                        {...field}
-                        value={field.value ?? ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isSelf && (
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="+233 54 648 8115"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

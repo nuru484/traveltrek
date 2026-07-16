@@ -7,12 +7,45 @@ import {
   useGetAllPaymentsQuery,
   useGetAllCustomerPaymentsQuery,
 } from "@/redux/paymentApi";
-import { IPaymentsQueryParams } from "@/types/payment.types";
+import { IPaymentMethod, IPaymentStatus } from "@/types/payment.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { isStaff } from "@/utils/roles";
+import { useTableQueryState } from "@/hooks/use-table-query-state";
+import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
+
+const PAYMENT_STATUSES = [
+  "PENDING",
+  "COMPLETED",
+  "FAILED",
+  "REFUNDED",
+  "REFUND_REQUESTED",
+] as const;
+
+const PAYMENT_METHODS = [
+  "CREDIT_CARD",
+  "DEBIT_CARD",
+  "MOBILE_MONEY",
+  "BANK_TRANSFER",
+] as const;
+
+// A type alias (not interface) so it satisfies the hook's Record constraint.
+type IPaymentsTableFilters = {
+  search?: string;
+  status?: IPaymentStatus;
+  paymentMethod?: IPaymentMethod;
+};
+
+// URL params are the source of truth on load, so ?status= deep links (e.g.
+// the dashboard's needs-attention tiles) land pre-filtered; garbage values
+// are dropped by the enum spec.
+const FILTERS_SPEC: TableFiltersSpec<IPaymentsTableFilters> = {
+  search: { kind: "string" },
+  status: { kind: "enum", values: PAYMENT_STATUSES },
+  paymentMethod: { kind: "enum", values: PAYMENT_METHODS },
+};
 
 const PaymentsPage = () => {
   const searchParams = useSearchParams();
@@ -21,18 +54,17 @@ const PaymentsPage = () => {
 
   const urlCustomerId = Number(searchParams.get("customerId"));
 
-  // ?status= deep links (e.g. the dashboard's needs-attention tiles) land
-  // pre-filtered; unknown values are ignored.
-  const urlStatus = searchParams.get("status");
-  const initialStatus = (
-    ["PENDING", "COMPLETED", "FAILED", "REFUNDED"] as const
-  ).find((status) => status === urlStatus);
-
-  const [params, setParams] = React.useState<IPaymentsQueryParams>({
-    page: 1,
-    limit: 10,
-    status: initialStatus,
-  });
+  // URL + session table state: deep links win, and navigating to a detail
+  // and back restores the page/filters you left.
+  const {
+    page,
+    pageSize,
+    filters,
+    queryParams,
+    handlePageChange,
+    handlePageSizeChange,
+    handleFiltersChange,
+  } = useTableQueryState<IPaymentsTableFilters>({ spec: FILTERS_SPEC });
 
   // Admin query
   const {
@@ -41,7 +73,7 @@ const PaymentsPage = () => {
     isError: isAdminError,
     isLoading: isAdminLoading,
     refetch: adminRefetch,
-  } = useGetAllPaymentsQuery(params, {
+  } = useGetAllPaymentsQuery(queryParams, {
     // Staff (admin or agent) see the global list; the backend scopes rows.
     skip: !staff || !!urlCustomerId,
   });
@@ -56,7 +88,7 @@ const PaymentsPage = () => {
   } = useGetAllCustomerPaymentsQuery(
     {
       customerId: urlCustomerId || user?.id || 0,
-      params,
+      params: queryParams,
     },
     {
       // Used for an explicit ?customerId (staff drill-down) or for a
@@ -87,39 +119,6 @@ const PaymentsPage = () => {
     isLoading = isAdminLoading;
     refetch = adminRefetch;
   }
-
-  // Memoize all callback functions
-  const handlePageChange = React.useCallback((page: number) => {
-    setParams((prev) => ({ ...prev, page }));
-  }, []);
-
-  const handlePageSizeChange = React.useCallback((pageSize: number) => {
-    setParams((prev) => ({ ...prev, limit: pageSize, page: 1 }));
-  }, []);
-
-  const handleFiltersChange = React.useCallback(
-    (filters: Partial<Omit<IPaymentsQueryParams, "page" | "limit">>) => {
-      setParams((prev) => ({ ...prev, ...filters, page: 1 }));
-    },
-    []
-  );
-
-  const filters = React.useMemo(
-    () => ({
-      search: params.search,
-      status: params.status,
-      paymentMethod: params.paymentMethod,
-      customerId: params.customerId,
-      bookingId: params.bookingId,
-    }),
-    [
-      params.search,
-      params.status,
-      params.paymentMethod,
-      params.customerId,
-      params.bookingId,
-    ]
-  );
 
   const errorMessage = extractApiErrorMessage(error).message;
 
@@ -155,8 +154,8 @@ const PaymentsPage = () => {
         data={payments}
         loading={isLoading}
         totalCount={meta?.total || 0}
-        page={meta?.page || 1}
-        pageSize={meta?.limit || 10}
+        page={page}
+        pageSize={pageSize}
         filters={filters}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}

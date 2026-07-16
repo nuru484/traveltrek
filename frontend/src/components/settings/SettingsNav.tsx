@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/dashboard/settings/password", label: "Password" },
+  { href: "/dashboard/settings/contact", label: "Contact" },
   { href: "/dashboard/settings/two-factor", label: "Two-factor" },
 ] as const;
 

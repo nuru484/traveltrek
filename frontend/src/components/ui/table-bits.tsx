@@ -10,6 +10,8 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 /**
  * The mobile half of a list page. Pair with `hidden md:block` on the table's
@@ -96,6 +98,42 @@ export function SkeletonRowCards({ rows = 8 }: { rows?: number }) {
         </li>
       ))}
     </>
+  );
+}
+
+/**
+ * Filters/search are active but matched nothing (table-empty-logic
+ * "filtered-empty"): the toolbar stays, the body offers a clear action.
+ * Rendered by BOTH halves of the dual-render pattern (row-card list and the
+ * md+ table's spanning cell).
+ */
+export function FilteredEmpty({
+  entityLabel,
+  onClear,
+}: {
+  /** Plural noun for the copy, e.g. "bookings". */
+  entityLabel: string;
+  onClear?: () => void;
+}) {
+  return (
+    <EmptyState
+      className="py-10"
+      eyebrow="No matches"
+      title={`No ${entityLabel} match these filters.`}
+      description="Try different search or filter criteria."
+      action={
+        onClear && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClear}
+            className="cursor-pointer"
+          >
+            Clear filters
+          </Button>
+        )
+      }
+    />
   );
 }
 

@@ -37,8 +37,27 @@ export function TableFilters({
   const debouncedSearch = useDebounce(searchInput, 500);
 
   // Update filters when debounced search changes
+  // Only USER-TYPED input propagates through the debounce; external filter
+  // changes (URL/session restore, clear-filters, empty-state clear) must not
+  // be echoed back - the echo would reset the page and clobber restored state.
+  const typedRef = React.useRef(false);
+
+  // External search changes override the input.
   React.useEffect(() => {
-    if (debouncedSearch !== filters.search) {
+    if ((filters.search || "") !== debouncedSearch) {
+      // Synchronizing with an external system (URL/session-restored filter
+      // state) - exactly what this input can't derive during render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSearchInput(filters.search || "");
+      typedRef.current = false;
+    }
+    // Sync only when the search filter itself changes externally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]);
+
+  React.useEffect(() => {
+    if (!typedRef.current) return;
+    if (debouncedSearch !== (filters.search || "")) {
       onFiltersChange({ search: debouncedSearch || undefined });
     }
   }, [debouncedSearch, filters.search, onFiltersChange]);
@@ -58,7 +77,10 @@ export function TableFilters({
           <Input
             placeholder="Search customers by name, email or phone..."
             value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
+            onChange={(event) => {
+              typedRef.current = true;
+              setSearchInput(event.target.value);
+            }}
             className="w-full"
           />
         </div>

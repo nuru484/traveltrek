@@ -72,6 +72,7 @@ export function ToursSection() {
   return (
     <div className="space-y-4">
       <ReportFilterBar
+        controlCount={3}
         filterColumns={3}
         filterCount={filterCount}
         hasFiltersApplied={filterCount > 0}

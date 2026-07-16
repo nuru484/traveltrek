@@ -56,6 +56,7 @@ export function OverviewSection() {
   return (
     <div className="space-y-4">
       <ReportFilterBar
+        controlCount={1}
         filterColumns={2}
         filterCount={filterCount}
         hasFiltersApplied={filterCount > 0}

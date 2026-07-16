@@ -2,7 +2,11 @@
 import { apiSlice } from "../apiSlice";
 import { userLoggedIn, userLoggedOut, userRegistration } from "./authSlice";
 import {
+  IChangeEmailInput,
   IChangePasswordInput,
+  IChangePhoneInput,
+  IConfirmEmailChangeInput,
+  IConfirmPhoneChangeInput,
   IForgotPasswordInput,
   IGoogleSignInInput,
   ILoginResponseData,
@@ -112,6 +116,61 @@ export const authApi = apiSlice.injectEndpoints({
         }),
       }
     ),
+
+    // --- Secure contact changes (email/phone are login identifiers) ---
+
+    // Re-auth code for passwordless accounts — the 2FA challenge engine
+    // sends a 6-digit code to the account's CURRENT contact.
+    reauthChallenge: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "auth/reauth/challenge",
+        method: "POST",
+      }),
+    }),
+
+    // Parks the new address; the confirmation link goes to the NEW inbox.
+    changeEmail: builder.mutation<{ message: string }, IChangeEmailInput>({
+      query: (data) => ({
+        url: "auth/change-email",
+        method: "POST",
+        body: data,
+      }),
+    }),
+
+    // PUBLIC: the emailed token is the credential. Success bumps the session
+    // epoch — every session (including this one) signs in again.
+    confirmEmailChange: builder.mutation<
+      { message: string },
+      IConfirmEmailChangeInput
+    >({
+      query: (data) => ({
+        url: "auth/confirm-email-change",
+        method: "POST",
+        body: data,
+      }),
+    }),
+
+    // Parks the new number; an OTP goes to the NEW phone.
+    changePhone: builder.mutation<{ message: string }, IChangePhoneInput>({
+      query: (data) => ({
+        url: "auth/change-phone",
+        method: "POST",
+        body: data,
+      }),
+    }),
+
+    // AUTHENTICATED: the code proves possession of the new phone. Success
+    // re-mints THIS session's cookies; the caller refreshes the stored user.
+    confirmPhoneChange: builder.mutation<
+      { message: string },
+      IConfirmPhoneChangeInput
+    >({
+      query: (data) => ({
+        url: "auth/confirm-phone-change",
+        method: "POST",
+        body: data,
+      }),
+    }),
 
     twoFactorStatus: builder.query<IApiResponse<ITwoFactorStatus>, void>({
       query: () => ({
@@ -246,6 +305,11 @@ export const {
   useTwoFactorVerifyMutation,
   useTwoFactorResendMutation,
   useChangePasswordMutation,
+  useReauthChallengeMutation,
+  useChangeEmailMutation,
+  useConfirmEmailChangeMutation,
+  useChangePhoneMutation,
+  useConfirmPhoneChangeMutation,
   useTwoFactorStatusQuery,
   useTwoFactorChallengeMutation,
   useTwoFactorEnableMutation,

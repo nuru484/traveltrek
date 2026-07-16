@@ -78,6 +78,34 @@ export interface IChangePasswordInput {
   newPassword: string;
 }
 
+/**
+ * POST /auth/change-email — the new address plus exactly ONE re-auth proof:
+ * currentPassword (accounts with a password) or the 6-digit code that
+ * POST /auth/reauth/challenge sent (passwordless accounts).
+ */
+export interface IChangeEmailInput {
+  newEmail: string;
+  currentPassword?: string;
+  code?: string;
+}
+
+/** POST /auth/change-phone — same exactly-one re-auth proof rule. */
+export interface IChangePhoneInput {
+  newPhone: string;
+  currentPassword?: string;
+  code?: string;
+}
+
+/** POST /auth/confirm-email-change — the emailed link token (public). */
+export interface IConfirmEmailChangeInput {
+  token: string;
+}
+
+/** POST /auth/confirm-phone-change — the code texted to the NEW phone. */
+export interface IConfirmPhoneChangeInput {
+  code: string;
+}
+
 export type TwoFactorChannel = "email" | "sms";
 
 /** GET /auth/2fa/status — channel is where codes go (null: no email/phone). */

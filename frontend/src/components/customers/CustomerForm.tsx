@@ -1,6 +1,7 @@
 // src/components/customers/CustomerForm.tsx
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Resolver, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,13 @@ import {
 interface ICustomerFormProps {
   mode: "create" | "edit";
   customer?: ICustomer;
+  /**
+   * True when the customer is editing their OWN profile. Email/phone are
+   * login identifiers — the backend 400s self-service changes here, so the
+   * fields are replaced with a note pointing at Settings → Contact (the
+   * verified change flows). Staff editing a customer keep the fields.
+   */
+  isSelf?: boolean;
   /** Where to go after a successful save (defaults to the customers list). */
   redirectTo?: string;
 }
@@ -46,6 +54,7 @@ interface ICustomerFormProps {
 export default function CustomerForm({
   mode,
   customer,
+  isSelf = false,
   redirectTo,
 }: ICustomerFormProps) {
   const router = useRouter();
@@ -133,8 +142,12 @@ export default function CustomerForm({
       } else {
         const formData = new FormData();
         formData.append("name", values.name);
-        if (values.email) formData.append("email", values.email);
-        if (values.phone) formData.append("phone", values.phone);
+        // Self-service edits never write the login identifiers — the backend
+        // 400s changed values; Settings → Contact is the verified path.
+        if (!isSelf) {
+          if (values.email) formData.append("email", values.email);
+          if (values.phone) formData.append("phone", values.phone);
+        }
         if (values.address) formData.append("address", values.address);
         if (pictureFile) formData.append("profilePicture", pictureFile);
 
@@ -183,7 +196,27 @@ export default function CustomerForm({
                 )}
               />
 
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
+              {isSelf && (
+                <p className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                  Your email and phone number are how you sign in, so they
+                  can&apos;t be edited here. Change them securely under{" "}
+                  <Link
+                    href="/dashboard/settings/contact"
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    Settings → Contact
+                  </Link>
+                  .
+                </p>
+              )}
+
+              <div
+                className={
+                  isSelf
+                    ? "hidden"
+                    : "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4"
+                }
+              >
                 <FormField
                   control={form.control}
                   name="email"

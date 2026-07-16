@@ -32,11 +32,17 @@ import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { ICustomersDataTableProps } from "@/types/customer.types";
 import {
+  FilteredEmpty,
   RowCard,
-  RowCardEmpty,
   RowCardList,
   SkeletonRowCards,
 } from "@/components/ui/table-bits";
+import {
+  clearAllFiltersPatch,
+  hasActiveTableFilters,
+  tableEmptyMode,
+} from "@/components/ui/table-empty-logic";
+import EmptyState from "@/components/ui/EmptyState";
 
 export function CustomersDataTable({
   data,
@@ -83,6 +89,28 @@ export function CustomersDataTable({
     manualFiltering: true,
     pageCount: Math.ceil(totalCount / pageSize),
   });
+
+  // Empty-state semantics (dms/website pattern): no data + no filters means
+  // the whole table scaffold gives way to a single EmptyState; an empty
+  // FILTERED result keeps the toolbar and offers a clear action.
+  const emptyMode = tableEmptyMode(
+    loading,
+    table.getRowModel().rows?.length ?? 0,
+    hasActiveTableFilters(filters)
+  );
+  const handleClearFilters = () => onFiltersChange(clearAllFiltersPatch(filters));
+
+  if (emptyMode === "no-data") {
+    return (
+      <div className="w-full max-w-full">
+        <EmptyState
+          className="rounded-lg border border-foreground/15"
+          title="No customers yet."
+          description="Add your first customer and their bookings will follow."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-full space-y-6">
@@ -134,10 +162,12 @@ export function CustomersDataTable({
               );
             })
           ) : (
-            <RowCardEmpty
-              title="No customers found"
-              hint="Try adjusting your search criteria"
-            />
+            <li>
+              <FilteredEmpty
+                entityLabel="customers"
+                onClear={handleClearFilters}
+              />
+            </li>
           )}
         </RowCardList>
 
@@ -203,18 +233,11 @@ export function CustomersDataTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="text-muted-foreground">
-                        No customers found
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Try adjusting your search criteria
-                      </div>
-                    </div>
+                  <TableCell colSpan={columns.length}>
+                    <FilteredEmpty
+                      entityLabel="customers"
+                      onClear={handleClearFilters}
+                    />
                   </TableCell>
                 </TableRow>
               )}

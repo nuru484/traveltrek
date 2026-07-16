@@ -8,6 +8,7 @@ import BookingDetailView from "@/components/bookings/BookingDetailView";
 import BookingDetailViewSkeleton from "@/components/bookings/BookingDetailViewSkeleton";
 import DetailPageHeader from "@/components/ui/DetailPageHeader";
 import { BookingReviewCard } from "@/components/reviews/booking-review-card";
+import { CancelBookingButton } from "@/components/bookings/CancelBookingButton";
 
 const BookingDetailPage = () => {
   const params = useParams<{ id: string }>();
@@ -41,6 +42,12 @@ const BookingDetailPage = () => {
         backHref="/dashboard/bookings"
         backLabel="Back to Bookings"
       />
+
+      {/* Cancel action — customers on their own booking, staff on any;
+          hidden for terminal/started bookings (booking-cancel-logic). */}
+      <div className="flex justify-end">
+        <CancelBookingButton booking={booking} />
+      </div>
 
       {/* Booking Detail Component */}
       <BookingDetailView booking={booking} />

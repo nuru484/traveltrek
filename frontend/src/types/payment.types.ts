@@ -6,7 +6,13 @@ export type IPaymentMethod =
   | "MOBILE_MONEY"
   | "BANK_TRANSFER";
 
-export type IPaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
+export type IPaymentStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "FAILED"
+  | "REFUNDED"
+  /** Set only by customer self-cancel of a paid booking; leaves via refund. */
+  | "REFUND_REQUESTED";
 
 export interface IPaymentInput {
   bookingId: number;
