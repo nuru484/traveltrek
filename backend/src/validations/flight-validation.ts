@@ -1,432 +1,210 @@
-import { ValidationChain } from 'express-validator';
-
-import { FlightStatus } from '../../generated/prisma/client';
-import prisma from '../config/prismaClient';
 // src/validations/flight-validation.ts
-import { validator } from './validation-factory';
+//
+// Zod schemas for the flight domain (replaces the express-validator chains).
+// Boundary rules only — shape, formats, ranges, enums and date ordering.
+// Invariants that need the database (origin/destination existence, route and
+// capacity guards, the status state machine, cross-field checks that fall
+// back to the stored flight, flightNumber uniqueness — a DB constraint) live
+// in services/flight.service.ts; the multer file checks (zod only sees
+// req.body) live in the controller's photo-file middleware.
+import { z } from 'zod';
 
-export const createFlightValidation: ValidationChain[] = [
-  validator.string('flightNumber', {
-    customMessage: 'Flight number must be in format like AA123, BA1234, etc.',
-    maxLength: 15,
-    minLength: 3,
-    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
-    required: true,
-  }),
+import { FlightStatus } from '../config/prismaClient';
+import { FLIGHT_SORT_FIELDS } from '../services/flight.service';
+import { paginationQuery } from './common-validation';
 
-  validator.string('airline', {
-    customMessage:
-      'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
-    maxLength: 60,
-    minLength: 2,
-    pattern: /^[a-zA-Z\s\-&.()]+$/,
-    required: true,
-  }),
+/** Cabin classes the legacy validation accepted (the column is a string). */
+export const FLIGHT_CLASSES = [
+  'Economy',
+  'Premium Economy',
+  'Business',
+  'First',
+] as const;
 
-  validator.date('departure', {
-    minDate: new Date(),
-    required: true,
-  }),
+const AIRLINE_MESSAGE =
+  'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses';
+const AIRLINE_PATTERN = /^[a-zA-Z\s\-&.()]+$/;
+const FLIGHT_NUMBER_MESSAGE =
+  'Flight number must be in format like AA123, BA1234, etc.';
+const FLIGHT_NUMBER_PATTERN = /^[A-Z0-9]{2,3}[0-9]{1,4}$/;
+const MINUTE_MS = 1000 * 60;
 
-  validator.date('arrival', {
-    compareDateField: 'departure',
-    compareDateOperation: 'after',
-    required: true,
-  }),
+/** A raw query/body date string that must at least parse as a date. */
+const dateString = (field: string) =>
+  z
+    .string(`${field} must be a valid date`)
+    .refine((value) => !isNaN(new Date(value).getTime()), {
+      error: `${field} must be a valid date`,
+    });
 
-  validator.number('originId', {
-    min: 1,
-    required: true,
-  }),
+const flightFields = z.object({
+  airline: z
+    .string(AIRLINE_MESSAGE)
+    .min(2, 'Airline must be between 2 and 60 characters')
+    .max(60, 'Airline must be between 2 and 60 characters')
+    .regex(AIRLINE_PATTERN, AIRLINE_MESSAGE),
+  arrival: z.coerce.date('arrival must be a valid date'),
+  // Multipart form fields arrive as strings, so numbers are coerced.
+  capacity: z.coerce
+    .number('Capacity must be an integer between 1 and 850')
+    .int('Capacity must be an integer between 1 and 850')
+    .min(1, 'Capacity must be an integer between 1 and 850')
+    .max(850, 'Capacity must be an integer between 1 and 850'),
+  departure: z.coerce.date('departure must be a valid date'),
+  destinationId: z.coerce
+    .number('A valid destinationId is required')
+    .int('A valid destinationId is required')
+    .min(1, 'A valid destinationId is required'),
+  flightClass: z.enum(
+    FLIGHT_CLASSES,
+    'Flight class must be one of: Economy, Premium Economy, Business, First',
+  ),
+  flightNumber: z
+    .string(FLIGHT_NUMBER_MESSAGE)
+    .min(3, FLIGHT_NUMBER_MESSAGE)
+    .max(15, FLIGHT_NUMBER_MESSAGE)
+    .regex(FLIGHT_NUMBER_PATTERN, FLIGHT_NUMBER_MESSAGE),
+  // Either a client-sent URL or, after the Cloudinary middleware runs, the
+  // uploaded image URL. A multipart file upload arrives as req.file instead
+  // and is guarded by the controller's photo-file middleware.
+  flightPhoto: z.string().optional(),
+  originId: z.coerce
+    .number('A valid originId is required')
+    .int('A valid originId is required')
+    .min(1, 'A valid originId is required'),
+  price: z.coerce
+    .number('Price must be a number between 0 and 10,000,000')
+    .min(0, 'Price must be a number between 0 and 10,000,000')
+    .max(10_000_000, 'Price must be a number between 0 and 10,000,000'),
+  stops: z.coerce
+    .number('Stops must be an integer between 0 and 5')
+    .int('Stops must be an integer between 0 and 5')
+    .min(0, 'Stops must be an integer between 0 and 5')
+    .max(5, 'Stops must be an integer between 0 and 5')
+    .optional(),
+});
 
-  validator.number('destinationId', {
-    min: 1,
-    required: true,
-  }),
-
-  validator.number('price', {
-    allowDecimals: true,
-    max: 10_000_000,
-    min: 0,
-    required: true,
-  }),
-
-  validator.enum(
-    'flightClass',
-    ['Economy', 'Premium Economy', 'Business', 'First'],
+export const createFlightSchema = flightFields
+  .refine((body) => body.departure.getTime() > Date.now(), {
+    error: 'Departure time must be in the future',
+    path: ['departure'],
+  })
+  .refine((body) => body.arrival > body.departure, {
+    error: 'Arrival time must be after departure time',
+    path: ['arrival'],
+  })
+  .refine(
+    (body) =>
+      (body.arrival.getTime() - body.departure.getTime()) / MINUTE_MS >= 30,
     {
-      required: true,
+      error: 'Arrival time must be at least 30 minutes after departure',
+      path: ['arrival'],
     },
-  ),
+  )
+  .refine((body) => body.destinationId !== body.originId, {
+    error: 'Origin and destination must be different',
+    path: ['destinationId'],
+  });
 
-  validator.number('stops', {
-    max: 5,
-    min: 0,
-    required: false,
-  }),
-
-  validator.number('capacity', {
-    max: 850,
-    min: 1,
-    required: true,
-  }),
-
-  validator.custom(
-    'destinationId',
-    (value, req) => {
-      const { originId } = req.body;
-      return parseInt(value) !== parseInt(originId);
-    },
-    'Origin and destination must be different',
-    { required: false },
-  ),
-
-  validator.custom(
-    'arrival',
-    (value, req) => {
-      if (!value || !req.body.departure) return true;
-
-      const departureTime = new Date(req.body.departure);
-      const arrivalTime = new Date(value);
-      const diffInMinutes =
-        (arrivalTime.getTime() - departureTime.getTime()) / (1000 * 60);
-
-      return diffInMinutes >= 30;
-    },
-    'Arrival time must be at least 30 minutes after departure',
-    { required: false },
-  ),
-];
-
-export const updateFlightValidation: ValidationChain[] = [
-  validator.string('flightNumber', {
-    customMessage: 'Flight number must be in format like AA123, BA1234, etc.',
-    maxLength: 15,
-    minLength: 3,
-    pattern: /^[A-Z0-9]{2,3}[0-9]{1,4}$/,
-    required: false,
-  }),
-
-  validator.string('airline', {
-    customMessage:
-      'Airline must contain only letters, spaces, hyphens, ampersands, dots, and parentheses',
-    maxLength: 60,
-    minLength: 2,
-    pattern: /^[a-zA-Z\s\-&.()]+$/,
-    required: false,
-  }),
-
-  validator.date('departure', {
-    minDate: new Date(),
-    required: false,
-  }),
-
-  validator.date('arrival', {
-    compareDateField: 'departure',
-    compareDateOperation: 'after',
-    required: false,
-  }),
-
-  validator.number('originId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.number('destinationId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.number('price', {
-    allowDecimals: true,
-    min: 1,
-    required: false,
-  }),
-
-  validator.enum(
-    'flightClass',
-    ['Economy', 'Premium Economy', 'Business', 'First'],
+// Cross-field rules that fall back to the STORED flight when one side is
+// omitted (origin/destination distinctness, the 30-minute arrival gap), the
+// "at least one field" rule (a photo may arrive as a file zod cannot see) and
+// the DELAYED/CANCELLED-only status rule are enforced by the update service.
+// Update-specific bounds differ from create on purpose: the legacy chains
+// allowed price >= 1 and capacity >= 0 here.
+export const updateFlightSchema = flightFields
+  .partial()
+  .extend({
+    capacity: z.coerce
+      .number('Capacity must be an integer between 0 and 850')
+      .int('Capacity must be an integer between 0 and 850')
+      .min(0, 'Capacity must be an integer between 0 and 850')
+      .max(850, 'Capacity must be an integer between 0 and 850')
+      .optional(),
+    price: z.coerce
+      .number('Price must be a number greater than or equal to 1')
+      .min(1, 'Price must be a number greater than or equal to 1')
+      .optional(),
+    status: z
+      .enum(
+        [FlightStatus.DELAYED, FlightStatus.CANCELLED],
+        'Admin can only update status to DELAYED or CANCELLED. Other statuses are managed automatically.',
+      )
+      .optional(),
+  })
+  .refine((body) => !body.departure || body.departure.getTime() > Date.now(), {
+    error: 'Departure time must be in the future',
+    path: ['departure'],
+  })
+  .refine(
+    (body) =>
+      !body.departure || !body.arrival || body.arrival > body.departure,
     {
-      required: false,
+      error: 'Arrival time must be after departure time',
+      path: ['arrival'],
     },
-  ),
+  );
 
-  validator.integer('stops', {
-    max: 5,
-    min: 0,
-    required: false,
-  }),
+/**
+ * PATCH /flights/:id/status body. Times stay raw strings: only the DELAYED
+ * path may use them, and the service parses/rejects them with the legacy
+ * messages ("Invalid date format for departure or arrival time.").
+ */
+export const flightStatusSchema = z.object({
+  arrival: z.string().optional(),
+  departure: z.string().optional(),
+  status: z.enum(FlightStatus, 'Invalid flight status'),
+});
 
-  validator.number('capacity', {
-    max: 850,
-    min: 0,
-    required: false,
-  }),
-
-  validator.custom(
-    'destinationId',
-    async (value, req) => {
-      const { originId } = req.body;
-      const flightId = req.params?.id;
-
-      if (!value && !originId) return true;
-
-      let currentOriginId = originId;
-      let currentDestinationId = value;
-
-      if (flightId && (!originId || !value)) {
-        const currentFlight = await prisma.flight.findUnique({
-          select: { destinationId: true, originId: true },
-          where: { id: parseInt(flightId) },
-        });
-
-        if (currentFlight) {
-          currentOriginId = originId || currentFlight.originId;
-          currentDestinationId = value || currentFlight.destinationId;
-        }
-      }
-
-      return parseInt(currentDestinationId) !== parseInt(currentOriginId);
-    },
-    'Origin and destination must be different',
-    { required: false },
-  ),
-
-  validator.custom(
-    'arrival',
-    async (value, req) => {
-      if (!value) return true;
-
-      const { departure } = req.body;
-      const flightId = req.params?.id;
-
-      let departureTime = departure ? new Date(departure) : null;
-
-      if (!departureTime && flightId) {
-        const currentFlight = await prisma.flight.findUnique({
-          select: { departure: true },
-          where: { id: parseInt(flightId) },
-        });
-
-        if (currentFlight) {
-          departureTime = currentFlight.departure;
-        }
-      }
-
-      if (!departureTime) return true;
-
-      const arrivalTime = new Date(value);
-      const diffInMinutes =
-        (arrivalTime.getTime() - departureTime.getTime()) / (1000 * 60);
-
-      return diffInMinutes >= 30;
-    },
-    'Arrival time must be at least 30 minutes after departure',
-    { required: false },
-  ),
-
-  validator.custom(
-    'updateFields',
-    (value, req) => {
-      const {
-        airline,
-        arrival,
-        departure,
-        destinationId,
-        duration,
-        flightClass,
-        flightNumber,
-        originId,
-        price,
-        seatsAvailable,
-        stops,
-      } = req.body;
-      const hasFile = req.file || req.body.flightPhoto;
-
-      return !!(
-        flightNumber ||
-        airline ||
-        departure ||
-        arrival ||
-        originId ||
-        destinationId ||
-        price ||
-        flightClass ||
-        duration ||
-        stops !== undefined ||
-        seatsAvailable ||
-        hasFile
-      );
-    },
-    'At least one field must be provided for update',
-    { required: false },
-  ),
-];
-
-export const flightSearchValidation: ValidationChain[] = [
-  validator.number('page', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.number('limit', {
-    max: 100,
-    min: 1,
-    required: false,
-  }),
-
-  validator.string('search', {
-    customMessage: 'Search term must be between 1 and 100 characters',
-    maxLength: 100,
-    minLength: 1,
-    required: false,
-  }),
-
-  validator.string('airline', {
-    customMessage: 'Airline filter must be between 2 and 100 characters',
-    maxLength: 60,
-    minLength: 2,
-    required: false,
-  }),
-
-  validator.number('originId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.number('destinationId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.enum(
-    'flightClass',
-    ['Economy', 'Premium Economy', 'Business', 'First'],
+export const flightListQuery = paginationQuery
+  .extend({
+    // The legacy chain capped airline at 60 but reported "100" — kept as-is.
+    airline: z
+      .string('Airline filter must be between 2 and 100 characters')
+      .min(2, 'Airline filter must be between 2 and 100 characters')
+      .max(60, 'Airline filter must be between 2 and 100 characters')
+      .optional(),
+    // Departure-window bounds stay strings so meta.filters echoes them raw.
+    departureFrom: dateString('departureFrom').optional(),
+    departureTo: dateString('departureTo').optional(),
+    destinationId: z.coerce.number().int().min(1).optional(),
+    flightClass: z.enum(FLIGHT_CLASSES).optional(),
+    maxDuration: z.coerce.number().int().min(30).max(1440).optional(),
+    maxPrice: z.coerce.number().min(0).optional(),
+    maxStops: z.coerce.number().int().min(0).max(5).optional(),
+    minPrice: z.coerce.number().min(0).optional(),
+    minSeats: z.coerce.number().int().min(1).max(850).optional(),
+    originId: z.coerce.number().int().min(1).optional(),
+    search: z
+      .string()
+      .min(1, 'Search term must be between 1 and 100 characters')
+      .max(100, 'Search term must be between 1 and 100 characters')
+      .optional(),
+    sortBy: z.enum(FLIGHT_SORT_FIELDS).default('departure'),
+    sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  })
+  .refine(
+    (q) =>
+      !q.departureFrom ||
+      !q.departureTo ||
+      new Date(q.departureTo).getTime() >= new Date(q.departureFrom).getTime(),
     {
-      required: false,
+      error: 'departureTo must be on or after departureFrom',
+      path: ['departureTo'],
     },
-  ),
-
-  validator.date('departureFrom', {
-    required: false,
-  }),
-
-  validator.date('departureTo', {
-    compareDateField: 'departureFrom',
-    compareDateOperation: 'after-or-same',
-    required: false,
-  }),
-
-  validator.number('minPrice', {
-    allowDecimals: true,
-    min: 0,
-    required: false,
-  }),
-
-  validator.number('maxPrice', {
-    allowDecimals: true,
-    min: 0,
-    required: false,
-  }),
-
-  validator.number('maxDuration', {
-    max: 1440,
-    min: 30,
-    required: false,
-  }),
-
-  validator.number('maxStops', {
-    max: 5,
-    min: 0,
-    required: false,
-  }),
-
-  validator.number('minSeats', {
-    max: 850,
-    min: 1,
-    required: false,
-  }),
-
-  validator.enum(
-    'sortBy',
-    [
-      'departure',
-      'arrival',
-      'price',
-      'duration',
-      'airline',
-      'flightNumber',
-      'createdAt',
-    ],
+  )
+  .refine(
+    (q) =>
+      q.minPrice === undefined ||
+      q.maxPrice === undefined ||
+      q.maxPrice >= q.minPrice,
     {
-      required: false,
+      error: 'Maximum price must be greater than or equal to minimum price',
+      path: ['maxPrice'],
     },
-  ),
+  );
 
-  validator.enum('sortOrder', ['asc', 'desc'], {
-    required: false,
-  }),
-
-  validator.custom(
-    'maxPrice',
-    (value, req) => {
-      const { minPrice } = req.query;
-      if (!value || !minPrice) return true;
-
-      return parseFloat(value) >= parseFloat(minPrice);
-    },
-    'Maximum price must be greater than or equal to minimum price',
-    { required: false },
-  ),
-];
-
-export const getFlightsValidation: ValidationChain[] = [
-  ...flightSearchValidation,
-];
-
-export const flightPhotoValidation: ValidationChain[] = [
-  validator.custom(
-    'flightPhoto',
-    (value, req) => {
-      const file = req.file;
-      if (!file) return true;
-
-      const allowedMimeTypes = [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/webp',
-      ];
-      return allowedMimeTypes.includes(file.mimetype);
-    },
-    'Flight photo must be a valid image file (JPEG, PNG, or WebP)',
-    { required: false },
-  ),
-
-  validator.custom(
-    'flightPhoto',
-    (value, req) => {
-      const file = req.file;
-      if (!file) return true;
-
-      const maxSize = 5 * 1024 * 1024;
-      return file.size <= maxSize;
-    },
-    'Flight photo size must not exceed 5MB',
-    { required: false },
-  ),
-];
-
-export const updateFlightStatusValidation: ValidationChain[] = [
-  validator.enum('status', Object.values(FlightStatus), {
-    required: true,
-  }),
-
-  validator.date('departure', {
-    required: false,
-  }),
-
-  validator.date('arrival', {
-    required: false,
-  }),
-];
+export type CreateFlightBody = z.infer<typeof createFlightSchema>;
+export type FlightListQuery = z.infer<typeof flightListQuery>;
+export type FlightStatusBody = z.infer<typeof flightStatusSchema>;
+export type UpdateFlightBody = z.infer<typeof updateFlightSchema>;
