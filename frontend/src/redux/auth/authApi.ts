@@ -23,8 +23,8 @@ export const authApi = apiSlice.injectEndpoints({
               user: result.data.data,
             })
           );
-        } catch (error: unknown) {
-          console.log(error);
+        } catch {
+          // errors are surfaced by the calling form
         }
       },
     }),
@@ -48,8 +48,8 @@ export const authApi = apiSlice.injectEndpoints({
               user: result.data.data,
             })
           );
-        } catch (error: unknown) {
-          console.log(error);
+        } catch {
+          // errors are surfaced by the calling form
         }
       },
     }),
@@ -64,8 +64,8 @@ export const authApi = apiSlice.injectEndpoints({
         try {
           await queryFulfilled;
           dispatch(userLoggedOut());
-        } catch (error: unknown) {
-          console.log(error);
+        } catch {
+          // errors are surfaced by the calling form
         }
       },
     }),

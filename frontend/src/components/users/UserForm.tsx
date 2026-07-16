@@ -172,7 +172,6 @@ export default function UserForm({ mode, user }: IUserFormProps) {
         router.push(`/dashboard/users/${resultUser.id}/user-profile`);
       }
     } catch (error) {
-      console.error("User form submission error:", error);
 
       // Extract message and field-level errors
       const { message, fieldErrors, hasFieldErrors } =
@@ -239,7 +238,11 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                   <FormItem>
                     <FormLabel>Phone (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="+233 54 648 8115" {...field} />
+                      <Input
+                        placeholder="+233 54 648 8115"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -256,6 +259,7 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                       <Input
                         placeholder="123 Main Street, City, Region"
                         {...field}
+                        value={field.value ?? ""}
                       />
                     </FormControl>
                     <FormMessage />

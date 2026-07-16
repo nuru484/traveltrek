@@ -95,14 +95,15 @@ export function BookingButton({
   useEffect(() => {
     if (isSearchError && searchError) {
       const { message } = extractApiErrorMessage(searchError);
-      console.error("Failed to search users:", searchError);
       toast.error(message || "Failed to search users");
     }
   }, [isSearchError, searchError]);
 
-  // Reset form when dialog closes
-  useEffect(() => {
-    if (!isDialogOpen) {
+  // Reset the form whenever the dialog closes (handler instead of an
+  // effect watching isDialogOpen, which re-renders twice per close).
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    setIsDialogOpen(nextOpen);
+    if (!nextOpen) {
       setSelectedUserId(null);
       setSearchTerm("");
       setNumberOfGuests("1");
@@ -111,7 +112,7 @@ export function BookingButton({
       setEndDate("");
       setNumberOfRooms("1");
     }
-  }, [isDialogOpen]);
+  };
 
   const handleBook = async (finalUserId: number) => {
     try {
@@ -161,7 +162,6 @@ export function BookingButton({
       setIsDialogOpen(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to book:", error);
       toast.error(message || "Failed to create booking");
     }
   };
@@ -188,7 +188,7 @@ export function BookingButton({
     <>
       {userId ? (
         // Normal user: Show dialog for additional details
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button
               variant={variant}
@@ -364,7 +364,7 @@ export function BookingButton({
               </Button>
               <Button
                 onClick={() => handleBook(userId)}
-                disabled={isLoading || (roomId && (!startDate || !endDate))}
+                disabled={isLoading || Boolean(roomId && (!startDate || !endDate))}
                 className="w-full sm:w-auto"
               >
                 {isLoading ? (
@@ -384,7 +384,7 @@ export function BookingButton({
         </Dialog>
       ) : (
         // Admin/agent: select user via dialog with additional fields
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button
               variant={variant}
@@ -630,7 +630,7 @@ export function BookingButton({
                 disabled={
                   !selectedUserId ||
                   isLoading ||
-                  (roomId && (!startDate || !endDate))
+                  Boolean(roomId && (!startDate || !endDate))
                 }
                 className="w-full sm:flex-1"
               >

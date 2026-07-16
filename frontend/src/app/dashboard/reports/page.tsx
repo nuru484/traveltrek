@@ -112,7 +112,8 @@ const ReportsPage = () => {
 
   // Prepare params for different components
   const dashboardParams = React.useMemo(() => {
-    const { limit, minBookings, ...rest } = params;
+    // limit/minBookings are table-only params the dashboard widgets don't take
+    const { limit: _limit, minBookings: _minBookings, ...rest } = params;
     return rest;
   }, [params]);
 

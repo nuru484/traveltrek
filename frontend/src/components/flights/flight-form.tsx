@@ -197,7 +197,6 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
 
       router.push("/dashboard/flights");
     } catch (error) {
-      console.error(`Failed to ${mode} flight:`, error);
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 

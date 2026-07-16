@@ -315,7 +315,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
       router.push("/dashboard/flights");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to delete flight:", error);
       toast.error(message || "Failed to delete flight");
     }
   };
@@ -336,7 +335,6 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
       setShowBookDialog(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to book flight:", error);
       toast.error(message || "Failed to book flight");
     }
   };

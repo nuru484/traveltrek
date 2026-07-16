@@ -85,7 +85,6 @@ export function RoomDetail({ room }: IRoomDetailProps) {
       router.push("/dashboard/hotels");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to delete room:", error);
       toast.dismiss(toastId);
       toast.error(message || "Failed to delete room");
     }

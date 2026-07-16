@@ -177,15 +177,18 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
         toast.success("Room created successfully");
         router.push(`/dashboard/rooms/${response.data.id}/detail`);
       } else {
+        if (!room) {
+          toast.error("No room to update");
+          return;
+        }
         await updateRoom({
-          id: room!.id,
+          id: room.id,
           formData,
         }).unwrap();
         toast.success("Room updated successfully");
         router.push(`/dashboard/rooms/${room.id}/detail`);
       }
     } catch (error) {
-      console.error(`Failed to ${mode} room:`, error);
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
@@ -257,8 +260,8 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                               value={hotel.id.toString()}
                             >
                               <span className="min-w-0 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
-                                {hotel.name} ({hotel?.destination?.city},{" "}
-                                {hotel?.destination.country})
+                                {hotel.name} ({hotel.destination?.city},{" "}
+                                {hotel.destination?.country})
                               </span>
                             </SelectItem>
                           ))}
@@ -268,8 +271,8 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                     {selectedHotel && (
                       <p className="min-w-0 text-sm text-muted-foreground mt-1 [overflow-wrap:anywhere]">
                         Selected: {selectedHotel.name} (
-                        {selectedHotel.destination.city},{" "}
-                        {selectedHotel.destination.country})
+                        {selectedHotel.destination?.city},{" "}
+                        {selectedHotel.destination?.country})
                       </p>
                     )}
                     <FormMessage />

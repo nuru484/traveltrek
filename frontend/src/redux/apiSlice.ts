@@ -97,8 +97,7 @@ export const apiSlice = createApi({
               user: result.data.data,
             })
           );
-        } catch (error: unknown) {
-          console.log(error);
+        } catch {
           dispatch(userLoggedOut());
         }
       },

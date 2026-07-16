@@ -40,7 +40,6 @@ export default function SignupPage() {
       toast.success("Signup Successful");
       router.push("/dashboard");
     } catch (err) {
-      console.error("Signup error:", err);
 
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(err);

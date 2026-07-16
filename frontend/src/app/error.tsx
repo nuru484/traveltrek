@@ -20,7 +20,6 @@ export default function Error({
 }) {
   useEffect(() => {
     // Surface the error for local debugging / an error reporter.
-    console.error(error);
   }, [error]);
 
   const retry = unstable_retry ?? reset;

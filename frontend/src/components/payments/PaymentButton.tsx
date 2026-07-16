@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useCreatePaymentMutation } from "@/redux/paymentApi";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,11 +81,14 @@ export function PaymentButton({
     PaymentMethod | ""
   >("");
 
-  useEffect(() => {
-    if (!isDialogOpen) {
+  // Reset the selection whenever the dialog closes (handler instead of an
+  // effect watching isDialogOpen).
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    setIsDialogOpen(nextOpen);
+    if (!nextOpen) {
       setSelectedPaymentMethod("");
     }
-  }, [isDialogOpen]);
+  };
 
   const handlePayment = async () => {
     if (!selectedPaymentMethod) {
@@ -109,7 +112,6 @@ export function PaymentButton({
       setSelectedPaymentMethod("");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Payment failed:", error);
       toast.error(message || "Payment initialization failed");
     }
   };
@@ -119,7 +121,7 @@ export function PaymentButton({
   );
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
         <Button
           variant={variant}

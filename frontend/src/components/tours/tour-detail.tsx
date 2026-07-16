@@ -128,7 +128,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
   useEffect(() => {
     if (isBookingsError) {
       const { message } = extractApiErrorMessage(bookingsError);
-      console.error("Failed to fetch Bookings:", bookingsError);
       toast.error(message || "Failed to load bookings");
     }
   }, [isBookingsError, bookingsError]);
@@ -201,7 +200,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
       router.push("/dashboard/tours");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to delete tour:", error);
       toast.error(message || "Failed to delete tour");
     }
   };
@@ -222,7 +220,6 @@ export function TourDetail({ tour }: ITourDetailProps) {
       setShowBookDialog(false);
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to book tour:", error);
       toast.error(message || "Failed to book tour");
     }
   };

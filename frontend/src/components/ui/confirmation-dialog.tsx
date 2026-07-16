@@ -40,11 +40,12 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const [inputValue, setInputValue] = useState("");
 
-  useEffect(() => {
-    if (!open) {
-      setInputValue("");
-    }
-  }, [open]);
+  // Reset the confirmation input on every open/close transition instead of
+  // watching `open` in an effect (avoids a redundant re-render cascade).
+  const handleOpenChange = (nextOpen: boolean) => {
+    setInputValue("");
+    onOpenChange(nextOpen);
+  };
 
   const handleConfirm = () => {
     onConfirm();
@@ -55,7 +56,7 @@ export function ConfirmationDialog({
     : false;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="max-w-[95vw] sm:max-w-lg gap-6">
         <AlertDialogHeader className="space-y-3">
           <AlertDialogTitle className="text-xl font-semibold tracking-tight break-all">

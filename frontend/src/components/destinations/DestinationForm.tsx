@@ -149,7 +149,6 @@ export default function DestinationForm({
 
       router.push("/dashboard/destinations");
     } catch (error) {
-      console.error("Destination form submission error:", error);
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
@@ -197,7 +196,11 @@ export default function DestinationForm({
                   <FormItem>
                     <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., The City of Light" {...field} />
+                      <Input
+                        placeholder="e.g., The City of Light"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -227,7 +230,11 @@ export default function DestinationForm({
                     <FormItem>
                       <FormLabel>City (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Paris" {...field} />
+                        <Input
+                          placeholder="e.g., Paris"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

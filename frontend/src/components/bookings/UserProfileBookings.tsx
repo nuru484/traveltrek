@@ -5,7 +5,6 @@ import { BookingsDataTable } from "@/components/bookings/table/BookingsDataTable
 import { useGetAllUserBookingsQuery } from "@/redux/bookingApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { AlertCircle, RefreshCw } from "lucide-react";

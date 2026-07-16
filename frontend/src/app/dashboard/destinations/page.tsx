@@ -42,13 +42,14 @@ export default function DestinationsPage() {
     refetch,
   } = useGetAllDestinationsQuery(queryParams);
 
+  const destinations = destinationsData?.data;
   const { countries, cities } = useMemo(() => {
-    if (!destinationsData?.data) return { countries: [], cities: [] };
+    if (!destinations) return { countries: [], cities: [] };
 
     const countrySet = new Set<string>();
     const citySet = new Set<string>();
 
-    destinationsData.data.forEach((dest) => {
+    destinations.forEach((dest) => {
       if (dest.country) countrySet.add(dest.country);
       if (dest.city) citySet.add(dest.city);
     });
@@ -57,7 +58,7 @@ export default function DestinationsPage() {
       countries: Array.from(countrySet).sort(),
       cities: Array.from(citySet).sort(),
     };
-  }, [destinationsData?.data]);
+  }, [destinations]);
 
   const handlePageChange = (newPage: number) => setPage(newPage);
 

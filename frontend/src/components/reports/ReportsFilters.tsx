@@ -42,7 +42,10 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
   const [startDate, setStartDate] = React.useState<Date>();
   const [endDate, setEndDate] = React.useState<Date>();
 
-  const handleFilterChange = (key: keyof IReportsQueryParams, value) => {
+  const handleFilterChange = <K extends keyof IReportsQueryParams>(
+    key: K,
+    value: IReportsQueryParams[K],
+  ) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
@@ -246,7 +249,12 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
           <Select
             value={filters.status ?? "ALL"}
             onValueChange={(value) =>
-              handleFilterChange("status", value === "ALL" ? undefined : value)
+              handleFilterChange(
+                "status",
+                value === "ALL"
+                  ? undefined
+                  : (value as IReportsQueryParams["status"]),
+              )
             }
           >
             <SelectTrigger className="w-full cursor-pointer">
@@ -277,7 +285,9 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                   onValueChange={(value) =>
                     handleFilterChange(
                       "tourType",
-                      value === "ALL" ? undefined : value
+                      value === "ALL"
+                        ? undefined
+                        : (value as IReportsQueryParams["tourType"])
                     )
                   }
                 >
@@ -303,7 +313,9 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                   onValueChange={(value) =>
                     handleFilterChange(
                       "tourStatus",
-                      value === "ALL" ? undefined : value
+                      value === "ALL"
+                        ? undefined
+                        : (value as IReportsQueryParams["tourStatus"])
                     )
                   }
                 >
@@ -356,7 +368,9 @@ export const ReportsFilters: React.FC<ReportsFiltersProps> = ({
                   onValueChange={(value) =>
                     handleFilterChange(
                       "paymentMethod",
-                      value === "ALL" ? undefined : value
+                      value === "ALL"
+                        ? undefined
+                        : (value as IReportsQueryParams["paymentMethod"])
                     )
                   }
                 >

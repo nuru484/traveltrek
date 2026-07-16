@@ -40,7 +40,7 @@ const getStatusVariant = (status: IBooking["status"]) => {
 };
 
 const getPaymentStatusVariant = (
-  paymentStatus: IBooking["payment"]["status"] | undefined
+  paymentStatus: NonNullable<IBooking["payment"]>["status"] | undefined
 ) => {
   switch (paymentStatus) {
     case "COMPLETED":
@@ -137,7 +137,7 @@ export const createBookingColumns = (
             serviceName = booking.tour.name;
             break;
           case "ROOM":
-            serviceName = `${booking.room.roomType} - ${
+            serviceName = `${booking.room?.roomType ?? ""} - ${
               booking?.room?.hotel?.name ?? ""
             }`;
             break;

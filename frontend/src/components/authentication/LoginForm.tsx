@@ -32,8 +32,8 @@ export default function LoginForm({
   const handleSubmit = async (data: ILoginFormSchema) => {
     try {
       await onSubmit(data);
-    } catch (error) {
-      console.error("Form submission error:", error);
+    } catch {
+      // onSubmit surfaces its own error feedback
     }
   };
 

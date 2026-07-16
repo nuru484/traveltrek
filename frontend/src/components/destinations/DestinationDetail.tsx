@@ -49,7 +49,6 @@ export default function DestinationDetail({
       router.push("/dashboard/destinations");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to delete destination:", error);
       toast.error(message || "Failed to delete destination");
     }
   };

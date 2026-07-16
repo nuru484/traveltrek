@@ -5,7 +5,6 @@ import { PaymentsDataTable } from "@/components/payments/table/PaymentsDataTable
 import { useGetAllUserPaymentsQuery } from "@/redux/paymentApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { AlertCircle, RefreshCw } from "lucide-react";

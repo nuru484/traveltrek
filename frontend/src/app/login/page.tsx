@@ -33,7 +33,6 @@ export default function LoginPage() {
       toast.success("Login successful! Redirecting...");
       router.push("/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
 
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(err);

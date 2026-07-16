@@ -147,7 +147,6 @@ export function BookingsDataTable({
       setRowSelection({});
       onRefresh?.();
     } catch (error) {
-      console.error("Delete error:", error);
       toast.dismiss(toastId);
       const { message } = extractApiErrorMessage(error);
       toast.error(message);
@@ -166,7 +165,6 @@ export function BookingsDataTable({
       setRowSelection({});
       onRefresh?.();
     } catch (error) {
-      console.error("Delete all error:", error);
       toast.dismiss(toastId);
       const { message } = extractApiErrorMessage(error);
       toast.error(message);

@@ -28,7 +28,8 @@ const BookingDetailPage = () => {
 
   if (isLoading) return <BookingDetailViewSkeleton />;
 
-  if (isError) return <ErrorMessage error={errorMessage} onRetry={refetch} />;
+  if (isError || !booking)
+    return <ErrorMessage error={errorMessage} onRetry={refetch} />;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">

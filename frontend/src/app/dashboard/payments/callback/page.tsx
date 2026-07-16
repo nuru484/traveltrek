@@ -1,6 +1,6 @@
 // src/app/dashboard/payments/callback/page.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
@@ -13,51 +13,55 @@ type PaymentStatus = "loading" | "success" | "failed" | "error";
 export default function PaymentCallbackPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<PaymentStatus>("loading");
 
   const reference = searchParams.get("reference") || searchParams.get("trxref");
 
   const {
     data: result,
     error,
+    isFetching,
     isLoading,
     refetch,
   } = usePaymentCallbackQuery(reference || "", {
     skip: !reference,
   });
 
+  // Status is fully derivable from the query — no mirrored state needed.
+  const status: PaymentStatus = !reference
+    ? "error"
+    : isLoading || isFetching
+      ? "loading"
+      : result?.success
+        ? "success"
+        : error
+          ? "error"
+          : result
+            ? "failed"
+            : "loading";
+
+  // Toasts are side effects of the verification outcome (no setState here).
   useEffect(() => {
     if (!reference) {
-      setStatus("error");
       toast.error("No payment reference found");
       return;
     }
-
     if (result?.success) {
-      setStatus("success");
       toast.success("Payment verified successfully!");
     } else if (error) {
-      setStatus("error");
       const err = error as { data?: { message?: string } };
       toast.error(err.data?.message || "Payment verification failed");
     } else if (result && !result.success) {
-      setStatus("failed");
       toast.error("Payment verification failed");
     }
   }, [result, error, reference]);
 
   const handleContinue = () => {
-    if (status === "success") {
-      router.push(`/dashboard/bookings`);
-    } else {
-      router.push(`/dashboard/bookings`);
-    }
+    router.push(`/dashboard/bookings`);
   };
 
   const handleRetry = () => {
     if (reference) {
-      setStatus("loading");
-      refetch();
+      void refetch();
     }
   };
 

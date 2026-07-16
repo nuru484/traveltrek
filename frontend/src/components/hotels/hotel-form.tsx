@@ -180,7 +180,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
 
       router.push("/dashboard/hotels");
     } catch (error) {
-      console.error(`Failed to ${mode} hotel:`, error);
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 

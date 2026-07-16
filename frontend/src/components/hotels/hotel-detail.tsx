@@ -32,7 +32,7 @@ import {
   Eye,
   Bookmark,
   DoorOpen,
-  Building2 } from "lucide-react";
+} from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
@@ -63,7 +63,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
   useEffect(() => {
     if (isBookingsError) {
       const { message } = extractApiErrorMessage(bookingsError);
-      console.error("Failed to fetch Bookings:", bookingsError);
       toast.error(message || "Failed to load bookings");
     }
   }, [isBookingsError, bookingsError]);
@@ -84,7 +83,6 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
       );
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
-      console.error("Failed to delete hotel:", error);
       toast.error(message || "Failed to delete hotel");
     }
   };
