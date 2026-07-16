@@ -17,6 +17,7 @@ export const apiSliceTags = [
   "Payments",
   "User",
   "Users",
+  "TwoFactor",
   "Dashboard",
   "NeedsAttention",
   "Rooms",

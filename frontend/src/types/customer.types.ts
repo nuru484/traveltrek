@@ -3,6 +3,7 @@
 // Customers are their own principal (backend Phase 5b): bookings/payments
 // hang off a Customer record, and customers have NO role field. The DTO
 // shapes mirror backend src/utils/mappers/customer.mapper.ts.
+import type { BookingStatus } from "./booking.types";
 
 export interface ICustomer {
   id: number;
@@ -16,11 +17,33 @@ export interface ICustomer {
   updatedAt: string;
 }
 
-/** GET /customers/:id returns the base DTO plus lifetime activity counters. */
+/** How the account came to exist (derived by the profile service). */
+export type CustomerSignupMethod = "email" | "google" | "phone";
+
+/**
+ * GET /customers/:id returns the base DTO plus the lifetime activity stats
+ * block (mirrors backend CustomerProfileDTO in customer.mapper.ts). All
+ * money figures are integer pesewas.
+ */
 export interface ICustomerProfile extends ICustomer {
   stats: {
+    /** Mean COMPLETED payment (pesewas); null when none has completed. */
+    averageBookingValue: number | null;
+    /** Lifetime booking count per status; zero-count statuses are absent. */
+    bookingsByStatus: Partial<Record<BookingStatus, number>>;
+    /** Most-booked destination; null with no bookings. */
+    favoriteDestination: { id: number; name: string } | null;
+    /** createdAt of the most recent booking; null with no bookings. */
+    lastBookingAt: string | null;
+    /** Account creation instant (echoes createdAt). */
+    memberSince: string;
+    signupMethod: CustomerSignupMethod;
     totalBookings: number;
     totalPayments: number;
+    /** Sum of COMPLETED payment amounts (pesewas). */
+    totalSpent: number;
+    /** PENDING/CONFIRMED bookings whose trip hasn't started yet. */
+    upcomingTrips: number;
   };
 }
 
@@ -58,13 +81,13 @@ export interface ICustomerHistoryQueryParams {
   limit?: number;
 }
 
-/** POST /customers is JSON (no upload middleware on the create route). */
+/** POST /customers is JSON (no upload middleware on the create route). No
+ * password — staff never set one; owners use POST /auth/change-password. */
 export interface ICustomerCreateInput {
   name: string;
   email?: string;
   phone?: string;
   address?: string;
-  password?: string;
 }
 
 export interface IDeleteCustomerResponse {

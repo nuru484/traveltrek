@@ -20,6 +20,31 @@ const baseQuery = fetchBaseQuery({
   credentials: "include" as const,
 });
 
+/**
+ * 401 codes that mean "the credential you just typed is wrong", not "your
+ * session expired": wrong password at login/change-password, wrong 2FA/OTP
+ * code, missing 2FA-pending cookie. Refresh-and-retry must NOT fire for
+ * these — the retry would silently re-submit the bad credential and register
+ * a second failed attempt toward the backend's lockout counters.
+ */
+const NON_SESSION_401_CODES = new Set([
+  "INVALID_CREDENTIALS",
+  "INVALID_2FA_CODE",
+  "INVALID_OTP",
+  "MISSING_2FA_SESSION",
+]);
+
+const isSessionExpiry401 = (error: FetchBaseQueryError): boolean => {
+  const { data } = error;
+  if (data && typeof data === "object" && "code" in data) {
+    const code = (data as { code?: unknown }).code;
+    if (typeof code === "string" && NON_SESSION_401_CODES.has(code)) {
+      return false;
+    }
+  }
+  return true;
+};
+
 // Create a wrapper for the baseQuery
 const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
@@ -30,7 +55,11 @@ const baseQueryWithReauth: BaseQueryFn<
   let result = await baseQuery(args, api, extraOptions);
 
   // If it's a 401 (Unauthorized) error, try to refresh the token once
-  if (result.error && result.error.status === 401) {
+  if (
+    result.error &&
+    result.error.status === 401 &&
+    isSessionExpiry401(result.error)
+  ) {
     // Check if another request is already refreshing the token
     if (!mutex.isLocked()) {
       const release = await mutex.acquire();

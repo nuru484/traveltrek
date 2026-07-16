@@ -1,13 +1,25 @@
 // src/components/customers/CustomerProfileHeader.tsx
 "use client";
 import React from "react";
+import { Mail, Phone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import EmptyState from "@/components/ui/EmptyState";
-import { ICustomerProfile } from "@/types/customer.types";
-import { BookOpen, CreditCard } from "lucide-react";
+import {
+  CustomerSignupMethod,
+  ICustomerProfile,
+} from "@/types/customer.types";
 
 type CustomerProfileHeaderProps = {
   customer?: ICustomerProfile | null;
+  /** Role-gated actions (edit/delete) rendered inside the record card. */
+  actions?: React.ReactNode;
+};
+
+const SIGNUP_LABEL: Record<CustomerSignupMethod, string> = {
+  google: "Via Google",
+  email: "Via e-mail",
+  phone: "Via phone",
 };
 
 /** One labelled field, in the boarding-pass voice. */
@@ -27,7 +39,7 @@ function ProfileField({
       </dt>
       <dd
         className={`mt-1 text-sm font-medium text-foreground ${
-          breakAll ? "break-all" : "break-words [overflow-wrap:anywhere]"
+          breakAll ? "break-all" : "[overflow-wrap:anywhere]"
         }`}
       >
         {value || "Not provided"}
@@ -36,38 +48,36 @@ function ProfileField({
   );
 }
 
-/** Lifetime activity counter tile. */
-function StatTile({
-  label,
-  value,
+/** Compact contact chip; unbroken tokens (emails) wrap safely. */
+function ContactChip({
   icon: Icon,
+  value,
+  breakAll = false,
 }: {
-  label: string;
-  value: number;
   icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  breakAll?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-foreground/15 bg-muted/30 px-4 py-3">
-      <Icon className="h-5 w-5 flex-none text-primary" aria-hidden />
-      <div className="min-w-0">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight">
-          {value}
-        </p>
-      </div>
-    </div>
+    <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border border-foreground/15 bg-muted/30 px-2.5 py-1 text-xs text-foreground">
+      <Icon className="h-3.5 w-3.5 flex-none text-muted-foreground" aria-hidden />
+      <span
+        className={`min-w-0 ${breakAll ? "break-all" : "[overflow-wrap:anywhere]"}`}
+      >
+        {value}
+      </span>
+    </span>
   );
 }
 
 /**
- * The customer profile as a passenger record: night strip, avatar with the
- * name, mono-labelled fields, and lifetime activity tiles from the profile
- * DTO's stats block.
+ * The customer profile as a passenger record: night strip, avatar + name with
+ * contact chips and the signup-method badge, role-gated actions, and the
+ * mono-labelled record fields. Lifetime activity lives in CustomerStats.
  */
 export function CustomerProfileHeader({
   customer,
+  actions,
 }: CustomerProfileHeaderProps) {
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";
@@ -113,51 +123,58 @@ export function CustomerProfileHeader({
       </div>
 
       <div className="p-4 sm:p-6">
-        {/* Identity */}
-        <div className="flex flex-col items-center gap-4 text-center min-[480px]:flex-row min-[480px]:items-center min-[480px]:text-left">
-          <Avatar className="h-20 w-20 flex-none border border-foreground/15 sm:h-24 sm:w-24">
-            <AvatarImage
-              src={customer.profilePicture || undefined}
-              alt={`${customer.name} profile picture`}
-              className="object-cover"
-            />
-            <AvatarFallback className="bg-muted font-display text-2xl font-semibold text-foreground">
-              {getInitials(customer.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <h1 className="break-words [overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
-              {customer.name}
-            </h1>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Member since {formatDate(customer.createdAt)}
-            </p>
-          </div>
-        </div>
+        {/* Identity + role-gated actions */}
+        <div className="flex flex-col gap-5 @3xl/main:flex-row @3xl/main:items-start @3xl/main:justify-between">
+          <div className="flex min-w-0 flex-col items-center gap-4 text-center min-[480px]:flex-row min-[480px]:items-start min-[480px]:text-left">
+            <Avatar className="h-20 w-20 flex-none border border-foreground/15 sm:h-24 sm:w-24">
+              <AvatarImage
+                src={customer.profilePicture || undefined}
+                alt={`${customer.name} profile picture`}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-muted font-display text-2xl font-semibold text-foreground">
+                {getInitials(customer.name)}
+              </AvatarFallback>
+            </Avatar>
 
-        {/* Lifetime activity */}
-        <div className="mt-6 grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
-          <StatTile
-            label="Total bookings"
-            value={customer.stats.totalBookings}
-            icon={BookOpen}
-          />
-          <StatTile
-            label="Total payments"
-            value={customer.stats.totalPayments}
-            icon={CreditCard}
-          />
+            <div className="min-w-0">
+              <h1 className="[overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
+                {customer.name}
+              </h1>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Member since {formatDate(customer.stats.memberSince)}
+              </p>
+
+              {/* Contact chips + signup method */}
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 min-[480px]:justify-start">
+                <Badge variant="default">
+                  {SIGNUP_LABEL[customer.stats.signupMethod]}
+                </Badge>
+                {customer.email && (
+                  <ContactChip icon={Mail} value={customer.email} breakAll />
+                )}
+                {customer.phone && (
+                  <ContactChip icon={Phone} value={customer.phone} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {actions && (
+            <div className="flex flex-none flex-wrap items-center justify-center gap-2 min-[480px]:justify-start">
+              {actions}
+            </div>
+          )}
         </div>
 
         {/* Record fields */}
-        <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-dashed border-foreground/20 pt-5 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
-          <ProfileField label="Email" value={customer.email} breakAll />
-          <ProfileField label="Phone" value={customer.phone} />
+        <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-4 border-t border-dashed border-foreground/20 pt-5 @xl/main:grid-cols-2 @4xl/main:grid-cols-3">
           <ProfileField label="Address" value={customer.address} />
           <ProfileField
             label="Last updated"
             value={formatDate(customer.updatedAt)}
           />
+          <ProfileField label="Record no." value={`CUS-${customer.id}`} />
         </dl>
       </div>
     </div>

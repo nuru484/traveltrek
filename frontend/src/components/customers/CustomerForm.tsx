@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, X, Upload, Eye, EyeOff } from "lucide-react";
+import { Loader2, X, Upload } from "lucide-react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import {
@@ -39,8 +39,9 @@ interface ICustomerFormProps {
 
 /**
  * Staff create is JSON (the backend create route has no upload middleware);
- * edit is multipart so a profile picture can be uploaded. Password is an
- * optional set/reset in both modes.
+ * edit is multipart so a profile picture can be uploaded. NO password field:
+ * only the account owner manages a password, via Settings → Password
+ * (POST /auth/change-password).
  */
 export default function CustomerForm({
   mode,
@@ -49,7 +50,6 @@ export default function CustomerForm({
 }: ICustomerFormProps) {
   const router = useRouter();
 
-  const [showPassword, setShowPassword] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     customer?.profilePicture || null
   );
@@ -66,7 +66,6 @@ export default function CustomerForm({
       email: customer?.email || "",
       phone: customer?.phone || "",
       address: customer?.address || "",
-      password: "",
     }),
     [customer]
   );
@@ -128,7 +127,6 @@ export default function CustomerForm({
           ...(values.email ? { email: values.email } : {}),
           ...(values.phone ? { phone: values.phone } : {}),
           ...(values.address ? { address: values.address } : {}),
-          ...(values.password ? { password: values.password } : {}),
         }).unwrap();
         toast.success("Customer created successfully");
         router.push(redirectTo ?? `/dashboard/customers/${res.data.id}`);
@@ -138,7 +136,6 @@ export default function CustomerForm({
         if (values.email) formData.append("email", values.email);
         if (values.phone) formData.append("phone", values.phone);
         if (values.address) formData.append("address", values.address);
-        if (values.password) formData.append("password", values.password);
         if (pictureFile) formData.append("profilePicture", pictureFile);
 
         const res = await updateCustomer({
@@ -228,7 +225,9 @@ export default function CustomerForm({
 
               {mode === "create" && (
                 <p className="text-xs text-muted-foreground">
-                  One contact is enough — email or phone.
+                  One contact is enough — email or phone. Accounts start
+                  passwordless: the customer signs in with a one-time code and
+                  can set a password later under Settings.
                 </p>
               )}
 
@@ -244,51 +243,6 @@ export default function CustomerForm({
                         {...field}
                         value={field.value ?? ""}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {mode === "create"
-                        ? "Password (Optional)"
-                        : "Set New Password (Optional)"}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder={
-                            mode === "create"
-                              ? "Leave blank for a passwordless account"
-                              : "Leave blank to keep the current password"
-                          }
-                          className="pr-11"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors rounded-sm p-0.5"
-                          tabIndex={-1}
-                          aria-label={
-                            showPassword ? "Hide password" : "Show password"
-                          }
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

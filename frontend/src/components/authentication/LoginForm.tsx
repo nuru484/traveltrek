@@ -86,8 +86,10 @@ export default function LoginForm({
                     Forgot password?
                   </Link>
                 </div>
-                <FormControl>
-                  <div className="relative">
+                {/* The wrapper sits OUTSIDE FormControl so the label's id
+                    lands on the input itself, not this div. */}
+                <div className="relative">
+                  <FormControl>
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
@@ -96,24 +98,24 @@ export default function LoginForm({
                       disabled={isLoading}
                       {...field}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute  right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm p-0.5 disabled:opacity-50 disabled:cursor-not-allowed curor-pointer"
-                      tabIndex={-1}
-                      disabled={isLoading}
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                </FormControl>
+                  </FormControl>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm p-0.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    tabIndex={-1}
+                    disabled={isLoading}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 <FormMessage className="text-xs" />
               </FormItem>
             )}

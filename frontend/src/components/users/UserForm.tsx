@@ -1,8 +1,10 @@
 // src/components/users/UserForm.tsx
 //
 // STAFF form: /users is staff-only on the backend. Create requires the role
-// (ADMIN | AGENT) plus name/email/address (backend adminCreateUserSchema);
-// password is optional in both modes. Customers are managed by CustomerForm.
+// (ADMIN | AGENT) plus name/email/address (backend adminCreateUserSchema).
+// NO password field in either mode: accounts start passwordless and only the
+// owner sets/rotates one via Settings → Password (POST /auth/change-password).
+// Customers are managed by CustomerForm.
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
@@ -66,7 +68,6 @@ export default function UserForm({ mode, user }: IUserFormProps) {
       phone: user?.phone || "",
       address: user?.address || "",
       role: user?.role,
-      password: "",
     }),
     [user]
   );
@@ -128,7 +129,6 @@ export default function UserForm({ mode, user }: IUserFormProps) {
       if (mode === "create") formData.append("role", values.role);
       if (values.phone) formData.append("phone", values.phone);
       if (values.address) formData.append("address", values.address);
-      if (values.password) formData.append("password", values.password);
       if (pictureFile) formData.append("profilePicture", pictureFile);
 
       if (mode === "create") {
@@ -264,32 +264,13 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {mode === "create"
-                        ? "Password (Optional)"
-                        : "Set New Password (Optional)"}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder={
-                          mode === "create"
-                            ? "Leave blank to let them set it via reset"
-                            : "Leave blank to keep the current password"
-                        }
-                        {...field}
-                        value={field.value ?? ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {mode === "create" && (
+                <p className="text-xs text-muted-foreground">
+                  Staff accounts start passwordless — the new member sets
+                  their own password via the forgot-password email or under
+                  Settings once signed in.
+                </p>
+              )}
 
               <FormItem>
                 <FormLabel>Profile Picture (Optional)</FormLabel>

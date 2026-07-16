@@ -2,8 +2,10 @@
 //
 // Form schemas for the customers section. Mirrors backend
 // backend/src/validations/customer-validation.ts:
-// - create: name + at least one contact (email OR phone); password/address optional.
+// - create: name + at least one contact (email OR phone); address optional.
 // - update: every field optional (empty strings are simply not sent).
+// NO password on either surface — staff never set a customer's password
+// (the backend strips a `password` key); owners use POST /auth/change-password.
 import { z } from "zod";
 
 const phoneRegex = /^\+?[0-9]{10,15}$/;
@@ -33,13 +35,6 @@ const addressField = z
   .or(z.literal(""))
   .optional();
 
-const passwordField = z
-  .string()
-  .min(4, "Password must be at least 4 characters")
-  .max(255, "Password must be 255 characters or less")
-  .or(z.literal(""))
-  .optional();
-
 /** Mirrors backend `createCustomerSchema` (JSON create; no picture upload). */
 export const customerCreateFormSchema = z
   .object({
@@ -47,7 +42,6 @@ export const customerCreateFormSchema = z
     email: emailField,
     phone: phoneField,
     address: addressField,
-    password: passwordField,
   })
   .refine((data) => Boolean(data.email) || Boolean(data.phone), {
     message: "Provide an email or a phone number",
@@ -64,7 +58,6 @@ export const customerUpdateFormSchema = z.object({
   email: emailField,
   phone: phoneField,
   address: addressField,
-  password: passwordField,
   profilePicture: z.instanceof(File).optional(),
 });
 

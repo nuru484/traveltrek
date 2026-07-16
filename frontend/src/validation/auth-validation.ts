@@ -108,6 +108,41 @@ export const resetPasswordFormSchema = z
 
 export type IResetPasswordFormSchema = z.infer<typeof resetPasswordFormSchema>;
 
+/**
+ * Mirrors backend `changePasswordSchema` plus a confirm field. currentPassword
+ * stays optional here: passwordless accounts (Google / OTP-only / staff-
+ * created) set their FIRST password by leaving it blank — the backend 400s
+ * with a clear message when the blank/filled choice doesn't match the account.
+ */
+export const changePasswordFormSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .max(255, "Current password must be 255 characters or less")
+      .optional(),
+    newPassword: z
+      .string()
+      .min(4, "Password must be at least 4 characters")
+      .max(255, "Password must be 255 characters or less"),
+    confirmPassword: z.string().min(1, "Confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type IChangePasswordFormSchema = z.infer<
+  typeof changePasswordFormSchema
+>;
+
+/** The 6-digit code consumed by /auth/2fa/{verify,enable,disable} — the same
+ * rule as the OTP login code (mirrors backend `twoFactorCodeSchema`). */
+export const twoFactorCodeFormSchema = z.object({
+  code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code we sent you"),
+});
+
+export type ITwoFactorCodeFormSchema = z.infer<typeof twoFactorCodeFormSchema>;
+
 /** Shared helper: split a contact string into the backend's email|phone pair. */
 export const contactToPayload = (
   contact: string

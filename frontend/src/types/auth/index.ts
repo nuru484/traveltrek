@@ -48,3 +48,45 @@ export interface IResetPasswordInput {
 export interface IGoogleSignInInput {
   idToken: string;
 }
+
+/**
+ * Password login on a 2FA-enabled account answers 200 with this payload
+ * instead of a user DTO: no session cookies were issued — only the signed
+ * pending cookie that gates POST /auth/2fa/{verify,resend}.
+ */
+export interface ITwoFactorRequiredData {
+  twoFactorRequired: true;
+}
+
+/** POST /auth/login data: a full login DTO or the 2FA-pending marker. */
+export type ILoginResponseData =
+  | IUserRegistrationResponseData
+  | ITwoFactorRequiredData;
+
+export const isTwoFactorRequired = (
+  data: ILoginResponseData
+): data is ITwoFactorRequiredData =>
+  "twoFactorRequired" in data && data.twoFactorRequired === true;
+
+/**
+ * POST /auth/change-password — currentPassword is required for accounts that
+ * have a password and must be ABSENT for the passwordless first-set (the
+ * backend 400s with a clear message when the rule is broken).
+ */
+export interface IChangePasswordInput {
+  currentPassword?: string;
+  newPassword: string;
+}
+
+export type TwoFactorChannel = "email" | "sms";
+
+/** GET /auth/2fa/status — channel is where codes go (null: no email/phone). */
+export interface ITwoFactorStatus {
+  enabled: boolean;
+  channel: TwoFactorChannel | null;
+}
+
+/** The 6-digit code bodies of /auth/2fa/{verify,enable,disable}. */
+export interface ITwoFactorCodeInput {
+  code: string;
+}

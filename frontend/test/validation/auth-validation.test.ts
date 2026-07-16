@@ -4,10 +4,12 @@
 // (email or phone), password optional. Mirrors the backend rules.
 import { describe, expect, it } from "vitest";
 import {
+  changePasswordFormSchema,
   contactToPayload,
   otpRequestFormSchema,
   otpVerifyFormSchema,
   signupFormSchema,
+  twoFactorCodeFormSchema,
 } from "@/validation/auth-validation";
 
 describe("signupFormSchema", () => {
@@ -105,5 +107,76 @@ describe("OTP schemas", () => {
     expect(contactToPayload("+233540000000")).toEqual({
       phone: "+233540000000",
     });
+  });
+});
+
+describe("changePasswordFormSchema", () => {
+  const base = {
+    currentPassword: "",
+    newPassword: "new-secret",
+    confirmPassword: "new-secret",
+  };
+
+  it("accepts a blank current password (passwordless first-set)", () => {
+    expect(changePasswordFormSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("accepts a filled current password (rotation)", () => {
+    expect(
+      changePasswordFormSchema.safeParse({ ...base, currentPassword: "old" })
+        .success
+    ).toBe(true);
+  });
+
+  it("rejects when the confirmation does not match", () => {
+    const result = changePasswordFormSchema.safeParse({
+      ...base,
+      confirmPassword: "different",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue?.message).toBe("Passwords do not match");
+      expect(issue?.path).toEqual(["confirmPassword"]);
+    }
+  });
+
+  it("enforces the backend's new-password bounds", () => {
+    expect(
+      changePasswordFormSchema.safeParse({
+        ...base,
+        newPassword: "abc",
+        confirmPassword: "abc",
+      }).success
+    ).toBe(false);
+    const long = "x".repeat(256);
+    expect(
+      changePasswordFormSchema.safeParse({
+        ...base,
+        newPassword: long,
+        confirmPassword: long,
+      }).success
+    ).toBe(false);
+  });
+
+  it("requires the confirmation field", () => {
+    expect(
+      changePasswordFormSchema.safeParse({ ...base, confirmPassword: "" })
+        .success
+    ).toBe(false);
+  });
+});
+
+describe("twoFactorCodeFormSchema", () => {
+  it("accepts exactly six digits and nothing else", () => {
+    expect(twoFactorCodeFormSchema.safeParse({ code: "123456" }).success).toBe(
+      true
+    );
+    expect(twoFactorCodeFormSchema.safeParse({ code: "12345" }).success).toBe(
+      false
+    );
+    expect(twoFactorCodeFormSchema.safeParse({ code: "12345a" }).success).toBe(
+      false
+    );
   });
 });

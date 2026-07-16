@@ -3,9 +3,11 @@
 // Form schemas for the STAFF section (/users is staff-only on the backend).
 // Mirrors backend backend/src/validations/auth-validation.ts
 // `adminCreateUserSchema` (create: name/email/address required, role required
-// and restricted to ADMIN | AGENT, password optional) and
+// and restricted to ADMIN | AGENT) and
 // backend/src/validations/user-validation.ts `updateUserProfileSchema`
-// (edit: everything optional).
+// (edit: everything optional). NO password on either surface — the backend
+// strips a `password` key; accounts start passwordless and their owner sets
+// one via POST /auth/change-password (or forgot-password).
 import { z } from "zod";
 
 const phoneRegex = /^\+?[0-9]{10,15}$/;
@@ -27,13 +29,6 @@ const phoneField = z
   .or(z.literal(""))
   .optional();
 
-const passwordField = z
-  .string()
-  .min(4, "Password must be at least 4 characters")
-  .max(255, "Password must be 255 characters or less")
-  .or(z.literal(""))
-  .optional();
-
 export const staffRoleEnum = z.enum(["ADMIN", "AGENT"]);
 
 /** Admin creates STAFF only: role is required, ADMIN | AGENT. */
@@ -46,7 +41,6 @@ export const staffCreateFormSchema = z.object({
     .min(1, "Address is required")
     .max(100, "Address must be 100 characters or less"),
   phone: phoneField,
-  password: passwordField,
   profilePicture: z.instanceof(File).optional(),
 });
 
@@ -62,7 +56,6 @@ export const staffUpdateFormSchema = z.object({
     .or(z.literal(""))
     .optional(),
   phone: phoneField,
-  password: passwordField,
   profilePicture: z.instanceof(File).optional(),
 });
 

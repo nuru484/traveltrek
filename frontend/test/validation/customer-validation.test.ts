@@ -1,7 +1,8 @@
 // test/validation/customer-validation.test.ts
 //
-// Customer create: name + at least one contact; set-password is OPTIONAL in
-// both modes (blank means "passwordless" / "keep current password").
+// Customer create: name + at least one contact. NO password on either
+// surface — staff never set a customer's password (the backend strips a
+// `password` key); owners manage it via Settings → Password.
 import { describe, expect, it } from "vitest";
 import {
   customerCreateFormSchema,
@@ -13,27 +14,22 @@ const base = {
   email: "fuseini@example.com",
   phone: "",
   address: "",
-  password: "",
 };
 
 describe("customerCreateFormSchema", () => {
-  it("accepts a customer with a blank password (passwordless)", () => {
+  it("accepts a minimal customer (accounts start passwordless)", () => {
     expect(customerCreateFormSchema.safeParse(base).success).toBe(true);
   });
 
-  it("accepts a password of 4+ characters when set", () => {
-    expect(
-      customerCreateFormSchema.safeParse({ ...base, password: "s3cret" })
-        .success
-    ).toBe(true);
-  });
-
-  it("rejects a too-short password when one is provided", () => {
+  it("has no password field — a stray key is stripped, not validated", () => {
     const result = customerCreateFormSchema.safeParse({
       ...base,
       password: "abc",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("password" in result.data).toBe(false);
+    }
   });
 
   it("requires at least one contact channel", () => {
@@ -69,12 +65,14 @@ describe("customerUpdateFormSchema", () => {
     ).toBe(true);
   });
 
-  it("still keeps password optional with bounds", () => {
-    expect(
-      customerUpdateFormSchema.safeParse({ ...base, password: "" }).success
-    ).toBe(true);
-    expect(
-      customerUpdateFormSchema.safeParse({ ...base, password: "abc" }).success
-    ).toBe(false);
+  it("has no password field — a stray key is stripped, not validated", () => {
+    const result = customerUpdateFormSchema.safeParse({
+      ...base,
+      password: "abc",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("password" in result.data).toBe(false);
+    }
   });
 });

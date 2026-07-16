@@ -9,11 +9,13 @@ import {
 } from "@/validation/auth-validation";
 import LoginForm from "@/components/authentication/LoginForm";
 import OtpLoginForm from "@/components/authentication/OtpLoginForm";
+import TwoFactorLoginForm from "@/components/authentication/TwoFactorLoginForm";
 import GoogleSignInButton from "@/components/authentication/GoogleSignInButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { useLoginMutation } from "@/redux/auth/authApi";
+import { isTwoFactorRequired } from "@/types/auth";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import { useRouter } from "next/navigation";
@@ -22,6 +24,10 @@ import Header from "@/components/index/Header";
 export default function LoginPage() {
   const router = useRouter();
   const [loginUser, { isLoading }] = useLoginMutation();
+
+  // A 2FA account's password step answers { twoFactorRequired: true } with
+  // no session — the card swaps to the code step until verify completes.
+  const [twoFactorPending, setTwoFactorPending] = React.useState(false);
 
   const form = useForm<ILoginFormSchema>({
     resolver: zodResolver(loginFormSchema),
@@ -33,7 +39,16 @@ export default function LoginPage() {
 
   async function onSubmit(data: z.infer<typeof loginFormSchema>) {
     try {
-      await loginUser(data).unwrap();
+      const result = await loginUser(data).unwrap();
+
+      if (isTwoFactorRequired(result.data)) {
+        toast.success(
+          result.message || "Enter the verification code we just sent you."
+        );
+        setTwoFactorPending(true);
+        return;
+      }
+
       toast.success("Login successful! Redirecting...");
       router.push(loginRedirectPath(window.location.search));
     } catch (err) {
@@ -167,31 +182,39 @@ export default function LoginPage() {
             </div>
 
             <div className="px-5 py-7 sm:px-6 sm:py-8">
-              <Tabs defaultValue="password" className="w-full">
-                <TabsList className="mb-6 grid w-full grid-cols-2">
-                  <TabsTrigger value="password" className="cursor-pointer">
-                    Password
-                  </TabsTrigger>
-                  <TabsTrigger value="otp" className="cursor-pointer">
-                    Email me a code
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="password">
-                  <LoginForm
-                    form={form}
-                    onSubmit={onSubmit}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-                <TabsContent value="otp">
-                  <OtpLoginForm />
-                </TabsContent>
-              </Tabs>
+              {twoFactorPending ? (
+                <TwoFactorLoginForm
+                  onCancel={() => setTwoFactorPending(false)}
+                />
+              ) : (
+                <>
+                  <Tabs defaultValue="password" className="w-full">
+                    <TabsList className="mb-6 grid w-full grid-cols-2">
+                      <TabsTrigger value="password" className="cursor-pointer">
+                        Password
+                      </TabsTrigger>
+                      <TabsTrigger value="otp" className="cursor-pointer">
+                        Email me a code
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="password">
+                      <LoginForm
+                        form={form}
+                        onSubmit={onSubmit}
+                        isLoading={isLoading}
+                      />
+                    </TabsContent>
+                    <TabsContent value="otp">
+                      <OtpLoginForm />
+                    </TabsContent>
+                  </Tabs>
 
-              {/* Google sign-in (rendered only when configured) */}
-              <div className="mt-6">
-                <GoogleSignInButton />
-              </div>
+                  {/* Google sign-in (rendered only when configured) */}
+                  <div className="mt-6">
+                    <GoogleSignInButton />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

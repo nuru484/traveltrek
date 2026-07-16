@@ -37,10 +37,11 @@ export interface IUsersPaginatedResponse {
   };
 }
 
+/** PUT /users/:userId — no password field (a `password` key is stripped);
+ * passwords rotate only through POST /auth/change-password. */
 export interface IUserUpdateInput {
   name?: string;
   email?: string;
-  password?: string;
   phone?: string;
   address?: string;
   profilePicture?: string;

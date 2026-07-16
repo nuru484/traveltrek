@@ -2,12 +2,17 @@
 import { apiSlice } from "../apiSlice";
 import { userLoggedIn, userLoggedOut, userRegistration } from "./authSlice";
 import {
+  IChangePasswordInput,
   IForgotPasswordInput,
   IGoogleSignInInput,
+  ILoginResponseData,
   IOtpRequestInput,
   IOtpVerifyInput,
   IResetPasswordInput,
+  ITwoFactorCodeInput,
+  ITwoFactorStatus,
   IUserRegistrationResponseData,
+  isTwoFactorRequired,
 } from "../../types/auth/index";
 import { IApiResponse } from "../../types/api";
 
@@ -36,8 +41,10 @@ export const authApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // A 2FA-enabled account answers { twoFactorRequired: true } WITHOUT
+    // cookies — no user may be stored until /auth/2fa/verify completes.
     login: builder.mutation<
-      IApiResponse<IUserRegistrationResponseData>,
+      IApiResponse<ILoginResponseData>,
       { email: string; password: string }
     >({
       query: (data) => ({
@@ -50,15 +57,100 @@ export const authApi = apiSlice.injectEndpoints({
         try {
           const result = await queryFulfilled;
 
-          dispatch(
-            userLoggedIn({
-              user: result.data.data,
-            })
-          );
+          if (!isTwoFactorRequired(result.data.data)) {
+            dispatch(
+              userLoggedIn({
+                user: result.data.data,
+              })
+            );
+          }
         } catch {
           // errors are surfaced by the calling form
         }
       },
+    }),
+
+    // Login second step — unauthenticated, gated by the pending 2FA cookie.
+    // Success is the exact login envelope (cookies + DTO).
+    twoFactorVerify: builder.mutation<
+      IApiResponse<IUserRegistrationResponseData>,
+      ITwoFactorCodeInput
+    >({
+      query: (data) => ({
+        url: "auth/2fa/verify",
+        method: "POST",
+        body: data,
+      }),
+      async onQueryStarted(arg, { queryFulfilled, dispatch }) {
+        try {
+          const result = await queryFulfilled;
+          dispatch(userLoggedIn({ user: result.data.data }));
+        } catch {
+          // errors are surfaced by the calling form
+        }
+      },
+    }),
+
+    // Always 200 (cooldown re-requests are silently dropped server-side).
+    twoFactorResend: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "auth/2fa/resend",
+        method: "POST",
+      }),
+    }),
+
+    // --- Authenticated security settings ---
+
+    // Sets the first password (no currentPassword) or rotates an existing
+    // one; success re-issues THIS session's cookies (every other session dies).
+    changePassword: builder.mutation<{ message: string }, IChangePasswordInput>(
+      {
+        query: (data) => ({
+          url: "auth/change-password",
+          method: "POST",
+          body: data,
+        }),
+      }
+    ),
+
+    twoFactorStatus: builder.query<IApiResponse<ITwoFactorStatus>, void>({
+      query: () => ({
+        url: "auth/2fa/status",
+        method: "GET",
+      }),
+      providesTags: ["TwoFactor"],
+    }),
+
+    // Sends the code BOTH enable and disable consume; 400 when the account
+    // has neither email nor phone.
+    twoFactorChallenge: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "auth/2fa/challenge",
+        method: "POST",
+      }),
+    }),
+
+    twoFactorEnable: builder.mutation<{ message: string }, ITwoFactorCodeInput>(
+      {
+        query: (data) => ({
+          url: "auth/2fa/enable",
+          method: "POST",
+          body: data,
+        }),
+        invalidatesTags: ["TwoFactor"],
+      }
+    ),
+
+    twoFactorDisable: builder.mutation<
+      { message: string },
+      ITwoFactorCodeInput
+    >({
+      query: (data) => ({
+        url: "auth/2fa/disable",
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: ["TwoFactor"],
     }),
 
     // Passwordless OTP login, step 1 — always replies 200 (no enumeration).
@@ -151,6 +243,13 @@ export const authApi = apiSlice.injectEndpoints({
 export const {
   useRegisterUserMutation,
   useLoginMutation,
+  useTwoFactorVerifyMutation,
+  useTwoFactorResendMutation,
+  useChangePasswordMutation,
+  useTwoFactorStatusQuery,
+  useTwoFactorChallengeMutation,
+  useTwoFactorEnableMutation,
+  useTwoFactorDisableMutation,
   useOtpRequestMutation,
   useOtpVerifyMutation,
   useForgotPasswordMutation,
