@@ -5,10 +5,13 @@
 // surfaces validate identically:
 //
 // - createCustomer is the staff-side minimal creation: name plus at least one
-//   contact (email OR phone), password/address optional — the same rule the
-//   public signup enforces.
+//   contact (email OR phone), address optional. NO password: staff never set
+//   a customer's password (a `password` key is simply stripped) — the account
+//   starts passwordless and the customer signs in via OTP login (or sets a
+//   password through forgot-password / POST /auth/change-password).
 // - updateCustomer mirrors updateUserProfile field-for-field (no role — a
-//   customer has none).
+//   customer has none, and no password — same rule as creation: only the
+//   account owner rotates a password, via POST /auth/change-password).
 // - list query: pagination + a free-text search across name/email/phone.
 import { z } from 'zod';
 
@@ -26,11 +29,6 @@ const nameField = z
   .string('Name can only be a string up to 100 characters')
   .max(100, 'Name can only be a string up to 100 characters');
 
-const passwordField = z
-  .string('Password must be a strong password')
-  .min(4, 'Password must be at least 4 characters long')
-  .max(255, 'Password must be a strong password');
-
 const phoneField = z
   .string('Phone must be a valid phone number (10-15 digits)')
   .regex(
@@ -38,13 +36,13 @@ const phoneField = z
     'Phone must be a valid phone number (10-15 digits)',
   );
 
-/** POST /customers — minimal: name + (email OR phone), the rest optional. */
+/** POST /customers — minimal: name + (email OR phone), the rest optional.
+ * No password (stripped if sent) — see the header note. */
 export const createCustomerSchema = z
   .object({
     address: addressField.optional(),
     email: emailField.optional(),
     name: nameField,
-    password: passwordField.optional(),
     phone: phoneField.optional(),
     profilePicture: z.string('profilePicture must be a string').optional(),
   })
@@ -53,12 +51,12 @@ export const createCustomerSchema = z
     path: ['email'],
   });
 
-/** PUT /customers/:id — every field optional. */
+/** PUT /customers/:id — every field optional. No password (stripped if
+ * sent) — passwords rotate only through POST /auth/change-password. */
 export const updateCustomerSchema = z.object({
   address: addressField.optional(),
   email: emailField.optional(),
   name: nameField.optional(),
-  password: passwordField.optional(),
   phone: phoneField.optional(),
   profilePicture: z.string('profilePicture must be a string').optional(),
 });

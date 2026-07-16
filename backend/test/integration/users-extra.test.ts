@@ -1,10 +1,11 @@
 // test/integration/users-extra.test.ts
 //
 // Coverage the baseline users suite lacks, updated for Phase 5b (STAFF-only
-// users): the staff-vs-customer route gates, uniqueness conflicts, password
-// re-hashing, role-change guard rails (including the legacy-reserved CUSTOMER
-// value) and their effect, and the delete protections (admin self-delete, the
-// bulk confirmation gate). Staff carry no bookings/payments anymore, so the
+// users): the staff-vs-customer route gates, uniqueness conflicts, the
+// password field being stripped from profile updates (rotation is POST
+// /auth/change-password only), role-change guard rails (including the
+// legacy-reserved CUSTOMER value) and their effect, and the delete
+// protections (admin self-delete, the bulk confirmation gate). Staff carry no bookings/payments anymore, so the
 // legacy payment-based delete guards are gone — deletes are plain soft
 // deletes. JSON-only flows — no multipart, so the Cloudinary upload path
 // stays out of scope here.
@@ -77,12 +78,15 @@ describe('PUT /api/v1/users/:userId (gates and rules)', () => {
     );
   });
 
-  it('re-hashes a changed password with bcrypt at the configured cost', async () => {
+  it('IGNORES a password in the body — updates never touch credentials', async () => {
     const user = await createAgent();
 
+    // The schema strips the removed key, so the update still succeeds — but
+    // the stored hash is untouched: passwords rotate ONLY through the
+    // authenticated POST /auth/change-password.
     const res = await authedApi(user)
       .put(`/api/v1/users/${user.id}`)
-      .send({ password: 'NewPassword9!' });
+      .send({ name: 'Renamed', password: 'NewPassword9!' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.password).toBeUndefined();
@@ -90,11 +94,9 @@ describe('PUT /api/v1/users/:userId (gates and rules)', () => {
     const row = await prisma.user.findUniqueOrThrow({
       where: { id: user.id },
     });
-    expect(row.password).not.toBe('NewPassword9!');
-    expect(await bcrypt.compare('NewPassword9!', row.password!)).toBe(true);
-    expect(await bcrypt.compare(TEST_PASSWORD, row.password!)).toBe(false);
-    // BCRYPT_SALT_ROUNDS from config/constants.
-    expect(bcrypt.getRounds(row.password!)).toBe(10);
+    expect(row.password).toBe(user.password);
+    expect(await bcrypt.compare('NewPassword9!', row.password!)).toBe(false);
+    expect(await bcrypt.compare(TEST_PASSWORD, row.password!)).toBe(true);
   });
 
   it('returns 404 for an admin updating a missing user', async () => {

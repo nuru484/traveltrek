@@ -54,6 +54,12 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  /// When true, a correct password alone does not establish a session: login
+  /// answers with twoFactorRequired and a TWO_FACTOR code must be verified
+  /// first. OTP login and Google sign-in (customer-only surfaces) are already
+  /// single-possession-factor and bypass this flag by design.
+  twoFactorEnabled Boolean @default(false)
+
   /// Soft delete: reads are auto-scoped to `deletedAt: null` by the client
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
@@ -99,6 +105,12 @@ model Customer {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  /// When true, a correct password alone does not establish a session: login
+  /// answers with twoFactorRequired and a TWO_FACTOR code must be verified
+  /// first. OTP login and Google sign-in are already single-possession-factor
+  /// and bypass this flag by design.
+  twoFactorEnabled Boolean @default(false)
+
   /// Soft delete: reads are auto-scoped to `deletedAt: null` by the client
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
@@ -119,6 +131,10 @@ enum TokenType {
   OTP_LOGIN
   /// Long random opaque token embedded in a password-reset link (next phase).
   PASSWORD_RESET
+  /// 6-digit second-factor code: sent on password login when the principal has
+  /// twoFactorEnabled, and by the authed /auth/2fa/challenge step that gates
+  /// enabling/disabling the feature. Single-use, attempt-capped (attempts col).
+  TWO_FACTOR
 }
 
 /// One security-token row belongs to exactly ONE principal: either a staff

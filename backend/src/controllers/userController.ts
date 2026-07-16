@@ -5,7 +5,7 @@
 // middleware, asyncHandler(handler)]. Handlers read the typed
 // req.query/body/params the middleware wrote back, call the user service,
 // and reply through the standard envelope helpers. All domain logic
-// (uniqueness checks, password hashing, role-change and delete guards,
+// (uniqueness checks, role-change and delete guards,
 // Cloudinary cleanup) lives in services/user.service.ts.
 //
 // Like payments, the self-vs-others profile rules are NOT duplicated by
@@ -70,7 +70,6 @@ const handleUpdateUserProfile = asyncHandler(
         address: body.address,
         email: body.email,
         name: body.name,
-        password: body.password,
         phone: body.phone,
         profilePicture: body.profilePicture,
       },

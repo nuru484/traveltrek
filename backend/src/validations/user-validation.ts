@@ -7,11 +7,10 @@
 // - updateUserProfile mirrors the legacy chain field-for-field (name, email,
 //   role, address, phone — all optional, same messages). `role` is validated
 //   but IGNORED downstream, exactly as before: the legacy chain checked it
-//   yet the handler never wrote it. password and profilePicture went
-//   unvalidated in the legacy chain but the handler read them, so they are
-//   declared with minimal typing to survive the parse (the Cloudinary
-//   middleware overwrites profilePicture after parsing when a file is
-//   uploaded).
+//   yet the handler never wrote it. `password` is GONE from this surface —
+//   passwords rotate only through POST /auth/change-password. profilePicture
+//   is declared with minimal typing to survive the parse (the Cloudinary
+//   middleware overwrites it after parsing when a file is uploaded).
 // - changeUserRole: the legacy in-handler check ('Valid role is required')
 //   moved here — same 400, now in the standard validation envelope.
 // - list query: an invalid role FILTER was silently ignored by the legacy
@@ -23,7 +22,10 @@ import { z } from 'zod';
 import { Role } from '#config/prismaClient.js';
 import { paginationQuery } from '#validations/common-validation.js';
 
-/** PUT /users/:userId — every field optional, legacy messages kept. */
+/** PUT /users/:userId — every field optional, legacy messages kept. NO
+ * password (a `password` key in the body is simply stripped): passwords
+ * rotate only through the authenticated POST /auth/change-password, so a
+ * staff session can never overwrite another account's credential. */
 export const updateUserProfileSchema = z.object({
   address: z
     .string('Address must be a string up to only 100 characters')
@@ -37,7 +39,6 @@ export const updateUserProfileSchema = z.object({
     .string('Name must be a string up to 100 characters')
     .max(100, 'Name must be a string up to 100 characters')
     .optional(),
-  password: z.string('password must be a string').optional(),
   phone: z
     .string('Phone must be a valid phone number (10-15 digits)')
     .regex(

@@ -9,8 +9,8 @@
 //   completed later via PUT /customers/:id. Public signups always create a
 //   Customer (Phase 5b).
 // - adminCreateUser creates STAFF ONLY: the legacy required fields (address,
-//   email, name) with the password optional, and role required + restricted
-//   to ADMIN | AGENT.
+//   email, name) and role required + restricted to ADMIN | AGENT. No
+//   password — accounts start passwordless (see the schema note).
 // - profilePicture is declared minimally: the Cloudinary middleware
 //   overwrites it after parsing when a file is uploaded.
 // - login/otp/reset only check presence/shape — password strength is enforced
@@ -73,13 +73,14 @@ export const registerUserSchema = z
     path: ['email'],
   });
 
-/** Admin STAFF creation: the legacy required fields, password optional, and
- * the role now mandatory + staff-only (ADMIN | AGENT). */
+/** Admin STAFF creation: the legacy required fields and the role mandatory +
+ * staff-only (ADMIN | AGENT). NO password — admins never set one (a `password`
+ * key in the body is simply stripped): the account starts passwordless and
+ * its owner establishes a password via forgot-password. */
 export const adminCreateUserSchema = z.object({
   address: addressField,
   email: emailField,
   name: nameField,
-  password: passwordField.optional(),
   phone: phoneField.optional(),
   profilePicture: z.string('profilePicture must be a string').optional(),
   role: staffRoleField,
@@ -125,7 +126,28 @@ export const googleSignInSchema = z.object({
   idToken: z.string('idToken is required').min(1, 'idToken is required'),
 });
 
+/** POST /auth/change-password — currentPassword is conditionally required
+ * (accounts WITH a password) / forbidden (passwordless first-set); that rule
+ * depends on DB state, so it lives in the service, not here. */
+export const changePasswordSchema = z.object({
+  currentPassword: z
+    .string('currentPassword must be a string')
+    .min(1, 'currentPassword must not be empty')
+    .max(255, 'currentPassword must not be empty')
+    .optional(),
+  newPassword: passwordField,
+});
+
+/** The 6-digit code bodies of /auth/2fa/{verify,enable,disable} — the same
+ * shape OTP login verifies. */
+export const twoFactorCodeSchema = z.object({
+  code: z
+    .string('Code must be the 6-digit number we sent you')
+    .regex(/^\d{6}$/, 'Code must be the 6-digit number we sent you'),
+});
+
 export type AdminCreateUserBody = z.infer<typeof adminCreateUserSchema>;
+export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
 export type GoogleSignInBody = z.infer<typeof googleSignInSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;
@@ -133,3 +155,4 @@ export type OtpRequestBody = z.infer<typeof otpRequestSchema>;
 export type OtpVerifyBody = z.infer<typeof otpVerifySchema>;
 export type RegisterUserBody = z.infer<typeof registerUserSchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordSchema>;
+export type TwoFactorCodeBody = z.infer<typeof twoFactorCodeSchema>;

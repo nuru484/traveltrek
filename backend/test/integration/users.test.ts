@@ -5,6 +5,8 @@
 // staff creation with a required staff role, role changes, self-updates.
 import { describe, expect, it } from 'vitest';
 
+import prisma from '#config/prismaClient.js';
+
 import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
@@ -32,9 +34,11 @@ describe('GET /api/v1/users', () => {
 });
 
 describe('POST /api/v1/users', () => {
-  it('lets an admin create a staff user with an explicit role', async () => {
+  it('lets an admin create a staff user with an explicit role — always passwordless', async () => {
     const admin = await createAdmin();
 
+    // A password in the body is STRIPPED by the schema: admins never set
+    // passwords, the new staffer establishes one via forgot-password.
     const res = await authedApi(admin).post('/api/v1/users').send({
       address: '99 Admin Way',
       email: 'agent@test.local',
@@ -45,6 +49,11 @@ describe('POST /api/v1/users', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.role).toBe('AGENT');
+
+    const row = await prisma.user.findUniqueOrThrow({
+      where: { email: 'agent@test.local' },
+    });
+    expect(row.password).toBeNull();
   });
 
   it('rejects the legacy-reserved CUSTOMER role with 400', async () => {

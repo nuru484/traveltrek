@@ -14,6 +14,7 @@ import {
   createAgent,
   createCustomer,
   createTour,
+  TEST_PASSWORD,
 } from '../helpers/factories.js';
 
 /** A tour booking (+ optional payment) for history/guard scenarios. */
@@ -99,9 +100,12 @@ describe('POST /api/v1/customers', () => {
     expect(row.password).toBeNull();
   });
 
-  it('hashes a provided password so the customer can log in', async () => {
+  it('IGNORES a provided password — staff never set customer credentials', async () => {
     const admin = await createAdmin();
 
+    // The schema strips unknown/removed keys, so the request still succeeds —
+    // but the account is created passwordless (OTP login / forgot-password /
+    // change-password establish a password later).
     const res = await authedApi(admin).post('/api/v1/customers').send({
       email: 'created@test.local',
       name: 'Created Customer',
@@ -112,8 +116,13 @@ describe('POST /api/v1/customers', () => {
     const row = await prisma.customer.findUniqueOrThrow({
       where: { email: 'created@test.local' },
     });
-    expect(row.password).not.toBeNull();
-    expect(row.password).not.toBe('Created9!');
+    expect(row.password).toBeNull();
+
+    // And the stripped password is not a credential.
+    const login = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: 'created@test.local', password: 'Created9!' });
+    expect(login.status).toBe(401);
   });
 
   it('rejects a creation with neither email nor phone', async () => {
@@ -160,9 +169,15 @@ describe('GET /api/v1/customers/:id (full profile + self-access)', () => {
     expect(res.body.data.id).toBe(customer.id);
     expect(res.body.data.email).toBe(customer.email);
     expect(res.body.data.password).toBeUndefined();
-    expect(res.body.data.stats).toEqual({
+    // The exhaustive per-field assertions live in customer-profile.test.ts;
+    // this pins the headline counters plus the derived money stats.
+    expect(res.body.data.stats).toMatchObject({
+      averageBookingValue: 500,
+      bookingsByStatus: { PENDING: 2 },
       totalBookings: 2,
       totalPayments: 1,
+      totalSpent: 500,
+      upcomingTrips: 2,
     });
   });
 
@@ -331,23 +346,31 @@ describe('PUT /api/v1/customers/:id', () => {
     );
   });
 
-  it('changes the password (bcrypt) so the new one logs in', async () => {
+  it('IGNORES a password in the body — updates never touch credentials', async () => {
     const customer = await createCustomer();
 
+    // The schema strips the removed key, so the update succeeds — but the
+    // stored hash is untouched (rotation is POST /auth/change-password only).
     const res = await authedApi(customer)
       .put(`/api/v1/customers/${customer.id}`)
-      .send({ password: 'Rotated9!' });
+      .send({ name: 'Renamed', password: 'Rotated9!' });
     expect(res.status).toBe(200);
+    expect(res.body.data.name).toBe('Renamed');
 
     const row = await prisma.customer.findUniqueOrThrow({
       where: { id: customer.id },
     });
-    expect(row.password).not.toBe('Rotated9!');
+    expect(row.password).toBe(customer.password);
 
-    const login = await api()
+    // The "new" password never became a credential; the old one still works.
+    const rejected = await api()
       .post('/api/v1/auth/login')
       .send({ email: customer.email, password: 'Rotated9!' });
-    expect(login.status).toBe(200);
+    expect(rejected.status).toBe(401);
+    const stillValid = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: customer.email, password: TEST_PASSWORD });
+    expect(stillValid.status).toBe(200);
   });
 });
 

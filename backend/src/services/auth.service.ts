@@ -20,8 +20,16 @@
 // JWTs. The service never touches req/res or cookies (those live in the
 // controllers); it takes typed inputs, talks to the injected Prisma client +
 // clock + config + mail/sms/google, and throws typed errors. All one-time
-// secrets (refresh jtis, OTP codes, reset tokens) are stored as sha256 hashes
-// and are single-use.
+// secrets (refresh jtis, OTP codes, reset tokens, 2FA codes) are stored as
+// sha256 hashes and are single-use.
+//
+// This phase adds:
+//   - changePassword — the ONLY authenticated way to set/rotate a password
+//     (profile updates no longer accept one, and admins never set passwords:
+//     staff-created accounts start passwordless).
+//   - two-factor authentication for PASSWORD login on both principals (see
+//     the 2FA section below). OTP login and Google sign-in bypass it — each
+//     is already a single possession factor.
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
@@ -35,6 +43,7 @@ import {
   type User,
 } from '#config/prismaClient.js';
 import {
+  BadRequestError,
   ServiceUnavailableError,
   TooManyRequestsError,
   UnauthorizedError,
@@ -92,6 +101,12 @@ const OTP_RESEND_COOLDOWN_SECONDS = 60;
 /** Password-reset links are longer-lived than OTPs but still single-use. */
 const PASSWORD_RESET_TTL_MINUTES = 30;
 
+/** TWO_FACTOR codes: same lifetime/attempt/cooldown shape as OTP login codes.
+ * The pending-cookie TTL (utils/two-factor-pending.ts) matches the code TTL. */
+const TWO_FACTOR_TTL_MINUTES = 10;
+const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const TWO_FACTOR_RESEND_COOLDOWN_SECONDS = 60;
+
 /** The account a login/refresh resolved — the controller picks the DTO and
  * mints tokens for whichever principal came back. */
 export type AuthPrincipal =
@@ -103,9 +118,28 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+/** POST /auth/change-password body, resolved against the authenticated actor. */
+export interface ChangePasswordInput {
+  /** Required when the account already has a password; must be ABSENT when it
+   * is passwordless (this call then sets the first password). */
+  currentPassword?: string;
+  newPassword: string;
+}
+
 export interface LoginInput {
   email: string;
   password: string;
+}
+
+/**
+ * What password login resolves to. When the principal has twoFactorEnabled,
+ * NO session may be established yet: a TWO_FACTOR code has been sent and the
+ * controller answers with `twoFactorRequired` plus the pending cookie instead
+ * of auth cookies. Only /auth/2fa/verify completes the login.
+ */
+export interface LoginResult {
+  principal: AuthPrincipal;
+  twoFactorRequired: boolean;
 }
 
 /** How an OTP-login caller identifies the account — validation guarantees
@@ -164,11 +198,37 @@ export const toTokenPrincipal = (principal: AuthPrincipal): TokenPrincipal =>
  * both tables), so the login/lockout logic runs once for either principal. */
 type AuthStateRow = Pick<
   User,
-  'failedLoginAttempts' | 'id' | 'lockedUntil' | 'password' | 'tokenVersion'
+  | 'failedLoginAttempts'
+  | 'id'
+  | 'lockedUntil'
+  | 'password'
+  | 'tokenVersion'
+  | 'twoFactorEnabled'
 >;
 
 const authState = (principal: AuthPrincipal): AuthStateRow =>
   principal.kind === 'customer' ? principal.customer : principal.user;
+
+/** The full row behind a principal (Customer and User share every column the
+ * auth flows read — contact details, name, auth state). */
+const principalRow = (principal: AuthPrincipal): Customer | User =>
+  principal.kind === 'customer' ? principal.customer : principal.user;
+
+/**
+ * The channel a principal's security codes travel over: email when one is on
+ * file (durable, free), else SMS, else none — accounts with neither contact
+ * cannot use code-based flows.
+ */
+export const twoFactorChannel = (row: {
+  email: null | string;
+  phone: null | string;
+}): 'email' | 'sms' | null => (row.email ? 'email' : row.phone ? 'sms' : null);
+
+/** GET /auth/2fa/status payload. */
+export interface TwoFactorStatus {
+  channel: 'email' | 'sms' | null;
+  enabled: boolean;
+}
 
 type AuthDeps = Pick<
   AppDeps,
@@ -217,6 +277,7 @@ export const makeAuthService = (d: AuthDeps) => {
       lockedUntil?: Date | null;
       password?: string;
       tokenVersion?: { increment: number };
+      twoFactorEnabled?: boolean;
     },
   ): Promise<unknown> =>
     kind === 'customer'
@@ -250,23 +311,22 @@ export const makeAuthService = (d: AuthDeps) => {
 
   /** Admin staff creation (POST /users): the role is required and validation
    * restricts it to ADMIN | AGENT — customers are created via /customers or
-   * the public signup, never here. */
+   * the public signup, never here. Admins never set passwords: the account is
+   * created PASSWORDLESS and its owner establishes one via forgot-password
+   * (OTP login is customer-only) — so no shared secret ever transits an
+   * admin. */
   const adminCreateUser = async (
-    input: RegisterInput,
+    input: Omit<RegisterInput, 'password'>,
     role: Role,
   ): Promise<RegisteredUser> => {
     // Symmetric guard: a staff account must not claim a customer's contact.
     await assertContactFreeAcrossPrincipals(prisma, input, 'staff');
-    const hashedPassword =
-      input.password === undefined
-        ? null
-        : await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
     return prisma.user.create({
       data: {
         address: input.address,
         email: input.email,
         name: input.name,
-        password: hashedPassword,
+        password: null,
         phone: input.phone,
         profilePicture: input.profilePicture,
         role,
@@ -373,13 +433,20 @@ export const makeAuthService = (d: AuthDeps) => {
   };
 
   /**
-   * Verifies email + password and returns the resolved principal (the
-   * controller mints tokens / sets cookies). Customer first, then staff —
-   * first match wins. Uniform "Invalid credentials" (same status, same
-   * timing) for unknown-email, passwordless-account and wrong-password, for
-   * BOTH principal kinds — no user enumeration.
+   * Verifies email + password and returns the resolved principal plus whether
+   * a second factor is still owed. Customer first, then staff — first match
+   * wins. Uniform "Invalid credentials" (same status, same timing) for
+   * unknown-email, passwordless-account and wrong-password, for BOTH
+   * principal kinds — no user enumeration.
+   *
+   * 2FA applies to PASSWORD login only: when the principal has
+   * twoFactorEnabled a TWO_FACTOR code is sent and NO session may be issued —
+   * the controller sets the pending cookie and /auth/2fa/verify completes the
+   * login. OTP login and Google sign-in already prove possession of the
+   * account's channel/identity (a single possession factor), so they BYPASS
+   * the flag by design.
    */
-  const login = async (input: LoginInput): Promise<AuthPrincipal> => {
+  const login = async (input: LoginInput): Promise<LoginResult> => {
     const principal = await findPrincipalByEmail(input.email);
     const row = principal ? authState(principal) : null;
 
@@ -419,7 +486,14 @@ export const makeAuthService = (d: AuthDeps) => {
       });
     }
 
-    return principal;
+    // The password alone is not enough for a 2FA account: challenge the
+    // second factor and withhold the session.
+    if (row.twoFactorEnabled) {
+      await issueTwoFactorChallenge(principal);
+      return { principal, twoFactorRequired: true };
+    }
+
+    return { principal, twoFactorRequired: false };
   };
 
   /** Theft response: bump the principal's session epoch so every issued token
@@ -452,6 +526,22 @@ export const makeAuthService = (d: AuthDeps) => {
 
   const isPrincipalKind = (value: unknown): value is PrincipalKind =>
     value === 'customer' || value === 'staff';
+
+  /** Resolves a principal by (kind, id) — the tables have overlapping ids, so
+   * the kind picks the table. findFirst: soft-deleted accounts read as gone. */
+  const findPrincipalById = (
+    kind: PrincipalKind,
+    id: number,
+  ): Promise<AuthPrincipal | null> =>
+    kind === 'customer'
+      ? prisma.customer
+          .findFirst({ where: { id } })
+          .then((customer) =>
+            customer ? { customer, kind: 'customer' as const } : null,
+          )
+      : prisma.user
+          .findFirst({ where: { id } })
+          .then((user) => (user ? { kind: 'staff' as const, user } : null));
 
   /** Whether a security-token row belongs to the given principal (the FK
    * column must match the token's kind — ids overlap across the tables). */
@@ -495,17 +585,8 @@ export const makeAuthService = (d: AuthDeps) => {
     if (!isPrincipalKind(decoded.kind)) throw invalidRefreshError();
     const kind = decoded.kind;
 
-    // findFirst: a soft-deleted account can no longer refresh a session.
-    const principal: AuthPrincipal | null =
-      kind === 'customer'
-        ? await prisma.customer
-            .findFirst({ where: { id: decoded.id } })
-            .then((customer) =>
-              customer ? { customer, kind: 'customer' as const } : null,
-            )
-        : await prisma.user
-            .findFirst({ where: { id: decoded.id } })
-            .then((user) => (user ? { kind: 'staff' as const, user } : null));
+    // findFirst inside: a soft-deleted account can no longer refresh a session.
+    const principal = await findPrincipalById(kind, decoded.id);
     if (!principal) {
       throw new UnauthorizedError('Account not found. Please log in again.', {
         code: 'USER_NOT_FOUND',
@@ -669,6 +750,57 @@ export const makeAuthService = (d: AuthDeps) => {
       { code: 'INVALID_OTP', layer: 'auth' },
     );
 
+  /** Same uniform-401 discipline for TWO_FACTOR codes (login second step,
+   * enable/disable confirmation) — a distinct code for the frontend only. */
+  const invalidTwoFactorError = (): UnauthorizedError =>
+    new UnauthorizedError(
+      'Your code is invalid or has expired. Request a new one.',
+      { code: 'INVALID_2FA_CODE', layer: 'auth' },
+    );
+
+  /**
+   * Verifies and consumes the live security code of (principal, type): the
+   * shared engine behind OTP login and every TWO_FACTOR check. Uniform
+   * failure (the caller's error) for no-live-code / expired / attempt-capped
+   * / wrong code — wrong guesses feed the attempts counter, and a correct
+   * guess is consumed atomically (redeemable at most once, races lose).
+   */
+  const consumeSecurityCode = async (
+    kind: PrincipalKind,
+    principalId: number,
+    type: TokenType,
+    code: string,
+    maxAttempts: number,
+    invalidError: () => UnauthorizedError,
+  ): Promise<void> => {
+    const record = await prisma.userSecurityToken.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { consumedAt: null, type, ...principalFk(kind, principalId) },
+    });
+    if (
+      !record ||
+      record.expiresAt.getTime() < clock.timestamp() ||
+      record.attempts >= maxAttempts
+    ) {
+      throw invalidError();
+    }
+
+    if (!timingSafeEqualHex(record.tokenHash, hashSecurityToken(code))) {
+      await prisma.userSecurityToken.update({
+        data: { attempts: { increment: 1 } },
+        where: { id: record.id },
+      });
+      throw invalidError();
+    }
+
+    // Guarded consume: two concurrent verifies race here and only one wins.
+    const consumed = await prisma.userSecurityToken.updateMany({
+      data: { consumedAt: clock.now() },
+      where: { consumedAt: null, id: record.id },
+    });
+    if (consumed.count === 0) throw invalidError();
+  };
+
   /**
    * Requests a passwordless login code (customers only). ALWAYS resolves for
    * unknown contacts (same response as known ones — no enumeration); for a
@@ -738,6 +870,10 @@ export const makeAuthService = (d: AuthDeps) => {
    * code's attempt counter — at the cap the code is dead and a fresh one must
    * be requested. A correct guess is consumed atomically (redeemable at most
    * once) and clears any password-failure lockout state.
+   *
+   * 2FA note: OTP login BYPASSES twoFactorEnabled by design — the emailed/
+   * texted code already proves possession of the account's channel, which is
+   * exactly the factor 2FA would ask for a second time.
    */
   const verifyOtpLogin = async (
     contact: OtpContact,
@@ -746,36 +882,14 @@ export const makeAuthService = (d: AuthDeps) => {
     const customer = await findCustomerByContact(contact);
     if (!customer) throw invalidOtpError();
 
-    const record = await prisma.userSecurityToken.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: {
-        consumedAt: null,
-        customerId: customer.id,
-        type: TokenType.OTP_LOGIN,
-      },
-    });
-    if (
-      !record ||
-      record.expiresAt.getTime() < clock.timestamp() ||
-      record.attempts >= OTP_MAX_ATTEMPTS
-    ) {
-      throw invalidOtpError();
-    }
-
-    if (!timingSafeEqualHex(record.tokenHash, hashSecurityToken(code))) {
-      await prisma.userSecurityToken.update({
-        data: { attempts: { increment: 1 } },
-        where: { id: record.id },
-      });
-      throw invalidOtpError();
-    }
-
-    // Guarded consume: two concurrent verifies race here and only one wins.
-    const consumed = await prisma.userSecurityToken.updateMany({
-      data: { consumedAt: clock.now() },
-      where: { consumedAt: null, id: record.id },
-    });
-    if (consumed.count === 0) throw invalidOtpError();
+    await consumeSecurityCode(
+      'customer',
+      customer.id,
+      TokenType.OTP_LOGIN,
+      code,
+      OTP_MAX_ATTEMPTS,
+      invalidOtpError,
+    );
 
     // A successful OTP login is as good as a correct password: clear the
     // failure counter and any temporary lock.
@@ -903,6 +1017,10 @@ export const makeAuthService = (d: AuthDeps) => {
    * else by verified email (linking the googleId for next time), else a fresh
    * passwordless Customer. The controller mints tokens / sets cookies for the
    * returned customer. Staff never authenticate via Google.
+   *
+   * 2FA note: Google sign-in BYPASSES twoFactorEnabled by design — Google
+   * already enforces its own possession factor(s) on the account, so the
+   * verified ID token is a stronger proof than a password + emailed code.
    */
   const googleSignIn = async (idToken: string): Promise<Customer> => {
     if (!config.GOOGLE_CLIENT_ID) {
@@ -965,8 +1083,337 @@ export const makeAuthService = (d: AuthDeps) => {
     });
   };
 
+  // ---- Two-factor authentication (password login only) ----
+  //
+  // Enabled per principal (Customer.twoFactorEnabled / User.twoFactorEnabled).
+  // Password login withholds the session and sends a TWO_FACTOR code over the
+  // account's channel (email if present, else SMS); /auth/2fa/verify redeems
+  // it. Enabling/disabling is a two-step: the authed /auth/2fa/challenge
+  // sends a code, and enable/disable consume it — proving channel possession
+  // before the flag flips either way. OTP login and Google sign-in BYPASS the
+  // flag: each is already a single possession factor (the channel / the
+  // Google account), so a second code adds nothing.
+
+  /** Sends a TWO_FACTOR code over the principal's channel — email preferred,
+   * SMS otherwise. Fire-and-forget like every other code delivery. */
+  const sendTwoFactorCode = (principal: AuthPrincipal, code: string): void => {
+    const row = principalRow(principal);
+    const message = `Your TravelTrek verification code is ${code}. It expires in ${String(TWO_FACTOR_TTL_MINUTES)} minutes.`;
+    if (row.email) {
+      dispatch(
+        mail.send({
+          subject: 'Your TravelTrek verification code',
+          text: message,
+          to: row.email,
+        }),
+        '2FA email',
+      );
+    } else if (row.phone) {
+      dispatch(sms.send({ message, to: row.phone }), '2FA SMS');
+    } else {
+      // Unreachable in practice: enabling requires a channel and profile
+      // updates never null contacts out. Fail closed (no session either way).
+      logger.error(
+        { kind: principal.kind, principalId: row.id },
+        '2FA code issued for a principal with no delivery channel',
+      );
+    }
+  };
+
+  /** Issues a fresh TWO_FACTOR code (replacing any prior live one) and sends
+   * it — the shared engine behind login challenges and enable/disable. */
+  const issueTwoFactorChallenge = async (
+    principal: AuthPrincipal,
+  ): Promise<void> => {
+    const code = generateOtpCode();
+    await issueSecurityToken(
+      principal.kind,
+      principalRow(principal).id,
+      TokenType.TWO_FACTOR,
+      code,
+      TWO_FACTOR_TTL_MINUTES,
+    );
+    sendTwoFactorCode(principal, code);
+  };
+
+  /** Whether the latest TWO_FACTOR code for the principal was issued inside
+   * the cooldown window (consumed or not — issuance is what's throttled). */
+  const insideTwoFactorCooldown = async (
+    kind: PrincipalKind,
+    principalId: number,
+  ): Promise<boolean> => {
+    const latest = await prisma.userSecurityToken.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { type: TokenType.TWO_FACTOR, ...principalFk(kind, principalId) },
+    });
+    return (
+      latest !== null &&
+      clock.timestamp() - latest.createdAt.getTime() <
+        TWO_FACTOR_RESEND_COOLDOWN_SECONDS * 1000
+    );
+  };
+
+  /**
+   * Login second step: redeems the TWO_FACTOR code for the principal the
+   * pending cookie vouches for and returns that principal (the controller
+   * mints tokens / sets cookies — the same envelope as a plain login).
+   * Uniform 401 on every failure mode; wrong guesses feed the attempts cap.
+   */
+  const verifyTwoFactorLogin = async (
+    kind: PrincipalKind,
+    principalId: number,
+    code: string,
+  ): Promise<AuthPrincipal> => {
+    const principal = await findPrincipalById(kind, principalId);
+    // The account vanished mid-login (deleted during the pending window) —
+    // indistinguishable from a bad code on purpose.
+    if (!principal) throw invalidTwoFactorError();
+
+    await consumeSecurityCode(
+      kind,
+      principalId,
+      TokenType.TWO_FACTOR,
+      code,
+      TWO_FACTOR_MAX_ATTEMPTS,
+      invalidTwoFactorError,
+    );
+    return principal;
+  };
+
+  /**
+   * Re-sends the login challenge for a pending 2FA login. Re-requests inside
+   * the 60s cooldown are SILENTLY dropped (the response is always the same
+   * 200 — no oracle for whether a code went out); a vanished account is
+   * likewise silent. Volume abuse is the route's per-IP limiter.
+   */
+  const resendTwoFactorLogin = async (
+    kind: PrincipalKind,
+    principalId: number,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) return;
+
+    if (await insideTwoFactorCooldown(kind, principalId)) {
+      logger.info(
+        { event: 'two_factor_cooldown', kind, principalId },
+        '2FA re-request inside cooldown dropped',
+      );
+      return;
+    }
+    await issueTwoFactorChallenge(principal);
+  };
+
+  /**
+   * Authed challenge (POST /auth/2fa/challenge): sends the code that BOTH
+   * enable and disable then consume — the same possession proof gates the
+   * flag in both directions. 400 when the account has no delivery channel
+   * (neither email nor phone). Cooldown re-requests are silently dropped,
+   * mirroring the login resend.
+   */
+  const requestTwoFactorChallenge = async (
+    kind: PrincipalKind,
+    principalId: number,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    const row = principalRow(principal);
+    if (!twoFactorChannel(row)) {
+      throw new BadRequestError(
+        'Add an email address or phone number to your profile before using two-factor authentication.',
+      );
+    }
+
+    if (await insideTwoFactorCooldown(kind, principalId)) {
+      logger.info(
+        { event: 'two_factor_cooldown', kind, principalId },
+        '2FA challenge re-request inside cooldown dropped',
+      );
+      return;
+    }
+    await issueTwoFactorChallenge(principal);
+  };
+
+  /** Enables 2FA after the challenge code verifies (POST /auth/2fa/enable). */
+  const enableTwoFactor = async (
+    kind: PrincipalKind,
+    principalId: number,
+    code: string,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    if (authState(principal).twoFactorEnabled) {
+      throw new BadRequestError('Two-factor authentication is already enabled');
+    }
+
+    await consumeSecurityCode(
+      kind,
+      principalId,
+      TokenType.TWO_FACTOR,
+      code,
+      TWO_FACTOR_MAX_ATTEMPTS,
+      invalidTwoFactorError,
+    );
+    await updateAuthState(kind, principalId, { twoFactorEnabled: true });
+  };
+
+  /** Disables 2FA — gated by the SAME challenge+code proof as enabling, so a
+   * hijacked session alone can't switch the protection off. Outstanding
+   * TWO_FACTOR codes are dropped with the flag. */
+  const disableTwoFactor = async (
+    kind: PrincipalKind,
+    principalId: number,
+    code: string,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    if (!authState(principal).twoFactorEnabled) {
+      throw new BadRequestError('Two-factor authentication is not enabled');
+    }
+
+    await consumeSecurityCode(
+      kind,
+      principalId,
+      TokenType.TWO_FACTOR,
+      code,
+      TWO_FACTOR_MAX_ATTEMPTS,
+      invalidTwoFactorError,
+    );
+    await updateAuthState(kind, principalId, { twoFactorEnabled: false });
+    await prisma.userSecurityToken.deleteMany({
+      where: {
+        consumedAt: null,
+        type: TokenType.TWO_FACTOR,
+        ...principalFk(kind, principalId),
+      },
+    });
+  };
+
+  /** GET /auth/2fa/status — whether 2FA is on and which channel codes use. */
+  const getTwoFactorStatus = async (
+    kind: PrincipalKind,
+    principalId: number,
+  ): Promise<TwoFactorStatus> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    const row = principalRow(principal);
+    return {
+      channel: twoFactorChannel(row),
+      enabled: row.twoFactorEnabled,
+    };
+  };
+
+  /**
+   * POST /auth/change-password (authenticated, both kinds). Two modes:
+   *
+   * - The account HAS a password: currentPassword is required and must
+   *   verify. A mismatch answers the SAME uniform 401 as login and feeds the
+   *   login lockout counter (a hijacked session can't grind the password
+   *   here any faster than at /auth/login), and a locked account is refused
+   *   outright.
+   * - The account is PASSWORDLESS (minimal signup / Google / admin-created
+   *   staff): currentPassword must be ABSENT — this call sets the first
+   *   password.
+   *
+   * On success the session epoch bumps (every other session/device dies) and
+   * every outstanding one-time secret is dropped; the returned principal
+   * carries the NEW epoch so the controller can mint fresh tokens and keep
+   * THIS session signed in.
+   */
+  const changePassword = async (
+    kind: PrincipalKind,
+    principalId: number,
+    input: ChangePasswordInput,
+  ): Promise<TokenPrincipal> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    const row = authState(principal);
+
+    if (row.password === null) {
+      if (input.currentPassword !== undefined) {
+        throw new BadRequestError(
+          'This account has no password yet — omit currentPassword to set one.',
+        );
+      }
+    } else {
+      if (input.currentPassword === undefined) {
+        throw new BadRequestError(
+          'Current password is required to change your password.',
+        );
+      }
+      // Same lock/verify/counter discipline as login.
+      if (row.lockedUntil && row.lockedUntil.getTime() > clock.timestamp()) {
+        throw new TooManyRequestsError(
+          'Too many failed attempts. Please wait a few minutes and try again.',
+          { code: 'ACCOUNT_LOCKED', layer: 'auth' },
+        );
+      }
+      const valid = await bcrypt.compare(input.currentPassword, row.password);
+      if (!valid) {
+        await registerFailedLogin(principal);
+        throw new UnauthorizedError('Invalid credentials', {
+          code: 'INVALID_CREDENTIALS',
+          layer: 'auth',
+        });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      input.newPassword,
+      BCRYPT_SALT_ROUNDS,
+    );
+    // Epoch bump: every already-issued token (access + refresh, every
+    // device) dies. The controller re-issues THIS session from the returned
+    // (new-epoch) principal.
+    await updateAuthState(kind, principalId, {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      password: hashedPassword,
+      tokenVersion: { increment: 1 },
+    });
+    // No stale one-time secret survives a password change (reset links, OTP
+    // codes, refresh registrations — same sweep as resetPassword).
+    await prisma.userSecurityToken.deleteMany({
+      where: { consumedAt: null, ...principalFk(kind, principalId) },
+    });
+    invalidateCachedTokenVersion(kind, principalId);
+
+    return {
+      ...toTokenPrincipal(principal),
+      tokenVersion: row.tokenVersion + 1,
+    };
+  };
+
   return {
     adminCreateUser,
+    changePassword,
+    disableTwoFactor,
+    enableTwoFactor,
+    getTwoFactorStatus,
     googleSignIn,
     invalidateSession,
     login,
@@ -976,8 +1423,11 @@ export const makeAuthService = (d: AuthDeps) => {
     register,
     requestOtpLogin,
     requestPasswordReset,
+    requestTwoFactorChallenge,
+    resendTwoFactorLogin,
     resetPassword,
     verifyOtpLogin,
+    verifyTwoFactorLogin,
   };
 };
 
@@ -985,6 +1435,10 @@ export const authService = makeAuthService(defaultDeps);
 
 export const {
   adminCreateUser,
+  changePassword,
+  disableTwoFactor,
+  enableTwoFactor,
+  getTwoFactorStatus,
   googleSignIn,
   invalidateSession,
   login,
@@ -994,6 +1448,9 @@ export const {
   register,
   requestOtpLogin,
   requestPasswordReset,
+  requestTwoFactorChallenge,
+  resendTwoFactorLogin,
   resetPassword,
   verifyOtpLogin,
+  verifyTwoFactorLogin,
 } = authService;

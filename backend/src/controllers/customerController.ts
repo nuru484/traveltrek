@@ -5,7 +5,7 @@
 // validation middleware, asyncHandler(handler)]. Handlers read the typed
 // req.query/body/params the middleware wrote back, call the customer service,
 // and reply through the standard envelope helpers. All domain logic
-// (uniqueness checks, password hashing, delete guards, Cloudinary cleanup,
+// (uniqueness checks, delete guards, Cloudinary cleanup,
 // the self-vs-staff actor rule) lives in services/customer.service.ts.
 //
 // The `!user` guards below only narrow the optional type (authenticate-jwt
@@ -71,7 +71,6 @@ const handleCreateCustomer = asyncHandler(
       address: body.address,
       email: body.email,
       name: body.name,
-      password: body.password,
       phone: body.phone,
       profilePicture: body.profilePicture,
     });
@@ -200,7 +199,6 @@ const handleUpdateCustomer = asyncHandler(
       address: body.address,
       email: body.email,
       name: body.name,
-      password: body.password,
       phone: body.phone,
       profilePicture: body.profilePicture,
     });

@@ -6,19 +6,23 @@
 // (paginated) booking and payment history, not just a recent-N slice.
 //
 // Pure, DI'd functions: they take typed inputs, own every Prisma access and
-// domain invariant (email/phone uniqueness, password hashing, delete guards,
-// Cloudinary picture cleanup), throw the typed CustomError subclasses and
-// never touch req/res.
+// domain invariant (email/phone uniqueness, delete guards, Cloudinary picture
+// cleanup), throw the typed CustomError subclasses and never touch req/res.
+// Credentials are OUT of scope here: staff never set or change a customer's
+// password (creation is passwordless; rotation happens only through the
+// authenticated POST /auth/change-password).
 //
 // Authorization: routes gate the broad role sets; the self-vs-others rule
 // lives here as an explicit actor check. A CUSTOMER actor may only touch
 // their own profile/history; ADMIN/AGENT staff may touch anyone. The actor's
 // `kind` matters — customer and staff ids overlap across the two tables, so
 // "self" only ever means a customer principal with the same id.
-import bcrypt from 'bcrypt';
-
-import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '#config/constants.js';
-import { BookingStatus, type Prisma } from '#config/prismaClient.js';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import {
+  BookingStatus,
+  PaymentStatus,
+  type Prisma,
+} from '#config/prismaClient.js';
 import {
   CustomError,
   NotFoundError,
@@ -48,12 +52,12 @@ export interface CustomerActor {
   role: UserRole;
 }
 
+/** NO password: staff-created customers start passwordless (OTP login /
+ * forgot-password establish one) — the zod schema strips any sent value. */
 export interface CustomerCreateInput {
   address?: string;
   email?: string;
   name: string;
-  /** Hashed with BCRYPT_SALT_ROUNDS before it touches the database. */
-  password?: string;
   phone?: string;
   profilePicture?: string;
 }
@@ -72,18 +76,30 @@ export interface CustomerListParams {
 
 export interface CustomerProfile {
   customer: SafeCustomer;
-  stats: {
-    totalBookings: number;
-    totalPayments: number;
-  };
+  stats: CustomerProfileStats;
 }
 
+/** The lifetime-activity block of GET /customers/:id — see the mapper
+ * (CustomerProfileDTO) for the per-field wire documentation. */
+export interface CustomerProfileStats {
+  averageBookingValue: null | number;
+  bookingsByStatus: Partial<Record<BookingStatus, number>>;
+  favoriteDestination: null | { id: number; name: string };
+  lastBookingAt: Date | null;
+  memberSince: Date;
+  signupMethod: 'email' | 'google' | 'phone';
+  totalBookings: number;
+  totalPayments: number;
+  totalSpent: number;
+  upcomingTrips: number;
+}
+
+/** NO password: profile updates never touch credentials — passwords rotate
+ * only through the authenticated POST /auth/change-password. */
 export interface CustomerUpdateInput {
   address?: string;
   email?: string;
   name?: string;
-  /** Re-hashed with BCRYPT_SALT_ROUNDS before it touches the database. */
-  password?: string;
   phone?: string;
   /** Cloudinary URL, already uploaded by the route's middleware. */
   profilePicture?: string;
@@ -155,7 +171,9 @@ export const makeCustomerService = (
     await assertContactFreeAcrossPrincipals(prisma, input, 'customer');
   };
 
-  /** POST /customers — staff-side creation (walk-in / phone customers). */
+  /** POST /customers — staff-side creation (walk-in / phone customers).
+   * Always PASSWORDLESS: the customer signs in via OTP login, or claims a
+   * password themselves through forgot-password / change-password. */
   const createCustomer = async (
     input: CustomerCreateInput,
   ): Promise<SafeCustomer> => {
@@ -166,9 +184,6 @@ export const makeCustomerService = (
         address: input.address,
         email: input.email,
         name: input.name,
-        password: input.password
-          ? await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS)
-          : null,
         phone: input.phone,
         profilePicture: input.profilePicture,
       },
@@ -217,8 +232,96 @@ export const makeCustomerService = (
     return customer;
   };
 
-  /** GET /customers/:id — the FULL profile: identity plus lifetime activity
-   * counters (top-level counts so the soft-delete scope applies). */
+  /** The booking slice the profile stats reduce over: status + timeline plus
+   * the destination each product ultimately points at. */
+  const bookingActivitySelect = {
+    createdAt: true,
+    flight: {
+      select: {
+        departure: true,
+        destination: { select: { id: true, name: true } },
+      },
+    },
+    room: {
+      select: {
+        hotel: { select: { destination: { select: { id: true, name: true } } } },
+      },
+    },
+    startDate: true,
+    status: true,
+    tour: {
+      select: {
+        destination: { select: { id: true, name: true } },
+        startDate: true,
+      },
+    },
+  } satisfies Prisma.BookingSelect;
+
+  type BookingActivityRow = Prisma.BookingGetPayload<{
+    select: typeof bookingActivitySelect;
+  }>;
+
+  /** The date a booking's trip actually starts: the tour's start, the room's
+   * check-in (booking.startDate), or the flight's departure. */
+  const tripStartOf = (row: BookingActivityRow): Date | null =>
+    row.tour?.startDate ?? row.flight?.departure ?? row.startDate;
+
+  /** The destination a booking ultimately points at (tour's, flight's, or the
+   * room's hotel's), or null for malformed rows. */
+  const destinationOf = (
+    row: BookingActivityRow,
+  ): null | { id: number; name: string } =>
+    row.tour?.destination ??
+    row.flight?.destination ??
+    row.room?.hotel.destination ??
+    null;
+
+  /** The destination booked most often, ties broken by the most recently
+   * booked one. Rows must arrive in createdAt ASC order so "latest booking
+   * for this destination" is a simple overwrite. */
+  const favoriteDestinationOf = (
+    rows: BookingActivityRow[],
+  ): null | { id: number; name: string } => {
+    const tally = new Map<
+      number,
+      { count: number; latestAt: number; name: string }
+    >();
+    for (const row of rows) {
+      const destination = destinationOf(row);
+      if (!destination) continue;
+      const entry = tally.get(destination.id) ?? {
+        count: 0,
+        latestAt: 0,
+        name: destination.name,
+      };
+      entry.count += 1;
+      entry.latestAt = row.createdAt.getTime();
+      tally.set(destination.id, entry);
+    }
+
+    let favorite: null | { id: number; name: string } = null;
+    let best = { count: 0, latestAt: 0 };
+    for (const [id, entry] of tally) {
+      if (
+        entry.count > best.count ||
+        (entry.count === best.count && entry.latestAt > best.latestAt)
+      ) {
+        favorite = { id, name: entry.name };
+        best = { count: entry.count, latestAt: entry.latestAt };
+      }
+    }
+    return favorite;
+  };
+
+  /**
+   * GET /customers/:id — the FULL profile: identity plus the lifetime
+   * activity stats (see CustomerProfileStats / the mapper for field-by-field
+   * docs). Three queries total — one booking slice that every booking-derived
+   * stat reduces over (statuses, upcoming trips, last booking, favorite
+   * destination), one payment aggregate, one payment count — no N+1. All
+   * reads are top-level so the soft-delete scope applies; "upcoming" is
+   * judged against the injected clock.
+   */
   const getCustomerById = async (
     actor: CustomerActor,
     customerId: number,
@@ -231,12 +334,67 @@ export const makeCustomerService = (
 
     const customer = await findCustomerOr404(customerId);
 
-    const [totalBookings, totalPayments] = await Promise.all([
-      prisma.booking.count({ where: { customerId } }),
-      prisma.payment.count({ where: { customerId } }),
-    ]);
+    const [identity, bookings, completedPayments, totalPayments] =
+      await Promise.all([
+        // googleId is auth bookkeeping and stays out of customerSelect; the
+        // profile only needs it to derive signupMethod.
+        prisma.customer.findFirst({
+          select: { googleId: true },
+          where: { id: customerId },
+        }),
+        prisma.booking.findMany({
+          orderBy: { createdAt: 'asc' },
+          select: bookingActivitySelect,
+          where: { customerId },
+        }),
+        prisma.payment.aggregate({
+          _count: { _all: true },
+          _sum: { amount: true },
+          where: { customerId, status: PaymentStatus.COMPLETED },
+        }),
+        prisma.payment.count({ where: { customerId } }),
+      ]);
 
-    return { customer, stats: { totalBookings, totalPayments } };
+    const bookingsByStatus: Partial<Record<BookingStatus, number>> = {};
+    for (const row of bookings) {
+      bookingsByStatus[row.status] = (bookingsByStatus[row.status] ?? 0) + 1;
+    }
+
+    const now = clock.timestamp();
+    const upcomingTrips = bookings.filter((row) => {
+      if (
+        row.status !== BookingStatus.PENDING &&
+        row.status !== BookingStatus.CONFIRMED
+      ) {
+        return false;
+      }
+      const start = tripStartOf(row);
+      return start !== null && start.getTime() > now;
+    }).length;
+
+    const totalSpent = completedPayments._sum.amount ?? 0;
+    const completedCount = completedPayments._count._all;
+
+    return {
+      customer,
+      stats: {
+        averageBookingValue:
+          completedCount === 0 ? null : Math.round(totalSpent / completedCount),
+        bookingsByStatus,
+        favoriteDestination: favoriteDestinationOf(bookings),
+        lastBookingAt: bookings.at(-1)?.createdAt ?? null,
+        memberSince: customer.createdAt,
+        signupMethod: identity?.googleId
+          ? 'google'
+          : customer.email
+            ? 'email'
+            : 'phone',
+        totalBookings: bookings.length,
+        totalPayments,
+        totalSpent,
+        upcomingTrips,
+      },
+    };
   };
 
   /** GET /customers/:id/bookings — the customer's COMPLETE booking history,
@@ -328,16 +486,13 @@ export const makeCustomerService = (
         customerId,
       );
 
-      // Prisma ignores undefined keys, so omitted fields stay untouched. An
-      // empty password string is skipped (falsy check, like the user domain).
+      // Prisma ignores undefined keys, so omitted fields stay untouched.
+      // Credentials are deliberately NOT writable here — see the input type.
       const updated = await prisma.customer.update({
         data: {
           address: input.address,
           email: input.email,
           name: input.name,
-          password: input.password
-            ? await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS)
-            : undefined,
           phone: input.phone,
           profilePicture: uploadedImageUrl,
         },

@@ -3,9 +3,10 @@
 // STAFF management domain logic (Phase 5b: customers moved to their own
 // Customer model/service — every User row is an ADMIN or AGENT). Pure, DI'd
 // functions: they take typed inputs, own every Prisma access and domain
-// invariant (email/phone uniqueness, password re-hashing, role-change and
-// delete guards, Cloudinary picture cleanup), throw the typed CustomError
-// subclasses and never touch req/res.
+// invariant (email/phone uniqueness, role-change and delete guards,
+// Cloudinary picture cleanup), throw the typed CustomError subclasses and
+// never touch req/res. Credentials are OUT of scope: profile updates carry no
+// password (rotation happens only through POST /auth/change-password).
 //
 // Authorization note: routes/user.ts now gates every endpoint to staff; the
 // per-record rules stay here as explicit actor checks — staff may view/update
@@ -19,9 +20,7 @@
 // keeps the legacy fire-and-forget semantics (the response never waits on
 // image deletion); the legacy `.then` that counted rejected settlements was
 // dead code (each cleanup catches internally), so it was dropped.
-import bcrypt from 'bcrypt';
-
-import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '#config/constants.js';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 import { type Prisma, type Role } from '#config/prismaClient.js';
 import {
   BadRequestError,
@@ -55,12 +54,12 @@ export interface UsersBulkDeleteSummary {
   deletedCount: number;
 }
 
+/** NO password: profile updates never touch credentials — passwords rotate
+ * only through the authenticated POST /auth/change-password. */
 export interface UserUpdateInput {
   address?: string;
   email?: string;
   name?: string;
-  /** Re-hashed with BCRYPT_SALT_ROUNDS before it touches the database. */
-  password?: string;
   phone?: string;
   /** Cloudinary URL, already uploaded by the route's middleware. */
   profilePicture?: string;
@@ -217,16 +216,13 @@ export const makeUserService = (
         'staff',
       );
 
-      // Prisma ignores undefined keys, so omitted fields stay untouched. An
-      // empty password string is skipped, like the legacy falsy check.
+      // Prisma ignores undefined keys, so omitted fields stay untouched.
+      // Credentials are deliberately NOT writable here — see the input type.
       const updatedUser = await prisma.user.update({
         data: {
           address: input.address,
           email: input.email,
           name: input.name,
-          password: input.password
-            ? await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS)
-            : undefined,
           phone: input.phone,
           profilePicture: uploadedImageUrl,
         },

@@ -13,6 +13,8 @@
 //   actor may create users (agents pass the route gate but are refused here,
 //   as in the legacy handler), the role is required and zod-restricted to
 //   ADMIN | AGENT, and NO session cookies are issued for the created account.
+//   Admins never set passwords: the account starts PASSWORDLESS (zod strips
+//   any sent value) and its owner establishes one via forgot-password.
 //
 // Both share the multer -> zod -> Cloudinary pipeline; if account creation
 // fails after the middleware already uploaded a picture, that upload is
@@ -51,14 +53,16 @@ import {
   registerUserSchema,
 } from '#validations/auth-validation.js';
 
-/** Bodies of both creation flows; admin's is a stricter superset shape. */
+/** Bodies of both creation flows; admin's is stricter (and password-free —
+ * only the public signup may carry one). */
 type UserCreationBody = AdminCreateUserBody | RegisterUserBody;
 
-const toRegisterInput = (body: UserCreationBody): RegisterInput => ({
+const toRegisterInput = (
+  body: UserCreationBody,
+): Omit<RegisterInput, 'password'> => ({
   address: body.address,
   email: body.email,
   name: body.name,
-  password: body.password,
   // Written by conditionalCloudinaryUpload when a file was uploaded.
   profilePicture: body.profilePicture,
   ...(body.phone !== undefined && { phone: body.phone }),
@@ -89,8 +93,9 @@ const handleRegisterUser = asyncHandler(
     const body = req.body as RegisterUserBody;
 
     // Public signup: always a Customer — no role exists on this surface.
+    // The optional password is a PUBLIC-signup-only affordance.
     const customer = await createReclaimingUpload(body, () =>
-      registerService(toRegisterInput(body)),
+      registerService({ ...toRegisterInput(body), password: body.password }),
     );
     const tokens = await mintAuthTokens(customerPrincipal(customer));
 

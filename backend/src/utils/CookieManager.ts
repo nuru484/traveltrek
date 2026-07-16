@@ -30,6 +30,12 @@ const tokenConfigs = {
     ...defaultOptions,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
+  // The mid-login "awaiting 2FA code" proof: as short-lived as the code it
+  // waits on (see utils/two-factor-pending.ts).
+  twoFactorPending: {
+    ...defaultOptions,
+    maxAge: 10 * 60 * 1000, // 10 minutes
+  },
 };
 
 // cookie-parser types req.cookies as any; narrow it once here
@@ -69,6 +75,14 @@ export const CookieManager = {
       ...defaultOptions,
       maxAge: 0,
     });
+  },
+
+  /**
+   * Clears the mid-login 2FA pending cookie (after a successful verify, or
+   * when abandoning the pending login).
+   */
+  clearTwoFactorPendingToken(res: Response): void {
+    setCookie(res, 'twoFactorPending', '', { ...defaultOptions, maxAge: 0 });
   },
 
   /**
@@ -123,6 +137,14 @@ export const CookieManager = {
   },
 
   /**
+   * Retrieves the signed 2FA pending token, or null when no password login is
+   * awaiting its second factor.
+   */
+  getTwoFactorPendingToken(req: Request): null | string {
+    return cookiesOf(req).twoFactorPending ?? null;
+  },
+
+  /**
    * Sets the httpOnly access token cookie (session-scoped).
    */
   setAccessToken(res: Response, token: string): void {
@@ -147,5 +169,14 @@ export const CookieManager = {
    */
   setRefreshToken(res: Response, token: string): void {
     setCookie(res, 'refreshToken', token, tokenConfigs.refreshToken);
+  },
+
+  /**
+   * Sets the httpOnly 2FA pending cookie (10 minutes — the lifetime of the
+   * code the login is waiting on). No auth cookies accompany it: the pending
+   * token grants nothing but the right to call /auth/2fa/{verify,resend}.
+   */
+  setTwoFactorPendingToken(res: Response, token: string): void {
+    setCookie(res, 'twoFactorPending', token, tokenConfigs.twoFactorPending);
   },
 };

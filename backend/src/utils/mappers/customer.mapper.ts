@@ -8,7 +8,7 @@
 // not stripped afterwards, so they can never appear in a DTO. Nullable
 // columns map to undefined (dropped from the JSON), mirroring the user
 // mapper's shape.
-import type { Prisma } from '#config/prismaClient.js';
+import type { BookingStatus, Prisma } from '#config/prismaClient.js';
 
 /** Every customer column except password/auth internals. */
 export const customerSelect = {
@@ -35,11 +35,35 @@ export interface CustomerDTO {
 }
 
 /** The full-profile shape GET /customers/:id returns: the base DTO plus
- * lifetime activity counters (scoped to non-deleted rows by the service). */
+ * lifetime activity stats (scoped to non-deleted rows by the service). */
 export interface CustomerProfileDTO extends CustomerDTO {
   stats: {
+    /** Mean COMPLETED payment, integer pesewas (totalSpent / completed
+     * payment count, rounded); null when no payment has completed. */
+    averageBookingValue: null | number;
+    /** Lifetime booking count per status; statuses with zero bookings are
+     * simply absent (e.g. `{ PENDING: 2, COMPLETED: 1 }`). */
+    bookingsByStatus: Partial<Record<BookingStatus, number>>;
+    /** The destination booked most often across tours, flights and hotel
+     * rooms; ties go to the most recently booked one. Null with no bookings. */
+    favoriteDestination: null | { id: number; name: string };
+    /** createdAt of the most recent booking, or null with no bookings. */
+    lastBookingAt: Date | null;
+    /** Account creation instant — echoes createdAt so the stats block is
+     * self-contained for profile widgets. */
+    memberSince: Date;
+    /** How the account came to exist: 'google' (googleId set), else 'email'
+     * (email on file), else 'phone' (phone-only signup). */
+    signupMethod: 'email' | 'google' | 'phone';
+    /** Lifetime booking count, any status. */
     totalBookings: number;
+    /** Lifetime payment count, any status (COMPLETED, PENDING, FAILED, ...). */
     totalPayments: number;
+    /** Sum of COMPLETED payment amounts, integer pesewas (GH₵1.00 = 100). */
+    totalSpent: number;
+    /** PENDING/CONFIRMED bookings whose trip hasn't started yet (tour start /
+     * room check-in / flight departure is still in the future). */
+    upcomingTrips: number;
   };
 }
 
