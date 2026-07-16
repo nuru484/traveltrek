@@ -8,7 +8,9 @@
 // the derived `bookedItem` block (legacy getBookedItemFromBooking): TOUR /
 // ROOM / FLIGHT checked in that order, with the same name/description
 // composition, and the same 'Unknown Item' TOUR fallback (carrying the
-// booking id) for a booking with no associated item.
+// booking id) for a booking with no associated item. Phase 5b: payments
+// belong to Customers — the DTO emits customerId + a nested customer summary
+// where userId/user used to be.
 import type { Prisma } from '#config/prismaClient.js';
 
 /** Relations every payment read fetches; services pass this to Prisma. */
@@ -29,7 +31,7 @@ export const paymentInclude = {
       tour: true,
     },
   },
-  user: {
+  customer: {
     select: { email: true, id: true, name: true },
   },
 } satisfies Prisma.PaymentInclude;
@@ -48,14 +50,14 @@ export interface PaymentDTO {
   bookingId: number;
   createdAt: Date;
   currency: string;
+  customer: PaymentWithRelations['customer'];
+  customerId: number;
   id: number;
   paymentDate: Date | null;
   paymentMethod: PaymentWithRelations['paymentMethod'];
   status: PaymentWithRelations['status'];
   transactionReference: string;
   updatedAt: Date;
-  user: PaymentWithRelations['user'];
-  userId: number;
 }
 
 export type PaymentWithRelations = Prisma.PaymentGetPayload<{
@@ -103,12 +105,12 @@ export const toPaymentDTO = (payment: PaymentWithRelations): PaymentDTO => ({
   bookingId: payment.bookingId,
   createdAt: payment.createdAt,
   currency: payment.currency,
+  customer: payment.customer,
+  customerId: payment.customerId,
   id: payment.id,
   paymentDate: payment.paymentDate,
   paymentMethod: payment.paymentMethod,
   status: payment.status,
   transactionReference: payment.transactionReference ?? '',
   updatedAt: payment.updatedAt,
-  user: payment.user,
-  userId: payment.userId,
 });

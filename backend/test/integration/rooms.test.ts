@@ -10,9 +10,9 @@ import prisma, { BookingStatus } from '#config/prismaClient.js';
 import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
+  createCustomer,
   createHotel,
   createRoom,
-  createUser,
 } from '../helpers/factories.js';
 
 const roomPayload = (hotelId: number) => ({
@@ -26,18 +26,18 @@ const roomPayload = (hotelId: number) => ({
 });
 
 /** A PENDING room booking placed directly in the DB (a week-long stay soon). */
-const createPendingBooking = async (roomId: number, userId: number) => {
+const createPendingBooking = async (roomId: number, customerId: number) => {
   const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const endDate = new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000);
   return prisma.booking.create({
     data: {
+      customerId,
       endDate,
       numberOfRooms: 1,
       roomId,
       startDate,
       status: BookingStatus.PENDING,
       totalPrice: 450,
-      userId,
     },
   });
 };
@@ -66,7 +66,7 @@ describe('POST /api/v1/rooms', () => {
   });
 
   it('forbids customers from creating rooms', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const hotel = await createHotel();
 
     const res = await authedApi(customer)
@@ -89,7 +89,7 @@ describe('POST /api/v1/rooms', () => {
 
 describe('GET /api/v1/rooms', () => {
   it('returns a paginated list with meta', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     for (let i = 0; i < 3; i++) {
       await createRoom();
     }
@@ -107,7 +107,7 @@ describe('GET /api/v1/rooms', () => {
   });
 
   it('filters by hotel', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const hotel = await createHotel();
     await createRoom({ hotelId: hotel.id });
     await createRoom({ hotelId: hotel.id });
@@ -124,7 +124,7 @@ describe('GET /api/v1/rooms', () => {
 
 describe('GET /api/v1/rooms/:id', () => {
   it('returns a room by id with availability counts', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const room = await createRoom({ totalRooms: 4 });
 
     const res = await authedApi(customer).get(`/api/v1/rooms/${room.id}`);
@@ -136,7 +136,7 @@ describe('GET /api/v1/rooms/:id', () => {
   });
 
   it('404s for a missing room', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const res = await authedApi(customer).get('/api/v1/rooms/999999');
     expect(res.status).toBe(404);
   });
@@ -157,7 +157,7 @@ describe('PUT /api/v1/rooms/:id', () => {
   });
 
   it('forbids customers from updating rooms', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const room = await createRoom();
     const res = await authedApi(customer)
       .put(`/api/v1/rooms/${room.id}`)
@@ -169,7 +169,7 @@ describe('PUT /api/v1/rooms/:id', () => {
 describe('DELETE /api/v1/rooms/:id', () => {
   it('refuses to delete a room with an active booking', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const room = await createRoom();
     await createPendingBooking(room.id, customer.id);
 

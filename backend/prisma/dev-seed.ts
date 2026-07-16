@@ -1,6 +1,8 @@
 import * as bcrypt from 'bcrypt';
 
-// Dev-only sample users, bookings, and payments for UI visualisation.
+// Dev-only sample customers, staff, bookings, and payments for UI
+// visualisation. Phase 5b: bookings/payments hang off Customer rows; agents
+// are staff Users.
 import prisma from '#config/prismaClient.js';
 
 import {
@@ -12,27 +14,26 @@ import {
 
 async function run() {
   const password = await bcrypt.hash('Password123!', 10);
-  const usersData = [
+  const customersData = [
     {
       address: 'Osu, Accra',
       email: 'amina.fuseini@example.com',
       name: 'Amina Fuseini',
       phone: '233540000001',
-      role: Role.CUSTOMER,
     },
     {
       address: 'Ahodwo, Kumasi',
       email: 'kwabena.mensah@example.com',
       name: 'Kwabena Mensah',
       phone: '233540000002',
-      role: Role.CUSTOMER,
     },
     {
       email: 'efua.owusu@example.com',
       name: 'Efua Owusu-Ansah',
       phone: '233540000003',
-      role: Role.CUSTOMER,
     },
+  ];
+  const staffData = [
     {
       address: 'Airport City, Accra',
       email: 'yaw.darko@example.com',
@@ -48,17 +49,24 @@ async function run() {
       role: Role.AGENT,
     },
   ];
-  const users = [];
-  for (const u of usersData) {
-    users.push(
-      await prisma.user.upsert({
-        create: { ...u, password },
+  const customers = [];
+  for (const c of customersData) {
+    customers.push(
+      await prisma.customer.upsert({
+        create: { ...c, password },
         update: {},
-        where: { email: u.email },
+        where: { email: c.email },
       }),
     );
   }
-  console.log('users:', users.map((u) => u.id).join(','));
+  for (const s of staffData) {
+    await prisma.user.upsert({
+      create: { ...s, password },
+      update: {},
+      where: { email: s.email },
+    });
+  }
+  console.log('customers:', customers.map((c) => c.id).join(','));
 
   const [tourA, tourB] = await prisma.tour.findMany({
     orderBy: { id: 'asc' },
@@ -77,39 +85,40 @@ async function run() {
 
   const b1 = await mk({
     bookingDate: new Date(now - 6 * day),
+    customerId: customers[0].id,
     numberOfGuests: 2,
     status: BookingStatus.CONFIRMED,
     totalPrice: tourA.price * 2,
     tourId: tourA.id,
-    userId: users[0].id,
   });
   const b2 = await mk({
     bookingDate: new Date(now - 1 * day),
+    customerId: customers[1].id,
     numberOfGuests: 1,
     paymentDeadline: new Date(now + 2 * day),
     status: BookingStatus.PENDING,
     totalPrice: tourB.price,
     tourId: tourB.id,
-    userId: users[1].id,
   });
   const b3 = await mk({
     bookingDate: new Date(now - 3 * day),
+    customerId: customers[2].id,
     flightId: flightA.id,
     numberOfGuests: 1,
     status: BookingStatus.CONFIRMED,
     totalPrice: flightA.price,
-    userId: users[2].id,
   });
   const _b4 = await mk({
     bookingDate: new Date(now - 10 * day),
+    customerId: customers[0].id,
     flightId: flightB.id,
     numberOfGuests: 1,
     status: BookingStatus.CANCELLED,
     totalPrice: flightB.price,
-    userId: users[0].id,
   });
   const b5 = await mk({
     bookingDate: new Date(now - 25 * day),
+    customerId: customers[1].id,
     endDate: new Date(now - 17 * day),
     numberOfGuests: 2,
     numberOfNights: 3,
@@ -118,7 +127,6 @@ async function run() {
     startDate: new Date(now - 20 * day),
     status: BookingStatus.COMPLETED,
     totalPrice: rooms[0].pricePerNight * 3,
-    userId: users[1].id,
   });
 
   await prisma.payment.createMany({
@@ -126,37 +134,37 @@ async function run() {
       {
         amount: b1.totalPrice,
         bookingId: b1.id,
+        customerId: customers[0].id,
         paymentDate: new Date(now - 6 * day + 3600000),
         paymentMethod: PaymentMethod.MOBILE_MONEY,
         status: PaymentStatus.COMPLETED,
         transactionReference: 'TT-PAY-0001',
-        userId: users[0].id,
       },
       {
         amount: b2.totalPrice,
         bookingId: b2.id,
+        customerId: customers[1].id,
         paymentMethod: PaymentMethod.MOBILE_MONEY,
         status: PaymentStatus.PENDING,
         transactionReference: 'TT-PAY-0002',
-        userId: users[1].id,
       },
       {
         amount: b3.totalPrice,
         bookingId: b3.id,
+        customerId: customers[2].id,
         paymentDate: new Date(now - 3 * day + 7200000),
         paymentMethod: PaymentMethod.CREDIT_CARD,
         status: PaymentStatus.COMPLETED,
         transactionReference: 'TT-PAY-0003',
-        userId: users[2].id,
       },
       {
         amount: b5.totalPrice,
         bookingId: b5.id,
+        customerId: customers[1].id,
         paymentDate: new Date(now - 24 * day),
         paymentMethod: PaymentMethod.BANK_TRANSFER,
         status: PaymentStatus.REFUNDED,
         transactionReference: 'TT-PAY-0005',
-        userId: users[1].id,
       },
     ],
   });
@@ -293,6 +301,16 @@ export async function maximize() {
       where: { id: u.id },
     });
   }
+  for (const c of await prisma.customer.findMany()) {
+    await prisma.customer.update({
+      data: {
+        address: LONG_NAMES.address,
+        email: `maximiliana.wolfeschlegelsteinhausenbergerdorff.kunde${c.id}@extremelylongdomainnameprovider-with-subsidiaries.example.com`,
+        name: LONG_NAMES.user,
+      },
+      where: { id: c.id },
+    });
+  }
   for (const b of await prisma.booking.findMany()) {
     await prisma.booking.update({
       data: {
@@ -388,14 +406,13 @@ export async function worstCase() {
     },
   });
   const password = await bcrypt.hash('Password123!', 10);
-  const wcUser = await prisma.user.upsert({
+  const wcCustomer = await prisma.customer.upsert({
     create: {
       email:
         'maximiliana.wolfeschlegelsteinhausenbergerdorff@extremelylongdomainnameprovider.example.com',
       name: 'Maximiliana-Anastasia Wolfeschlegelsteinhausenbergerdorff-Okonkwo-Abdulrahman III',
       password,
       phone: '233549999999',
-      role: Role.CUSTOMER,
     },
     update: {},
     where: {
@@ -405,22 +422,22 @@ export async function worstCase() {
   });
   const wb = await prisma.booking.create({
     data: {
+      customerId: wcCustomer.id,
       numberOfGuests: 42,
       status: BookingStatus.CONFIRMED,
       totalPrice: 999_999_999,
       tourId: tour.id,
-      userId: wcUser.id,
     },
   });
   await prisma.payment.create({
     data: {
       amount: 999_999_999,
       bookingId: wb.id,
+      customerId: wcCustomer.id,
       paymentDate: new Date(),
       paymentMethod: PaymentMethod.BANK_TRANSFER,
       status: PaymentStatus.COMPLETED,
       transactionReference: 'TT-PAY-WORSTCASE-24493353',
-      userId: wcUser.id,
     },
   });
   console.log(`SEEDED worst-case rows (flight ${flight.id})`);

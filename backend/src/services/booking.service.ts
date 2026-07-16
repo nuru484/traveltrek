@@ -52,6 +52,9 @@ export const BOOKING_TYPES = ['FLIGHT', 'ROOM', 'TOUR'] as const;
 export type BookingActor = Pick<IUser, 'id' | 'role'>;
 
 export interface BookingCreateInput {
+  /** The customer the booking is FOR: customers must self-book (actor rule);
+   * admins/agents may book on behalf of any customer. */
+  customerId: number;
   endDate?: string;
   flightId?: number;
   numberOfGuests?: number;
@@ -61,7 +64,6 @@ export interface BookingCreateInput {
   startDate?: string;
   totalPrice: number;
   tourId?: number;
-  userId: number;
 }
 
 export interface BookingCreateResult {
@@ -93,6 +95,8 @@ export interface BookingDeleteSummary {
 }
 
 export interface BookingListParams {
+  /** Filter by owner; ignored for customers (always scoped to themselves). */
+  customerId?: number;
   flightId?: number;
   /** Raw date strings, parsed here the way the legacy handler did. */
   fromDate?: string;
@@ -104,13 +108,12 @@ export interface BookingListParams {
   toDate?: string;
   tourId?: number;
   type?: BookingType;
-  /** Filter by owner; ignored for customers (always scoped to themselves). */
-  userId?: number;
 }
 
 export type BookingType = (typeof BOOKING_TYPES)[number];
 
 export interface BookingUpdateInput {
+  customerId?: number;
   endDate?: string;
   flightId?: number;
   numberOfGuests?: number;
@@ -121,7 +124,6 @@ export interface BookingUpdateInput {
   status?: BookingStatus;
   totalPrice?: number;
   tourId?: number;
-  userId?: number;
 }
 
 export interface BulkBookingDeleteSummary {
@@ -286,8 +288,8 @@ export const makeBookingService = (
     },
     { flight: { flightNumber: { contains: search, mode: 'insensitive' } } },
     { flight: { airline: { contains: search, mode: 'insensitive' } } },
-    { user: { name: { contains: search, mode: 'insensitive' } } },
-    { user: { email: { contains: search, mode: 'insensitive' } } },
+    { customer: { name: { contains: search, mode: 'insensitive' } } },
+    { customer: { email: { contains: search, mode: 'insensitive' } } },
   ];
 
   /**
@@ -364,6 +366,7 @@ export const makeBookingService = (
     input: BookingCreateInput,
   ): Promise<BookingCreateResult> => {
     const {
+      customerId,
       endDate,
       flightId,
       numberOfGuests,
@@ -373,10 +376,9 @@ export const makeBookingService = (
       startDate,
       totalPrice,
       tourId,
-      userId,
     } = input;
 
-    if (actor.role === UserRole.CUSTOMER && actor.id !== userId) {
+    if (actor.role === UserRole.CUSTOMER && actor.id !== customerId) {
       throw new UnauthorizedError('Customers can only book for themselves');
     }
 
@@ -388,8 +390,10 @@ export const makeBookingService = (
 
     // findFirst everywhere below so soft-deleted rows 404 like hard-deleted
     // ones did (the soft-delete extension does not scope findUnique).
-    const targetUser = await prisma.user.findFirst({ where: { id: userId } });
-    if (!targetUser) throw new NotFoundError('User not found');
+    const targetCustomer = await prisma.customer.findFirst({
+      where: { id: customerId },
+    });
+    if (!targetCustomer) throw new NotFoundError('Customer not found');
 
     let tour: null | Tour = null;
     let room: null | Room = null;
@@ -510,7 +514,7 @@ export const makeBookingService = (
     // insert (e.g. the duplicate-booking unique constraint) rolls them back.
     // Note: the duplicate-booking unique constraints span soft-deleted rows
     // (khadys convention) — a soft-deleted booking still holds its
-    // user+tour/room/flight slot until it is restored or hard-purged.
+    // customer+tour/room/flight slot until it is restored or hard-purged.
     const booking = await prisma.$transaction(async (tx) => {
       if (tourId && tour) {
         const guestsToBook = numberOfGuests ?? 1;
@@ -530,6 +534,7 @@ export const makeBookingService = (
 
       return await tx.booking.create({
         data: {
+          customer: { connect: { id: customerId } },
           endDate: roomId && endDate ? new Date(endDate) : null,
           flight: flightId ? { connect: { id: flightId } } : undefined,
           numberOfGuests: numberOfGuests ?? 1,
@@ -545,7 +550,6 @@ export const makeBookingService = (
           status: BookingStatus.PENDING,
           totalPrice: calculatedTotalPrice,
           tour: tourId ? { connect: { id: tourId } } : undefined,
-          user: { connect: { id: userId } },
         },
         include: bookingInclude,
       });
@@ -574,7 +578,7 @@ export const makeBookingService = (
     });
     if (!booking) throw new NotFoundError('Booking not found');
 
-    if (actor.role === UserRole.CUSTOMER && booking.userId !== actor.id) {
+    if (actor.role === UserRole.CUSTOMER && booking.customerId !== actor.id) {
       throw new UnauthorizedError('You can only view your own bookings');
     }
 
@@ -586,6 +590,7 @@ export const makeBookingService = (
     input: BookingUpdateInput,
   ): Promise<BookingWithRelations> => {
     const {
+      customerId,
       endDate,
       flightId,
       numberOfGuests,
@@ -596,7 +601,6 @@ export const makeBookingService = (
       status,
       totalPrice,
       tourId,
-      userId,
     } = input;
 
     const existingBooking = await prisma.booking.findFirst({
@@ -650,7 +654,7 @@ export const makeBookingService = (
     if (
       (existingBooking.status === BookingStatus.COMPLETED ||
         existingBooking.status === BookingStatus.CANCELLED) &&
-      (tourId || roomId || flightId || userId || numberOfGuests)
+      (tourId || roomId || flightId || customerId || numberOfGuests)
     ) {
       throw new BadRequestError(
         `Cannot modify ${existingBooking.status.toLowerCase()} bookings`,
@@ -663,9 +667,11 @@ export const makeBookingService = (
     let requiresImmediatePayment = existingBooking.requiresImmediatePayment;
 
     return await prisma.$transaction(async (tx) => {
-      if (userId) {
-        const targetUser = await tx.user.findFirst({ where: { id: userId } });
-        if (!targetUser) throw new NotFoundError('User not found');
+      if (customerId) {
+        const targetCustomer = await tx.customer.findFirst({
+          where: { id: customerId },
+        });
+        if (!targetCustomer) throw new NotFoundError('Customer not found');
       }
 
       if (
@@ -930,6 +936,7 @@ export const makeBookingService = (
 
       return await tx.booking.update({
         data: {
+          customer: customerId ? { connect: { id: customerId } } : undefined,
           endDate: endDate ? new Date(endDate) : existingBooking.endDate,
           flight: flightId ? { connect: { id: flightId } } : undefined,
           numberOfGuests: numberOfGuests ?? existingBooking.numberOfGuests,
@@ -948,7 +955,6 @@ export const makeBookingService = (
           status: status ?? existingBooking.status,
           totalPrice: calculatedTotalPrice ?? existingBooking.totalPrice,
           tour: tourId ? { connect: { id: tourId } } : undefined,
-          user: userId ? { connect: { id: userId } } : undefined,
         },
         include: bookingInclude,
         where: { id },
@@ -971,8 +977,8 @@ export const makeBookingService = (
 
     const booking = await prisma.booking.findFirst({
       include: {
+        customer: { select: { email: true, id: true, name: true } },
         payment: true,
-        user: { select: { email: true, id: true, name: true } },
       },
       where: { id },
     });
@@ -1081,11 +1087,11 @@ export const makeBookingService = (
     const where: Prisma.BookingWhereInput = {};
 
     if (actor.role === UserRole.CUSTOMER) {
-      where.userId = actor.id;
+      where.customerId = actor.id;
     }
 
-    if (params.userId && actor.role !== UserRole.CUSTOMER) {
-      where.userId = params.userId;
+    if (params.customerId && actor.role !== UserRole.CUSTOMER) {
+      where.customerId = params.customerId;
     }
 
     applyListFilters(where, params, params.search);
@@ -1093,17 +1099,17 @@ export const makeBookingService = (
     return findPage(where, params.page, params.limit);
   };
 
-  /** GET /bookings/user/:userId — a customer may only list their own. */
-  const listUserBookings = async (
+  /** GET /bookings/customer/:customerId — a customer may only list their own. */
+  const listCustomerBookings = async (
     actor: BookingActor,
-    userId: number,
+    customerId: number,
     params: BookingListParams,
   ): Promise<{ bookings: BookingWithRelations[]; total: number }> => {
-    if (actor.role === UserRole.CUSTOMER && actor.id !== userId) {
+    if (actor.role === UserRole.CUSTOMER && actor.id !== customerId) {
       throw new UnauthorizedError('You can only view your own bookings');
     }
 
-    const where: Prisma.BookingWhereInput = { userId };
+    const where: Prisma.BookingWhereInput = { customerId };
 
     // The legacy handler trimmed and truncated the search term (the general
     // list endpoint used it raw); preserved.
@@ -1289,7 +1295,7 @@ export const makeBookingService = (
     deleteBooking,
     getBookingById,
     listBookings,
-    listUserBookings,
+    listCustomerBookings,
     updateBooking,
   };
 };
@@ -1302,6 +1308,6 @@ export const {
   deleteBooking,
   getBookingById,
   listBookings,
-  listUserBookings,
+  listCustomerBookings,
   updateBooking,
 } = bookingService;

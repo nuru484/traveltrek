@@ -1,4 +1,7 @@
 // src/routes/user.ts
+//
+// STAFF management (Phase 5b): every endpoint is staff-gated — customers have
+// their own /customers surface and never touch /users anymore.
 import { Router } from 'express';
 
 import { adminCreateUser } from '#controllers/authentication/index.js';
@@ -23,7 +26,7 @@ userRoutes.post(
 
 userRoutes.put(
   '/users/:userId',
-  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
   ...updateUserProfile,
 );
 
@@ -35,7 +38,7 @@ userRoutes.get(
 
 userRoutes.get(
   '/users/:userId',
-  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
   getUserById,
 );
 

@@ -1,18 +1,18 @@
 // src/services/user.service.ts
 //
-// Users domain logic, extracted from the legacy fat controller. Pure, DI'd
+// STAFF management domain logic (Phase 5b: customers moved to their own
+// Customer model/service — every User row is an ADMIN or AGENT). Pure, DI'd
 // functions: they take typed inputs, own every Prisma access and domain
 // invariant (email/phone uniqueness, password re-hashing, role-change and
 // delete guards, Cloudinary picture cleanup), throw the typed CustomError
 // subclasses and never touch req/res.
 //
-// Authorization note: like payments, the user actor rules are NOT fully
-// enforced by routes/user.ts — customers pass authorizeRole on the profile
-// endpoints and the self-vs-others distinction lived in the handlers. Every
-// legacy in-handler check is preserved as an explicit actor-based rule:
-// users may view/update their own profile, ADMIN/AGENT may touch anyone,
-// admins may not change their own role or delete themselves, and only
-// admins may delete other users.
+// Authorization note: routes/user.ts now gates every endpoint to staff; the
+// per-record rules stay here as explicit actor checks — staff may view/update
+// their own profile, ADMIN/AGENT may touch anyone, admins may not change
+// their own role or delete themselves, and only admins may delete other
+// users. The legacy payment-based delete guards are GONE: staff users have no
+// bookings/payments relations anymore (those hang off Customer).
 //
 // Cleanup note: every Cloudinary delete is best-effort via the injected
 // cloudinary dep — a cleanup failure never fails the request. deleteAllUsers
@@ -22,7 +22,7 @@
 import bcrypt from 'bcrypt';
 
 import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '#config/constants.js';
-import { PaymentStatus, type Prisma, type Role } from '#config/prismaClient.js';
+import { type Prisma, type Role } from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
@@ -287,7 +287,7 @@ export const makeUserService = (
 
     // Drop the cached session epoch so the next authenticated request
     // re-reads the user's live row rather than a pre-change cache entry.
-    invalidateCachedTokenVersion(userId);
+    invalidateCachedTokenVersion('staff', userId);
 
     return updated;
   };
@@ -295,9 +295,10 @@ export const makeUserService = (
   /**
    * DELETE /users/:userId — admins may not delete themselves; only admins
    * may delete others (a non-admin self-delete fell through in the legacy
-   * handler — unreachable anyway, routes gate this endpoint to ADMIN). A
-   * user with any non-refunded payment is protected (409). The profile
-   * picture is cleaned up best-effort after the row is gone.
+   * handler — unreachable anyway, routes gate this endpoint to ADMIN). Staff
+   * users carry no bookings/payments (those belong to Customers), so the
+   * legacy payment guard is gone. The profile picture is cleaned up
+   * best-effort after the row is gone.
    */
   const deleteUser = async (
     actor: UserActor,
@@ -328,21 +329,6 @@ export const makeUserService = (
       throw new NotFoundError('User not found');
     }
 
-    const activePayments = await prisma.payment.count({
-      where: {
-        status: { not: PaymentStatus.REFUNDED },
-        userId,
-      },
-    });
-
-    if (activePayments > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        'Cannot delete user with active (non-refunded) payments. ' +
-          'Please handle or refund payments first.',
-      );
-    }
-
     // Soft delete: the row survives (deletedAt set); scoped reads hide it.
     await prisma.user.update({
       data: { deletedAt: clock.now() },
@@ -351,7 +337,7 @@ export const makeUserService = (
 
     // Deleted accounts must lose access at once, not at cache expiry: the
     // next request re-reads the DB (scoped), finds no row, and is rejected.
-    invalidateCachedTokenVersion(userId);
+    invalidateCachedTokenVersion('staff', userId);
 
     if (existingUser.profilePicture) {
       await cleanupPicture(
@@ -364,11 +350,11 @@ export const makeUserService = (
   };
 
   /**
-   * DELETE /users — wipes every user EXCEPT the acting admin. Requires the
-   * legacy confirmation phrase (kept here, not in zod, so the exact message
-   * and error shape survive), reports zero deletions as a success, and is
-   * refused entirely (409) while any doomed user still has a non-refunded
-   * payment. Picture cleanup is fire-and-forget, as before.
+   * DELETE /users — wipes every staff user EXCEPT the acting admin. Requires
+   * the legacy confirmation phrase (kept here, not in zod, so the exact
+   * message and error shape survive) and reports zero deletions as a success.
+   * The legacy payment guard is gone — staff carry no payments (Customers
+   * do). Picture cleanup is fire-and-forget, as before.
    */
   const deleteAllUsers = async (
     actor: UserActor,
@@ -394,26 +380,6 @@ export const makeUserService = (
 
     if (usersToDelete.length === 0) {
       return { deletedCount: 0 };
-    }
-
-    const usersWithActivePayments = await prisma.payment.findMany({
-      select: { userId: true },
-      where: {
-        status: { not: PaymentStatus.REFUNDED },
-        userId: { in: usersToDelete.map((u) => u.id) },
-      },
-    });
-
-    const blockedUserIds = new Set(
-      usersWithActivePayments.map((p) => p.userId),
-    );
-
-    if (blockedUserIds.size > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete ${String(blockedUserIds.size)} users with active (non-refunded) payments. ` +
-          'Please handle or refund payments first.',
-      );
     }
 
     const profilePicturesToDelete = usersToDelete.flatMap((user) =>

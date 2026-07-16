@@ -6,10 +6,11 @@
 //
 // - registerUser is the MINIMAL public signup: name plus at least one contact
 //   (email OR phone); password/address are optional — the profile is
-//   completed later via PUT /users/:userId.
-// - adminCreateUser keeps the stricter legacy requirements (address, email,
-//   name) with only the password now optional (admin-created accounts can
-//   OTP-login). `role` is read by the admin controller only.
+//   completed later via PUT /customers/:id. Public signups always create a
+//   Customer (Phase 5b).
+// - adminCreateUser creates STAFF ONLY: the legacy required fields (address,
+//   email, name) with the password optional, and role required + restricted
+//   to ADMIN | AGENT.
 // - profilePicture is declared minimally: the Cloudinary middleware
 //   overwrites it after parsing when a file is uploaded.
 // - login/otp/reset only check presence/shape — password strength is enforced
@@ -42,18 +43,22 @@ const phoneField = z
     'Phone must be a valid phone number (10-15 digits)',
   );
 
-// Read only by the admin create-user controller; public register forces
-// CUSTOMER regardless of what was sent.
-const roleField = z
-  .enum(Role, 'role must be one of: ADMIN, CUSTOMER, AGENT')
-  .optional();
+// POST /users creates STAFF ONLY (Phase 5b): customers are a separate model
+// created via public signup or POST /customers, so the role is required here
+// and restricted to the staff roles.
+const staffRoleField = z.enum(
+  [Role.ADMIN, Role.AGENT],
+  'role must be one of: ADMIN, AGENT',
+);
 
 export const loginSchema = z.object({
   email: z.email('Invalid email address'),
   password: z.string('Password is required').min(1, 'Password is required'),
 });
 
-/** Public minimal signup: name + (email OR phone); everything else optional. */
+/** Public minimal signup: name + (email OR phone); everything else optional.
+ * Creates a CUSTOMER — there is no role concept on the public surface (a
+ * `role` key in the body is simply stripped). */
 export const registerUserSchema = z
   .object({
     address: addressField.optional(),
@@ -62,14 +67,14 @@ export const registerUserSchema = z
     password: passwordField.optional(),
     phone: phoneField.optional(),
     profilePicture: z.string('profilePicture must be a string').optional(),
-    role: roleField,
   })
   .refine((body) => Boolean(body.email ?? body.phone), {
     message: 'Provide an email address or a phone number',
     path: ['email'],
   });
 
-/** Admin user creation: the legacy required fields, password now optional. */
+/** Admin STAFF creation: the legacy required fields, password optional, and
+ * the role now mandatory + staff-only (ADMIN | AGENT). */
 export const adminCreateUserSchema = z.object({
   address: addressField,
   email: emailField,
@@ -77,7 +82,7 @@ export const adminCreateUserSchema = z.object({
   password: passwordField.optional(),
   phone: phoneField.optional(),
   profilePicture: z.string('profilePicture must be a string').optional(),
-  role: roleField,
+  role: staffRoleField,
 });
 
 /** OTP login identifies the account by exactly ONE of email or phone. */

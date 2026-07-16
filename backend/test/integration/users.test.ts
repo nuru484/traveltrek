@@ -1,17 +1,22 @@
 // test/integration/users.test.ts
 //
-// Baseline behaviour of user management before the refactor: role gates on
-// listing, admin user creation with roles, role changes, self-updates.
+// Baseline behaviour of STAFF management (Phase 5b: the User table is
+// staff-only — customers live in /customers): role gates on listing, admin
+// staff creation with a required staff role, role changes, self-updates.
 import { describe, expect, it } from 'vitest';
 
 import { authedApi } from '../helpers/auth.js';
-import { createAdmin, createUser } from '../helpers/factories.js';
+import {
+  createAdmin,
+  createAgent,
+  createCustomer,
+} from '../helpers/factories.js';
 
 describe('GET /api/v1/users', () => {
-  it('lets an admin list users', async () => {
+  it('lets an admin list staff users', async () => {
     const admin = await createAdmin();
-    await createUser();
-    await createUser();
+    await createAgent();
+    await createAgent();
 
     const res = await authedApi(admin).get('/api/v1/users');
 
@@ -20,14 +25,14 @@ describe('GET /api/v1/users', () => {
   });
 
   it('forbids customers from listing users', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const res = await authedApi(customer).get('/api/v1/users');
     expect(res.status).toBe(403);
   });
 });
 
 describe('POST /api/v1/users', () => {
-  it('lets an admin create a user with an explicit role', async () => {
+  it('lets an admin create a staff user with an explicit role', async () => {
     const admin = await createAdmin();
 
     const res = await authedApi(admin).post('/api/v1/users').send({
@@ -42,60 +47,88 @@ describe('POST /api/v1/users', () => {
     expect(res.body.data.role).toBe('AGENT');
   });
 
+  it('rejects the legacy-reserved CUSTOMER role with 400', async () => {
+    const admin = await createAdmin();
+
+    const res = await authedApi(admin).post('/api/v1/users').send({
+      address: '1 Customer Lane',
+      email: 'not-staff@test.local',
+      name: 'Not Staff',
+      password: 'Password1!',
+      role: 'CUSTOMER',
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('requires a role (staff creation is explicit)', async () => {
+    const admin = await createAdmin();
+
+    const res = await authedApi(admin).post('/api/v1/users').send({
+      address: '2 No Role Road',
+      email: 'no-role@test.local',
+      name: 'No Role',
+      password: 'Password1!',
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it('forbids customers from creating users', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const res = await authedApi(customer).post('/api/v1/users').send({
       address: '1 Nope Street',
       email: 'nope@test.local',
       name: 'Nope',
       password: 'Password1!',
+      role: 'AGENT',
     });
     expect(res.status).toBe(403);
   });
 });
 
 describe('PATCH /api/v1/users/:userId/role', () => {
-  it('lets an admin change a user role', async () => {
+  it('lets an admin change a staff role', async () => {
     const admin = await createAdmin();
-    const user = await createUser();
+    const agent = await createAgent();
 
     const res = await authedApi(admin)
-      .patch(`/api/v1/users/${user.id}/role`)
-      .send({ role: 'AGENT' });
+      .patch(`/api/v1/users/${agent.id}/role`)
+      .send({ role: 'ADMIN' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.role).toBe('AGENT');
+    expect(res.body.data.role).toBe('ADMIN');
   });
 
   it('forbids non-admins from changing roles', async () => {
-    const customer = await createUser();
-    const other = await createUser();
+    const customer = await createCustomer();
+    const agent = await createAgent();
     const res = await authedApi(customer)
-      .patch(`/api/v1/users/${other.id}/role`)
+      .patch(`/api/v1/users/${agent.id}/role`)
       .send({ role: 'ADMIN' });
     expect(res.status).toBe(403);
   });
 });
 
 describe('GET /api/v1/users/:userId', () => {
-  it('returns a user for an admin without the password field', async () => {
+  it('returns a staff user for an admin without the password field', async () => {
     const admin = await createAdmin();
-    const user = await createUser();
+    const agent = await createAgent();
 
-    const res = await authedApi(admin).get(`/api/v1/users/${user.id}`);
+    const res = await authedApi(admin).get(`/api/v1/users/${agent.id}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.email).toBe(user.email);
+    expect(res.body.data.email).toBe(agent.email);
     expect(res.body.data.password).toBeUndefined();
   });
 });
 
 describe('PUT /api/v1/users/:userId', () => {
-  it('lets a user update their own profile', async () => {
-    const user = await createUser();
+  it('lets a staff user update their own profile', async () => {
+    const agent = await createAgent();
 
-    const res = await authedApi(user)
-      .put(`/api/v1/users/${user.id}`)
+    const res = await authedApi(agent)
+      .put(`/api/v1/users/${agent.id}`)
       .send({ name: 'Renamed Self' });
 
     expect(res.status).toBe(200);

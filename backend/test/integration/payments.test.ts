@@ -19,7 +19,11 @@ import { describe, expect, it, vi } from 'vitest';
 import prisma from '#config/prismaClient.js';
 
 import { api, authedApi } from '../helpers/auth.js';
-import { createAdmin, createTour, createUser } from '../helpers/factories.js';
+import {
+  createAdmin,
+  createCustomer,
+  createTour,
+} from '../helpers/factories.js';
 
 vi.mock('#lib/paystack.js', async (importOriginal) => {
   const actual =
@@ -82,21 +86,21 @@ const postWebhook = (event: Record<string, unknown>, signature?: string) => {
 };
 
 /** A PENDING tour booking to pay for. */
-const createPendingBooking = async (userId: number, totalPrice = 500) => {
+const createPendingBooking = async (customerId: number, totalPrice = 500) => {
   const tour = await createTour({ price: totalPrice });
   return prisma.booking.create({
     data: {
+      customerId,
       numberOfGuests: 1,
       totalPrice,
       tourId: tour.id,
-      userId,
     },
   });
 };
 
 /** Initializes a payment through the API; returns the response data block. */
 const initPayment = async (
-  user: { id: number; role: 'ADMIN' | 'AGENT' | 'CUSTOMER' },
+  user: { id: number; role?: 'ADMIN' | 'AGENT' | 'CUSTOMER' },
   bookingId: number,
 ) => {
   const res = await authedApi(user)
@@ -112,7 +116,7 @@ const initPayment = async (
 
 describe('POST /api/v1/payments', () => {
   it('initializes a Paystack transaction and creates a PENDING payment row', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id, 750);
 
     const res = await authedApi(customer)
@@ -134,11 +138,11 @@ describe('POST /api/v1/payments', () => {
     expect(payment?.status).toBe('PENDING');
     expect(payment?.amount).toBe(750);
     expect(payment?.bookingId).toBe(booking.id);
-    expect(payment?.userId).toBe(customer.id);
+    expect(payment?.customerId).toBe(customer.id);
   });
 
   it('resumes an existing pending payment with its original reference', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id);
     const first = await initPayment(customer, booking.id);
 
@@ -156,8 +160,8 @@ describe('POST /api/v1/payments', () => {
   });
 
   it("blocks a customer from paying for another user's booking", async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
     const booking = await createPendingBooking(customerA.id);
 
     const res = await authedApi(customerB)
@@ -169,7 +173,7 @@ describe('POST /api/v1/payments', () => {
   });
 
   it('rejects an invalid payment method with the legacy 400', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id);
 
     const res = await authedApi(customer)
@@ -183,7 +187,7 @@ describe('POST /api/v1/payments', () => {
 
 describe('POST /api/v1/payments/webhook', () => {
   it('completes the payment and confirms the booking on a validly signed charge.success', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id, 500);
     const { transactionReference } = await initPayment(customer, booking.id);
 
@@ -211,7 +215,7 @@ describe('POST /api/v1/payments/webhook', () => {
   });
 
   it('rejects a webhook whose signature does not match the raw body', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id);
     const { transactionReference } = await initPayment(customer, booking.id);
 
@@ -236,7 +240,7 @@ describe('POST /api/v1/payments/webhook', () => {
   });
 
   it('marks the payment FAILED and 500s when the verified amount mismatches the booking total', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id, 500);
     const { transactionReference } = await initPayment(customer, booking.id);
 
@@ -279,7 +283,7 @@ describe('POST /api/v1/payments/webhook', () => {
 
 describe('GET /api/v1/payments/callback', () => {
   it('verifies the transaction, completes the payment and confirms the booking', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id, 500);
     const { transactionReference } = await initPayment(customer, booking.id);
 
@@ -309,7 +313,7 @@ describe('GET /api/v1/payments/callback', () => {
   });
 
   it('rejects a callback without a reference', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
 
     const res = await authedApi(customer).get('/api/v1/payments/callback');
 
@@ -323,8 +327,8 @@ describe('GET /api/v1/payments/callback', () => {
 
 describe('GET /api/v1/payments (scoping)', () => {
   it('scopes customers to their own payments while admins see all', async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
     const admin = await createAdmin();
     const bookingA = await createPendingBooking(customerA.id);
     const bookingB = await createPendingBooking(customerB.id);
@@ -334,7 +338,7 @@ describe('GET /api/v1/payments (scoping)', () => {
     const asCustomer = await authedApi(customerA).get('/api/v1/payments');
     expect(asCustomer.status).toBe(200);
     expect(asCustomer.body.data.length).toBe(1);
-    expect(asCustomer.body.data[0].userId).toBe(customerA.id);
+    expect(asCustomer.body.data[0].customerId).toBe(customerA.id);
     expect(asCustomer.body.data[0].bookedItem.type).toBe('TOUR');
     expect(asCustomer.body.meta.total).toBe(1);
 
@@ -344,8 +348,8 @@ describe('GET /api/v1/payments (scoping)', () => {
   });
 
   it("blocks a customer from reading another user's payment by id", async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
     const booking = await createPendingBooking(customerA.id);
     const { paymentId } = await initPayment(customerA, booking.id);
 
@@ -358,11 +362,11 @@ describe('GET /api/v1/payments (scoping)', () => {
   });
 
   it("blocks a customer from listing another user's payments", async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
 
     const res = await authedApi(customerA).get(
-      `/api/v1/payments/user/${String(customerB.id)}`,
+      `/api/v1/payments/customer/${String(customerB.id)}`,
     );
 
     expect(res.status).toBe(401);
@@ -372,7 +376,7 @@ describe('GET /api/v1/payments (scoping)', () => {
 
 describe('PATCH /api/v1/payments/:id (manual status update)', () => {
   it('lets an admin complete a payment manually and confirms the booking', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
@@ -392,7 +396,7 @@ describe('PATCH /api/v1/payments/:id (manual status update)', () => {
   });
 
   it('blocks non-admins from updating payment status', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
 
@@ -407,7 +411,7 @@ describe('PATCH /api/v1/payments/:id (manual status update)', () => {
   });
 
   it('refuses to move a completed payment back to pending', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
@@ -428,7 +432,7 @@ describe('PATCH /api/v1/payments/:id (manual status update)', () => {
 
 describe('PATCH /api/v1/payments/:id/refund', () => {
   it('refunds a completed payment and cancels the booking', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id, 500);
     const { paymentId, transactionReference } = await initPayment(
@@ -465,7 +469,7 @@ describe('PATCH /api/v1/payments/:id/refund', () => {
   });
 
   it('refuses to refund a payment that is not completed', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
@@ -479,7 +483,7 @@ describe('PATCH /api/v1/payments/:id/refund', () => {
   });
 
   it('blocks non-admins from refunding', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
 
@@ -494,7 +498,7 @@ describe('PATCH /api/v1/payments/:id/refund', () => {
 
 describe('DELETE /api/v1/payments/:id', () => {
   it('lets an admin delete a pending payment and reverts the booking to PENDING', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id);
     const { paymentId } = await initPayment(customer, booking.id);
@@ -525,7 +529,7 @@ describe('DELETE /api/v1/payments/:id', () => {
   });
 
   it('protects completed payments from deletion', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const admin = await createAdmin();
     const booking = await createPendingBooking(customer.id);
     const { paymentId, transactionReference } = await initPayment(

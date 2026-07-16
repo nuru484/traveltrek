@@ -12,6 +12,7 @@ export const TEST_PASSWORD = 'Password1!';
 let uniq = 0;
 const next = () => ++uniq;
 
+/** A STAFF user (Phase 5b: the User table is staff-only). Default AGENT. */
 export const createUser = async (
   overrides: {
     email?: string;
@@ -25,11 +26,11 @@ export const createUser = async (
   return prisma.user.create({
     data: {
       address: '123 Test Street',
-      email: overrides.email ?? `user-${n}@test.local`,
-      name: overrides.name ?? `Test User ${n}`,
+      email: overrides.email ?? `staff-${n}@test.local`,
+      name: overrides.name ?? `Test Staff ${n}`,
       password: await bcrypt.hash(overrides.password ?? TEST_PASSWORD, 4),
       phone: overrides.phone === undefined ? `2335500${1000 + n}` : overrides.phone,
-      role: overrides.role ?? Role.CUSTOMER,
+      role: overrides.role ?? Role.AGENT,
     },
   });
 };
@@ -39,6 +40,32 @@ export const createAdmin = (overrides: Parameters<typeof createUser>[0] = {}) =>
 
 export const createAgent = (overrides: Parameters<typeof createUser>[0] = {}) =>
   createUser({ role: Role.AGENT, ...overrides });
+
+/** A customer principal — owns bookings/payments, has no role. */
+export const createCustomer = async (
+  overrides: {
+    address?: string;
+    email?: string;
+    name?: string;
+    password?: null | string;
+    phone?: null | string;
+  } = {},
+) => {
+  const n = next();
+  return prisma.customer.create({
+    data: {
+      address: overrides.address ?? '123 Test Street',
+      email: overrides.email ?? `customer-${n}@test.local`,
+      name: overrides.name ?? `Test Customer ${n}`,
+      password:
+        overrides.password === null
+          ? null
+          : await bcrypt.hash(overrides.password ?? TEST_PASSWORD, 4),
+      phone:
+        overrides.phone === undefined ? `2335501${1000 + n}` : overrides.phone,
+    },
+  });
+};
 
 export const createDestination = (
   overrides: Partial<{ city: string; country: string; name: string }> = {},

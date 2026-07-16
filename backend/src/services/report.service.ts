@@ -50,9 +50,9 @@ export type MonthlyBookingRow = Prisma.BookingGetPayload<{
 }>;
 
 export interface MonthlyBookingsParams extends ReportPeriodParams {
+  customerId?: number;
   status?: BookingStatus;
   tourId?: number;
-  userId?: number;
 }
 
 export interface MonthlyBookingsReport {
@@ -76,9 +76,9 @@ export interface PaymentMonthBucket {
 export interface PaymentsSummaryParams extends ReportPeriodParams {
   /** Always present (zod defaults to GHS), so it always filters — as before. */
   currency: string;
+  customerId?: number;
   paymentMethod?: PaymentMethod;
   status?: PaymentStatus;
-  userId?: number;
 }
 
 export interface PaymentsSummaryReport {
@@ -155,18 +155,18 @@ type TopTourRow = Prisma.TourGetPayload<{ select: typeof topTourSelect }>;
 
 const monthlyBookingSelect = {
   bookingDate: true,
+  customer: {
+    select: {
+      email: true,
+      id: true,
+      name: true,
+    },
+  },
   id: true,
   status: true,
   totalPrice: true,
   tour: {
     select: {
-      id: true,
-      name: true,
-    },
-  },
-  user: {
-    select: {
-      email: true,
       id: true,
       name: true,
     },
@@ -188,18 +188,18 @@ const paymentSummarySelect = {
     },
   },
   currency: true,
-  id: true,
-  paymentDate: true,
-  paymentMethod: true,
-  status: true,
-  transactionReference: true,
-  user: {
+  customer: {
     select: {
       email: true,
       id: true,
       name: true,
     },
   },
+  id: true,
+  paymentDate: true,
+  paymentMethod: true,
+  status: true,
+  transactionReference: true,
 } satisfies Prisma.PaymentSelect;
 
 const topTourBookingSelect = {
@@ -286,7 +286,7 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
       bookingDate: periodClause(params, year),
     };
     if (params.tourId) where.tourId = params.tourId;
-    if (params.userId) where.userId = params.userId;
+    if (params.customerId) where.customerId = params.customerId;
     if (params.status) where.status = params.status;
 
     const bookings = await prisma.booking.findMany({
@@ -352,7 +352,7 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
     };
     if (params.paymentMethod) where.paymentMethod = params.paymentMethod;
     if (params.status) where.status = params.status;
-    if (params.userId) where.userId = params.userId;
+    if (params.customerId) where.customerId = params.customerId;
 
     const payments = await prisma.payment.findMany({
       select: paymentSummarySelect,

@@ -21,6 +21,7 @@ import { Prisma } from '../../generated/prisma/client.js';
 /** Models that carry a `deletedAt` soft-delete column. */
 const SOFT_DELETE_MODELS = new Set<string>([
   'Booking',
+  'Customer',
   'Destination',
   'Flight',
   'Hotel',

@@ -28,16 +28,16 @@ import {
   deleteBooking as deleteBookingService,
   getBookingById,
   listBookings,
-  listUserBookings,
+  listCustomerBookings,
   updateBooking as updateBookingService,
 } from '#services/booking.service.js';
 import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
 import { toBookingDTO } from '#utils/mappers/booking.mapper.js';
 import {
+  bookingCustomerIdParam,
   bookingIdParam,
   bookingListQuery,
   BookingListQueryInput,
-  bookingUserIdParam,
   CreateBookingBody,
   createBookingSchema,
   UpdateBookingBody,
@@ -57,6 +57,7 @@ const handleCreateBooking = asyncHandler(
     const { booking, details } = await createBookingService(
       { id: user.id, role: user.role },
       {
+        customerId: body.customerId,
         endDate: body.endDate,
         flightId: body.flightId,
         numberOfGuests: body.numberOfGuests,
@@ -66,7 +67,6 @@ const handleCreateBooking = asyncHandler(
         startDate: body.startDate,
         totalPrice: body.totalPrice,
         tourId: body.tourId,
-        userId: body.userId,
       },
     );
 
@@ -110,6 +110,7 @@ const handleUpdateBooking = asyncHandler(
   async (req: Request, res: Response) => {
     const body = req.body as UpdateBookingBody;
     const booking = await updateBookingService(idParam(req), {
+      customerId: body.customerId,
       endDate: body.endDate,
       flightId: body.flightId,
       numberOfGuests: body.numberOfGuests,
@@ -120,7 +121,6 @@ const handleUpdateBooking = asyncHandler(
       status: body.status,
       totalPrice: body.totalPrice,
       tourId: body.tourId,
-      userId: body.userId,
     });
 
     sendSuccess(res, {
@@ -156,30 +156,31 @@ export const deleteBooking: RequestHandler[] = [
   handleDeleteBooking,
 ];
 
-const handleGetUserBookings = asyncHandler(
+const handleGetCustomerBookings = asyncHandler(
   async (req: Request, res: Response) => {
     const { user } = req;
     if (!user) throw new UnauthorizedError('Unauthorized, no user provided');
 
-    const userId = (req.params as unknown as { userId: number }).userId;
+    const customerId = (req.params as unknown as { customerId: number })
+      .customerId;
     const query = req.query as unknown as BookingListQueryInput;
-    const { bookings, total } = await listUserBookings(
+    const { bookings, total } = await listCustomerBookings(
       { id: user.id, role: user.role },
-      userId,
+      customerId,
       query,
     );
 
     sendSuccess(res, {
       data: bookings.map(toBookingDTO),
-      message: `Bookings for user ${userId} retrieved successfully`,
+      message: `Bookings for customer ${customerId} retrieved successfully`,
       meta: buildPaginationMeta(total, query.page, query.limit),
     });
   },
 );
-export const getUserBookings: RequestHandler[] = [
-  ...zodValidation.params(bookingUserIdParam),
+export const getCustomerBookings: RequestHandler[] = [
+  ...zodValidation.params(bookingCustomerIdParam),
   ...zodValidation.query(bookingListQuery),
-  handleGetUserBookings,
+  handleGetCustomerBookings,
 ];
 
 const handleGetAllBookings = asyncHandler(

@@ -28,7 +28,7 @@ import { type AppDeps, defaultDeps } from '#services/deps.js';
 // by routes/payment.ts (it only authenticates), so every legacy in-handler
 // check is preserved as an explicit actor-based rule — customers may only
 // pay for / view their own payments, only admins may update status, refund,
-// delete, or filter the list by userId.
+// delete, or filter the list by customerId.
 //
 // Webhook/callback note: those two endpoints reply with legacy bespoke
 // envelopes and Paystack-mandated status codes, so their functions return
@@ -100,13 +100,13 @@ export interface PaymentInitializeResult {
 }
 
 export interface PaymentListParams {
+  /** Filter by owner; the legacy handler honoured it for ADMIN only. */
+  customerId?: number;
   limit: number;
   page: number;
   paymentMethod?: PaymentMethod;
   search?: string;
   status?: PaymentStatus;
-  /** Filter by owner; the legacy handler honoured it for ADMIN only. */
-  userId?: number;
 }
 
 export interface PaymentRefundSummary {
@@ -184,8 +184,8 @@ export const makePaymentService = (
     // findFirst so soft-deleted bookings 404 like hard-deleted ones did.
     const booking = await prisma.booking.findFirst({
       include: {
+        customer: true,
         payment: true,
-        user: true,
       },
       where: { id: bookingId },
     });
@@ -194,7 +194,7 @@ export const makePaymentService = (
       throw new NotFoundError('Booking not found');
     }
 
-    if (actor.role === UserRole.CUSTOMER && booking.userId !== actor.id) {
+    if (actor.role === UserRole.CUSTOMER && booking.customerId !== actor.id) {
       throw new UnauthorizedError('You can only pay for your own bookings');
     }
 
@@ -219,7 +219,7 @@ export const makePaymentService = (
 
     // Paystack requires a customer email on every transaction; phone-only
     // accounts must add one before they can pay online.
-    const payerEmail = booking.user.email;
+    const payerEmail = booking.customer.email;
     if (!payerEmail) {
       throw new BadRequestError(
         'An email address is required for online payment; please add one to your profile',
@@ -279,10 +279,10 @@ export const makePaymentService = (
         amount: booking.totalPrice,
         bookingId: bookingId,
         currency: 'GHS',
+        customerId: booking.customerId,
         paymentMethod,
         status: PaymentStatus.PENDING,
         transactionReference: initialized.reference,
-        userId: booking.userId,
       },
     });
 
@@ -447,7 +447,7 @@ export const makePaymentService = (
       throw new NotFoundError('Payment not found');
     }
 
-    if (actor.role === UserRole.CUSTOMER && payment.userId !== actor.id) {
+    if (actor.role === UserRole.CUSTOMER && payment.customerId !== actor.id) {
       throw new UnauthorizedError('You can only view your own payments');
     }
 
@@ -475,15 +475,15 @@ export const makePaymentService = (
 
   /**
    * GET /payments — customers are always scoped to their own rows; the
-   * userId filter is honoured for admins only (legacy rule: agents may see
-   * everything but not filter by owner).
+   * customerId filter is honoured for admins only (legacy rule: agents may
+   * see everything but not filter by owner).
    */
   const listPayments = async (
     actor: PaymentActor,
     params: PaymentListParams,
   ): Promise<{ payments: PaymentWithRelations[]; total: number }> => {
     const where: Prisma.PaymentWhereInput =
-      actor.role === UserRole.CUSTOMER ? { userId: actor.id } : {};
+      actor.role === UserRole.CUSTOMER ? { customerId: actor.id } : {};
 
     if (params.status) {
       where.status = params.status;
@@ -493,8 +493,8 @@ export const makePaymentService = (
       where.paymentMethod = params.paymentMethod;
     }
 
-    if (params.userId && actor.role === UserRole.ADMIN) {
-      where.userId = params.userId;
+    if (params.customerId && actor.role === UserRole.ADMIN) {
+      where.customerId = params.customerId;
     }
 
     if (params.search) {
@@ -505,25 +505,31 @@ export const makePaymentService = (
             mode: 'insensitive',
           },
         },
-        { user: { name: { contains: params.search, mode: 'insensitive' } } },
-        { user: { email: { contains: params.search, mode: 'insensitive' } } },
+        {
+          customer: { name: { contains: params.search, mode: 'insensitive' } },
+        },
+        {
+          customer: {
+            email: { contains: params.search, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
     return findPage(where, params.page, params.limit);
   };
 
-  /** GET /payments/user/:userId — a customer may only list their own. */
-  const listUserPayments = async (
+  /** GET /payments/customer/:customerId — a customer may only list their own. */
+  const listCustomerPayments = async (
     actor: PaymentActor,
-    userId: number,
+    customerId: number,
     params: PaymentListParams,
   ): Promise<{ payments: PaymentWithRelations[]; total: number }> => {
-    if (actor.role === UserRole.CUSTOMER && actor.id !== userId) {
+    if (actor.role === UserRole.CUSTOMER && actor.id !== customerId) {
       throw new UnauthorizedError('You can only view your own payments');
     }
 
-    const where: Prisma.PaymentWhereInput = { userId };
+    const where: Prisma.PaymentWhereInput = { customerId };
 
     if (params.status) {
       where.status = params.status;
@@ -791,8 +797,8 @@ export const makePaymentService = (
     getPaymentById,
     handleWebhookEvent,
     initializePayment,
+    listCustomerPayments,
     listPayments,
-    listUserPayments,
     refundPayment,
     updatePaymentStatus,
     verifyPaymentCallback,
@@ -807,8 +813,8 @@ export const {
   getPaymentById,
   handleWebhookEvent,
   initializePayment,
+  listCustomerPayments,
   listPayments,
-  listUserPayments,
   refundPayment,
   updatePaymentStatus,
   verifyPaymentCallback,

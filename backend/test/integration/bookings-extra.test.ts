@@ -11,10 +11,10 @@ import prisma from '#config/prismaClient.js';
 import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
+  createCustomer,
   createFlight,
   createRoom,
   createTour,
-  createUser,
 } from '../helpers/factories.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,17 +22,17 @@ const inDays = (days: number) => new Date(Date.now() + days * DAY_MS);
 
 describe('POST /api/v1/bookings (rooms)', () => {
   it('books a room for a date window and derives nights and price', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const room = await createRoom({ pricePerNight: 150, totalRooms: 5 });
 
     const res = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       endDate: inDays(13).toISOString(),
       numberOfGuests: 4,
       numberOfRooms: 2,
       roomId: room.id,
       startDate: inDays(10).toISOString(),
       totalPrice: 1,
-      userId: customer.id,
     });
 
     expect(res.status).toBe(201);
@@ -48,28 +48,28 @@ describe('POST /api/v1/bookings (rooms)', () => {
   });
 
   it('counts held rooms against availability for overlapping dates', async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
     const room = await createRoom({ totalRooms: 5 });
 
     const first = await authedApi(customerA).post('/api/v1/bookings').send({
+      customerId: customerA.id,
       endDate: inDays(13).toISOString(),
       numberOfRooms: 3,
       roomId: room.id,
       startDate: inDays(10).toISOString(),
       totalPrice: 1,
-      userId: customerA.id,
     });
     expect(first.status).toBe(201);
 
     // 3 of 5 rooms are held for the window; a further 3 must be refused.
     const second = await authedApi(customerB).post('/api/v1/bookings').send({
+      customerId: customerB.id,
       endDate: inDays(13).toISOString(),
       numberOfRooms: 3,
       roomId: room.id,
       startDate: inDays(10).toISOString(),
       totalPrice: 1,
-      userId: customerB.id,
     });
 
     expect(second.status).toBe(400);
@@ -77,15 +77,15 @@ describe('POST /api/v1/bookings (rooms)', () => {
   });
 
   it('rejects a room booking with a check-in date in the past', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const room = await createRoom();
 
     const res = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       endDate: inDays(2).toISOString(),
       roomId: room.id,
       startDate: inDays(-2).toISOString(),
       totalPrice: 1,
-      userId: customer.id,
     });
 
     expect(res.status).toBe(400);
@@ -95,14 +95,14 @@ describe('POST /api/v1/bookings (rooms)', () => {
 
 describe('POST /api/v1/bookings (flights)', () => {
   it('books seats on a flight and decrements seatsAvailable', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const flight = await createFlight({ capacity: 100, price: 800 });
 
     const res = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       flightId: flight.id,
       numberOfGuests: 2,
       totalPrice: 1,
-      userId: customer.id,
     });
 
     expect(res.status).toBe(201);
@@ -119,14 +119,14 @@ describe('POST /api/v1/bookings (flights)', () => {
   });
 
   it('rejects a booking beyond the remaining seats', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const flight = await createFlight({ capacity: 3 });
 
     const res = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       flightId: flight.id,
       numberOfGuests: 4,
       totalPrice: 1,
-      userId: customer.id,
     });
 
     expect(res.status).toBe(400);
@@ -137,14 +137,14 @@ describe('POST /api/v1/bookings (flights)', () => {
 describe('PUT /api/v1/bookings/:id', () => {
   it('lets an admin change the guest count and re-syncs the tour counter', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour({ maxGuests: 10, price: 500 });
 
     const created = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 2,
       totalPrice: 1000,
       tourId: tour.id,
-      userId: customer.id,
     });
     expect(created.status).toBe(201);
 
@@ -164,14 +164,14 @@ describe('PUT /api/v1/bookings/:id', () => {
 
   it('lets an admin cancel a pending booking', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour();
 
     const created = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 1,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customer.id,
     });
 
     const res = await authedApi(admin)
@@ -184,14 +184,14 @@ describe('PUT /api/v1/bookings/:id', () => {
 
   it('refuses to confirm a booking without a completed payment', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour();
 
     const created = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 1,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customer.id,
     });
 
     const res = await authedApi(admin)
@@ -206,14 +206,14 @@ describe('PUT /api/v1/bookings/:id', () => {
 
   it('refuses to modify a cancelled booking', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour();
 
     const created = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 1,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customer.id,
     });
     await authedApi(admin)
       .put(`/api/v1/bookings/${created.body.data.id}`)
@@ -228,34 +228,34 @@ describe('PUT /api/v1/bookings/:id', () => {
   });
 });
 
-describe('GET /api/v1/bookings/user/:userId', () => {
+describe('GET /api/v1/bookings/customer/:customerId', () => {
   it('lets a customer list their own bookings', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour();
 
     await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 1,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customer.id,
     });
 
     const res = await authedApi(customer).get(
-      `/api/v1/bookings/user/${customer.id}`,
+      `/api/v1/bookings/customer/${customer.id}`,
     );
 
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBe(1);
-    expect(res.body.data[0].userId).toBe(customer.id);
+    expect(res.body.data[0].customerId).toBe(customer.id);
     expect(res.body.meta.total).toBe(1);
   });
 
   it("blocks a customer from listing another user's bookings", async () => {
-    const customerA = await createUser();
-    const customerB = await createUser();
+    const customerA = await createCustomer();
+    const customerB = await createCustomer();
 
     const res = await authedApi(customerA).get(
-      `/api/v1/bookings/user/${customerB.id}`,
+      `/api/v1/bookings/customer/${customerB.id}`,
     );
 
     expect(res.status).toBe(401);
@@ -264,22 +264,22 @@ describe('GET /api/v1/bookings/user/:userId', () => {
 
   it("lets an admin list any user's bookings", async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const tour = await createTour();
 
     await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
       numberOfGuests: 1,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customer.id,
     });
 
     const res = await authedApi(admin).get(
-      `/api/v1/bookings/user/${customer.id}`,
+      `/api/v1/bookings/customer/${customer.id}`,
     );
 
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBe(1);
-    expect(res.body.data[0].userId).toBe(customer.id);
+    expect(res.body.data[0].customerId).toBe(customer.id);
   });
 });

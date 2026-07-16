@@ -17,7 +17,12 @@ import { type AppConfig, type GoogleAuthClient } from '#services/deps.js';
 import logger from '#utils/logger.js';
 
 import { api, authedApi, cookieValue } from '../helpers/auth.js';
-import { createTour, createUser, TEST_PASSWORD } from '../helpers/factories.js';
+import {
+  createAgent,
+  createCustomer,
+  createTour,
+  TEST_PASSWORD,
+} from '../helpers/factories.js';
 import {
   clearMessages,
   lastEmailTo,
@@ -42,12 +47,13 @@ describe('POST /api/v1/auth/register-user (minimal signup)', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.email).toBe('minimal@test.local');
-    expect(res.body.data.role).toBe('CUSTOMER');
+    // Customers have no role; the DTO carries none.
+    expect(res.body.data.role).toBeUndefined();
     expect(res.body.data.password).toBeUndefined();
     expect(cookieValue(res, 'accessToken')).toBeTruthy();
     expect(cookieValue(res, 'refreshToken')).toBeTruthy();
 
-    const row = await prisma.user.findUniqueOrThrow({
+    const row = await prisma.customer.findUniqueOrThrow({
       where: { email: 'minimal@test.local' },
     });
     expect(row.password).toBeNull();
@@ -61,11 +67,10 @@ describe('POST /api/v1/auth/register-user (minimal signup)', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.phone).toBe('233550009999');
     expect(res.body.data.email).toBeUndefined();
-    expect(res.body.data.role).toBe('CUSTOMER');
     expect(cookieValue(res, 'accessToken')).toBeTruthy();
     expect(cookieValue(res, 'refreshToken')).toBeTruthy();
 
-    const row = await prisma.user.findUniqueOrThrow({
+    const row = await prisma.customer.findUniqueOrThrow({
       where: { phone: '233550009999' },
     });
     expect(row.email).toBeNull();
@@ -80,7 +85,7 @@ describe('POST /api/v1/auth/register-user (minimal signup)', () => {
     });
     expect(res.status).toBe(201);
 
-    const row = await prisma.user.findUniqueOrThrow({
+    const row = await prisma.customer.findUniqueOrThrow({
       where: { email: 'with-password@test.local' },
     });
     expect(row.password).not.toBeNull();
@@ -115,20 +120,20 @@ const wrongCode = (code: string): string =>
 
 describe('POST /api/v1/auth/otp/{request,verify}', () => {
   it('logs in via an emailed code (cookies set, code single-use)', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
 
     const requested = await api()
       .post('/api/v1/auth/otp/request')
-      .send({ email: user.email });
+      .send({ email: customer.email });
     expect(requested.status).toBe(200);
 
-    const code = otpFromEmail(user.email!);
+    const code = otpFromEmail(customer.email!);
     const verified = await api()
       .post('/api/v1/auth/otp/verify')
-      .send({ code, email: user.email });
+      .send({ code, email: customer.email });
 
     expect(verified.status).toBe(200);
-    expect(verified.body.data.id).toBe(user.id);
+    expect(verified.body.data.id).toBe(customer.id);
     expect(verified.body.data.password).toBeUndefined();
     expect(cookieValue(verified, 'accessToken')).toBeTruthy();
     expect(cookieValue(verified, 'refreshToken')).toBeTruthy();
@@ -136,19 +141,19 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
     // The code was consumed — replaying it is refused.
     const replay = await api()
       .post('/api/v1/auth/otp/verify')
-      .send({ code, email: user.email });
+      .send({ code, email: customer.email });
     expect(replay.status).toBe(401);
   });
 
   it('logs in via an SMS code for a phone contact', async () => {
-    const user = await createUser({ phone: '233550008888' });
+    const customer = await createCustomer({ phone: '233550008888' });
 
     const requested = await api()
       .post('/api/v1/auth/otp/request')
       .send({ phone: '233550008888' });
     expect(requested.status).toBe(200);
     // The code went out over SMS, not email.
-    expect(lastEmailTo(user.email!)).toBeUndefined();
+    expect(lastEmailTo(customer.email!)).toBeUndefined();
 
     const code = otpFromSms('233550008888');
     const verified = await api()
@@ -156,39 +161,39 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
       .send({ code, phone: '233550008888' });
 
     expect(verified.status).toBe(200);
-    expect(verified.body.data.id).toBe(user.id);
+    expect(verified.body.data.id).toBe(customer.id);
     expect(cookieValue(verified, 'accessToken')).toBeTruthy();
   });
 
   it('resets the password-failure counter on a successful OTP login', async () => {
-    const user = await createUser();
-    await prisma.user.update({
+    const customer = await createCustomer();
+    await prisma.customer.update({
       data: { failedLoginAttempts: 3 },
-      where: { id: user.id },
+      where: { id: customer.id },
     });
 
-    await api().post('/api/v1/auth/otp/request').send({ email: user.email });
-    const code = otpFromEmail(user.email!);
+    await api().post('/api/v1/auth/otp/request').send({ email: customer.email });
+    const code = otpFromEmail(customer.email!);
     const verified = await api()
       .post('/api/v1/auth/otp/verify')
-      .send({ code, email: user.email });
+      .send({ code, email: customer.email });
     expect(verified.status).toBe(200);
 
-    const row = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
+    const row = await prisma.customer.findUniqueOrThrow({
+      where: { id: customer.id },
     });
     expect(row.failedLoginAttempts).toBe(0);
   });
 
   it('rejects a wrong code with a uniform 401 and caps attempts at 5', async () => {
-    const user = await createUser();
-    await api().post('/api/v1/auth/otp/request').send({ email: user.email });
-    const code = otpFromEmail(user.email!);
+    const customer = await createCustomer();
+    await api().post('/api/v1/auth/otp/request').send({ email: customer.email });
+    const code = otpFromEmail(customer.email!);
 
     for (let i = 0; i < 5; i++) {
       const res = await api()
         .post('/api/v1/auth/otp/verify')
-        .send({ code: wrongCode(code), email: user.email });
+        .send({ code: wrongCode(code), email: customer.email });
       expect(res.status).toBe(401);
       expect(res.body.message).toBe(
         'Your code is invalid or has expired. Request a new one.',
@@ -198,7 +203,7 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
     // The cap killed the code: even the RIGHT one is refused now.
     const dead = await api()
       .post('/api/v1/auth/otp/verify')
-      .send({ code, email: user.email });
+      .send({ code, email: customer.email });
     expect(dead.status).toBe(401);
   });
 
@@ -217,11 +222,11 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
   });
 
   it('silently drops a re-request inside the 60s cooldown (no enumeration)', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
 
     const first = await api()
       .post('/api/v1/auth/otp/request')
-      .send({ email: user.email });
+      .send({ email: customer.email });
     expect(first.status).toBe(200);
 
     // A 429 here would only ever fire for existing accounts, leaking
@@ -229,7 +234,7 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
     // path and just not send.
     const second = await api()
       .post('/api/v1/auth/otp/request')
-      .send({ email: user.email });
+      .send({ email: customer.email });
     expect(second.status).toBe(200);
     expect(second.body.message).toBe(
       'If an account exists for that contact, a login code is on its way.',
@@ -239,18 +244,18 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
   });
 
   it('rejects a verify for an account that never requested a code', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
     const res = await api()
       .post('/api/v1/auth/otp/verify')
-      .send({ code: '123456', email: user.email });
+      .send({ code: '123456', email: customer.email });
     expect(res.status).toBe(401);
   });
 
   it('rejects a request naming both email and phone', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
     const res = await api()
       .post('/api/v1/auth/otp/request')
-      .send({ email: user.email, phone: user.phone });
+      .send({ email: customer.email, phone: customer.phone });
     expect(res.status).toBe(400);
   });
 });
@@ -259,22 +264,22 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
 
 describe('POST /api/v1/auth/{forgot,reset}-password', () => {
   it('resets the password via the emailed link and kills every session', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
     const login = await api()
       .post('/api/v1/auth/login')
-      .send({ email: user.email, password: TEST_PASSWORD });
+      .send({ email: customer.email, password: TEST_PASSWORD });
     const refreshToken = cookieValue(login, 'refreshToken');
 
     const forgot = await api()
       .post('/api/v1/auth/forgot-password')
-      .send({ email: user.email });
+      .send({ email: customer.email });
     expect(forgot.status).toBe(200);
 
     // The emailed link carries the raw token and points at the frontend.
-    expect(lastEmailTo(user.email!)?.text).toContain(
+    expect(lastEmailTo(customer.email!)?.text).toContain(
       `${ENV.FRONTEND_URL}/reset-password?token=`,
     );
-    const token = resetTokenFromEmail(user.email!);
+    const token = resetTokenFromEmail(customer.email!);
 
     const reset = await api()
       .post('/api/v1/auth/reset-password')
@@ -290,12 +295,45 @@ describe('POST /api/v1/auth/{forgot,reset}-password', () => {
     // Old password refused, new one accepted.
     const oldLogin = await api()
       .post('/api/v1/auth/login')
-      .send({ email: user.email, password: TEST_PASSWORD });
+      .send({ email: customer.email, password: TEST_PASSWORD });
     expect(oldLogin.status).toBe(401);
     const newLogin = await api()
       .post('/api/v1/auth/login')
-      .send({ email: user.email, password: 'BrandNew9!' });
+      .send({ email: customer.email, password: 'BrandNew9!' });
     expect(newLogin.status).toBe(200);
+  });
+
+  it('resets a STAFF password too (the reset token FKs the staff row)', async () => {
+    const agent = await createAgent();
+
+    const forgot = await api()
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: agent.email });
+    expect(forgot.status).toBe(200);
+
+    const token = resetTokenFromEmail(agent.email!);
+    const reset = await api()
+      .post('/api/v1/auth/reset-password')
+      .send({ password: 'StaffNew9!', token });
+    expect(reset.status).toBe(200);
+
+    // The token row was FK'd to the staff principal, not a customer.
+    const record = await prisma.userSecurityToken.findFirstOrThrow({
+      where: { type: 'PASSWORD_RESET' },
+    });
+    expect(record.userId).toBe(agent.id);
+    expect(record.customerId).toBeNull();
+
+    // Old password refused, new one accepted — still a staff login.
+    const oldLogin = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: agent.email, password: TEST_PASSWORD });
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: agent.email, password: 'StaffNew9!' });
+    expect(newLogin.status).toBe(200);
+    expect(newLogin.body.data.role).toBe('AGENT');
   });
 
   it('answers 200 for an unknown email without sending anything', async () => {
@@ -311,11 +349,11 @@ describe('POST /api/v1/auth/{forgot,reset}-password', () => {
   });
 
   it('reset tokens are single-use', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
     await api()
       .post('/api/v1/auth/forgot-password')
-      .send({ email: user.email });
-    const token = resetTokenFromEmail(user.email!);
+      .send({ email: customer.email });
+    const token = resetTokenFromEmail(customer.email!);
 
     const first = await api()
       .post('/api/v1/auth/reset-password')
@@ -336,16 +374,16 @@ describe('POST /api/v1/auth/{forgot,reset}-password', () => {
   });
 
   it('a fresh forgot-password invalidates the previous unconsumed link', async () => {
-    const user = await createUser();
+    const customer = await createCustomer();
     await api()
       .post('/api/v1/auth/forgot-password')
-      .send({ email: user.email });
-    const firstToken = resetTokenFromEmail(user.email!);
+      .send({ email: customer.email });
+    const firstToken = resetTokenFromEmail(customer.email!);
 
     await api()
       .post('/api/v1/auth/forgot-password')
-      .send({ email: user.email });
-    const secondToken = resetTokenFromEmail(user.email!);
+      .send({ email: customer.email });
+    const secondToken = resetTokenFromEmail(customer.email!);
     expect(secondToken).not.toBe(firstToken);
 
     const stale = await api()
@@ -391,35 +429,36 @@ describe('googleSignIn (service, fake google dep)', () => {
     name: 'Google User',
   };
 
-  it('creates a passwordless CUSTOMER for a brand-new identity', async () => {
+  it('creates a passwordless Customer for a brand-new identity', async () => {
     const service = makeGoogleService({
       verifyIdToken: vi.fn(() => Promise.resolve(identity)),
     });
 
-    const user = await service.googleSignIn('a-valid-token');
+    const customer = await service.googleSignIn('a-valid-token');
 
-    expect(user.email).toBe(identity.email);
-    expect(user.googleId).toBe(identity.googleId);
-    expect(user.name).toBe(identity.name);
-    expect(user.role).toBe('CUSTOMER');
-    expect(user.password).toBeNull();
+    expect(customer.email).toBe(identity.email);
+    expect(customer.googleId).toBe(identity.googleId);
+    expect(customer.name).toBe(identity.name);
+    expect(customer.password).toBeNull();
 
-    // Second sign-in resolves the SAME account by googleId.
+    // Second sign-in resolves the SAME account by googleId; nothing lands in
+    // the staff table.
     const again = await service.googleSignIn('a-valid-token');
-    expect(again.id).toBe(user.id);
-    expect(await prisma.user.count()).toBe(1);
+    expect(again.id).toBe(customer.id);
+    expect(await prisma.customer.count()).toBe(1);
+    expect(await prisma.user.count()).toBe(0);
   });
 
   it('links the googleId to an existing account with the verified email', async () => {
-    const existing = await createUser({ email: identity.email });
+    const existing = await createCustomer({ email: identity.email });
     const service = makeGoogleService({
       verifyIdToken: vi.fn(() => Promise.resolve(identity)),
     });
 
-    const user = await service.googleSignIn('a-valid-token');
+    const customer = await service.googleSignIn('a-valid-token');
 
-    expect(user.id).toBe(existing.id);
-    const row = await prisma.user.findUniqueOrThrow({
+    expect(customer.id).toBe(existing.id);
+    const row = await prisma.customer.findUniqueOrThrow({
       where: { id: existing.id },
     });
     expect(row.googleId).toBe(identity.googleId);
@@ -435,7 +474,7 @@ describe('googleSignIn (service, fake google dep)', () => {
   });
 
   it('refuses to link or create from an UNVERIFIED Google email', async () => {
-    await createUser({ email: identity.email });
+    await createCustomer({ email: identity.email });
     const service = makeGoogleService({
       verifyIdToken: vi.fn(() =>
         Promise.resolve({ ...identity, emailVerified: false }),
@@ -461,20 +500,20 @@ describe('POST /api/v1/auth/google (unconfigured)', () => {
 
 describe('POST /api/v1/payments without an email on file', () => {
   it('refuses to initialize a Paystack payment with 400', async () => {
-    const user = await prisma.user.create({
-      data: { name: 'Phone Payer', phone: '233550007777', role: 'CUSTOMER' },
+    const customer = await prisma.customer.create({
+      data: { name: 'Phone Payer', phone: '233550007777' },
     });
     const tour = await createTour({ price: 300 });
     const booking = await prisma.booking.create({
       data: {
+        customerId: customer.id,
         numberOfGuests: 1,
         totalPrice: 300,
         tourId: tour.id,
-        userId: user.id,
       },
     });
 
-    const res = await authedApi(user)
+    const res = await authedApi(customer)
       .post('/api/v1/payments')
       .send({ bookingId: booking.id, paymentMethod: 'CREDIT_CARD' });
 

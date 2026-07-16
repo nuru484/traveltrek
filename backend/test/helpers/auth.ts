@@ -6,20 +6,39 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
-import type { User } from '#config/prismaClient.js';
+import type { Role } from '#config/prismaClient.js';
+import type { PrincipalKind } from '#types/auth.types.js';
 
 import ENV from '#config/env.js';
 
 import app from '../../app.js';
 
-/** What the token helpers need; tokenVersion defaults to 0 (a fresh user). */
-type TokenUser = Pick<User, 'id' | 'role'> & { tokenVersion?: number };
+/**
+ * What the token helpers need. Phase 5b tokens carry a principal `kind`;
+ * when omitted it is derived from the role — a Customer row (no role, or
+ * role CUSTOMER) mints a customer token, staff roles mint staff tokens — so
+ * `authedApi(customer)` and `authedApi(admin)` both Just Work.
+ */
+interface TokenUser {
+  id: number;
+  kind?: PrincipalKind;
+  role?: Role;
+  tokenVersion?: number;
+}
 
 export const api = () => request(app);
 
+const principalKind = (user: TokenUser): PrincipalKind =>
+  user.kind ?? (user.role && user.role !== 'CUSTOMER' ? 'staff' : 'customer');
+
 export const mintAccessToken = (user: TokenUser): string =>
   jwt.sign(
-    { id: user.id, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
+    {
+      id: user.id,
+      kind: principalKind(user),
+      role: user.role ?? 'CUSTOMER',
+      tokenVersion: user.tokenVersion ?? 0,
+    },
     ENV.ACCESS_TOKEN_SECRET,
     { expiresIn: '30m' },
   );

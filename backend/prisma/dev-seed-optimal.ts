@@ -664,25 +664,26 @@ async function main() {
   }
   console.log(`tours: ${tours.length}`);
 
-  // ---------- Users (30 + admin kept)
+  // ---------- Customers (26) + agent staff (4, admin kept)
   const password = await bcrypt.hash('Password123!', 10);
-  const users = [];
+  const customers = [];
+  let agents = 0;
   for (let i = 0; i < 30; i++) {
-    const name = `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`;
-    users.push(
-      await prisma.user.create({
-        data: {
-          address: pick(AREAS),
-          email: `${FIRST_NAMES[i].toLowerCase()}.${LAST_NAMES[i].toLowerCase().replace(/[^a-z]/g, '')}@example.com`,
-          name,
-          password,
-          phone: `2335400${String(10000 + i * 13).slice(0, 5)}`,
-          role: i < 26 ? Role.CUSTOMER : Role.AGENT,
-        },
-      }),
-    );
+    const identity = {
+      address: pick(AREAS),
+      email: `${FIRST_NAMES[i].toLowerCase()}.${LAST_NAMES[i].toLowerCase().replace(/[^a-z]/g, '')}@example.com`,
+      name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
+      password,
+      phone: `2335400${String(10000 + i * 13).slice(0, 5)}`,
+    };
+    if (i < 26) {
+      customers.push(await prisma.customer.create({ data: identity }));
+    } else {
+      await prisma.user.create({ data: { ...identity, role: Role.AGENT } });
+      agents++;
+    }
   }
-  console.log(`users: ${users.length}`);
+  console.log(`customers: ${customers.length}, agents: ${agents}`);
 
   // ---------- Bookings (~100) + Payments (~85)
   let bookings = 0;
@@ -694,10 +695,10 @@ async function main() {
 
   const createPayment = async (booking: {
     bookingDate: Date;
+    customerId: number;
     id: number;
     status: BookingStatus;
     totalPrice: number;
-    userId: number;
   }) => {
     let status: PaymentStatus;
     if (
@@ -717,6 +718,7 @@ async function main() {
         amount: booking.totalPrice,
         bookingId: booking.id,
         currency: 'GHS',
+        customerId: booking.customerId,
         paymentDate:
           status === PaymentStatus.PENDING
             ? null
@@ -732,7 +734,6 @@ async function main() {
         ]),
         status,
         transactionReference: `TT-PAY-2026-${payRef++}`,
-        userId: booking.userId,
       },
     });
     payments++;
@@ -762,9 +763,9 @@ async function main() {
 
   // Tour bookings (40)
   for (let i = 0; i < 40; i++) {
-    const user = users[i % users.length];
+    const customer = customers[i % customers.length];
     const tour = tours[(i * 3 + 1) % tours.length];
-    const key = `${user.id}-${tour.id}`;
+    const key = `${customer.id}-${tour.id}`;
     if (bookedTourPairs.has(key)) continue;
     bookedTourPairs.add(key);
     const guests = between(1, 4);
@@ -773,12 +774,12 @@ async function main() {
     const b = await prisma.booking.create({
       data: {
         bookingDate: when,
+        customerId: customer.id,
         numberOfGuests: guests,
         specialRequests: pick(SPECIAL_REQUESTS),
         status,
         totalPrice: tour.price * guests,
         tourId: tour.id,
-        userId: user.id,
         ...(status === BookingStatus.PENDING
           ? { paymentDeadline: new Date(NOW + between(1, 5) * DAY) }
           : {}),
@@ -790,9 +791,9 @@ async function main() {
 
   // Flight bookings (32)
   for (let i = 0; i < 32; i++) {
-    const user = users[(i * 2 + 5) % users.length];
+    const customer = customers[(i * 2 + 5) % customers.length];
     const flight = flights[(i * 4 + 2) % flights.length];
-    const key = `${user.id}-${flight.id}`;
+    const key = `${customer.id}-${flight.id}`;
     if (bookedFlightPairs.has(key)) continue;
     bookedFlightPairs.add(key);
     const guests = between(1, 3);
@@ -801,12 +802,12 @@ async function main() {
     const b = await prisma.booking.create({
       data: {
         bookingDate: when,
+        customerId: customer.id,
         flightId: flight.id,
         numberOfGuests: guests,
         specialRequests: pick(SPECIAL_REQUESTS),
         status,
         totalPrice: flight.price * guests,
-        userId: user.id,
       },
     });
     bookings++;
@@ -815,7 +816,7 @@ async function main() {
 
   // Room bookings (30)
   for (let i = 0; i < 30; i++) {
-    const user = users[(i * 3 + 7) % users.length];
+    const customer = customers[(i * 3 + 7) % customers.length];
     const room = rooms[(i * 5 + 3) % rooms.length];
     const nights = between(1, 6);
     const numberOfRooms = between(1, 2);
@@ -825,6 +826,7 @@ async function main() {
     const b = await prisma.booking.create({
       data: {
         bookingDate: when,
+        customerId: customer.id,
         endDate: new Date(checkIn.getTime() + nights * DAY),
         numberOfGuests: between(1, room.capacity),
         numberOfNights: nights,
@@ -834,7 +836,6 @@ async function main() {
         startDate: checkIn,
         status,
         totalPrice: room.pricePerNight * nights * numberOfRooms,
-        userId: user.id,
       },
     });
     bookings++;
@@ -853,6 +854,7 @@ async function wipe(adminEmail: string) {
   await prisma.flight.deleteMany();
   await prisma.tour.deleteMany();
   await prisma.destination.deleteMany();
+  await prisma.customer.deleteMany();
   await prisma.user.deleteMany({ where: { email: { not: adminEmail } } });
   console.log('wiped existing module data (admin kept)');
 }

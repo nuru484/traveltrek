@@ -37,8 +37,8 @@ import {
   getPaymentById,
   handleWebhookEvent,
   initializePayment,
+  listCustomerPayments,
   listPayments,
-  listUserPayments,
   type PaystackWebhookEvent,
   refundPayment as refundPaymentService,
   updatePaymentStatus as updatePaymentStatusService,
@@ -54,14 +54,14 @@ import { intParam } from '#validations/common-validation.js';
 import {
   CreatePaymentBody,
   createPaymentSchema,
+  customerPaymentsQuery,
+  CustomerPaymentsQueryInput,
   paymentListQuery,
   PaymentListQueryInput,
   RefundPaymentBody,
   refundPaymentSchema,
   UpdatePaymentStatusBody,
   updatePaymentStatusSchema,
-  userPaymentsQuery,
-  UserPaymentsQueryInput,
 } from '#validations/payment-validation.js';
 
 /** Reads the payment id that `intParam('id')` validated and coerced. */
@@ -222,30 +222,31 @@ export const getAllPayments: RequestHandler[] = [
   handleGetAllPayments,
 ];
 
-const handleGetUserPayments = asyncHandler(
+const handleGetCustomerPayments = asyncHandler(
   async (req: Request, res: Response) => {
     const { user } = req;
     if (!user) throw new UnauthorizedError('Unauthorized, no user provided');
 
-    const userId = (req.params as unknown as { userId: number }).userId;
-    const query = req.query as unknown as UserPaymentsQueryInput;
-    const { payments, total } = await listUserPayments(
+    const customerId = (req.params as unknown as { customerId: number })
+      .customerId;
+    const query = req.query as unknown as CustomerPaymentsQueryInput;
+    const { payments, total } = await listCustomerPayments(
       { id: user.id, role: user.role },
-      userId,
+      customerId,
       query,
     );
 
     sendSuccess(res, {
       data: payments.map(toPaymentDTO),
-      message: `Payments for user ${String(userId)} retrieved successfully`,
+      message: `Payments for customer ${String(customerId)} retrieved successfully`,
       meta: buildPaginationMeta(total, query.page, query.limit),
     });
   },
 );
-export const getUserPayments: RequestHandler[] = [
-  ...zodValidation.params(intParam('userId')),
-  ...zodValidation.query(userPaymentsQuery),
-  handleGetUserPayments,
+export const getCustomerPayments: RequestHandler[] = [
+  ...zodValidation.params(intParam('customerId')),
+  ...zodValidation.query(customerPaymentsQuery),
+  handleGetCustomerPayments,
 ];
 
 const handleUpdatePaymentStatus = asyncHandler(

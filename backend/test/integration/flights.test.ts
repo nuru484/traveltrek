@@ -10,9 +10,9 @@ import prisma, { BookingStatus } from '#config/prismaClient.js';
 import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
+  createCustomer,
   createDestination,
   createFlight,
-  createUser,
 } from '../helpers/factories.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -37,13 +37,13 @@ const flightPayload = (originId: number, destinationId: number) => {
 };
 
 /** A PENDING flight booking placed directly in the DB. */
-const createPendingBooking = async (flightId: number, userId: number) =>
+const createPendingBooking = async (flightId: number, customerId: number) =>
   prisma.booking.create({
     data: {
+      customerId,
       flightId,
       status: BookingStatus.PENDING,
       totalPrice: 800,
-      userId,
     },
   });
 
@@ -75,7 +75,7 @@ describe('POST /api/v1/flights', () => {
   });
 
   it('forbids customers from creating flights', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const origin = await createDestination();
     const destination = await createDestination();
 
@@ -99,7 +99,7 @@ describe('POST /api/v1/flights', () => {
 
 describe('GET /api/v1/flights', () => {
   it('returns a paginated list with meta and echoed filters', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     for (let i = 0; i < 3; i++) {
       await createFlight();
     }
@@ -118,7 +118,7 @@ describe('GET /api/v1/flights', () => {
   });
 
   it('filters by origin', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const origin = await createDestination();
     await createFlight({ originId: origin.id });
     await createFlight({ originId: origin.id });
@@ -136,7 +136,7 @@ describe('GET /api/v1/flights', () => {
 
 describe('GET /api/v1/flights/:id', () => {
   it('returns a flight by id with its route summaries', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const flight = await createFlight();
 
     const res = await authedApi(customer).get(`/api/v1/flights/${flight.id}`);
@@ -151,7 +151,7 @@ describe('GET /api/v1/flights/:id', () => {
   });
 
   it('404s for a missing flight', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const res = await authedApi(customer).get('/api/v1/flights/999999');
     expect(res.status).toBe(404);
   });
@@ -172,7 +172,7 @@ describe('PUT /api/v1/flights/:id', () => {
   });
 
   it('forbids customers from updating flights', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     const flight = await createFlight();
     const res = await authedApi(customer)
       .put(`/api/v1/flights/${flight.id}`)
@@ -222,7 +222,7 @@ describe('PATCH /api/v1/flights/:id/status', () => {
 describe('DELETE /api/v1/flights/:id', () => {
   it('refuses to delete a flight with an active booking', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     const flight = await createFlight();
     await createPendingBooking(flight.id, customer.id);
 

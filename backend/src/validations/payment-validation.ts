@@ -11,8 +11,9 @@
 //   services/payment.service.ts.
 // - updatePaymentStatus: status stays an optional string for the same reason
 //   (the legacy 401 admin gate ran before the 400 'Invalid payment status').
-// - GET /payments/user/:userId silently IGNORED invalid status/paymentMethod
-//   filters instead of rejecting them; `.catch(undefined)` preserves that.
+// - GET /payments/customer/:customerId silently IGNORES invalid
+//   status/paymentMethod filters instead of rejecting them (the legacy
+//   /payments/user behaviour); `.catch(undefined)` preserves that.
 import { z } from 'zod';
 
 import { PaymentMethod, PaymentStatus } from '#config/prismaClient.js';
@@ -37,27 +38,27 @@ export const refundPaymentSchema = z.object({
   reason: z.string('reason must be a string').optional(),
 });
 
-/** List filters for GET /payments (admin userId override applied in service). */
+/** List filters for GET /payments (admin customerId override in service). */
 export const paymentListQuery = paginationQuery.extend({
+  customerId: z.coerce.number().int().min(1).optional(),
   paymentMethod: z.enum(PaymentMethod, 'Invalid payment method').optional(),
   search: z.string().optional(),
   status: z.enum(PaymentStatus, 'Invalid payment status').optional(),
-  userId: z.coerce.number().int().min(1).optional(),
 });
 
 /**
- * List filters for GET /payments/user/:userId — invalid enum values fall back
- * to undefined (ignored), exactly as the legacy includes-check did.
+ * List filters for GET /payments/customer/:customerId — invalid enum values
+ * fall back to undefined (ignored), exactly as the legacy includes-check did.
  */
-export const userPaymentsQuery = paginationQuery.extend({
+export const customerPaymentsQuery = paginationQuery.extend({
   paymentMethod: z.enum(PaymentMethod).optional().catch(undefined),
   status: z.enum(PaymentStatus).optional().catch(undefined),
 });
 
 export type CreatePaymentBody = z.infer<typeof createPaymentSchema>;
+export type CustomerPaymentsQueryInput = z.infer<typeof customerPaymentsQuery>;
 export type PaymentListQueryInput = z.infer<typeof paymentListQuery>;
 export type RefundPaymentBody = z.infer<typeof refundPaymentSchema>;
 export type UpdatePaymentStatusBody = z.infer<
   typeof updatePaymentStatusSchema
 >;
-export type UserPaymentsQueryInput = z.infer<typeof userPaymentsQuery>;

@@ -10,12 +10,13 @@
 // skipped them — they never actually ran; the handler check was the real
 // enforcement and stays the only one).
 //
-// The legacy chains only validated userId, the item ids, hotelId and
+// The legacy chains only validated the owner id, the item ids, hotelId and
 // totalPrice; the other fields the handler read (numberOfGuests,
 // numberOfRooms, specialRequests, startDate, endDate) went unvalidated. They
 // are declared here so the parsed body keeps them, with minimal typing —
 // stay dates remain raw strings because the service parses and rejects them
 // with the legacy messages ('Check-in date cannot be in the past', ...).
+// Phase 5b: bookings belong to Customers, so the owner field is customerId.
 import { z } from 'zod';
 
 import { BookingStatus } from '#config/prismaClient.js';
@@ -43,6 +44,9 @@ const dateQuery = (message: string) =>
   });
 
 const bookingFields = z.object({
+  // Admins/agents book on behalf of a customer; customers must self-book
+  // (the actor rule in the service keeps the legacy 401).
+  customerId: intField('customerId'),
   endDate: z.string().optional(),
   flightId: intField('flightId').optional(),
   // Accepted (the legacy chain validated it) but nothing reads it.
@@ -58,11 +62,10 @@ const bookingFields = z.object({
     .int('totalPrice must be an integer (pesewas)')
     .min(0, 'totalPrice must be greater than or equal to 0'),
   tourId: intField('tourId').optional(),
-  userId: intField('userId'),
 });
 
 /**
- * POST /bookings. userId and totalPrice stay required — the service
+ * POST /bookings. customerId and totalPrice stay required — the service
  * recalculates the price, but the legacy contract (and its baseline tests)
  * pin both as mandatory.
  */
@@ -86,20 +89,22 @@ export const bookingIdParam = z.object({
     .min(1, 'Booking ID must be a positive integer'),
 });
 
-/** `/bookings/user/:userId` route param (legacy handler message kept). */
-export const bookingUserIdParam = z.object({
-  userId: z.coerce
-    .number('Invalid user ID')
-    .int('Invalid user ID')
-    .min(1, 'Invalid user ID'),
+/** `/bookings/customer/:customerId` route param (legacy message adapted). */
+export const bookingCustomerIdParam = z.object({
+  customerId: z.coerce
+    .number('Invalid customer ID')
+    .int('Invalid customer ID')
+    .min(1, 'Invalid customer ID'),
 });
 
 /**
- * List filters for GET /bookings and GET /bookings/user/:userId — the union
- * of what the two legacy handlers parsed by hand, with their messages.
+ * List filters for GET /bookings and GET /bookings/customer/:customerId —
+ * the union of what the two legacy handlers parsed by hand, with their
+ * messages.
  */
 export const bookingListQuery = paginationQuery
   .extend({
+    customerId: z.coerce.number().int().min(1).optional(),
     flightId: z.coerce
       .number('Invalid flight ID')
       .int('Invalid flight ID')
@@ -120,7 +125,6 @@ export const bookingListQuery = paginationQuery
       .min(1, 'Invalid tour ID')
       .optional(),
     type: z.enum(BOOKING_TYPES, 'Invalid booking type').optional(),
-    userId: z.coerce.number().int().min(1).optional(),
   })
   .refine(
     (q) =>

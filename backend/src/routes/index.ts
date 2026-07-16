@@ -3,6 +3,7 @@ import express from 'express';
 import authenticateJWT from '#middlewares/authenticate-jwt.js';
 import { authenticationRouter } from '#routes/authentication/index.js';
 import bookingRoutes from '#routes/booking.js';
+import customerRoutes from '#routes/customer.js';
 import dashboardRoutes from '#routes/dashboard.js';
 import destinationRoutes from '#routes/destination.js';
 import flightRoutes from '#routes/flight.js';
@@ -34,6 +35,8 @@ routes.use(bookingRoutes);
 routes.use(roomRoutes);
 
 routes.use(userRoutes);
+
+routes.use(customerRoutes);
 
 routes.use(dashboardRoutes);
 

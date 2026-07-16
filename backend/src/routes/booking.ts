@@ -6,7 +6,7 @@ import {
   deleteBooking,
   getAllBookings,
   getBooking,
-  getUserBookings,
+  getCustomerBookings,
   updateBooking,
 } from '#controllers/index.js';
 import { authorizeRole } from '#middlewares/authorize-roles.js';
@@ -44,10 +44,12 @@ bookingRoutes.get(
   getAllBookings,
 );
 
+// Phase 5b: bookings hang off Customers — the old /bookings/user/:userId
+// path is REMOVED (not aliased).
 bookingRoutes.get(
-  '/bookings/user/:userId',
+  '/bookings/customer/:customerId',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
-  getUserBookings,
+  getCustomerBookings,
 );
 
 bookingRoutes.delete(

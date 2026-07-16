@@ -95,12 +95,13 @@ export const makeDashboardService = (d: Pick<AppDeps, 'prisma'>) => {
     };
 
     if (role === UserRole.ADMIN || role === UserRole.AGENT) {
+      // Phase 5b: customers live in their own table; User is staff-only.
+      // `total` keeps its legacy meaning (every account) as staff + customers.
       const [
         totalBookings,
         pendingBookings,
         confirmedBookings,
         completedBookings,
-        totalUsers,
         totalCustomers,
         totalAgents,
         totalAdmins,
@@ -109,8 +110,7 @@ export const makeDashboardService = (d: Pick<AppDeps, 'prisma'>) => {
         prisma.booking.count({ where: { status: BookingStatus.PENDING } }),
         prisma.booking.count({ where: { status: BookingStatus.CONFIRMED } }),
         prisma.booking.count({ where: { status: BookingStatus.COMPLETED } }),
-        prisma.user.count(),
-        prisma.user.count({ where: { role: Role.CUSTOMER } }),
+        prisma.customer.count(),
         prisma.user.count({ where: { role: Role.AGENT } }),
         prisma.user.count({ where: { role: Role.ADMIN } }),
       ]);
@@ -126,7 +126,7 @@ export const makeDashboardService = (d: Pick<AppDeps, 'prisma'>) => {
         admins: totalAdmins,
         agents: totalAgents,
         customers: totalCustomers,
-        total: totalUsers,
+        total: totalAdmins + totalAgents + totalCustomers,
       };
     }
 

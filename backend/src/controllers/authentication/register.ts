@@ -1,22 +1,22 @@
 // src/controllers/authentication/register.ts
 //
-// Two thin bundles over the auth service's user creation:
+// Two thin bundles over the auth service's account creation (Phase 5b —
+// customers and staff are separate principals):
 //
-// - registerUser — the PUBLIC signup (POST /auth/register-user), now MINIMAL:
+// - registerUser — the PUBLIC signup (POST /auth/register-user), MINIMAL:
 //   name + (email OR phone), password optional (passwordless accounts sign in
 //   via OTP/Google and complete their profile later). No authentication runs
-//   before it, so it NEVER trusts a role from the body: every public signup
-//   is a CUSTOMER, and a session is issued immediately.
+//   before it and there is NO role concept: every public signup creates a
+//   Customer, and a customer session is issued immediately.
 // - adminCreateUser — POST /users (borrowed by routes/user.ts, behind
-//   authenticate-jwt + authorizeRole). Only an ADMIN actor may create users
-//   (agents pass the route gate but are refused here, as in the legacy
-//   handler), the stricter legacy field requirements still apply (password
-//   excepted), the body's role is honoured, and NO session cookies are
-//   issued for the created account.
+//   authenticate-jwt + authorizeRole). Creates STAFF ONLY: only an ADMIN
+//   actor may create users (agents pass the route gate but are refused here,
+//   as in the legacy handler), the role is required and zod-restricted to
+//   ADMIN | AGENT, and NO session cookies are issued for the created account.
 //
-// Both share the multer -> zod -> Cloudinary pipeline; if user creation fails
-// after the middleware already uploaded a picture, that upload is reclaimed
-// best-effort before rethrowing (legacy behaviour).
+// Both share the multer -> zod -> Cloudinary pipeline; if account creation
+// fails after the middleware already uploaded a picture, that upload is
+// reclaimed best-effort before rethrowing (legacy behaviour).
 import { Request, RequestHandler, Response } from 'express';
 
 import { cloudinaryService } from '#config/claudinary.js';
@@ -33,8 +33,8 @@ import {
 import zodValidation from '#middlewares/validate-request.js';
 import {
   adminCreateUser as adminCreateUserService,
+  customerPrincipal,
   mintAuthTokens,
-  type RegisteredUser,
   type RegisterInput,
   register as registerService,
 } from '#services/auth.service.js';
@@ -42,6 +42,7 @@ import { UserRole } from '#types/user-profile.types.js';
 import { CookieManager } from '#utils/CookieManager.js';
 import { sendSuccess } from '#utils/http-response.js';
 import logger from '#utils/logger.js';
+import { toCustomerDTO } from '#utils/mappers/customer.mapper.js';
 import { toUserDTO } from '#utils/mappers/user.mapper.js';
 import {
   AdminCreateUserBody,
@@ -65,10 +66,10 @@ const toRegisterInput = (body: UserCreationBody): RegisterInput => ({
 
 /** Runs the given creation; if it fails after the middleware already uploaded
  * a profile picture, reclaims that upload best-effort before rethrowing. */
-const createReclaimingUpload = async (
+const createReclaimingUpload = async <T>(
   body: UserCreationBody,
-  create: () => Promise<RegisteredUser>,
-): Promise<RegisteredUser> => {
+  create: () => Promise<T>,
+): Promise<T> => {
   try {
     return await create();
   } catch (error) {
@@ -87,15 +88,15 @@ const handleRegisterUser = asyncHandler(
   async (req: Request, res: Response) => {
     const body = req.body as RegisterUserBody;
 
-    // Public signup: the body's role is deliberately ignored.
-    const user = await createReclaimingUpload(body, () =>
+    // Public signup: always a Customer — no role exists on this surface.
+    const customer = await createReclaimingUpload(body, () =>
       registerService(toRegisterInput(body)),
     );
-    const tokens = await mintAuthTokens(user);
+    const tokens = await mintAuthTokens(customerPrincipal(customer));
 
     CookieManager.setAuthTokens(res, tokens);
     sendSuccess(res, {
-      data: toUserDTO(user),
+      data: toCustomerDTO(customer),
       message: 'Registration successful.',
       status: HTTP_STATUS_CODES.CREATED,
     });

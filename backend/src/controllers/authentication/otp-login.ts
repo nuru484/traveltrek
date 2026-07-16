@@ -1,21 +1,23 @@
 // src/controllers/authentication/otp-login.ts
 //
-// Thin bundles over the auth service's passwordless OTP login. The request
-// step replies with the SAME 200 whether or not the contact has an account
-// (no enumeration); the verify step is a full login — cookies are issued the
-// same way password login issues them.
+// Thin bundles over the auth service's passwordless OTP login — a
+// CUSTOMER-ONLY surface (staff use passwords). The request step replies with
+// the SAME 200 whether or not the contact has an account (no enumeration);
+// the verify step is a full login — cookies are issued the same way password
+// login issues them.
 import { Request, RequestHandler, Response } from 'express';
 
 import { asyncHandler } from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
+  customerPrincipal,
   mintAuthTokens,
   requestOtpLogin as requestOtpLoginService,
   verifyOtpLogin as verifyOtpLoginService,
 } from '#services/auth.service.js';
 import { CookieManager } from '#utils/CookieManager.js';
 import { sendSuccess } from '#utils/http-response.js';
-import { toUserDTO } from '#utils/mappers/user.mapper.js';
+import { toCustomerDTO } from '#utils/mappers/customer.mapper.js';
 import {
   OtpRequestBody,
   otpRequestSchema,
@@ -37,11 +39,14 @@ const handleRequestOtp = asyncHandler(async (req: Request, res: Response) => {
 const handleVerifyOtp = asyncHandler(async (req: Request, res: Response) => {
   const { code, email, phone } = req.body as OtpVerifyBody;
 
-  const user = await verifyOtpLoginService({ email, phone }, code);
-  const tokens = await mintAuthTokens(user);
+  const customer = await verifyOtpLoginService({ email, phone }, code);
+  const tokens = await mintAuthTokens(customerPrincipal(customer));
 
   CookieManager.setAuthTokens(res, tokens);
-  sendSuccess(res, { data: toUserDTO(user), message: 'Login successful' });
+  sendSuccess(res, {
+    data: toCustomerDTO(customer),
+    message: 'Login successful',
+  });
 });
 
 export const requestOtp: RequestHandler[] = [

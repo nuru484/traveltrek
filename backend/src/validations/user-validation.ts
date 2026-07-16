@@ -52,9 +52,11 @@ export const updateUserProfileSchema = z.object({
     .optional(),
 });
 
-/** PATCH /users/:userId/role — legacy in-handler message kept. */
+/** PATCH /users/:userId/role — legacy in-handler message kept. Staff-only
+ * (Phase 5b): no User row may become a CUSTOMER — customers are a separate
+ * model. */
 export const changeUserRoleSchema = z.object({
-  role: z.enum(Role, 'Valid role is required'),
+  role: z.enum([Role.ADMIN, Role.AGENT], 'Valid role is required'),
 });
 
 /**

@@ -52,12 +52,12 @@ const yearQuery = z.coerce
 
 /** GET /reports/bookings/monthly-summary */
 export const monthlyBookingsQuery = z.object({
+  customerId: positiveIntQuery('Customer ID must be a positive integer'),
   endDate: isoDateQuery('End date must be a valid ISO 8601 date'),
   month: monthQuery,
   startDate: isoDateQuery('Start date must be a valid ISO 8601 date'),
   status: z.enum(BookingStatus, 'Invalid booking status').optional(),
   tourId: positiveIntQuery('Tour ID must be a positive integer'),
-  userId: positiveIntQuery('User ID must be a positive integer'),
   year: yearQuery,
 });
 
@@ -67,12 +67,12 @@ export const paymentsSummaryQuery = z.object({
     .string('Currency must be a 3-letter code')
     .length(3, 'Currency must be a 3-letter code')
     .default('GHS'),
+  customerId: positiveIntQuery('Customer ID must be a positive integer'),
   endDate: isoDateQuery('End date must be a valid ISO 8601 date'),
   month: monthQuery,
   paymentMethod: z.enum(PaymentMethod, 'Invalid payment method').optional(),
   startDate: isoDateQuery('Start date must be a valid ISO 8601 date'),
   status: z.enum(PaymentStatus, 'Invalid payment status').optional(),
-  userId: positiveIntQuery('User ID must be a positive integer'),
   year: yearQuery,
 });
 

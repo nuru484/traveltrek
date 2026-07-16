@@ -12,10 +12,16 @@ datasource db {
 
 enum Role {
   ADMIN
+  /// Legacy-reserved (Phase 5b): customers moved to their own Customer model,
+  /// so no User row carries this value anymore. The enum member stays because
+  /// removing a Postgres enum value is painful; the shared UserRole type still
+  /// uses 'CUSTOMER' as the role customers present on their access tokens.
   CUSTOMER
   AGENT
 }
 
+/// STAFF ONLY (Phase 5b): every row is an ADMIN or AGENT operating the system.
+/// Customers live in the separate Customer model below.
 model User {
   id   Int    @id @default(autoincrement())
   name String
@@ -52,6 +58,51 @@ model User {
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
 
+  securityTokens UserSecurityToken[]
+
+  @@index([deletedAt])
+}
+
+/// The customer principal (Phase 5b), split out of User so the business can
+/// manage customer profiles (full booking/payment history, contact details)
+/// independently of staff accounts. Same auth surface as staff — optional
+/// password (OTP/Google otherwise), lockout counters, tokenVersion session
+/// epoch — but no role: a customer is always exactly a customer.
+model Customer {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  /// Nullable: phone-only signups have no email. Postgres allows multiple
+  /// NULLs under a unique index, so the constraint still holds where it matters.
+  email String? @unique
+
+  /// Nullable: minimal signups and Google-created accounts have no password —
+  /// they authenticate via OTP login or Google until they set one.
+  password       String?
+  phone          String?  @unique
+  address        String?
+  profilePicture String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  /// Google account subject (`sub` claim) once the customer signs in with
+  /// Google; set at creation or linked to an existing verified-email account.
+  googleId String? @unique
+
+  /// Session epoch: every issued token embeds it, and a mismatch on
+  /// verification rejects the token. Bumping it invalidates every live
+  /// session at once (refresh-token theft response).
+  tokenVersion Int @default(0)
+
+  /// Consecutive wrong-password counter; at the threshold the account is
+  /// temporarily locked (lockedUntil), then the counter starts fresh.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  /// Soft delete: reads are auto-scoped to `deletedAt: null` by the client
+  /// extension (src/lib/soft-delete-extension.ts).
+  deletedAt DateTime?
+
   bookings       Booking[]
   payments       Payment[]
   securityTokens UserSecurityToken[]
@@ -70,10 +121,16 @@ enum TokenType {
   PASSWORD_RESET
 }
 
+/// One security-token row belongs to exactly ONE principal: either a staff
+/// user (userId) or a customer (customerId) — enforced by a DB CHECK
+/// constraint (num_nonnulls = 1, see the separate_customers_from_staff
+/// migration) and by the auth service, which always sets exactly one FK.
 model UserSecurityToken {
-  id     String @id @default(uuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int
+  id         String    @id @default(uuid())
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int?
 
   /// sha256 hex of the plaintext token/jti — the plaintext is never persisted.
   tokenHash String    @unique
@@ -93,6 +150,7 @@ model UserSecurityToken {
   createdAt DateTime @default(now())
 
   @@index([userId, type])
+  @@index([customerId, type])
   @@index([expiresAt])
 }
 
@@ -257,9 +315,9 @@ enum BookingStatus {
 }
 
 model Booking {
-  id     Int  @id @default(autoincrement())
-  user   User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  userId Int
+  id         Int      @id @default(autoincrement())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customerId Int
 
   tour   Tour? @relation(fields: [tourId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   tourId Int?
@@ -292,11 +350,11 @@ model Booking {
 
   payment Payment?
 
-  @@unique([userId, tourId])
-  @@unique([userId, roomId, startDate, endDate])
-  @@unique([userId, flightId])
+  @@unique([customerId, tourId])
+  @@unique([customerId, roomId, startDate, endDate])
+  @@unique([customerId, flightId])
   @@index([deletedAt])
-  @@index([userId, tourId, roomId, flightId], name: "booking_user_tour_hotel_room_flight_idx")
+  @@index([customerId, tourId, roomId, flightId], name: "booking_customer_tour_hotel_room_flight_idx")
   @@index([status])
   @@index([paymentDeadline])
   @@index([startDate, endDate])
@@ -320,8 +378,8 @@ model Payment {
   id                   Int           @id @default(autoincrement())
   booking              Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   bookingId            Int           @unique
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  userId               Int
+  customer             Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customerId           Int
   /// Integer minor units (pesewas): GH₵ 1.00 = 100.
   amount               Int
   currency             String        @default("GHS")
@@ -334,7 +392,7 @@ model Payment {
   deletedAt            DateTime?
 
   @@index([deletedAt])
-  @@index([userId], name: "payment_user_idx")
+  @@index([customerId], name: "payment_customer_idx")
   @@index([transactionReference], name: "payment_transaction_ref_idx")
   @@index([status])
 }

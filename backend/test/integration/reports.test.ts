@@ -18,28 +18,28 @@ import prisma, {
 import { api, authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
+  createCustomer,
   createFlight,
   createHotel,
   createRoom,
   createTour,
-  createUser,
 } from '../helpers/factories.js';
 
-/** One booking per (user, tour) — the schema enforces that pair unique. */
+/** One booking per (customer, tour) — the schema enforces that pair unique. */
 const createBooking = async (input: {
   bookingDate: string;
+  customerId: number;
   status?: BookingStatus;
   totalPrice: number;
   tourId: number;
-  userId: number;
 }) =>
   prisma.booking.create({
     data: {
       bookingDate: new Date(input.bookingDate),
+      customerId: input.customerId,
       status: input.status ?? BookingStatus.PENDING,
       totalPrice: input.totalPrice,
       tourId: input.tourId,
-      userId: input.userId,
     },
   });
 
@@ -47,31 +47,31 @@ const createBooking = async (input: {
 const seedBookingScenario = async () => {
   const tour = await createTour();
   const [u1, u2, u3] = await Promise.all([
-    createUser(),
-    createUser(),
-    createUser(),
+    createCustomer(),
+    createCustomer(),
+    createCustomer(),
   ]);
 
   const march1 = await createBooking({
     bookingDate: '2026-03-10T12:00:00Z',
+    customerId: u1.id,
     status: BookingStatus.CONFIRMED,
     totalPrice: 500,
     tourId: tour.id,
-    userId: u1.id,
   });
   const march2 = await createBooking({
     bookingDate: '2026-03-20T12:00:00Z',
+    customerId: u2.id,
     status: BookingStatus.PENDING,
     totalPrice: 300,
     tourId: tour.id,
-    userId: u2.id,
   });
   const april = await createBooking({
     bookingDate: '2026-04-05T12:00:00Z',
+    customerId: u3.id,
     status: BookingStatus.CONFIRMED,
     totalPrice: 200,
     tourId: tour.id,
-    userId: u3.id,
   });
 
   return { april, march1, march2, tour };
@@ -123,8 +123,8 @@ describe('GET /api/v1/reports/bookings/monthly-summary', () => {
 
     expect(bookings).toHaveLength(3);
     expect(bookings[0]).toMatchObject({
+      customer: { email: expect.any(String) },
       tour: { name: expect.any(String) },
-      user: { email: expect.any(String) },
     });
   });
 
@@ -189,7 +189,7 @@ describe('GET /api/v1/reports/bookings/monthly-summary', () => {
   });
 
   it('is forbidden for customers', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
 
     const res = await authedApi(customer).get(
       '/api/v1/reports/bookings/monthly-summary?year=2026',
@@ -225,24 +225,24 @@ describe('GET /api/v1/reports/payments/summary', () => {
 
     const payments = [];
     for (const row of rows) {
-      const user = await createUser();
+      const customer = await createCustomer();
       const tour = await createTour();
       const booking = await createBooking({
         bookingDate: row.paymentDate,
+        customerId: customer.id,
         totalPrice: row.amount,
         tourId: tour.id,
-        userId: user.id,
       });
       payments.push(
         await prisma.payment.create({
           data: {
             amount: row.amount,
             bookingId: booking.id,
+            customerId: customer.id,
             paymentDate: new Date(row.paymentDate),
             paymentMethod: row.method,
             status: row.status,
             transactionReference: `reports-ref-${String(booking.id)}`,
-            userId: user.id,
           },
         }),
       );
@@ -329,7 +329,7 @@ describe('GET /api/v1/reports/payments/summary', () => {
   });
 
   it('is forbidden for customers', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
 
     const res = await authedApi(customer).get(
       '/api/v1/reports/payments/summary?year=2026',
@@ -348,40 +348,40 @@ describe('GET /api/v1/reports/tours/top-by-bookings', () => {
       await createTour(),
     ];
 
-    const users = await Promise.all([
-      createUser(),
-      createUser(),
-      createUser(),
-      createUser(),
+    const customers = await Promise.all([
+      createCustomer(),
+      createCustomer(),
+      createCustomer(),
+      createCustomer(),
     ]);
 
     await createBooking({
       bookingDate: '2026-05-15T12:00:00Z',
+      customerId: customers[0].id,
       status: BookingStatus.CONFIRMED,
       totalPrice: 400,
       tourId: t1.id,
-      userId: users[0].id,
     });
     await createBooking({
       bookingDate: '2026-05-16T12:00:00Z',
+      customerId: customers[1].id,
       status: BookingStatus.CONFIRMED,
       totalPrice: 400,
       tourId: t1.id,
-      userId: users[1].id,
     });
     await createBooking({
       bookingDate: '2026-05-17T12:00:00Z',
+      customerId: customers[2].id,
       status: BookingStatus.PENDING,
       totalPrice: 200,
       tourId: t1.id,
-      userId: users[2].id,
     });
     await createBooking({
       bookingDate: '2026-05-18T12:00:00Z',
+      customerId: customers[3].id,
       status: BookingStatus.CONFIRMED,
       totalPrice: 300,
       tourId: t2.id,
-      userId: users[3].id,
     });
 
     return { t1, t2, t3 };
@@ -480,7 +480,7 @@ describe('GET /api/v1/reports/tours/top-by-bookings', () => {
   });
 
   it('is forbidden for customers', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
 
     const res = await authedApi(customer).get(
       '/api/v1/reports/tours/top-by-bookings?year=2026',
@@ -499,15 +499,15 @@ describe('GET /api/v1/dashboard', () => {
     await createFlight({ capacity: 120 }); // +2 destinations
     await createBooking({
       bookingDate: '2026-06-10T12:00:00Z',
+      customerId: customerId,
       status: BookingStatus.CONFIRMED,
       totalPrice: 500,
       tourId: tour.id,
-      userId: customerId,
     });
   };
 
   it('returns the base inventory stats to a customer, without bookings/users', async () => {
-    const customer = await createUser();
+    const customer = await createCustomer();
     await seedDashboardScenario(customer.id);
 
     const res = await authedApi(customer).get('/api/v1/dashboard');
@@ -526,7 +526,7 @@ describe('GET /api/v1/dashboard', () => {
 
   it('adds booking and user stats for an admin', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const customer = await createCustomer();
     await seedDashboardScenario(customer.id);
 
     const res = await authedApi(admin).get('/api/v1/dashboard');

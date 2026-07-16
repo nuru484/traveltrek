@@ -1,25 +1,36 @@
 // src/services/auth.service.ts
 //
-// Domain logic for authentication: registration (password optional — minimal
-// signups authenticate via OTP or Google until they set one), enumeration-safe
-// password login with account lockout, passwordless OTP login (email or SMS),
-// forgot/reset password, Google sign-in, refresh-token ROTATION (each refresh
-// token is spendable exactly once; a replay outside the tab-race grace window
-// is treated as theft and signs the account out everywhere via the
-// tokenVersion session epoch), and logout. Token minting is centralized in
-// mintAuthTokens — nothing else signs JWTs. The service never touches req/res
-// or cookies (those live in the controllers); it takes typed inputs, talks to
-// the injected Prisma client + clock + config + mail/sms/google, and throws
-// typed errors. All one-time secrets (refresh jtis, OTP codes, reset tokens)
-// are stored as sha256 hashes and are single-use.
+// Domain logic for authentication over TWO principal tables (Phase 5b):
+// customers (the public — registration, OTP, Google) and staff Users
+// (ADMIN/AGENT, created only by an admin). Every flow that used to read the
+// User table now resolves the right principal:
+//
+//   - public register / OTP login / Google sign-in → Customer ONLY
+//   - password login → Customer by email first, then staff — first match wins
+//   - forgot/reset password → Customer first, then staff (the reset-token row
+//     records which principal via its userId/customerId FK)
+//   - refresh/logout → whichever table the token's `kind` claim names
+//
+// Everything else is unchanged from the hardened Phase 4b design:
+// enumeration-safe login with account lockout, passwordless OTP login (email
+// or SMS), refresh-token ROTATION (each refresh token is spendable exactly
+// once; a replay outside the tab-race grace window is treated as theft and
+// signs the account out everywhere via the tokenVersion session epoch), and
+// logout. Token minting is centralized in mintAuthTokens — nothing else signs
+// JWTs. The service never touches req/res or cookies (those live in the
+// controllers); it takes typed inputs, talks to the injected Prisma client +
+// clock + config + mail/sms/google, and throws typed errors. All one-time
+// secrets (refresh jtis, OTP codes, reset tokens) are stored as sha256 hashes
+// and are single-use.
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 
 import { BCRYPT_SALT_ROUNDS } from '#config/constants.js';
 import {
+  type Customer,
   type Prisma,
-  Role,
+  type Role,
   TokenType,
   type User,
 } from '#config/prismaClient.js';
@@ -31,10 +42,12 @@ import {
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import {
   AccessTokenPayload,
+  PrincipalKind,
   RefreshTokenPayload,
 } from '#types/auth.types.js';
 import { UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
+import { customerSelect } from '#utils/mappers/customer.mapper.js';
 import { userSelect } from '#utils/mappers/user.mapper.js';
 import {
   generateOtpCode,
@@ -78,6 +91,12 @@ const OTP_RESEND_COOLDOWN_SECONDS = 60;
 /** Password-reset links are longer-lived than OTPs but still single-use. */
 const PASSWORD_RESET_TTL_MINUTES = 30;
 
+/** The account a login/refresh resolved — the controller picks the DTO and
+ * mints tokens for whichever principal came back. */
+export type AuthPrincipal =
+  | { customer: Customer; kind: 'customer' }
+  | { kind: 'staff'; user: User };
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -107,13 +126,66 @@ export interface RegisterInput {
   profilePicture?: string;
 }
 
+/** What mintAuthTokens needs to establish a session for either principal. */
+export interface TokenPrincipal {
+  id: number;
+  kind: PrincipalKind;
+  role: UserRole;
+  tokenVersion: number;
+}
+
+/** Customers have no role column; they always present CUSTOMER on tokens so
+ * the existing authorizeRole route gates keep working verbatim. */
+export const customerPrincipal = (
+  customer: Pick<Customer, 'id' | 'tokenVersion'>,
+): TokenPrincipal => ({
+  id: customer.id,
+  kind: 'customer',
+  role: UserRole.CUSTOMER,
+  tokenVersion: customer.tokenVersion,
+});
+
+export const staffPrincipal = (
+  user: Pick<User, 'id' | 'role' | 'tokenVersion'>,
+): TokenPrincipal => ({
+  id: user.id,
+  kind: 'staff',
+  role: user.role as UserRole,
+  tokenVersion: user.tokenVersion,
+});
+
+export const toTokenPrincipal = (principal: AuthPrincipal): TokenPrincipal =>
+  principal.kind === 'customer'
+    ? customerPrincipal(principal.customer)
+    : staffPrincipal(principal.user);
+
+/** The auth-state columns customers and staff share (same names and types in
+ * both tables), so the login/lockout logic runs once for either principal. */
+type AuthStateRow = Pick<
+  User,
+  'failedLoginAttempts' | 'id' | 'lockedUntil' | 'password' | 'tokenVersion'
+>;
+
+const authState = (principal: AuthPrincipal): AuthStateRow =>
+  principal.kind === 'customer' ? principal.customer : principal.user;
+
 type AuthDeps = Pick<
   AppDeps,
   'clock' | 'config' | 'google' | 'logger' | 'mail' | 'prisma' | 'sms'
 >;
 
-/** The password-free user shape plus tokenVersion, so the registration
+/** The password-free customer shape plus tokenVersion, so the registration
  * controller can mint a session without a second read. */
+const registeredCustomerSelect = {
+  ...customerSelect,
+  tokenVersion: true,
+} satisfies Prisma.CustomerSelect;
+
+export type RegisteredCustomer = Prisma.CustomerGetPayload<{
+  select: typeof registeredCustomerSelect;
+}>;
+
+/** Same idea for admin-created staff users. */
 const registeredUserSelect = {
   ...userSelect,
   tokenVersion: true,
@@ -126,9 +198,56 @@ export type RegisteredUser = Prisma.UserGetPayload<{
 export const makeAuthService = (d: AuthDeps) => {
   const { clock, config, google, logger, mail, prisma, sms } = d;
 
-  /** Persists a user with the given role; a password, when given, is hashed
-   * here — passwordless accounts store null and sign in via OTP/Google. */
-  const createUser = async (
+  /** The security-token FK column for a principal — exactly one is ever set
+   * per row (DB CHECK + this being the only writer). */
+  const principalFk = (
+    kind: PrincipalKind,
+    id: number,
+  ): { customerId: number } | { userId: number } =>
+    kind === 'customer' ? { customerId: id } : { userId: id };
+
+  /** Writes login/lockout/credential state to whichever table owns the
+   * principal (the shared-column shape keeps both branches identical). */
+  const updateAuthState = (
+    kind: PrincipalKind,
+    id: number,
+    data: {
+      failedLoginAttempts?: number;
+      lockedUntil?: Date | null;
+      password?: string;
+      tokenVersion?: { increment: number };
+    },
+  ): Promise<unknown> =>
+    kind === 'customer'
+      ? prisma.customer.update({ data, where: { id } })
+      : prisma.user.update({ data, where: { id } });
+
+  /** Public self-service signup: ALWAYS creates a Customer — there is no role
+   * concept on the public surface (staff are created by an admin). */
+  const register = async (
+    input: RegisterInput,
+  ): Promise<RegisteredCustomer> => {
+    const hashedPassword =
+      input.password === undefined
+        ? null
+        : await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
+    return prisma.customer.create({
+      data: {
+        address: input.address,
+        email: input.email,
+        name: input.name,
+        password: hashedPassword,
+        phone: input.phone,
+        profilePicture: input.profilePicture,
+      },
+      select: registeredCustomerSelect,
+    });
+  };
+
+  /** Admin staff creation (POST /users): the role is required and validation
+   * restricts it to ADMIN | AGENT — customers are created via /customers or
+   * the public signup, never here. */
+  const adminCreateUser = async (
     input: RegisterInput,
     role: Role,
   ): Promise<RegisteredUser> => {
@@ -150,24 +269,15 @@ export const makeAuthService = (d: AuthDeps) => {
     });
   };
 
-  /** Public self-service signup: the role is ALWAYS forced to CUSTOMER —
-   * whatever the request body claimed. */
-  const register = (input: RegisterInput): Promise<RegisteredUser> =>
-    createUser(input, Role.CUSTOMER);
-
-  /** Admin user creation (POST /users): takes the role explicitly. */
-  const adminCreateUser = (
-    input: RegisterInput,
-    role: Role = Role.CUSTOMER,
-  ): Promise<RegisteredUser> => createUser(input, role);
-
   /**
-   * Registers a refresh-token id (jti) for a session being issued. The issuer
-   * embeds it in the refresh JWT; refresh consumes it on exchange, so each
-   * refresh token is spendable exactly once.
+   * Registers a refresh-token id (jti) for a session being issued, against
+   * the principal's FK column. The issuer embeds it in the refresh JWT;
+   * refresh consumes it on exchange, so each refresh token is spendable
+   * exactly once.
    */
   const registerRefreshToken = async (
-    userId: number,
+    kind: PrincipalKind,
+    principalId: number,
     jti: string,
   ): Promise<void> => {
     await prisma.userSecurityToken.create({
@@ -178,25 +288,28 @@ export const makeAuthService = (d: AuthDeps) => {
         ),
         tokenHash: hashSecurityToken(jti),
         type: TokenType.REFRESH,
-        userId,
+        ...principalFk(kind, principalId),
       },
     });
   };
 
   /** Signs the access/refresh pair for a session — the ONLY place JWTs are
-   * signed. The refresh token carries the registered rotation id as its jti. */
+   * signed. The refresh token carries the registered rotation id as its jti;
+   * both tokens carry the principal kind. */
   const signAuthTokens = (
-    user: Pick<User, 'id' | 'role' | 'tokenVersion'>,
+    principal: TokenPrincipal,
     refreshJti: string,
   ): AuthTokens => {
     const accessPayload: AccessTokenPayload = {
-      id: user.id,
-      role: user.role as UserRole,
-      tokenVersion: user.tokenVersion,
+      id: principal.id,
+      kind: principal.kind,
+      role: principal.role,
+      tokenVersion: principal.tokenVersion,
     };
     const refreshPayload: Omit<RefreshTokenPayload, 'jti'> = {
-      id: user.id,
-      tokenVersion: user.tokenVersion,
+      id: principal.id,
+      kind: principal.kind,
+      tokenVersion: principal.tokenVersion,
     };
 
     const accessToken = jwt.sign(accessPayload, config.ACCESS_TOKEN_SECRET, {
@@ -213,45 +326,60 @@ export const makeAuthService = (d: AuthDeps) => {
   /** Establishes a session: registers a fresh rotation id and signs the pair.
    * Used by register, login and refresh — the single session issuer. */
   const mintAuthTokens = async (
-    user: Pick<User, 'id' | 'role' | 'tokenVersion'>,
+    principal: TokenPrincipal,
   ): Promise<AuthTokens> => {
     const jti = crypto.randomUUID();
-    await registerRefreshToken(user.id, jti);
-    return signAuthTokens(user, jti);
+    await registerRefreshToken(principal.kind, principal.id, jti);
+    return signAuthTokens(principal, jti);
   };
 
   /** Records a failed password attempt; locks the account once the threshold is
    * crossed, then resets the counter so the next window starts fresh. */
-  const registerFailedLogin = async (user: User): Promise<void> => {
-    const attempts = user.failedLoginAttempts + 1;
+  const registerFailedLogin = async (
+    principal: AuthPrincipal,
+  ): Promise<void> => {
+    const row = authState(principal);
+    const attempts = row.failedLoginAttempts + 1;
     const locked = attempts >= MAX_FAILED_LOGINS;
-    await prisma.user.update({
-      data: {
-        failedLoginAttempts: locked ? 0 : attempts,
-        lockedUntil: locked
-          ? new Date(clock.timestamp() + LOGIN_LOCK_MINUTES * 60_000)
-          : undefined,
-      },
-      where: { id: user.id },
+    await updateAuthState(principal.kind, row.id, {
+      failedLoginAttempts: locked ? 0 : attempts,
+      lockedUntil: locked
+        ? new Date(clock.timestamp() + LOGIN_LOCK_MINUTES * 60_000)
+        : undefined,
     });
   };
 
+  /** Resolves the principal an email names: Customer first, then staff —
+   * FIRST MATCH WINS, so a customer sharing an email with a staff account
+   * always logs in as the customer. */
+  const findPrincipalByEmail = async (
+    email: string,
+  ): Promise<AuthPrincipal | null> => {
+    // findFirst so the soft-delete extension scopes both reads: a
+    // soft-deleted account behaves exactly like an unknown email.
+    const customer = await prisma.customer.findFirst({ where: { email } });
+    if (customer) return { customer, kind: 'customer' };
+
+    const user = await prisma.user.findFirst({ where: { email } });
+    if (user) return { kind: 'staff', user };
+
+    return null;
+  };
+
   /**
-   * Verifies email + password and returns the user (the controller mints
-   * tokens / sets cookies). Uniform "Invalid credentials" (same status, same
-   * timing) for unknown-email, passwordless-account and wrong-password — no
-   * user enumeration.
+   * Verifies email + password and returns the resolved principal (the
+   * controller mints tokens / sets cookies). Customer first, then staff —
+   * first match wins. Uniform "Invalid credentials" (same status, same
+   * timing) for unknown-email, passwordless-account and wrong-password, for
+   * BOTH principal kinds — no user enumeration.
    */
-  const login = async (input: LoginInput): Promise<User> => {
-    // findFirst so the soft-delete extension scopes the read: a soft-deleted
-    // account behaves exactly like an unknown email.
-    const user = await prisma.user.findFirst({
-      where: { email: input.email },
-    });
+  const login = async (input: LoginInput): Promise<AuthPrincipal> => {
+    const principal = await findPrincipalByEmail(input.email);
+    const row = principal ? authState(principal) : null;
 
     // Passwordless accounts (minimal signup / Google) have no hash to check —
     // the dummy compare keeps their timing identical to unknown emails.
-    if (user?.password == null) {
+    if (!principal || row?.password == null) {
       await bcrypt.compare(input.password, DUMMY_PASSWORD_HASH);
       throw new UnauthorizedError('Invalid credentials', {
         code: 'INVALID_CREDENTIALS',
@@ -261,16 +389,16 @@ export const makeAuthService = (d: AuthDeps) => {
 
     // Temporary lock after repeated failures. Unknown emails never reach here
     // (no row to lock), so this can't be used to enumerate accounts blindly.
-    if (user.lockedUntil && user.lockedUntil.getTime() > clock.timestamp()) {
+    if (row.lockedUntil && row.lockedUntil.getTime() > clock.timestamp()) {
       throw new TooManyRequestsError(
         'Too many failed attempts. Please wait a few minutes and try again.',
         { code: 'ACCOUNT_LOCKED', layer: 'auth' },
       );
     }
 
-    const passwordValid = await bcrypt.compare(input.password, user.password);
+    const passwordValid = await bcrypt.compare(input.password, row.password);
     if (!passwordValid) {
-      await registerFailedLogin(user);
+      await registerFailedLogin(principal);
       throw new UnauthorizedError('Invalid credentials', {
         code: 'INVALID_CREDENTIALS',
         layer: 'auth',
@@ -278,22 +406,25 @@ export const makeAuthService = (d: AuthDeps) => {
     }
 
     // A correct password clears the failure counter.
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      await prisma.user.update({
-        data: { failedLoginAttempts: 0, lockedUntil: null },
-        where: { id: user.id },
+    if (row.failedLoginAttempts > 0 || row.lockedUntil) {
+      await updateAuthState(principal.kind, row.id, {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       });
     }
 
-    return user;
+    return principal;
   };
 
-  /** Theft response: bump the session epoch so every issued token (access +
-   * refresh, every device) dies, and drop the now-unusable registrations. */
-  const invalidateSession = async (userId: number): Promise<void> => {
-    await prisma.user.update({
-      data: { tokenVersion: { increment: 1 } },
-      where: { id: userId },
+  /** Theft response: bump the principal's session epoch so every issued token
+   * (access + refresh, every device) dies, and drop the now-unusable
+   * registrations. */
+  const invalidateSession = async (
+    kind: PrincipalKind,
+    principalId: number,
+  ): Promise<void> => {
+    await updateAuthState(kind, principalId, {
+      tokenVersion: { increment: 1 },
     });
     // The epoch bump already rejects them; dropping the rows keeps the table
     // from accumulating registrations that can never be exchanged.
@@ -301,10 +432,10 @@ export const makeAuthService = (d: AuthDeps) => {
       where: {
         consumedAt: null,
         type: TokenType.REFRESH,
-        userId,
+        ...principalFk(kind, principalId),
       },
     });
-    invalidateCachedTokenVersion(userId);
+    invalidateCachedTokenVersion(kind, principalId);
   };
 
   const invalidRefreshError = (): UnauthorizedError =>
@@ -313,17 +444,30 @@ export const makeAuthService = (d: AuthDeps) => {
       layer: 'auth',
     });
 
+  const isPrincipalKind = (value: unknown): value is PrincipalKind =>
+    value === 'customer' || value === 'staff';
+
+  /** Whether a security-token row belongs to the given principal (the FK
+   * column must match the token's kind — ids overlap across the tables). */
+  const recordBelongsTo = (
+    record: { customerId: null | number; userId: null | number },
+    kind: PrincipalKind,
+    id: number,
+  ): boolean =>
+    kind === 'customer' ? record.customerId === id : record.userId === id;
+
   /**
    * Exchanges a refresh JWT for a fresh access+refresh pair (full rotation):
-   * verifies the JWT, confirms the session epoch still matches, and consumes
-   * the token's rotation id — a refresh token is spendable exactly once. A
-   * replay of an already-spent token outside the concurrency grace window
-   * means the cookie exists in two places (theft), so the session epoch is
-   * bumped and every device is signed out.
+   * verifies the JWT, resolves the principal its `kind` claim names, confirms
+   * the session epoch still matches, and consumes the token's rotation id — a
+   * refresh token is spendable exactly once. A replay of an already-spent
+   * token outside the concurrency grace window means the cookie exists in two
+   * places (theft), so the session epoch is bumped and every device is signed
+   * out.
    */
   const refresh = async (
     presentedToken: string,
-  ): Promise<{ tokens: AuthTokens; user: User }> => {
+  ): Promise<{ principal: AuthPrincipal; tokens: AuthTokens }> => {
     let decoded: RefreshTokenPayload;
     try {
       decoded = await verifyJwtToken<RefreshTokenPayload>(
@@ -340,15 +484,30 @@ export const makeAuthService = (d: AuthDeps) => {
       throw invalidRefreshError();
     }
 
+    // Tokens minted before the customer/staff split name no principal table
+    // and can't be resolved — their holders just log in again.
+    if (!isPrincipalKind(decoded.kind)) throw invalidRefreshError();
+    const kind = decoded.kind;
+
     // findFirst: a soft-deleted account can no longer refresh a session.
-    const user = await prisma.user.findFirst({ where: { id: decoded.id } });
-    if (!user) {
+    const principal: AuthPrincipal | null =
+      kind === 'customer'
+        ? await prisma.customer
+            .findFirst({ where: { id: decoded.id } })
+            .then((customer) =>
+              customer ? { customer, kind: 'customer' as const } : null,
+            )
+        : await prisma.user
+            .findFirst({ where: { id: decoded.id } })
+            .then((user) => (user ? { kind: 'staff' as const, user } : null));
+    if (!principal) {
       throw new UnauthorizedError('Account not found. Please log in again.', {
         code: 'USER_NOT_FOUND',
         layer: 'auth',
       });
     }
-    if (decoded.tokenVersion !== user.tokenVersion) {
+    const row = authState(principal);
+    if (decoded.tokenVersion !== row.tokenVersion) {
       throw new UnauthorizedError(
         'Session has been invalidated. Please log in again.',
         { code: 'STALE_TOKEN_VERSION', layer: 'auth' },
@@ -362,7 +521,8 @@ export const makeAuthService = (d: AuthDeps) => {
       where: { tokenHash: hashSecurityToken(decoded.jti) },
     });
     if (
-      record?.userId !== user.id ||
+      !record ||
+      !recordBelongsTo(record, kind, row.id) ||
       record.type !== TokenType.REFRESH ||
       record.expiresAt.getTime() < clock.timestamp()
     ) {
@@ -374,9 +534,9 @@ export const makeAuthService = (d: AuthDeps) => {
       if (ageMs > REFRESH_REUSE_GRACE_MS) {
         // The token was already spent and this replay is too old to be a
         // tab race: someone else holds the cookie. Kill every session.
-        await invalidateSession(user.id);
+        await invalidateSession(kind, row.id);
         logger.warn(
-          { userId: user.id },
+          { kind, principalId: row.id },
           'Refresh-token reuse detected — session epoch bumped',
         );
       }
@@ -403,14 +563,18 @@ export const makeAuthService = (d: AuthDeps) => {
       );
     }
 
-    await registerRefreshToken(user.id, successorJti);
-    return { tokens: signAuthTokens(user, successorJti), user };
+    await registerRefreshToken(kind, row.id, successorJti);
+    return {
+      principal,
+      tokens: signAuthTokens(toTokenPrincipal(principal), successorJti),
+    };
   };
 
   /**
-   * Logout: consume the presented refresh token's registration so it can
-   * never be exchanged again (the controller clears the cookies). Tolerates a
-   * missing/garbage token — "log out" never errors.
+   * Logout: consume the presented refresh token's registration (against the
+   * principal the token names) so it can never be exchanged again — the
+   * controller clears the cookies. Tolerates a missing/garbage token —
+   * "log out" never errors.
    */
   const logout = async (presentedToken: null | string): Promise<void> => {
     if (!presentedToken) return;
@@ -426,6 +590,8 @@ export const makeAuthService = (d: AuthDeps) => {
       return;
     }
 
+    if (!isPrincipalKind(decoded.kind)) return;
+
     if (decoded.jti) {
       await prisma.userSecurityToken.updateMany({
         data: { consumedAt: clock.now() },
@@ -433,11 +599,11 @@ export const makeAuthService = (d: AuthDeps) => {
           consumedAt: null,
           tokenHash: hashSecurityToken(decoded.jti),
           type: TokenType.REFRESH,
-          userId: decoded.id,
+          ...principalFk(decoded.kind, decoded.id),
         },
       });
     }
-    invalidateCachedTokenVersion(decoded.id);
+    invalidateCachedTokenVersion(decoded.kind, decoded.id);
   };
 
   // ---- Passwordless OTP login, password reset, Google sign-in ----
@@ -450,35 +616,40 @@ export const makeAuthService = (d: AuthDeps) => {
     });
   };
 
-  /** Resolves the account an OTP request/verify identifies (email or phone). */
-  const findUserByContact = (contact: OtpContact): Promise<null | User> => {
+  /** Resolves the CUSTOMER an OTP request/verify identifies (email or phone).
+   * OTP login is a customer-only surface — staff use passwords. */
+  const findCustomerByContact = (
+    contact: OtpContact,
+  ): Promise<Customer | null> => {
     // findFirst: soft-deleted accounts read as unknown contacts.
     if (contact.email) {
-      return prisma.user.findFirst({ where: { email: contact.email } });
+      return prisma.customer.findFirst({ where: { email: contact.email } });
     }
     if (contact.phone) {
-      return prisma.user.findFirst({ where: { phone: contact.phone } });
+      return prisma.customer.findFirst({ where: { phone: contact.phone } });
     }
     return Promise.resolve(null);
   };
 
-  /** One live token per (user, type): issuing a new one drops any prior
+  /** One live token per (principal, type): issuing a new one drops any prior
    * unconsumed tokens of that type. Only the sha256 hash is stored. */
   const issueSecurityToken = async (
-    userId: number,
+    kind: PrincipalKind,
+    principalId: number,
     type: TokenType,
     plainToken: string,
     ttlMinutes: number,
   ): Promise<void> => {
+    const fk = principalFk(kind, principalId);
     await prisma.userSecurityToken.deleteMany({
-      where: { consumedAt: null, type, userId },
+      where: { consumedAt: null, type, ...fk },
     });
     await prisma.userSecurityToken.create({
       data: {
         expiresAt: new Date(clock.timestamp() + ttlMinutes * 60_000),
         tokenHash: hashSecurityToken(plainToken),
         type,
-        userId,
+        ...fk,
       },
     });
   };
@@ -493,18 +664,18 @@ export const makeAuthService = (d: AuthDeps) => {
     );
 
   /**
-   * Requests a passwordless login code. ALWAYS resolves for unknown contacts
-   * (same response as known ones — no enumeration); for a real account a
-   * 6-digit code is issued (replacing any prior live one) and sent to the
-   * channel the caller identified themselves by. Re-requests inside the
-   * cooldown are silently dropped: a 429 here would only ever fire for
-   * contacts that HAVE an account, leaking existence — the response must be
-   * indistinguishable from the unknown-contact path. Abuse control is the
+   * Requests a passwordless login code (customers only). ALWAYS resolves for
+   * unknown contacts (same response as known ones — no enumeration); for a
+   * real account a 6-digit code is issued (replacing any prior live one) and
+   * sent to the channel the caller identified themselves by. Re-requests
+   * inside the cooldown are silently dropped: a 429 here would only ever fire
+   * for contacts that HAVE an account, leaking existence — the response must
+   * be indistinguishable from the unknown-contact path. Abuse control is the
    * per-IP rate limiter on the route.
    */
   const requestOtpLogin = async (contact: OtpContact): Promise<void> => {
-    const user = await findUserByContact(contact);
-    if (!user) {
+    const customer = await findCustomerByContact(contact);
+    if (!customer) {
       // Spend comparable work to the known-contact path so response timing
       // doesn't reveal whether the contact has an account.
       await bcrypt.compare('otp-timing-guard', DUMMY_PASSWORD_HASH);
@@ -517,7 +688,7 @@ export const makeAuthService = (d: AuthDeps) => {
 
     const latest = await prisma.userSecurityToken.findFirst({
       orderBy: { createdAt: 'desc' },
-      where: { type: TokenType.OTP_LOGIN, userId: user.id },
+      where: { customerId: customer.id, type: TokenType.OTP_LOGIN },
     });
     if (
       latest &&
@@ -525,47 +696,57 @@ export const makeAuthService = (d: AuthDeps) => {
         OTP_RESEND_COOLDOWN_SECONDS * 1000
     ) {
       logger.info(
-        { event: 'otp_login_cooldown', userId: user.id },
+        { customerId: customer.id, event: 'otp_login_cooldown' },
         'OTP re-request inside cooldown dropped',
       );
       return;
     }
 
     const code = generateOtpCode();
-    await issueSecurityToken(user.id, TokenType.OTP_LOGIN, code, OTP_TTL_MINUTES);
+    await issueSecurityToken(
+      'customer',
+      customer.id,
+      TokenType.OTP_LOGIN,
+      code,
+      OTP_TTL_MINUTES,
+    );
 
     const message = `Your TravelTrek login code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
-    if (contact.email && user.email) {
+    if (contact.email && customer.email) {
       dispatch(
         mail.send({
           subject: 'Your TravelTrek login code',
           text: message,
-          to: user.email,
+          to: customer.email,
         }),
         'OTP email',
       );
-    } else if (contact.phone && user.phone) {
-      dispatch(sms.send({ message, to: user.phone }), 'OTP SMS');
+    } else if (contact.phone && customer.phone) {
+      dispatch(sms.send({ message, to: customer.phone }), 'OTP SMS');
     }
   };
 
   /**
-   * Verifies a passwordless login code and returns the user (the controller
-   * mints tokens / sets cookies). Wrong guesses increment the code's attempt
-   * counter — at the cap the code is dead and a fresh one must be requested.
-   * A correct guess is consumed atomically (redeemable at most once) and
-   * clears any password-failure lockout state.
+   * Verifies a passwordless login code and returns the customer (the
+   * controller mints tokens / sets cookies). Wrong guesses increment the
+   * code's attempt counter — at the cap the code is dead and a fresh one must
+   * be requested. A correct guess is consumed atomically (redeemable at most
+   * once) and clears any password-failure lockout state.
    */
   const verifyOtpLogin = async (
     contact: OtpContact,
     code: string,
-  ): Promise<User> => {
-    const user = await findUserByContact(contact);
-    if (!user) throw invalidOtpError();
+  ): Promise<Customer> => {
+    const customer = await findCustomerByContact(contact);
+    if (!customer) throw invalidOtpError();
 
     const record = await prisma.userSecurityToken.findFirst({
       orderBy: { createdAt: 'desc' },
-      where: { consumedAt: null, type: TokenType.OTP_LOGIN, userId: user.id },
+      where: {
+        consumedAt: null,
+        customerId: customer.id,
+        type: TokenType.OTP_LOGIN,
+      },
     });
     if (
       !record ||
@@ -592,25 +773,28 @@ export const makeAuthService = (d: AuthDeps) => {
 
     // A successful OTP login is as good as a correct password: clear the
     // failure counter and any temporary lock.
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      await prisma.user.update({
-        data: { failedLoginAttempts: 0, lockedUntil: null },
-        where: { id: user.id },
+    if (customer.failedLoginAttempts > 0 || customer.lockedUntil) {
+      await updateAuthState('customer', customer.id, {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       });
     }
 
-    return user;
+    return customer;
   };
 
   /**
-   * Forgot password. ALWAYS resolves (never reveals whether the email has an
-   * account). For a real account a single-use 256-bit link token is issued
-   * (sha256 stored) and the reset URL is emailed.
+   * Forgot password — works for BOTH principals (customer first, then staff;
+   * first match wins, mirroring login precedence). ALWAYS resolves (never
+   * reveals whether the email has an account). For a real account a
+   * single-use 256-bit link token is issued (sha256 stored, FK'd to the
+   * matched principal) and the reset URL is emailed.
    */
   const requestPasswordReset = async (email: string): Promise<void> => {
-    // findFirst: soft-deleted accounts read as unknown emails.
-    const user = await prisma.user.findFirst({ where: { email } });
-    if (!user?.email) {
+    const principal = await findPrincipalByEmail(email);
+    const account =
+      principal?.kind === 'customer' ? principal.customer : principal?.user;
+    if (!principal || !account?.email) {
       // Same dummy work as the known-email path (see requestOtpLogin).
       await bcrypt.compare('reset-timing-guard', DUMMY_PASSWORD_HASH);
       logger.info(
@@ -622,7 +806,8 @@ export const makeAuthService = (d: AuthDeps) => {
 
     const token = generateResetToken();
     await issueSecurityToken(
-      user.id,
+      principal.kind,
+      account.id,
       TokenType.PASSWORD_RESET,
       token,
       PASSWORD_RESET_TTL_MINUTES,
@@ -633,19 +818,23 @@ export const makeAuthService = (d: AuthDeps) => {
       mail.send({
         subject: 'Reset your TravelTrek password',
         text:
-          `Hi ${user.name},\n\nWe received a request to reset your password. ` +
+          `Hi ${account.name},\n\nWe received a request to reset your password. ` +
           `Use the link below within ${PASSWORD_RESET_TTL_MINUTES} minutes:\n\n` +
           `${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
-        to: user.email,
+        to: account.email,
       }),
       'Password-reset email',
     );
-    logger.info({ userId: user.id }, 'Password reset email requested');
+    logger.info(
+      { kind: principal.kind, principalId: account.id },
+      'Password reset email requested',
+    );
   };
 
   /**
    * Redeems a reset link: validates + consumes the token (atomic guarded
-   * update — single-use), sets the new bcrypt hash, and bumps the session
+   * update — single-use), sets the new bcrypt hash on whichever principal the
+   * token row FKs (customer or staff), and bumps that principal's session
    * epoch so every live session on every device must sign in again.
    */
   const resetPassword = async (
@@ -676,27 +865,40 @@ export const makeAuthService = (d: AuthDeps) => {
       );
     }
 
+    // The token row records which principal it was issued for (exactly one
+    // FK is ever set — DB CHECK).
+    const kind: PrincipalKind = record.customerId !== null ? 'customer' : 'staff';
+    const principalId = record.customerId ?? record.userId;
+    if (principalId === null) {
+      // Unreachable under the CHECK constraint; fail closed anyway.
+      throw new UnauthorizedError(
+        'This reset link is invalid or has expired. Request a new one.',
+        { code: 'INVALID_RESET_TOKEN', layer: 'auth' },
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
-    await prisma.user.update({
-      data: { password: hashedPassword, tokenVersion: { increment: 1 } },
-      where: { id: record.userId },
+    await updateAuthState(kind, principalId, {
+      password: hashedPassword,
+      tokenVersion: { increment: 1 },
     });
     // Drop every other outstanding code/link/refresh registration: the epoch
     // bump already rejects the JWTs, and no stale secret should survive a
     // password change.
     await prisma.userSecurityToken.deleteMany({
-      where: { consumedAt: null, userId: record.userId },
+      where: { consumedAt: null, ...principalFk(kind, principalId) },
     });
-    invalidateCachedTokenVersion(record.userId);
+    invalidateCachedTokenVersion(kind, principalId);
   };
 
   /**
-   * Google sign-in: verifies the ID token via the injected google client,
-   * then resolves the account — by googleId first, else by verified email
-   * (linking the googleId for next time), else a fresh passwordless CUSTOMER.
-   * The controller mints tokens / sets cookies for the returned user.
+   * Google sign-in — a CUSTOMER-ONLY surface: verifies the ID token via the
+   * injected google client, then resolves the account — by googleId first,
+   * else by verified email (linking the googleId for next time), else a fresh
+   * passwordless Customer. The controller mints tokens / sets cookies for the
+   * returned customer. Staff never authenticate via Google.
    */
-  const googleSignIn = async (idToken: string): Promise<User> => {
+  const googleSignIn = async (idToken: string): Promise<Customer> => {
     if (!config.GOOGLE_CLIENT_ID) {
       throw new ServiceUnavailableError('Google sign-in is not configured', {
         code: 'GOOGLE_NOT_CONFIGURED',
@@ -715,7 +917,7 @@ export const makeAuthService = (d: AuthDeps) => {
     // findFirst on both lookups: a soft-deleted account can neither sign in
     // nor be linked. Its unique email/googleId stay held (khadys convention),
     // so a re-signup for that identity surfaces as a P2002 conflict.
-    const byGoogleId = await prisma.user.findFirst({
+    const byGoogleId = await prisma.customer.findFirst({
       where: { googleId: identity.googleId },
     });
     if (byGoogleId) return byGoogleId;
@@ -730,22 +932,21 @@ export const makeAuthService = (d: AuthDeps) => {
       );
     }
 
-    const byEmail = await prisma.user.findFirst({
+    const byEmail = await prisma.customer.findFirst({
       where: { email: identity.email },
     });
     if (byEmail) {
-      return prisma.user.update({
+      return prisma.customer.update({
         data: { googleId: identity.googleId },
         where: { id: byEmail.id },
       });
     }
 
-    return prisma.user.create({
+    return prisma.customer.create({
       data: {
         email: identity.email,
         googleId: identity.googleId,
         name: identity.name,
-        role: Role.CUSTOMER,
       },
     });
   };

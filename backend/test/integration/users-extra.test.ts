@@ -1,59 +1,36 @@
 // test/integration/users-extra.test.ts
 //
-// Coverage the baseline users suite lacks, pinned against the service-layer
-// refactor: the self-vs-others actor rules on profile viewing and updates,
-// uniqueness conflicts, password re-hashing, role-change guard rails and
-// their effect, and the delete protections (active payments, admin
-// self-delete, the bulk confirmation gate). JSON-only flows — no multipart,
-// so the Cloudinary upload path stays out of scope here.
+// Coverage the baseline users suite lacks, updated for Phase 5b (STAFF-only
+// users): the staff-vs-customer route gates, uniqueness conflicts, password
+// re-hashing, role-change guard rails (including the legacy-reserved CUSTOMER
+// value) and their effect, and the delete protections (admin self-delete, the
+// bulk confirmation gate). Staff carry no bookings/payments anymore, so the
+// legacy payment-based delete guards are gone — deletes are plain soft
+// deletes. JSON-only flows — no multipart, so the Cloudinary upload path
+// stays out of scope here.
 import bcrypt from 'bcrypt';
 import { describe, expect, it } from 'vitest';
 
-import prisma, {
-  PaymentStatus,
-  Role,
-} from '#config/prismaClient.js';
+import prisma, { Role } from '#config/prismaClient.js';
 
 import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createAgent,
-  createTour,
-  createUser,
+  createCustomer,
   TEST_PASSWORD,
 } from '../helpers/factories.js';
 
-/** A booking + payment pair for the delete-guard tests. */
-const createPaymentFor = async (userId: number, status: PaymentStatus) => {
-  const tour = await createTour();
-  const booking = await prisma.booking.create({
-    data: { totalPrice: 500, tourId: tour.id, userId },
-  });
-  return prisma.payment.create({
-    data: {
-      amount: 500,
-      bookingId: booking.id,
-      paymentMethod: 'CREDIT_CARD',
-      status,
-      transactionReference: `users-extra-ref-${String(booking.id)}`,
-      userId,
-    },
-  });
-};
-
-describe('PUT /api/v1/users/:userId (actor rules)', () => {
-  it("rejects a customer updating another user's profile with 401", async () => {
-    const customer = await createUser();
-    const victim = await createUser();
+describe('PUT /api/v1/users/:userId (gates and rules)', () => {
+  it('rejects a customer updating a staff profile with 403 (route gate)', async () => {
+    const customer = await createCustomer();
+    const victim = await createAgent();
 
     const res = await authedApi(customer)
       .put(`/api/v1/users/${victim.id}`)
       .send({ name: 'Hijacked' });
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe(
-      'You are not authorized to update this user.',
-    );
+    expect(res.status).toBe(403);
 
     const untouched = await prisma.user.findUnique({
       where: { id: victim.id },
@@ -61,12 +38,12 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
     expect(untouched?.name).toBe(victim.name);
   });
 
-  it("lets an agent update another user's profile", async () => {
+  it("lets an agent update another staff user's profile", async () => {
     const agent = await createAgent();
-    const customer = await createUser();
+    const other = await createAgent();
 
     const res = await authedApi(agent)
-      .put(`/api/v1/users/${customer.id}`)
+      .put(`/api/v1/users/${other.id}`)
       .send({ name: 'Renamed By Agent' });
 
     expect(res.status).toBe(200);
@@ -75,8 +52,8 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
   });
 
   it('rejects an update to an email already taken by another user with 409', async () => {
-    const user = await createUser();
-    const other = await createUser();
+    const user = await createAgent();
+    const other = await createAgent();
 
     const res = await authedApi(user)
       .put(`/api/v1/users/${user.id}`)
@@ -87,8 +64,8 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
   });
 
   it('rejects an update to a phone already taken by another user with 409', async () => {
-    const user = await createUser();
-    const other = await createUser();
+    const user = await createAgent();
+    const other = await createAgent();
 
     const res = await authedApi(user)
       .put(`/api/v1/users/${user.id}`)
@@ -101,7 +78,7 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
   });
 
   it('re-hashes a changed password with bcrypt at the configured cost', async () => {
-    const user = await createUser();
+    const user = await createAgent();
 
     const res = await authedApi(user)
       .put(`/api/v1/users/${user.id}`)
@@ -132,27 +109,24 @@ describe('PUT /api/v1/users/:userId (actor rules)', () => {
   });
 });
 
-describe('GET /api/v1/users/:userId (actor rules)', () => {
-  it("rejects a customer viewing another user's profile with 401", async () => {
-    const customer = await createUser();
-    const other = await createUser();
+describe('GET /api/v1/users/:userId (gates)', () => {
+  it('rejects a customer viewing a staff profile with 403 (route gate)', async () => {
+    const customer = await createCustomer();
+    const agent = await createAgent();
 
-    const res = await authedApi(customer).get(`/api/v1/users/${other.id}`);
+    const res = await authedApi(customer).get(`/api/v1/users/${agent.id}`);
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe(
-      'You are not authorized to view this user profile',
-    );
+    expect(res.status).toBe(403);
   });
 
-  it('lets a customer view their own profile, without the password', async () => {
-    const customer = await createUser();
+  it('lets a staff user view their own profile, without the password', async () => {
+    const agent = await createAgent();
 
-    const res = await authedApi(customer).get(`/api/v1/users/${customer.id}`);
+    const res = await authedApi(agent).get(`/api/v1/users/${agent.id}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.id).toBe(customer.id);
-    expect(res.body.data.email).toBe(customer.email);
+    expect(res.body.data.id).toBe(agent.id);
+    expect(res.body.data.email).toBe(agent.email);
     expect(res.body.data.password).toBeUndefined();
   });
 });
@@ -163,7 +137,7 @@ describe('PATCH /api/v1/users/:userId/role (guards and effects)', () => {
 
     const res = await authedApi(admin)
       .patch(`/api/v1/users/${admin.id}/role`)
-      .send({ role: 'CUSTOMER' });
+      .send({ role: 'AGENT' });
 
     expect(res.status).toBe(403);
     expect(res.body.message).toBe('You cannot change your own role');
@@ -171,44 +145,58 @@ describe('PATCH /api/v1/users/:userId/role (guards and effects)', () => {
 
   it('rejects a no-op role change with 400', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const agent = await createAgent();
 
     const res = await authedApi(admin)
-      .patch(`/api/v1/users/${customer.id}/role`)
-      .send({ role: 'CUSTOMER' });
+      .patch(`/api/v1/users/${agent.id}/role`)
+      .send({ role: 'AGENT' });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toBe('User already has the role: CUSTOMER');
+    expect(res.body.message).toBe('User already has the role: AGENT');
   });
 
   it('rejects an invalid role value with 400', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const agent = await createAgent();
 
     const res = await authedApi(admin)
-      .patch(`/api/v1/users/${customer.id}/role`)
+      .patch(`/api/v1/users/${agent.id}/role`)
       .send({ role: 'SUPERUSER' });
 
     expect(res.status).toBe(400);
   });
 
-  it('grants agent access after a promotion (fresh token)', async () => {
+  it('rejects the legacy-reserved CUSTOMER role with 400', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
+    const agent = await createAgent();
 
-    // Customers may not list users.
-    const before = await authedApi(customer).get('/api/v1/users');
+    const res = await authedApi(admin)
+      .patch(`/api/v1/users/${agent.id}/role`)
+      .send({ role: 'CUSTOMER' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('grants admin powers after a promotion (fresh token)', async () => {
+    const admin = await createAdmin();
+    const agent = await createAgent();
+    const target = await createAgent();
+
+    // Agents may not delete users (ADMIN-only route).
+    const before = await authedApi(agent).delete(
+      `/api/v1/users/${target.id}`,
+    );
     expect(before.status).toBe(403);
 
     const promote = await authedApi(admin)
-      .patch(`/api/v1/users/${customer.id}/role`)
-      .send({ role: 'AGENT' });
+      .patch(`/api/v1/users/${agent.id}/role`)
+      .send({ role: 'ADMIN' });
     expect(promote.status).toBe(200);
-    expect(promote.body.data.role).toBe('AGENT');
+    expect(promote.body.data.role).toBe('ADMIN');
 
     // A token minted after the change (i.e. re-login) carries the new role.
-    const after = await authedApi({ id: customer.id, role: Role.AGENT }).get(
-      '/api/v1/users',
+    const after = await authedApi({ id: agent.id, role: Role.ADMIN }).delete(
+      `/api/v1/users/${target.id}`,
     );
     expect(after.status).toBe(200);
   });
@@ -224,40 +212,23 @@ describe('DELETE /api/v1/users/:userId (guards)', () => {
     expect(res.body.message).toBe('Admins cannot delete themselves');
   });
 
-  it('refuses to delete a user with a non-refunded payment (409)', async () => {
+  it('soft-deletes a staff user (no payment guard — staff own no payments)', async () => {
     const admin = await createAdmin();
-    const customer = await createUser();
-    await createPaymentFor(customer.id, PaymentStatus.COMPLETED);
+    const agent = await createAgent();
 
-    const res = await authedApi(admin).delete(`/api/v1/users/${customer.id}`);
-
-    expect(res.status).toBe(409);
-    expect(res.body.message).toContain('active (non-refunded) payments');
-
-    const stillThere = await prisma.user.findUnique({
-      where: { id: customer.id },
-    });
-    expect(stillThere).not.toBeNull();
-  });
-
-  it('deletes a user whose only payment is refunded', async () => {
-    const admin = await createAdmin();
-    const customer = await createUser();
-    await createPaymentFor(customer.id, PaymentStatus.REFUNDED);
-
-    const res = await authedApi(admin).delete(`/api/v1/users/${customer.id}`);
+    const res = await authedApi(admin).delete(`/api/v1/users/${agent.id}`);
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe(
-      `User "${customer.name}" (${customer.email}) deleted successfully`,
+      `User "${agent.name}" (${agent.email}) deleted successfully`,
     );
 
     // Soft delete: hidden from scoped reads, but the row survives with a
     // deletedAt tombstone (findUnique is deliberately unscoped).
-    const gone = await prisma.user.findFirst({ where: { id: customer.id } });
+    const gone = await prisma.user.findFirst({ where: { id: agent.id } });
     expect(gone).toBeNull();
     const tombstone = await prisma.user.findUnique({
-      where: { id: customer.id },
+      where: { id: agent.id },
     });
     expect(tombstone?.deletedAt).toBeInstanceOf(Date);
   });
@@ -275,7 +246,7 @@ describe('DELETE /api/v1/users/:userId (guards)', () => {
 describe('DELETE /api/v1/users (bulk guards)', () => {
   it('requires the confirmation phrase', async () => {
     const admin = await createAdmin();
-    await createUser();
+    await createAgent();
 
     const res = await authedApi(admin).delete('/api/v1/users').send({});
 
@@ -283,25 +254,10 @@ describe('DELETE /api/v1/users (bulk guards)', () => {
     expect(res.body.message).toContain('requires confirmation');
   });
 
-  it('is refused entirely while any user has a non-refunded payment', async () => {
+  it('deletes every staff user except the acting admin when confirmed', async () => {
     const admin = await createAdmin();
-    const blocked = await createUser();
-    await createUser();
-    await createPaymentFor(blocked.id, PaymentStatus.PENDING);
-
-    const res = await authedApi(admin)
-      .delete('/api/v1/users')
-      .send({ confirmDelete: 'DELETE_ALL_USERS' });
-
-    expect(res.status).toBe(409);
-    expect(res.body.message).toContain('active (non-refunded) payments');
-    expect(await prisma.user.count()).toBe(3);
-  });
-
-  it('deletes every user except the acting admin when confirmed', async () => {
-    const admin = await createAdmin();
-    await createUser();
-    await createUser();
+    await createAgent();
+    await createAgent();
 
     const res = await authedApi(admin)
       .delete('/api/v1/users')

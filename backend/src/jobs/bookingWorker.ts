@@ -15,6 +15,7 @@ export const bookingDeadlineWorker = new Worker(
 
     const expiredBookings = await prisma.booking.findMany({
       include: {
+        customer: true,
         flight: true,
         room: {
           include: {
@@ -22,7 +23,6 @@ export const bookingDeadlineWorker = new Worker(
           },
         },
         tour: true,
-        user: true,
       },
       where: {
         paymentDeadline: {
@@ -82,7 +82,7 @@ export const bookingDeadlineWorker = new Worker(
 
           cancelledCount++;
           logger.info(
-            `❌ Cancelled booking #${booking.id} for user ${booking.user.email ?? `#${booking.userId}`}`,
+            `❌ Cancelled booking #${booking.id} for customer ${booking.customer.email ?? `#${booking.customerId}`}`,
           );
         } catch (err) {
           failureCount++;

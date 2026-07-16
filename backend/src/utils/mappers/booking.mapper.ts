@@ -9,6 +9,8 @@
 // order), where the ROOM variant folds the booking-level stay fields
 // (startDate/endDate/numberOfNights/numberOfRooms) into the room object. A
 // booking with no associated item throws the same 400 the legacy helper did.
+// Phase 5b: bookings belong to Customers — the DTO emits customerId + a
+// nested customer summary where userId/user used to be.
 import type { Prisma } from '#config/prismaClient.js';
 
 import { BadRequestError } from '#middlewares/error-handler.js';
@@ -23,6 +25,9 @@ const bookingDestinationSelect = {
 
 /** Shared include for every booking read/write — the legacy bookingInclude. */
 export const bookingInclude = {
+  customer: {
+    select: { email: true, id: true, name: true },
+  },
   flight: {
     select: {
       airline: true,
@@ -62,9 +67,6 @@ export const bookingInclude = {
       id: true,
       name: true,
     },
-  },
-  user: {
-    select: { email: true, id: true, name: true },
   },
 } satisfies Prisma.BookingInclude;
 
@@ -111,6 +113,8 @@ export interface TourBookingDTO extends BookingBaseDTO {
 interface BookingBaseDTO {
   bookingDate: BookingWithRelations['bookingDate'];
   createdAt: BookingWithRelations['createdAt'];
+  customer: BookingWithRelations['customer'];
+  customerId: number;
   id: number;
   numberOfGuests: number;
   payment: BookingWithRelations['payment'];
@@ -119,14 +123,14 @@ interface BookingBaseDTO {
   status: BookingWithRelations['status'];
   totalPrice: number;
   updatedAt: BookingWithRelations['updatedAt'];
-  user: BookingWithRelations['user'];
-  userId: number;
 }
 
 export const toBookingDTO = (booking: BookingWithRelations): BookingDTO => {
   const baseResponse: BookingBaseDTO = {
     bookingDate: booking.bookingDate,
     createdAt: booking.createdAt,
+    customer: booking.customer,
+    customerId: booking.customerId,
     id: booking.id,
     numberOfGuests: booking.numberOfGuests,
     payment: booking.payment,
@@ -135,8 +139,6 @@ export const toBookingDTO = (booking: BookingWithRelations): BookingDTO => {
     status: booking.status,
     totalPrice: booking.totalPrice,
     updatedAt: booking.updatedAt,
-    user: booking.user,
-    userId: booking.userId,
   };
 
   if (booking.tour) {

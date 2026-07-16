@@ -1,4 +1,5 @@
 export * from '#controllers/bookingController.js';
+export * from '#controllers/customerController.js';
 export * from '#controllers/dashboardController.js';
 export * from '#controllers/destinationController.js';
 export * from '#controllers/flightController.js';
