@@ -7,6 +7,7 @@ import { useGetBookingQuery } from "@/redux/bookingApi";
 import BookingDetailView from "@/components/bookings/BookingDetailView";
 import BookingDetailViewSkeleton from "@/components/bookings/BookingDetailViewSkeleton";
 import DetailPageHeader from "@/components/ui/DetailPageHeader";
+import { BookingReviewCard } from "@/components/reviews/booking-review-card";
 
 const BookingDetailPage = () => {
   const params = useParams<{ id: string }>();
@@ -43,6 +44,9 @@ const BookingDetailPage = () => {
 
       {/* Booking Detail Component */}
       <BookingDetailView booking={booking} />
+
+      {/* Customer-only: leave / manage the review for this booking */}
+      <BookingReviewCard booking={booking} />
     </div>
   );
 };

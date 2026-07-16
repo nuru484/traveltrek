@@ -3,7 +3,6 @@ import {
   ITourResponse,
   IToursPaginatedResponse,
   IToursQueryParams,
-  ITourInput,
 } from "../types/tour.types";
 import { IApiResponse } from "@/types/api";
 
@@ -43,33 +42,30 @@ export const tourApi = apiSlice.injectEndpoints({
       providesTags: (result, error, id) => [{ type: "Tour", id }],
     }),
 
-    createTour: builder.mutation<IApiResponse<ITourResponse>, ITourInput>({
-      query: (tourData) => ({
+    // Multipart (photo upload via the 'tourPhoto' field) — the browser sets
+    // the multipart boundary header itself, same as the hotel mutations.
+    createTour: builder.mutation<IApiResponse<ITourResponse>, FormData>({
+      query: (formData) => ({
         url: "/tours",
         method: "POST",
-        body: tourData,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData,
       }),
       invalidatesTags: ["Tour", "Tours"],
     }),
 
     updateTour: builder.mutation<
       IApiResponse<ITourResponse>,
-      { id: number; tourData: ITourInput }
+      { id: number; formData: FormData }
     >({
-      query: ({ id, tourData }) => ({
+      query: ({ id, formData }) => ({
         url: `/tours/${id}`,
         method: "PUT",
-        body: tourData,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData,
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: "Tour", id },
         "Tour",
+        "Tours",
       ],
     }),
 

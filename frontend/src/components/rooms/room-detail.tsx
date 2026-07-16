@@ -53,7 +53,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings,
   } = useGetAllCustomerBookingsQuery(
-    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
+    { customerId: Number(user?.id), params: { page: 1, limit: 100 } },
     {
       skip: !user || canManageRooms,
       refetchOnMountOrArgChange: 30,

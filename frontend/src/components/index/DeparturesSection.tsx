@@ -30,6 +30,13 @@ const MODULES = [
       "Secure transaction handling with validation, confirmations, and automated expiry of unpaid bookings.",
     status: "Secured",
   },
+  {
+    code: "TT·05",
+    name: "Admin console",
+    detail:
+      "Analytics overview, booking, user and review moderation, plus monthly bookings, payments, and top-tours reporting.",
+    status: "Staffed",
+  },
 ];
 
 const DeparturesSection = () => (
@@ -39,7 +46,7 @@ const DeparturesSection = () => (
         01 · Departures
       </p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
-        Four booking modules, <span className="italic">one system.</span>
+        Five modules, <span className="italic">one system.</span>
       </h2>
 
       <div className="mt-10 sm:mt-14">

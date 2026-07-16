@@ -1,4 +1,6 @@
 // src/types/flight.types.ts
+import type { IRatingSummary } from "./review.types";
+
 export enum IFlightClass {
   ECONOMY = "Economy",
   BUSINESS = "Business",
@@ -35,6 +37,8 @@ export interface IFlight {
   duration: number;
   stops: number;
   photo: string | null;
+  /** Aggregate of PUBLISHED reviews; {average: null, count: 0} when none. */
+  rating: IRatingSummary;
   seatsAvailable: number;
   capacity: number;
   createdAt: string;

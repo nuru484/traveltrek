@@ -11,6 +11,7 @@ import { IHotel } from "@/types/hotel.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RatingStars } from "@/components/ui/rating";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -34,6 +35,7 @@ import {
   DoorOpen,
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import { ReviewsSection } from "@/components/reviews/reviews-section";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { isAdmin as isAdminUser, isStaff } from "@/utils/roles";
 import toast from "react-hot-toast";
@@ -59,7 +61,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
     data: bookingsData,
     isError: isBookingsError,
     error: bookingsError } = useGetAllCustomerBookingsQuery(
-    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
+    { customerId: Number(user?.id), params: { page: 1, limit: 100 } },
     // Customer-only: staff have no booking history of their own.
     { skip: !user || staff }
   );
@@ -142,6 +144,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
               <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
                 {hotel.name}
               </h1>
+              <RatingStars rating={hotel.rating} />
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1 @2xl/main:grid-cols-3">
                 {hotel.destination && (
                   <div className="min-w-0">
@@ -443,6 +446,9 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Published guest reviews of this hotel's rooms */}
+        <ReviewsSection kind="hotels" id={hotel.id} />
 
         <ConfirmationDialog
           open={showDeleteDialog}

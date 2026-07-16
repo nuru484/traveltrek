@@ -1,6 +1,6 @@
 // src/components/tours/tour-form.tsx
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -34,11 +34,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Save, Check, ChevronsUpDown } from "lucide-react";
+import { Save, Check, ChevronsUpDown, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useCreateTourMutation, useUpdateTourMutation } from "@/redux/tourApi";
 import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
-import { ITourInput } from "@/types/tour.types";
 import toast from "react-hot-toast";
 import { ITour } from "@/types/tour.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
@@ -60,6 +60,7 @@ const tourFormSchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   destinationId: z.number().min(1, "Destination is required"),
+  tourPhoto: z.any().optional(),
 });
 
 type TourFormValues = z.infer<typeof tourFormSchema>;
@@ -84,6 +85,10 @@ export function TourForm({ tour, mode }: ITourFormProps) {
   const [updateTour, { isLoading: isUpdating }] = useUpdateTourMutation();
   const [destinationSearch, setDestinationSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    tour?.photo || null
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: destinationsData, isLoading: isLoadingDestinations } =
     useGetAllDestinationsQuery({
@@ -111,30 +116,90 @@ export function TourForm({ tour, mode }: ITourFormProps) {
           tour.endDate.split("T")[1].slice(0, 5)
         : "",
       destinationId: tour?.destination?.id || 0,
+      tourPhoto: undefined,
     },
   });
 
+  const handleImageChange = (file: File | undefined) => {
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        form.setError("tourPhoto", {
+          type: "manual",
+          message: "Please select a valid image file",
+        });
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        form.setError("tourPhoto", {
+          type: "manual",
+          message: "Image size should be less than 5MB",
+        });
+        return;
+      }
+
+      // Clean up old preview URL
+      if (previewUrl && previewUrl !== tour?.photo) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      form.setValue("tourPhoto", file);
+      form.clearErrors("tourPhoto");
+    }
+  };
+
+  const removeImage = () => {
+    if (previewUrl && previewUrl !== tour?.photo) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setPreviewUrl(null);
+    form.setValue("tourPhoto", undefined);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl !== tour?.photo) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl, tour?.photo]);
+
   const onSubmit = async (values: TourFormValues) => {
     try {
-      const tourData: ITourInput = {
-        name: values.name,
-        description: values.description || null,
-        type: values.type,
-        // GHS decimal -> integer pesewas for the API.
-        price: Math.round(values.price * 100),
-        maxGuests: values.maxGuests,
-        startDate: new Date(values.startDate).toISOString(),
-        endDate: new Date(values.endDate).toISOString(),
-        destinationId: values.destinationId,
-      };
+      // Multipart body — the 'tourPhoto' file field rides along with the
+      // scalar fields (the backend zod schema coerces the stringified ones).
+      const formData = new FormData();
+      formData.append("name", values.name);
+      if (values.description)
+        formData.append("description", values.description);
+      formData.append("type", values.type);
+      // GHS decimal -> integer pesewas for the API.
+      formData.append("price", String(Math.round(values.price * 100)));
+      formData.append("maxGuests", String(values.maxGuests));
+      formData.append(
+        "startDate",
+        new Date(values.startDate).toISOString()
+      );
+      formData.append("endDate", new Date(values.endDate).toISOString());
+      formData.append("destinationId", String(values.destinationId));
+      if (values.tourPhoto) formData.append("tourPhoto", values.tourPhoto);
 
       if (mode === "create") {
-        await createTour(tourData).unwrap();
+        await createTour(formData).unwrap();
         toast.success("Tour created successfully");
       } else {
         await updateTour({
           id: tour!.id,
-          tourData,
+          formData,
         }).unwrap();
         toast.success("Tour updated successfully");
       }
@@ -378,6 +443,70 @@ export function TourForm({ tour, mode }: ITourFormProps) {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="tourPhoto"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Tour Photo (Optional)</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        {/* Preview */}
+                        {previewUrl && (
+                          <div className="relative w-24 h-24 mx-auto">
+                            <div className="relative w-full h-full rounded-md overflow-hidden border border-muted-foreground/20">
+                              <Image
+                                src={previewUrl}
+                                alt="Tour photo preview"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
+                              aria-label="Remove image"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* File Input */}
+                        <div className="relative">
+                          <Input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) =>
+                              handleImageChange(e.target.files?.[0])
+                            }
+                            disabled={isLoading}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full bg-muted border-dashed border hover:bg-muted/80"
+                            disabled={isLoading}
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {previewUrl ? "Change Photo" : "Upload Tour Photo"}
+                          </Button>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground text-center">
+                          Supported formats: JPG, PNG, GIF (Max 5MB)
+                        </p>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex gap-3 pt-4">
                 <Button

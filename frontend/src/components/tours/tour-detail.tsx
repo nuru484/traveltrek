@@ -31,6 +31,7 @@ import {
 import { TourDetailHeader } from "./tour-detail-header";
 import { TourInfoGrid } from "./tour-info-grid";
 import { TourBookingStatus } from "./tour-booking-status";
+import { ReviewsSection } from "@/components/reviews/reviews-section";
 
 interface ITourDetailProps {
   tour: ITour;
@@ -60,7 +61,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
     isFetching: isFetchingBookings,
     isError: isBookingsError,
     error: bookingsError } = useGetAllCustomerBookingsQuery(
-    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
+    { customerId: Number(user?.id), params: { page: 1, limit: 100 } },
     {
       // Customer-only: staff have no booking history of their own.
       skip: !user || isAdmin || isAgent,
@@ -282,6 +283,9 @@ export function TourDetail({ tour }: ITourDetailProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Published guest reviews (public endpoint: first 5 + total) */}
+        <ReviewsSection kind="tours" id={tour.id} />
 
         {/* Dialogs */}
         <ConfirmationDialog

@@ -1,3 +1,5 @@
+import type { IRatingSummary } from "./review.types";
+
 export interface IHotelRoom {
   id: number;
   roomType: string;
@@ -25,6 +27,8 @@ export interface IHotel {
   amenities: string[];
   photo: string | null;
   destination: IHotelDestination | null;
+  /** Aggregate of PUBLISHED reviews of this hotel's rooms. */
+  rating: IRatingSummary;
   createdAt: Date;
   updatedAt: Date;
 }

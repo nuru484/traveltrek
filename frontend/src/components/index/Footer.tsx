@@ -8,7 +8,7 @@ const Footer = () => (
   <footer id="contact" className="scroll-mt-20 bg-night text-night-foreground">
     <div className="mx-auto max-w-6xl px-4 pt-16 sm:px-6 sm:pt-24">
       <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[oklch(0.75_0.13_230)]">
-        04 · Crew of one
+        06 · Crew of one
       </p>
 
       <div className="mt-3 grid grid-cols-1 gap-10 pb-14 lg:grid-cols-[1.2fr_1fr] lg:gap-16 sm:pb-20">
@@ -69,6 +69,15 @@ const Footer = () => (
                   className="inline-flex items-center gap-1 hover:text-night-foreground transition-colors"
                 >
                   GitHub
+                  <ArrowUpRight className="h-3 w-3" aria-hidden />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1 hover:text-night-foreground transition-colors"
+                >
+                  Sign in to the demo
                   <ArrowUpRight className="h-3 w-3" aria-hidden />
                 </Link>
               </li>

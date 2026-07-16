@@ -5,6 +5,7 @@
 // destination link.
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Bookmark,
   ChevronDown,
@@ -17,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RatingStars } from "@/components/ui/rating";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,6 +77,18 @@ export function TourDetailHeader({
 
   return (
     <Card className="overflow-hidden py-0 gap-0">
+        {/* Cover photo banner — same hero treatment as flights/hotels. */}
+        {tour.photo && (
+          <div className="relative w-full h-[240px] md:h-[340px]">
+            <Image
+              src={tour.photo}
+              alt={tour.name}
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+        )}
         <div className="p-4 sm:p-5 md:p-6">
           <div className="flex items-start justify-between gap-2 sm:gap-3 md:gap-4">
             <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 overflow-hidden">
@@ -241,6 +255,7 @@ export function TourDetailHeader({
           <h1 className="mt-3 text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
             {tour.name}
           </h1>
+          <RatingStars rating={tour.rating} className="mt-1.5" />
           {tour.destination && (
             <Link
               href={`/dashboard/destinations/${tour.destination.id}/detail`}

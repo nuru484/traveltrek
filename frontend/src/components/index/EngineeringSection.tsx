@@ -5,15 +5,21 @@
 const DECISIONS = [
   {
     tag: "Auth",
-    title: "JWT + RBAC",
+    title: "Four doors, one session",
     detail:
-      "Token-based authentication with bcrypt-hashed credentials, protected routes, and role-based access for customers, agents, and admins.",
+      "Password, email-OTP and Google sign-in with optional two-factor; short-lived JWTs behind rotating refresh tokens, and role-based access for customers, agents, and admins.",
+  },
+  {
+    tag: "Money",
+    title: "Integer pesewas only",
+    detail:
+      "Every amount is an integer in minor units from database to API — no floats near money. One formatter renders GH₵ at the edge; Paystack collects, webhook-verified.",
   },
   {
     tag: "Data",
     title: "PostgreSQL + Prisma",
     detail:
-      "A relational schema built for booking integrity — flights, hotels, rooms, tours, and payments in one typed model.",
+      "A relational schema built for booking integrity — flights, hotels, rooms, tours, and payments in one typed model, with soft deletes auto-scoped out of every read.",
   },
   {
     tag: "Queues",
@@ -22,22 +28,16 @@ const DECISIONS = [
       "Scheduled background workers expire unpaid bookings and keep flight and tour statuses current.",
   },
   {
-    tag: "Payments",
-    title: "Paystack integration",
-    detail:
-      "Initialize, verify, and reconcile transactions — webhook-driven confirmation with automated expiry of unpaid bookings.",
-  },
-  {
     tag: "Validation",
-    title: "Guarded at both doors",
+    title: "Zod at both doors",
     detail:
-      "express-validator checks every request behind rate-limited endpoints; Zod and React Hook Form validate before anything leaves the client.",
+      "Every request body, query, and param passes a Zod schema behind rate-limited endpoints; React Hook Form and Zod validate again before anything leaves the client.",
   },
   {
-    tag: "Admin",
-    title: "Dashboard & reports",
+    tag: "Testing",
+    title: "450+ tests in CI",
     detail:
-      "Analytics overview, booking and user management, plus monthly bookings, payments, and top-tours reporting.",
+      "Over 340 integration tests exercise every endpoint against a real Postgres, plus a frontend suite — lint, types, tests, and build gate every merge.",
   },
 ];
 

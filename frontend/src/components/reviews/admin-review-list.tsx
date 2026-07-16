@@ -1,0 +1,251 @@
+// src/components/reviews/admin-review-list.tsx
+//
+// Staff moderation surface (GET /reviews): status/rating/search filters over
+// a RowCard-style list. ADMINs publish/hide (PATCH /reviews/:id/status) and
+// delete (with confirmation); AGENTs read. Reviews are moderated PENDING →
+// PUBLISHED before they appear anywhere public.
+"use client";
+import { useCallback, useState } from "react";
+import { format } from "date-fns";
+import { Eye, EyeOff, MoreHorizontal, Trash2 } from "lucide-react";
+import Link from "next/link";
+import toast from "react-hot-toast";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import EmptyState from "@/components/ui/EmptyState";
+import ErrorMessage from "@/components/ui/ErrorMessage";
+import Pagination from "@/components/ui/Pagination";
+import { RatingValue } from "@/components/ui/rating";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useDeleteReviewMutation,
+  useGetAllReviewsQuery,
+  useUpdateReviewStatusMutation,
+} from "@/redux/reviewApi";
+import type {
+  IReview,
+  IReviewsQueryParams,
+  ReviewStatus,
+} from "@/types/review.types";
+import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { ReviewFilters } from "./ReviewFilters";
+import { reviewTargetHref, reviewTargetLabel } from "./review-logic";
+
+const STATUS_VARIANT: Record<
+  ReviewStatus,
+  "default" | "secondary" | "outline"
+> = {
+  PENDING: "secondary",
+  PUBLISHED: "default",
+  HIDDEN: "outline",
+};
+
+export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<
+    Omit<IReviewsQueryParams, "page" | "limit">
+  >({});
+  const [deleteTarget, setDeleteTarget] = useState<IReview | null>(null);
+
+  const { data, isLoading, isError, error, refetch } = useGetAllReviewsQuery({
+    page,
+    limit: 10,
+    ...filters,
+  });
+
+  const [updateStatus] = useUpdateReviewStatusMutation();
+  const [deleteReview, { isLoading: isDeleting }] = useDeleteReviewMutation();
+
+  const handleFiltersChange = useCallback(
+    (newFilters: Partial<typeof filters>) => {
+      setFilters((prev) => ({ ...prev, ...newFilters }));
+      setPage(1);
+    },
+    []
+  );
+
+  const handleStatusChange = async (review: IReview, status: ReviewStatus) => {
+    try {
+      await updateStatus({ id: review.id, status }).unwrap();
+      toast.success(
+        status === "PUBLISHED" ? "Review published" : "Review hidden"
+      );
+    } catch (err) {
+      const { message } = extractApiErrorMessage(err);
+      toast.error(message || "Failed to update review status");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteReview(deleteTarget.id).unwrap();
+      toast.success("Review deleted");
+      setDeleteTarget(null);
+    } catch (err) {
+      const { message } = extractApiErrorMessage(err);
+      toast.error(message || "Failed to delete review");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <Skeleton className="h-10 w-full lg:max-w-xs" />
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="space-y-2.5 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
+            >
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    const errorMessage = extractApiErrorMessage(error).message;
+    return <ErrorMessage error={errorMessage} onRetry={refetch} />;
+  }
+
+  const reviews = data?.data ?? [];
+  const meta = data?.meta ?? { total: 0, page: 1, limit: 10, totalPages: 0 };
+
+  return (
+    <div className="space-y-6">
+      <ReviewFilters filters={filters} onFiltersChange={handleFiltersChange} />
+
+      <p className="text-xs sm:text-sm text-muted-foreground">
+        {meta.total} review{meta.total !== 1 ? "s" : ""} found
+      </p>
+
+      {reviews.length === 0 ? (
+        <EmptyState
+          title="No reviews match"
+          description="Reviews appear here once customers rate their completed bookings."
+        />
+      ) : (
+        <ul className="space-y-3">
+          {reviews.map((review) => (
+            <li
+              key={review.id}
+              className="rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RatingValue value={review.rating} />
+                    <Badge variant={STATUS_VARIANT[review.status]}>
+                      {review.status}
+                    </Badge>
+                  </div>
+                  {review.title && (
+                    <p className="font-semibold break-words [overflow-wrap:anywhere]">
+                      {review.title}
+                    </p>
+                  )}
+                  {review.comment && (
+                    <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
+                      {review.comment}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    <span className="break-words [overflow-wrap:anywhere]">
+                      By {review.customer.name}
+                    </span>
+                    <span aria-hidden>·</span>
+                    <Link
+                      href={reviewTargetHref(review.target)}
+                      className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    >
+                      {reviewTargetLabel(review.target)}
+                    </Link>
+                    <span aria-hidden>·</span>
+                    <span>
+                      {format(new Date(review.createdAt), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 flex-none cursor-pointer"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Review actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {review.status !== "PUBLISHED" && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleStatusChange(review, "PUBLISHED")
+                          }
+                          className="cursor-pointer"
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Publish
+                        </DropdownMenuItem>
+                      )}
+                      {review.status !== "HIDDEN" && (
+                        <DropdownMenuItem
+                          onClick={() => handleStatusChange(review, "HIDDEN")}
+                          className="cursor-pointer"
+                        >
+                          <EyeOff className="mr-2 h-4 w-4" />
+                          Hide
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => setDeleteTarget(review)}
+                        className="text-destructive focus:text-destructive cursor-pointer"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Pagination meta={meta} onPageChange={setPage} />
+
+      <ConfirmationDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null);
+        }}
+        title="Delete Review"
+        description={`Are you sure you want to delete ${
+          deleteTarget ? `${deleteTarget.customer.name}'s` : "this"
+        } review? This action cannot be undone.`}
+        onConfirm={handleDelete}
+        confirmText="Delete"
+        isDestructive
+      />
+    </div>
+  );
+}

@@ -122,6 +122,15 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
           <p className="w-full text-sm text-muted-foreground sm:w-auto">
             Booked on {formatDate(booking.bookingDate)}
           </p>
+          {booking.createdBy && (
+            <p className="w-full text-xs text-muted-foreground">
+              Recorded by{" "}
+              <span className="font-medium text-foreground/80 break-words [overflow-wrap:anywhere]">
+                {booking.createdBy.name}
+              </span>{" "}
+              (staff)
+            </p>
+          )}
         </div>
       </div>
 

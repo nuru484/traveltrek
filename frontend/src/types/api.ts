@@ -25,6 +25,9 @@ export const apiSliceTags = [
   "ToursReport",
   "PaymentsReport",
   "BookingsReport",
+  "Review",
+  "Reviews",
+  "MyReviews",
 ] as const;
 
 /** Success envelope: { message, data, meta? } (lists put pagination in meta). */

@@ -16,6 +16,7 @@ import {
   Home,
   BarChart3,
   ShieldCheck,
+  Star,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,6 +78,11 @@ const adminNavigationItems = [
     icon: CreditCard,
   },
   {
+    name: "Reviews",
+    path: "/dashboard/reviews",
+    icon: Star,
+  },
+  {
     name: "Reports",
     path: "/dashboard/reports",
     icon: BarChart3,
@@ -120,6 +126,11 @@ const agentNavigationItems = [
     path: "/dashboard/payments",
     icon: CreditCard,
   },
+  {
+    name: "Reviews",
+    path: "/dashboard/reviews",
+    icon: Star,
+  },
 ];
 
 // Navigation items for customers
@@ -153,6 +164,11 @@ const customerNavigationItems = [
     name: "My Payments",
     path: "/dashboard/payments",
     icon: CreditCard,
+  },
+  {
+    name: "My Reviews",
+    path: "/dashboard/reviews",
+    icon: Star,
   },
 ];
 

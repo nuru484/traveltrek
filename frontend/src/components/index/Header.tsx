@@ -1,16 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Compass, Cog, Layers, Mail } from "lucide-react";
+import { Compass, Cog, Layers, Mail, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Absolute paths with hashes so the tabs work from /login and /signup too:
 // on the landing page they smooth-scroll; elsewhere they navigate home first.
+// shortLabel keeps the phone bottom bar's five 9px-mono captions inside their
+// cells down to 280px-wide screens.
 const NAV_LINKS = [
-  { label: "Overview", href: "/#overview", icon: Compass },
-  { label: "Engineering", href: "/#engineering", icon: Cog },
-  { label: "Stack", href: "/#stack", icon: Layers },
-  { label: "Contact", href: "/#contact", icon: Mail },
+  { label: "Overview", shortLabel: "Overview", href: "/#overview", icon: Compass },
+  { label: "Engineering", shortLabel: "Specs", href: "/#engineering", icon: Cog },
+  { label: "Stack", shortLabel: "Stack", href: "/#stack", icon: Layers },
+  { label: "Live demo", shortLabel: "Demo", href: "/#demo", icon: Ticket },
+  { label: "Contact", shortLabel: "Contact", href: "/#contact", icon: Mail },
 ];
 
 const Header = () => {
@@ -72,8 +75,8 @@ const Header = () => {
         aria-label="Sections"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        <div className="grid grid-cols-4">
-          {NAV_LINKS.map(({ label, href, icon: Icon }) => (
+        <div className="grid grid-cols-5">
+          {NAV_LINKS.map(({ shortLabel, href, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -81,7 +84,7 @@ const Header = () => {
             >
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
               <span className="font-mono text-[9px] uppercase tracking-[0.14em]">
-                {label}
+                {shortLabel}
               </span>
             </Link>
           ))}

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { format } from "date-fns";
 import { Plane } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { RatingStars } from "@/components/ui/rating";
 import { IFlight } from "@/types/flight.types";
 import { Money } from "@/components/ui/Money";
 
@@ -57,6 +58,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
             <p className="mt-1.5 truncate text-lg font-semibold text-foreground">
               {flight.origin.name} → {flight.destination.name}
             </p>
+            <RatingStars rating={flight.rating} className="mt-1.5" />
           </div>
           <div className="flex-none text-right">
             <p className="text-lg font-semibold text-foreground">

@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MapPin, CreditCard } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
+import { ReviewsSection } from "@/components/reviews/reviews-section";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import toast from "react-hot-toast";
 import { Money } from "@/components/ui/Money";
@@ -67,7 +68,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
     data: bookingsData,
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings } = useGetAllCustomerBookingsQuery(
-    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
+    { customerId: Number(user?.id), params: { page: 1, limit: 100 } },
     {
       // Customer-only: staff have no booking history of their own.
       skip: !user || isAdmin || isAgent,
@@ -372,6 +373,9 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
             onStatusChange={handleStatusChange}
           />
         </div>
+
+        {/* Published guest reviews (public endpoint: first 5 + total) */}
+        <ReviewsSection kind="flights" id={flight.id} />
 
         {/* Delayed Status Update Modal */}
         <FlightDelayDialog

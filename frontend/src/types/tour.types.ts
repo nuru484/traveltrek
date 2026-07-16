@@ -1,3 +1,5 @@
+import type { IRatingSummary } from "./review.types";
+
 export enum TourType {
   ADVENTURE = "ADVENTURE",
   CULTURAL = "CULTURAL",
@@ -35,6 +37,9 @@ export interface ITour {
   startDate: string;
   endDate: string;
   destination: IDestinationSummary;
+  photo: string | null;
+  /** Aggregate of PUBLISHED reviews; {average: null, count: 0} when none. */
+  rating: IRatingSummary;
   createdAt: string;
   updatedAt: string;
 }

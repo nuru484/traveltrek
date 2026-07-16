@@ -72,6 +72,9 @@ export interface IBookingBase {
   id: number;
   customerId: number;
   customer: IBookingCustomer;
+  /** Staff attribution: who recorded the booking on the customer's behalf
+   *  (null for customer self-bookings). */
+  createdBy: { id: number; name: string } | null;
   numberOfGuests: number;
   specialRequests: string | null;
   paymentDeadline: string;

@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { RootState } from "@/redux/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "../ui/card";
@@ -167,17 +167,30 @@ interface ProtectedProps {
   children: React.ReactNode;
 }
 
+/** Stable no-op subscription for the mounted useSyncExternalStore below. */
+const emptySubscribe = () => () => {};
+
 export default function ProtectRoutes({ children }: ProtectedProps) {
   const user = useSelector((state: RootState) => state.auth.user);
   const router = useRouter();
 
+  // authSlice seeds `user` from localStorage, which the server can't see —
+  // SSR always renders the skeleton. useSyncExternalStore's server snapshot
+  // keeps the hydration render on the skeleton too (no mismatch); the first
+  // client-side re-render then swaps in the real layout.
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+
   useEffect(() => {
-    if (!user) {
+    if (mounted && !user) {
       router.push("/");
     }
-  }, [user, router]);
+  }, [mounted, user, router]);
 
-  if (!user) {
+  if (!mounted || !user) {
     return <DashboardSkeleton />;
   }
 

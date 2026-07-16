@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RatingStars } from "@/components/ui/rating";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +100,7 @@ export function FlightDetailHero({
           <p className="break-all font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
             Flight {flight.flightNumber}
           </p>
+          <RatingStars rating={flight.rating} />
         </div>
         <div className="flex flex-none items-center gap-1.5 md:gap-2">
           {!isAdmin && !isAgent && (

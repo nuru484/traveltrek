@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Hotel } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { RatingStars } from "@/components/ui/rating";
 import { IHotel } from "@/types/hotel.types";
 
 interface IHotelListItemProps {
@@ -53,6 +54,7 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
         <p className="truncate text-sm text-muted-foreground">
           {hotel.address}
         </p>
+        <RatingStars rating={hotel.rating} />
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
           <span>

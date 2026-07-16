@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Github, Plane } from "lucide-react";
+import { ArrowDown, ArrowRight, Github, Plane } from "lucide-react";
 
 /**
  * Dashed flight path drawn under the hero's italic line, ending in a small
@@ -187,35 +187,45 @@ const HeroSection = () => {
             from schema to screen.
           </motion.p>
 
-          <motion.div
-            {...fadeUp(0.22)}
-            className="flex flex-col gap-3 min-[420px]:flex-row lg:flex-none"
-          >
-            <Button
-              asChild
-              size="lg"
-              className="rounded-full bg-foreground px-7 text-background hover:bg-foreground/90"
-            >
-              <Link href="/login">
-                Try the platform
-                <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
+          <motion.div {...fadeUp(0.22)} className="lg:flex-none">
+            <div className="flex flex-col gap-3 min-[420px]:flex-row">
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full bg-foreground px-7 text-background hover:bg-foreground/90"
+              >
+                <Link href="/signup">
+                  Create an account
+                  <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="rounded-full border-foreground/25 bg-transparent px-7 hover:bg-foreground/5"
+              >
+                <Link href="/login">Sign in</Link>
+              </Button>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em]">
+              <Link
+                href="/#demo"
+                className="inline-flex items-center gap-1.5 text-foreground/70 transition-colors hover:text-foreground"
+              >
+                Explore the live demo
+                <ArrowDown className="h-3 w-3" aria-hidden />
               </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="rounded-full border-foreground/25 bg-transparent px-7 hover:bg-foreground/5"
-            >
               <Link
                 href="https://github.com/nuru484/traveltrek"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-foreground/70 transition-colors hover:text-foreground"
               >
-                <Github className="mr-1 h-4 w-4" aria-hidden />
+                <Github className="h-3 w-3" aria-hidden />
                 Source code
               </Link>
-            </Button>
+            </div>
           </motion.div>
         </div>
 
