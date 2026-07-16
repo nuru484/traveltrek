@@ -74,7 +74,9 @@ const hotelFields = z.object({
 export const createHotelSchema = hotelFields;
 
 // Empty updates were accepted by the legacy handler (a no-op update returning
-// the hotel), so no "at least one field" refinement here.
+// the hotel), so no "at least one field" refinement here. hotelPhoto: '' is
+// the remove-photo signal (the service nulls the column and deletes the old
+// Cloudinary image).
 export const updateHotelSchema = hotelFields.partial();
 
 export const hotelListQuery = paginationQuery

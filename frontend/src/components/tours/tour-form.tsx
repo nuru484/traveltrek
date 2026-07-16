@@ -42,6 +42,7 @@ import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import toast from "react-hot-toast";
 import { ITour } from "@/types/tour.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { cn } from "@/lib/utils";
 
 const tourFormSchema = z.object({
@@ -191,7 +192,19 @@ export function TourForm({ tour, mode }: ITourFormProps) {
       );
       formData.append("endDate", new Date(values.endDate).toISOString());
       formData.append("destinationId", String(values.destinationId));
-      if (values.tourPhoto) formData.append("tourPhoto", values.tourPhoto);
+      if (values.tourPhoto) {
+        formData.append("tourPhoto", values.tourPhoto);
+      } else if (
+        shouldRemovePhoto({
+          existingPhoto: tour?.photo,
+          isEdit: mode === "edit",
+          newFile: values.tourPhoto,
+          previewUrl,
+        })
+      ) {
+        // Empty string = the API's remove-photo signal.
+        formData.append("tourPhoto", "");
+      }
 
       if (mode === "create") {
         await createTour(formData).unwrap();

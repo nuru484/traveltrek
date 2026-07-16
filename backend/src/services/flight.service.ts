@@ -17,7 +17,6 @@
 // authorizeRole, which is the single authorization boundary.
 import type { IUser } from '#types/user-profile.types.js';
 
-import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   FlightStatus,
@@ -26,7 +25,6 @@ import {
 } from '#config/prismaClient.js';
 import {
   BadRequestError,
-  CustomError,
   NotFoundError,
 } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
@@ -36,6 +34,7 @@ import {
   type FlightWithFullRelations,
   type FlightWithSummaryRelations,
 } from '#utils/mappers/flight.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 /**
  * Whitelisted `sortBy` fields for flight listings — the columns the legacy
@@ -121,7 +120,7 @@ export interface PublicFlightListParams {
   search?: string;
 }
 
-/** Statuses that block a single-flight delete (and count against bulk deletes). */
+/** Statuses that block a single-flight delete. */
 const NON_DELETABLE_STATUSES: FlightStatus[] = [
   FlightStatus.DEPARTED,
   FlightStatus.LANDED,
@@ -412,7 +411,7 @@ export const makeFlightService = (
           input.originId === undefined
             ? undefined
             : { connect: { id: input.originId } },
-        photo: uploadedPhotoUrl,
+        photo: photoColumnValue(uploadedPhotoUrl),
         price: input.price,
         // Capacity moves seat inventory with it: booked seats stay booked.
         seatsAvailable:
@@ -429,8 +428,13 @@ export const makeFlightService = (
         where: { id },
       });
 
-      // Replaced photo: drop the old image now that the row points elsewhere.
-      if (uploadedPhotoUrl && oldPhoto && oldPhoto !== uploadedPhotoUrl) {
+      // Replaced or removed photo: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
+      if (
+        uploadedPhotoUrl !== undefined &&
+        oldPhoto &&
+        oldPhoto !== uploadedPhotoUrl
+      ) {
         await cleanupPhoto(oldPhoto, 'Failed to clean up old flight photo');
       }
 
@@ -917,110 +921,6 @@ export const makeFlightService = (
     };
   };
 
-  /**
-   * Wipes every flight, but only when NONE of them has a blocking condition
-   * (non-deletable status, pending/confirmed bookings, completed/pending
-   * payments); a single blocked flight refuses the whole operation with a 409
-   * summarising every issue. Returns the deleted count.
-   */
-  const deleteAllFlights = async (): Promise<number> => {
-    const flightCount = await prisma.flight.count();
-    if (flightCount === 0) {
-      throw new BadRequestError('No flights to delete');
-    }
-
-    const flights = await prisma.flight.findMany({
-      include: {
-        bookings: { include: { payment: true }, where: { deletedAt: null } },
-      },
-    });
-
-    const flightsWithNonDeletableStatus: number[] = [];
-    const flightsWithPendingBookings: number[] = [];
-    const flightsWithConfirmedBookings: number[] = [];
-    const flightsWithCompletedPayments: number[] = [];
-    const flightsWithPendingPayments: number[] = [];
-
-    for (const flight of flights) {
-      if (NON_DELETABLE_STATUSES.includes(flight.status)) {
-        flightsWithNonDeletableStatus.push(flight.id);
-      }
-      if (flight.bookings.some((b) => b.status === BookingStatus.PENDING)) {
-        flightsWithPendingBookings.push(flight.id);
-      }
-      if (flight.bookings.some((b) => b.status === BookingStatus.CONFIRMED)) {
-        flightsWithConfirmedBookings.push(flight.id);
-      }
-      if (
-        flight.bookings.some(
-          (b) => b.payment?.status === PaymentStatus.COMPLETED,
-        )
-      ) {
-        flightsWithCompletedPayments.push(flight.id);
-      }
-      if (
-        flight.bookings.some(
-          (b) => b.payment?.status === PaymentStatus.PENDING,
-        )
-      ) {
-        flightsWithPendingPayments.push(flight.id);
-      }
-    }
-
-    const blockingIssues: string[] = [];
-
-    if (flightsWithNonDeletableStatus.length > 0) {
-      blockingIssues.push(
-        `${flightsWithNonDeletableStatus.length} flight${flightsWithNonDeletableStatus.length > 1 ? 's' : ''} with non-deletable status (DEPARTED, LANDED, or DELAYED)`,
-      );
-    }
-    if (flightsWithPendingBookings.length > 0) {
-      blockingIssues.push(
-        `${flightsWithPendingBookings.length} flight${flightsWithPendingBookings.length > 1 ? 's' : ''} with pending bookings`,
-      );
-    }
-    if (flightsWithConfirmedBookings.length > 0) {
-      blockingIssues.push(
-        `${flightsWithConfirmedBookings.length} flight${flightsWithConfirmedBookings.length > 1 ? 's' : ''} with confirmed bookings`,
-      );
-    }
-    if (flightsWithCompletedPayments.length > 0) {
-      blockingIssues.push(
-        `${flightsWithCompletedPayments.length} flight${flightsWithCompletedPayments.length > 1 ? 's' : ''} with completed payments`,
-      );
-    }
-    if (flightsWithPendingPayments.length > 0) {
-      blockingIssues.push(
-        `${flightsWithPendingPayments.length} flight${flightsWithPendingPayments.length > 1 ? 's' : ''} with pending payments`,
-      );
-    }
-
-    if (blockingIssues.length > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete flights: ${blockingIssues.join(', ')} must be cancelled or resolved first`,
-      );
-    }
-
-    const photos = flights
-      .map((flight) => flight.photo)
-      .filter((photo): photo is string => Boolean(photo));
-
-    await prisma.flight.updateMany({
-      data: { deletedAt: clock.now() },
-      where: { deletedAt: null },
-    });
-
-    // Clean up photos from Cloudinary after the successful deletion.
-    await Promise.allSettled(
-      photos.map((photo) =>
-        cleanupPhoto(photo, `Failed to clean up photo ${photo}`),
-      ),
-    );
-
-    return flights.length;
-  };
-
   /** Aggregated dashboard numbers, ported verbatim from the legacy handler. */
   const getFlightStats = async () => {
     const now = clock.now();
@@ -1183,7 +1083,6 @@ export const makeFlightService = (
 
   return {
     createFlight,
-    deleteAllFlights,
     deleteFlight,
     getFlightById,
     getFlightStats,
@@ -1198,7 +1097,6 @@ export const flightService = makeFlightService(defaultDeps);
 
 export const {
   createFlight,
-  deleteAllFlights,
   deleteFlight,
   getFlightById,
   getFlightStats,

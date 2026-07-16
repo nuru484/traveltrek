@@ -52,6 +52,8 @@ export const createDestinationSchema = destinationFields;
 
 // "At least one field provided" is enforced by the update service, which also
 // sees the multer-uploaded photo that never passes through req.body here.
+// destinationPhoto: '' is the remove-photo signal (the service nulls the
+// column and deletes the old Cloudinary image).
 export const updateDestinationSchema = destinationFields.partial();
 
 export const destinationListQuery = paginationQuery.extend({

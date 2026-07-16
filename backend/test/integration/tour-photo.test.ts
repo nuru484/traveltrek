@@ -123,6 +123,38 @@ describe('tour photo pipeline', () => {
     expect(deleteImageMock).toHaveBeenCalledWith(oldPhoto);
   });
 
+  it('removes the photo on update with tourPhoto: "" and reclaims the image', async () => {
+    const admin = await createAdmin();
+    const created = await createTourWithPhoto(admin);
+    const oldPhoto: string = created.body.data.photo;
+
+    deleteImageMock.mockClear();
+
+    const updated = await authedApi(admin)
+      .put(`/api/v1/tours/${created.body.data.id}`)
+      .send({ tourPhoto: '' });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.photo).toBeNull();
+    // The removed image is reclaimed via the injected cloudinary dep.
+    expect(deleteImageMock).toHaveBeenCalledWith(oldPhoto);
+  });
+
+  it('leaves the photo untouched when the update omits tourPhoto', async () => {
+    const admin = await createAdmin();
+    const created = await createTourWithPhoto(admin);
+
+    deleteImageMock.mockClear();
+
+    const updated = await authedApi(admin)
+      .put(`/api/v1/tours/${created.body.data.id}`)
+      .send({ name: 'Volta Highlands Trek (Renamed)' });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.photo).toBe(created.body.data.photo);
+    expect(deleteImageMock).not.toHaveBeenCalled();
+  });
+
   it('cleans up the fresh upload when the update is refused', async () => {
     const admin = await createAdmin();
     deleteImageMock.mockClear();

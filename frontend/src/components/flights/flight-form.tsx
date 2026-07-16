@@ -30,6 +30,7 @@ import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import toast from "react-hot-toast";
 import { IFlight } from "@/types/flight.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { IDestination } from "@/types/destination.types";
 import {
   flightFormSchema,
@@ -141,7 +142,14 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
 
   const onSubmit = async (values: IFlightFormValues) => {
     try {
-      const formData = buildFlightFormData(values);
+      const formData = buildFlightFormData(values, {
+        removePhoto: shouldRemovePhoto({
+          existingPhoto: flight?.photo,
+          isEdit: mode === "edit",
+          newFile: values.flightPhoto,
+          previewUrl,
+        }),
+      });
 
       if (mode === "create") {
         await createFlight(formData).unwrap();

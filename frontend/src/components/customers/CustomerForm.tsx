@@ -25,6 +25,7 @@ import {
 } from "@/redux/customerApi";
 import { ICustomer } from "@/types/customer.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import {
   customerCreateFormSchema,
   customerUpdateFormSchema,
@@ -149,7 +150,19 @@ export default function CustomerForm({
           if (values.phone) formData.append("phone", values.phone);
         }
         if (values.address) formData.append("address", values.address);
-        if (pictureFile) formData.append("profilePicture", pictureFile);
+        if (pictureFile) {
+          formData.append("profilePicture", pictureFile);
+        } else if (
+          shouldRemovePhoto({
+            existingPhoto: customer?.profilePicture,
+            isEdit: true,
+            newFile: pictureFile,
+            previewUrl,
+          })
+        ) {
+          // Empty string = the API's remove-photo signal.
+          formData.append("profilePicture", "");
+        }
 
         const res = await updateCustomer({
           customerId: customer!.id,

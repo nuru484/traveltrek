@@ -16,10 +16,7 @@
 // bookings/payments relations anymore (those hang off Customer).
 //
 // Cleanup note: every Cloudinary delete is best-effort via the injected
-// cloudinary dep — a cleanup failure never fails the request. deleteAllUsers
-// keeps the legacy fire-and-forget semantics (the response never waits on
-// image deletion); the legacy `.then` that counted rejected settlements was
-// dead code (each cleanup catches internally), so it was dropped.
+// cloudinary dep — a cleanup failure never fails the request.
 import { HTTP_STATUS_CODES } from '#config/constants.js';
 import { type Prisma, type Role } from '#config/prismaClient.js';
 import {
@@ -34,6 +31,7 @@ import { type IUser, UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
 import { assertContactFreeAcrossPrincipals } from '#utils/cross-principal-contact.js';
 import { type SafeUser, userSelect } from '#utils/mappers/user.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 export type UserActor = Pick<IUser, 'id' | 'role'>;
 
@@ -48,10 +46,6 @@ export interface UserListParams {
   page: number;
   role?: Role;
   search?: string;
-}
-
-export interface UsersBulkDeleteSummary {
-  deletedCount: number;
 }
 
 /** NO password: profile updates never touch credentials — passwords rotate
@@ -244,15 +238,16 @@ export const makeUserService = (
           email: input.email,
           name: input.name,
           phone: input.phone,
-          profilePicture: uploadedImageUrl,
+          profilePicture: photoColumnValue(uploadedImageUrl),
         },
         select: userSelect,
         where: { id: userId },
       });
 
-      // Replaced picture: drop the old image now that the row points elsewhere.
+      // Replaced or removed picture: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
       if (
-        uploadedImageUrl &&
+        uploadedImageUrl !== undefined &&
         existingUser.profilePicture &&
         existingUser.profilePicture !== uploadedImageUrl
       ) {
@@ -377,69 +372,8 @@ export const makeUserService = (
     return { email: existingUser.email, name: existingUser.name };
   };
 
-  /**
-   * DELETE /users — wipes every staff user EXCEPT the acting admin. Requires
-   * the legacy confirmation phrase (kept here, not in zod, so the exact
-   * message and error shape survive) and reports zero deletions as a success.
-   * The legacy payment guard is gone — staff carry no payments (Customers
-   * do). Picture cleanup is fire-and-forget, as before.
-   */
-  const deleteAllUsers = async (
-    actor: UserActor,
-    confirmDelete: unknown,
-  ): Promise<UsersBulkDeleteSummary> => {
-    if (confirmDelete !== 'DELETE_ALL_USERS') {
-      throw new BadRequestError(
-        'This operation requires confirmation. Send { "confirmDelete": "DELETE_ALL_USERS" } in request body.',
-      );
-    }
-
-    const usersToDelete = await prisma.user.findMany({
-      select: {
-        email: true,
-        id: true,
-        name: true,
-        profilePicture: true,
-      },
-      where: {
-        id: { not: actor.id },
-      },
-    });
-
-    if (usersToDelete.length === 0) {
-      return { deletedCount: 0 };
-    }
-
-    const profilePicturesToDelete = usersToDelete.flatMap((user) =>
-      user.profilePicture ? [user.profilePicture] : [],
-    );
-
-    const deleteResult = await prisma.user.updateMany({
-      data: { deletedAt: clock.now() },
-      where: {
-        deletedAt: null,
-        id: { not: actor.id },
-      },
-    });
-
-    // Fire-and-forget: the response never waits on Cloudinary cleanup.
-    if (profilePicturesToDelete.length > 0) {
-      void Promise.allSettled(
-        profilePicturesToDelete.map((profilePicture) =>
-          cleanupPicture(
-            profilePicture,
-            `Failed to clean up profile picture: ${profilePicture}`,
-          ),
-        ),
-      );
-    }
-
-    return { deletedCount: deleteResult.count };
-  };
-
   return {
     changeUserRole,
-    deleteAllUsers,
     deleteUser,
     getUserById,
     listUsers,
@@ -451,7 +385,6 @@ export const userService = makeUserService(defaultDeps);
 
 export const {
   changeUserRole,
-  deleteAllUsers,
   deleteUser,
   getUserById,
   listUsers,

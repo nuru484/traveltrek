@@ -17,6 +17,7 @@ import {
   NotFoundError,
 } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 /** Whitelisted `sortBy` fields for destination listings (all scalar). */
 export const DESTINATION_SORT_FIELDS = [
@@ -168,7 +169,7 @@ export const makeDestinationService = (
         !input.description &&
         !input.country &&
         !input.city &&
-        !uploadedPhotoUrl
+        input.photo === undefined
       ) {
         throw new BadRequestError(
           'At least one field must be provided for update',
@@ -203,14 +204,15 @@ export const makeDestinationService = (
           country: input.country,
           description: input.description,
           name: input.name,
-          photo: uploadedPhotoUrl,
+          photo: photoColumnValue(uploadedPhotoUrl),
         },
         where: { id },
       });
 
-      // Replaced photo: drop the old image now that the row points elsewhere.
+      // Replaced or removed photo: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
       if (
-        uploadedPhotoUrl &&
+        uploadedPhotoUrl !== undefined &&
         existing.photo &&
         existing.photo !== uploadedPhotoUrl
       ) {
@@ -264,45 +266,6 @@ export const makeDestinationService = (
     }
   };
 
-  /**
-   * Wipes every destination, but only when none of them has dependent hotels,
-   * tours or flights. Returns the deleted count (0 when there was nothing to
-   * delete, which the controller reports as its own message).
-   */
-  const deleteAllDestinations = async (): Promise<number> => {
-    const destinations = await prisma.destination.findMany({
-      include: dependencyInclude,
-    });
-
-    if (destinations.length === 0) return 0;
-
-    const blocked = destinations.filter(
-      (dest) => blockingDependencies(dest).length > 0,
-    );
-    if (blocked.length > 0) {
-      throw new BadRequestError(
-        `Cannot delete all destinations. ${blocked.length} destination${blocked.length > 1 ? 's have' : ' has'} associated dependencies (Hotels, Tours, or Flights). Please remove these dependencies first.`,
-      );
-    }
-
-    const photos = destinations
-      .map((dest) => dest.photo)
-      .filter((photo): photo is string => Boolean(photo));
-
-    await prisma.destination.updateMany({
-      data: { deletedAt: clock.now() },
-      where: { deletedAt: null },
-    });
-
-    await Promise.allSettled(
-      photos.map((photo) =>
-        cleanupPhoto(photo, `Failed to clean up photo ${photo}`),
-      ),
-    );
-
-    return destinations.length;
-  };
-
   const buildWhere = (
     params: DestinationListParams,
   ): Prisma.DestinationWhereInput => {
@@ -348,7 +311,6 @@ export const makeDestinationService = (
 
   return {
     createDestination,
-    deleteAllDestinations,
     deleteDestination,
     getDestinationById,
     listDestinations,
@@ -360,7 +322,6 @@ export const destinationService = makeDestinationService(defaultDeps);
 
 export const {
   createDestination,
-  deleteAllDestinations,
   deleteDestination,
   getDestinationById,
   listDestinations,

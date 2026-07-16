@@ -79,7 +79,9 @@ const roomFields = z.object({
 export const createRoomSchema = roomFields;
 
 // Empty updates were accepted by the legacy handler (a no-op update returning
-// the room), so no "at least one field" refinement here.
+// the room), so no "at least one field" refinement here. roomPhoto: '' is
+// the remove-photo signal (the service nulls the column and deletes the old
+// Cloudinary image).
 export const updateRoomSchema = roomFields.partial();
 
 export const roomListQuery = paginationQuery

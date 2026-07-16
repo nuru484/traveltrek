@@ -41,6 +41,7 @@ import {
 } from "@/redux/userApi";
 import { IUserResponse } from "@/types/user.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import {
   staffCreateFormSchema,
   staffUpdateFormSchema,
@@ -141,7 +142,19 @@ export default function UserForm({ mode, user }: IUserFormProps) {
       if (mode === "create") formData.append("role", values.role);
       if (!isSelf && values.phone) formData.append("phone", values.phone);
       if (values.address) formData.append("address", values.address);
-      if (pictureFile) formData.append("profilePicture", pictureFile);
+      if (pictureFile) {
+        formData.append("profilePicture", pictureFile);
+      } else if (
+        shouldRemovePhoto({
+          existingPhoto: user?.profilePicture,
+          isEdit: mode === "edit",
+          newFile: pictureFile,
+          previewUrl,
+        })
+      ) {
+        // Empty string = the API's remove-photo signal.
+        formData.append("profilePicture", "");
+      }
 
       if (mode === "create") {
         await createUser(formData).unwrap();

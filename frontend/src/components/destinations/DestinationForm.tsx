@@ -23,6 +23,7 @@ import {
   useUpdateDestinationMutation,
 } from "@/redux/destinationApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { IDestination } from "@/types/destination.types";
 
 const destinationFormSchema = z.object({
@@ -133,8 +134,19 @@ export default function DestinationForm({
         formData.append("description", values.description);
       formData.append("country", values.country);
       if (values.city) formData.append("city", values.city);
-      if (values.destinationPhoto)
+      if (values.destinationPhoto) {
         formData.append("destinationPhoto", values.destinationPhoto);
+      } else if (
+        shouldRemovePhoto({
+          existingPhoto: destination?.photo,
+          isEdit: mode === "edit",
+          newFile: values.destinationPhoto,
+          previewUrl,
+        })
+      ) {
+        // Empty string = the API's remove-photo signal.
+        formData.append("destinationPhoto", "");
+      }
 
       if (mode === "create") {
         await createDestination(formData).unwrap();

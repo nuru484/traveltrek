@@ -5,20 +5,14 @@
 // invariant (destination existence, delete-with-rooms guards, Cloudinary
 // photo cleanup), throw the typed CustomError subclasses and never touch
 // req/res.
-//
-// Role enforcement note: the legacy deleteAllHotels handler re-checked
-// req.user.role inline (ADMIN gate). That duplicate was deliberately dropped
-// in this refactor — routes/hotel.ts already enforces roles via
-// authorizeRole, which is the single authorization boundary.
-import { HTTP_STATUS_CODES } from '#config/constants.js';
 import { type Prisma } from '#config/prismaClient.js';
 import {
   BadRequestError,
-  CustomError,
   NotFoundError,
 } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import { hotelInclude } from '#utils/mappers/hotel.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 /**
  * Whitelisted `sortBy` fields for hotel listings. `city` and `country` live
@@ -156,16 +150,17 @@ export const makeHotelService = (
           destinationId: input.destinationId,
           name: input.name,
           phone: input.phone,
-          photo: uploadedPhotoUrl,
+          photo: photoColumnValue(uploadedPhotoUrl),
           starRating: input.starRating,
         },
         include: hotelInclude,
         where: { id },
       });
 
-      // Replaced photo: drop the old image now that the row points elsewhere.
+      // Replaced or removed photo: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
       if (
-        uploadedPhotoUrl &&
+        uploadedPhotoUrl !== undefined &&
         existing.photo &&
         existing.photo !== uploadedPhotoUrl
       ) {
@@ -215,52 +210,6 @@ export const makeHotelService = (
         'Failed to clean up hotel photo from Cloudinary',
       );
     }
-  };
-
-  /**
-   * Wipes every hotel, but only when none of them still has rooms (reported
-   * together in one 409). Returns the deleted count; an empty table is
-   * refused as a 400, matching the legacy handler.
-   */
-  const deleteAllHotels = async (): Promise<number> => {
-    const hotelCount = await prisma.hotel.count();
-    if (hotelCount === 0) throw new BadRequestError('No hotels to delete');
-
-    const hotels = await prisma.hotel.findMany({
-      select: {
-        id: true,
-        name: true,
-        photo: true,
-        rooms: { select: { id: true }, where: { deletedAt: null } },
-      },
-    });
-
-    const hotelsWithRooms = hotels.filter((hotel) => hotel.rooms.length > 0);
-    if (hotelsWithRooms.length > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete all hotels: ${hotelsWithRooms.length} hotel${hotelsWithRooms.length > 1 ? 's' : ''} have rooms in it, it must be removed first`,
-      );
-    }
-
-    await prisma.hotel.updateMany({
-      data: { deletedAt: clock.now() },
-      where: { deletedAt: null },
-    });
-
-    const photosToClean = hotels.flatMap((hotel) =>
-      hotel.photo ? [{ ...hotel, photo: hotel.photo }] : [],
-    );
-    await Promise.allSettled(
-      photosToClean.map((hotel) =>
-        cleanupPhoto(
-          hotel.photo,
-          `Failed to clean up photo for hotel ${hotel.id} (${hotel.name})`,
-        ),
-      ),
-    );
-
-    return hotels.length;
   };
 
   const buildWhere = (params: HotelListParams): Prisma.HotelWhereInput => {
@@ -368,7 +317,6 @@ export const makeHotelService = (
 
   return {
     createHotel,
-    deleteAllHotels,
     deleteHotel,
     getHotelById,
     listHotels,
@@ -381,7 +329,6 @@ export const hotelService = makeHotelService(defaultDeps);
 
 export const {
   createHotel,
-  deleteAllHotels,
   deleteHotel,
   getHotelById,
   listHotels,

@@ -45,6 +45,7 @@ import toast from "react-hot-toast";
 import { IHotel } from "@/types/hotel.types";
 import Image from "next/image";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { cn } from "@/lib/utils";
 
 const hotelFormSchema = z.object({
@@ -165,7 +166,19 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
         });
       }
       formData.append("destinationId", values.destinationId.toString());
-      if (values.hotelPhoto) formData.append("hotelPhoto", values.hotelPhoto);
+      if (values.hotelPhoto) {
+        formData.append("hotelPhoto", values.hotelPhoto);
+      } else if (
+        shouldRemovePhoto({
+          existingPhoto: hotel?.photo,
+          isEdit: mode === "edit",
+          newFile: values.hotelPhoto,
+          previewUrl,
+        })
+      ) {
+        // Empty string = the API's remove-photo signal.
+        formData.append("hotelPhoto", "");
+      }
 
       if (mode === "create") {
         await createHotel(formData).unwrap();

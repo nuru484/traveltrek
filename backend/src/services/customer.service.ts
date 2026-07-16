@@ -46,6 +46,7 @@ import {
   paymentInclude,
   type PaymentWithRelations,
 } from '#utils/mappers/payment.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 export interface CustomerActor {
   id: number;
@@ -516,15 +517,16 @@ export const makeCustomerService = (
           email: input.email,
           name: input.name,
           phone: input.phone,
-          profilePicture: uploadedImageUrl,
+          profilePicture: photoColumnValue(uploadedImageUrl),
         },
         select: customerSelect,
         where: { id: customerId },
       });
 
-      // Replaced picture: drop the old image now that the row points elsewhere.
+      // Replaced or removed picture: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
       if (
-        uploadedImageUrl &&
+        uploadedImageUrl !== undefined &&
         existing.profilePicture &&
         existing.profilePicture !== uploadedImageUrl
       ) {

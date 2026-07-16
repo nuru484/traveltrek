@@ -135,6 +135,8 @@ export const updateFlightSchema = flightFields
         'Price must be an integer (pesewas) greater than or equal to 100',
       )
       .optional(),
+    // flightPhoto: '' (from the base fields) is the remove-photo signal —
+    // the service nulls the column and deletes the old Cloudinary image.
     status: z
       .enum(
         [FlightStatus.DELAYED, FlightStatus.CANCELLED],

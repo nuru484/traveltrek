@@ -29,6 +29,7 @@ import {
   roomInclude,
   type RoomWithRelations,
 } from '#utils/mappers/room.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 /**
  * Whitelisted `sortBy` fields for room listings — the columns the legacy
@@ -57,19 +58,6 @@ export interface RoomAvailabilityReport {
   roomType: string;
   startDate: Date;
   totalRooms: number;
-}
-
-export interface RoomBulkDeleteSummary {
-  deleted: number;
-  hotelsAffected: number;
-  skipped: number;
-  skippedDetails?: {
-    hotel: string;
-    reasons: string[];
-    roomId: number;
-    roomType: string;
-  }[];
-  total: number;
 }
 
 export interface RoomDeleteSummary {
@@ -384,7 +372,7 @@ export const makeRoomService = (
           input.hotelId === undefined
             ? undefined
             : { connect: { id: input.hotelId } },
-        photo: uploadedPhotoUrl,
+        photo: photoColumnValue(uploadedPhotoUrl),
         pricePerNight: input.pricePerNight,
         roomType: input.roomType?.trim(),
         totalRooms: input.totalRooms,
@@ -396,8 +384,13 @@ export const makeRoomService = (
         where: { id },
       });
 
-      // Replaced photo: drop the old image now that the row points elsewhere.
-      if (uploadedPhotoUrl && oldPhoto && oldPhoto !== uploadedPhotoUrl) {
+      // Replaced or removed photo: drop the old image now that the row no
+      // longer points at it ('' — the removal signal — is covered too).
+      if (
+        uploadedPhotoUrl !== undefined &&
+        oldPhoto &&
+        oldPhoto !== uploadedPhotoUrl
+      ) {
         await cleanupPhoto(oldPhoto, 'Failed to clean up old room photo');
       }
 
@@ -663,178 +656,9 @@ export const makeRoomService = (
     };
   };
 
-  /**
-   * Bulk-deletes every room without blocking conditions (same per-room guard
-   * list as deleteRoom, minus the last-room rule, which is enforced here as
-   * "no hotel may end up with zero rooms"). Refuses outright when nothing is
-   * deletable or when a hotel would lose all of its rooms.
-   */
-  const deleteAllRooms = async (): Promise<RoomBulkDeleteSummary> => {
-    const now = clock.now();
-
-    const rooms = await prisma.room.findMany({
-      include: {
-        bookings: {
-          include: { payment: { select: { id: true, status: true } } },
-          where: { deletedAt: null },
-        },
-        hotel: { select: { id: true, name: true } },
-      },
-    });
-
-    if (rooms.length === 0) {
-      throw new NotFoundError('No rooms found to delete');
-    }
-
-    // Categorize rooms and identify blocking conditions.
-    const deletableRooms: typeof rooms = [];
-    const roomsWithIssues: {
-      reasons: string[];
-      room: (typeof rooms)[0];
-    }[] = [];
-
-    for (const room of rooms) {
-      const issues: string[] = [];
-
-      const hasCompletedPayment = room.bookings.some(
-        (booking) =>
-          booking.payment?.status === PaymentStatus.COMPLETED,
-      );
-      if (hasCompletedPayment) {
-        issues.push('has completed payment(s)');
-      }
-
-      const hasActiveBooking = room.bookings.some(
-        (booking) =>
-          booking.status === BookingStatus.PENDING ||
-          booking.status === BookingStatus.CONFIRMED,
-      );
-      if (hasActiveBooking) {
-        issues.push('has active booking(s)');
-      }
-
-      const hasFutureBooking = room.bookings.some(
-        (booking) => booking.startDate && new Date(booking.startDate) > now,
-      );
-      if (hasFutureBooking) {
-        issues.push('has future booking(s)');
-      }
-
-      const hasOngoingBooking = room.bookings.some((booking) => {
-        if (!booking.startDate || !booking.endDate) return false;
-        const checkIn = new Date(booking.startDate);
-        const checkOut = new Date(booking.endDate);
-        return (
-          checkIn <= now &&
-          checkOut >= now &&
-          booking.status === BookingStatus.CONFIRMED
-        );
-      });
-      if (hasOngoingBooking) {
-        issues.push('has ongoing booking(s) - guests currently checked in');
-      }
-
-      const hasPendingPayment = room.bookings.some(
-        (booking) =>
-          booking.payment?.status === PaymentStatus.PENDING,
-      );
-      if (hasPendingPayment) {
-        issues.push('has pending payment(s)');
-      }
-
-      if (issues.length === 0) {
-        deletableRooms.push(room);
-      } else {
-        roomsWithIssues.push({ reasons: issues, room });
-      }
-    }
-
-    if (deletableRooms.length === 0) {
-      const issuesSummary = roomsWithIssues
-        .slice(0, 5)
-        .map(
-          ({ reasons, room }) =>
-            `Room ${room.id} (${room.roomType} at ${room.hotel.name}): ${reasons.join(', ')}`,
-        )
-        .join('; ');
-
-      throw new BadRequestError(
-        `Cannot delete any rooms. All ${rooms.length} room(s) have blocking conditions: ${issuesSummary}${roomsWithIssues.length > 5 ? '...' : ''}`,
-      );
-    }
-
-    const hotelRoomCounts = new Map<number, number>();
-    for (const room of rooms) {
-      hotelRoomCounts.set(
-        room.hotelId,
-        (hotelRoomCounts.get(room.hotelId) ?? 0) + 1,
-      );
-    }
-
-    const hotelsLosingAllRooms: string[] = [];
-    for (const room of deletableRooms) {
-      const currentCount = hotelRoomCounts.get(room.hotelId) ?? 0;
-      const deletableForHotel = deletableRooms.filter(
-        (r) => r.hotelId === room.hotelId,
-      ).length;
-
-      if (
-        currentCount === deletableForHotel &&
-        !hotelsLosingAllRooms.includes(room.hotel.name)
-      ) {
-        hotelsLosingAllRooms.push(room.hotel.name);
-      }
-    }
-
-    if (hotelsLosingAllRooms.length > 0) {
-      logger.warn(
-        `The following hotel(s) will have NO rooms after this operation: ${hotelsLosingAllRooms.join(', ')}`,
-      );
-      throw new BadRequestError(
-        `Cannot proceed: Hotels [${hotelsLosingAllRooms.join(', ')}] would have no rooms remaining.`,
-      );
-    }
-
-    await prisma.room.updateMany({
-      data: { deletedAt: now },
-      where: { id: { in: deletableRooms.map((r) => r.id) } },
-    });
-
-    await Promise.allSettled(
-      deletableRooms.flatMap((room) =>
-        room.photo
-          ? [cleanupPhoto(room.photo, `Failed to clean up photo ${room.photo}:`)]
-          : [],
-      ),
-    );
-
-    logger.info(
-      `Bulk room deletion completed - Deleted: ${deletableRooms.length}, Skipped: ${roomsWithIssues.length}`,
-    );
-
-    // The legacy response also spread a `warning` key for hotels losing all
-    // rooms, but that branch is unreachable (it throws above), so it was
-    // dropped here.
-    return {
-      deleted: deletableRooms.length,
-      hotelsAffected: new Set(deletableRooms.map((r) => r.hotel.name)).size,
-      skipped: roomsWithIssues.length,
-      total: rooms.length,
-      ...(roomsWithIssues.length > 0 && {
-        skippedDetails: roomsWithIssues.slice(0, 10).map(({ reasons, room }) => ({
-          hotel: room.hotel.name,
-          reasons,
-          roomId: room.id,
-          roomType: room.roomType,
-        })),
-      }),
-    };
-  };
-
   return {
     checkAvailability,
     createRoom,
-    deleteAllRooms,
     deleteRoom,
     getRoomById,
     listRooms,
@@ -847,7 +671,6 @@ export const roomService = makeRoomService(defaultDeps);
 export const {
   checkAvailability,
   createRoom,
-  deleteAllRooms,
   deleteRoom,
   getRoomById,
   listRooms,

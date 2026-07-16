@@ -42,8 +42,15 @@ export const getSelectionDisplayText = (
   return options.find((option) => option.id === id)?.name || placeholder;
 };
 
-/** Multipart payload for create/update; converts GHS decimals to pesewas. */
-export const buildFlightFormData = (values: IFlightFormValues): FormData => {
+/**
+ * Multipart payload for create/update; converts GHS decimals to pesewas.
+ * `removePhoto` sends flightPhoto as the empty string — the API's signal to
+ * clear the stored photo (a selected file always wins over removal).
+ */
+export const buildFlightFormData = (
+  values: IFlightFormValues,
+  options?: { removePhoto?: boolean }
+): FormData => {
   const formData = new FormData();
   formData.append("flightNumber", values.flightNumber);
   formData.append("airline", values.airline);
@@ -57,6 +64,10 @@ export const buildFlightFormData = (values: IFlightFormValues): FormData => {
   if (values.stops !== undefined)
     formData.append("stops", values.stops.toString());
   formData.append("capacity", values.capacity.toString());
-  if (values.flightPhoto) formData.append("flightPhoto", values.flightPhoto);
+  if (values.flightPhoto) {
+    formData.append("flightPhoto", values.flightPhoto);
+  } else if (options?.removePhoto) {
+    formData.append("flightPhoto", "");
+  }
   return formData;
 };

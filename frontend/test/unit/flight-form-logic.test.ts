@@ -85,4 +85,18 @@ describe("buildFlightFormData", () => {
     const formData = buildFlightFormData({ ...values, flightPhoto: photo });
     expect(formData.get("flightPhoto")).toBe(photo);
   });
+
+  it("sends flightPhoto as the empty string when removal is requested", () => {
+    const formData = buildFlightFormData(values, { removePhoto: true });
+    expect(formData.get("flightPhoto")).toBe("");
+  });
+
+  it("lets a picked photo win over a removal request", () => {
+    const photo = new File(["x"], "plane.png", { type: "image/png" });
+    const formData = buildFlightFormData(
+      { ...values, flightPhoto: photo },
+      { removePhoto: true }
+    );
+    expect(formData.get("flightPhoto")).toBe(photo);
+  });
 });

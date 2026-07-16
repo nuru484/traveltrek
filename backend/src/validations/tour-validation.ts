@@ -49,6 +49,8 @@ export const createTourSchema = tourFields
 // Date rules involving the stored tour (future-dating an edit, ordering
 // against the unchanged date) are enforced by the update service, which knows
 // the existing row. Here we only check ordering when both dates are sent.
+// tourPhoto: '' is the remove-photo signal (the service nulls the column and
+// deletes the old Cloudinary image).
 export const updateTourSchema = tourFields
   .partial()
   .refine(

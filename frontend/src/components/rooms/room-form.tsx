@@ -31,6 +31,7 @@ import { IRoom } from "@/types/room.types";
 import { IHotel } from "@/types/hotel.types";
 import Image from "next/image";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { shouldRemovePhoto } from "@/utils/photo-removal";
 
 const roomFormSchema = z.object({
   hotelId: z.number().min(1, "Hotel is required"),
@@ -177,7 +178,19 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
           formData.append(`amenities[${index}]`, amenity);
         });
       }
-      if (values.roomPhoto) formData.append("roomPhoto", values.roomPhoto);
+      if (values.roomPhoto) {
+        formData.append("roomPhoto", values.roomPhoto);
+      } else if (
+        shouldRemovePhoto({
+          existingPhoto: room?.photo,
+          isEdit: mode === "edit",
+          newFile: values.roomPhoto,
+          previewUrl,
+        })
+      ) {
+        // Empty string = the API's remove-photo signal.
+        formData.append("roomPhoto", "");
+      }
 
       if (mode === "create") {
         const response = await createRoom(formData).unwrap();

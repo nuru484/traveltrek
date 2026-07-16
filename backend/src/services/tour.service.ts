@@ -12,7 +12,6 @@
 // roles via authorizeRole, which is the single authorization boundary.
 import type { IUser } from '#types/user-profile.types.js';
 
-import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   PaymentStatus,
@@ -22,11 +21,11 @@ import {
 } from '#config/prismaClient.js';
 import {
   BadRequestError,
-  CustomError,
   NotFoundError,
 } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import { tourInclude } from '#utils/mappers/tour.mapper.js';
+import { photoColumnValue } from '#utils/photo-removal.js';
 
 /** Whitelisted `sortBy` fields for tour listings (all indexed-or-scalar). */
 export const TOUR_SORT_FIELDS = [
@@ -248,7 +247,7 @@ export const makeTourService = (
         endDate: input.endDate,
         maxGuests: input.maxGuests,
         name: input.name,
-        photo: input.photo,
+        photo: photoColumnValue(input.photo),
         price: input.price,
         startDate: input.startDate,
         type: input.type,
@@ -257,8 +256,13 @@ export const makeTourService = (
       where: { id },
     });
 
-    // Replaced photo: drop the old image now that the row points elsewhere.
-    if (input.photo && existing.photo && existing.photo !== input.photo) {
+    // Replaced or removed photo: drop the old image now that the row no
+    // longer points at it ('' — the removal signal — is covered too).
+    if (
+      input.photo !== undefined &&
+      existing.photo &&
+      existing.photo !== input.photo
+    ) {
       await cleanupPhoto(existing.photo, 'Failed to clean up old tour photo');
     }
 
@@ -418,97 +422,6 @@ export const makeTourService = (
     }
   };
 
-  /**
-   * Wipes every tour, but only when none of them is protected: confirmed
-   * bookings, completed payments, ongoing or already-started tours all block
-   * the wipe (reported together in one 409). Returns the deleted count.
-   */
-  const deleteAllTours = async (): Promise<number> => {
-    const tourCount = await prisma.tour.count();
-    if (tourCount === 0) throw new BadRequestError('No tours to delete');
-
-    const tours = await prisma.tour.findMany({
-      include: { bookings: { include: { payment: true } } },
-    });
-
-    const toursWithConfirmedBookings: number[] = [];
-    const toursWithCompletedPayments: number[] = [];
-    const ongoingTours: number[] = [];
-    const toursAlreadyStarted: number[] = [];
-
-    const now = clock.now();
-
-    tours.forEach((tour) => {
-      const hasConfirmedBookings = tour.bookings.some(
-        (booking) => booking.status === BookingStatus.CONFIRMED,
-      );
-      if (hasConfirmedBookings) toursWithConfirmedBookings.push(tour.id);
-
-      const hasCompletedPayments = tour.bookings.some(
-        (booking) => booking.payment?.status === PaymentStatus.COMPLETED,
-      );
-      if (hasCompletedPayments) toursWithCompletedPayments.push(tour.id);
-
-      if (tour.status === TourStatus.ONGOING) ongoingTours.push(tour.id);
-
-      if (tour.startDate <= now && tour.endDate >= now) {
-        ongoingTours.push(tour.id);
-      } else if (tour.startDate <= now) {
-        toursAlreadyStarted.push(tour.id);
-      }
-    });
-
-    const blockingIssues: string[] = [];
-    if (toursWithConfirmedBookings.length > 0) {
-      blockingIssues.push(
-        `${toursWithConfirmedBookings.length} tour${toursWithConfirmedBookings.length > 1 ? 's' : ''} with confirmed bookings`,
-      );
-    }
-    if (toursWithCompletedPayments.length > 0) {
-      blockingIssues.push(
-        `${toursWithCompletedPayments.length} tour${toursWithCompletedPayments.length > 1 ? 's' : ''} with completed payments`,
-      );
-    }
-    if (ongoingTours.length > 0) {
-      blockingIssues.push(
-        `${ongoingTours.length} ongoing tour${ongoingTours.length > 1 ? 's' : ''}`,
-      );
-    }
-    if (toursAlreadyStarted.length > 0) {
-      blockingIssues.push(
-        `${toursAlreadyStarted.length} tour${toursAlreadyStarted.length > 1 ? 's' : ''} already started`,
-      );
-    }
-
-    if (blockingIssues.length > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete tours: ${blockingIssues.join(', ')} must be cancelled or resolved first`,
-      );
-    }
-
-    // Soft delete every active tour (already-deleted rows keep their original
-    // deletedAt timestamp).
-    await prisma.tour.updateMany({
-      data: { deletedAt: now },
-      where: { deletedAt: null },
-    });
-
-    const photosToClean = tours.flatMap((tour) =>
-      tour.photo ? [{ ...tour, photo: tour.photo }] : [],
-    );
-    await Promise.allSettled(
-      photosToClean.map((tour) =>
-        cleanupPhoto(
-          tour.photo,
-          `Failed to clean up photo for tour ${tour.id} (${tour.name})`,
-        ),
-      ),
-    );
-
-    return tours.length;
-  };
-
   const buildWhere = (params: TourListParams): Prisma.TourWhereInput => {
     const where: Prisma.TourWhereInput = {};
 
@@ -633,7 +546,6 @@ export const makeTourService = (
 
   return {
     createTour,
-    deleteAllTours,
     deleteTour,
     getTourById,
     listPublicTours,
@@ -647,7 +559,6 @@ export const tourService = makeTourService(defaultDeps);
 
 export const {
   createTour,
-  deleteAllTours,
   deleteTour,
   getTourById,
   listPublicTours,

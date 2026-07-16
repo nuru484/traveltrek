@@ -3,8 +3,9 @@
 // Baseline behaviour of STAFF management (Phase 5b: the User table is
 // staff-only — customers live in /customers): role gates on listing, admin
 // staff creation with a required staff role, role changes, self-updates.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { cloudinaryService } from '#config/claudinary.js';
 import prisma from '#config/prismaClient.js';
 
 import { authedApi } from '../helpers/auth.js';
@@ -13,6 +14,11 @@ import {
   createAgent,
   createCustomer,
 } from '../helpers/factories.js';
+
+// The mocked service method is a vi.fn() (test/setup.ts fakes Cloudinary), so
+// the unbound reference is safe — there is no `this` to lose.
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const deleteImageMock = vi.mocked(cloudinaryService.deleteImage);
 
 describe('GET /api/v1/users', () => {
   it('lets an admin list staff users', async () => {
@@ -142,5 +148,59 @@ describe('PUT /api/v1/users/:userId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('Renamed Self');
+  });
+
+  it('removes the profile picture with profilePicture: "" and reclaims the image', async () => {
+    const agent = await createAgent();
+
+    // Give the profile a picture through the real multipart pipeline first.
+    const withPicture = await authedApi(agent)
+      .put(`/api/v1/users/${agent.id}`)
+      .attach('profilePicture', Buffer.from('89504e470d0a1a0a', 'hex'), {
+        contentType: 'image/png',
+        filename: 'me.png',
+      });
+    expect(withPicture.status).toBe(200);
+    const oldPicture: string = withPicture.body.data.profilePicture;
+    expect(oldPicture).toMatch(/^https:\/\/res\.cloudinary\.com\/test\//);
+
+    deleteImageMock.mockClear();
+
+    const removed = await authedApi(agent)
+      .put(`/api/v1/users/${agent.id}`)
+      .send({ profilePicture: '' });
+
+    expect(removed.status).toBe(200);
+    // The user DTO omits null fields, so the key disappears from the wire...
+    expect(removed.body.data.profilePicture).toBeUndefined();
+    // ...and the column itself is nulled.
+    const row = await prisma.user.findUnique({ where: { id: agent.id } });
+    expect(row?.profilePicture).toBeNull();
+    // The removed image is reclaimed via the injected cloudinary dep.
+    expect(deleteImageMock).toHaveBeenCalledWith(oldPicture);
+  });
+
+  it('leaves the profile picture untouched when the update omits it', async () => {
+    const agent = await createAgent();
+
+    const withPicture = await authedApi(agent)
+      .put(`/api/v1/users/${agent.id}`)
+      .attach('profilePicture', Buffer.from('89504e470d0a1a0a', 'hex'), {
+        contentType: 'image/png',
+        filename: 'me.png',
+      });
+    expect(withPicture.status).toBe(200);
+
+    deleteImageMock.mockClear();
+
+    const renamed = await authedApi(agent)
+      .put(`/api/v1/users/${agent.id}`)
+      .send({ name: 'Renamed, picture kept' });
+
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.data.profilePicture).toBe(
+      withPicture.body.data.profilePicture,
+    );
+    expect(deleteImageMock).not.toHaveBeenCalled();
   });
 });
