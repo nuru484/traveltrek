@@ -74,11 +74,16 @@ describe('cross-principal contact uniqueness', () => {
     expect(res.status).toBe(409);
   });
 
+  // The cross-table guard on profile updates is now exercised via STAFF
+  // (administrative) edits: self-service email/phone changes moved to the
+  // verified /auth/change-email / /auth/change-phone flows, which run the
+  // same cross-principal check (see contact-change.test.ts).
   it('customer profile update cannot move onto a staff contact', async () => {
     const staff = await createUser({ email: 'agent-ama@test.local' });
+    const admin = await createAdmin();
     const customer = await createCustomer();
 
-    const res = await authedApi(customer)
+    const res = await authedApi(admin)
       .put(`/api/v1/customers/${customer.id}`)
       .send({ email: staff.email });
 
@@ -87,10 +92,11 @@ describe('cross-principal contact uniqueness', () => {
 
   it('staff profile update cannot move onto a customer contact', async () => {
     const admin = await createAdmin();
+    const agent = await createUser({ email: 'agent-yaw@test.local' });
     const customer = await createCustomer({ phone: '233550116655' });
 
     const res = await authedApi(admin)
-      .put(`/api/v1/users/${admin.id}`)
+      .put(`/api/v1/users/${agent.id}`)
       .send({ phone: customer.phone });
 
     expect(res.status).toBe(409);

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
 import ENV from '#config/env.js';
+import { reportError } from '#lib/sentry.js';
 import { handlePrismaError, isPrismaError } from '#middlewares/prismaErrorHandler.js';
 import logger from '#utils/logger.js';
 
@@ -178,6 +179,24 @@ export const errorHandler = (
       break;
     default:
       log.error(logDetails);
+  }
+
+  // Report only UNEXPECTED errors to the tracker: server faults (5xx) or
+  // HIGH/CRITICAL severity. Expected 4xx (NotFound/Validation/…) stay
+  // log-only so the tracker isn't paged for routine client mistakes. No-op
+  // when Sentry is disabled. Context is the curated CustomError context +
+  // code — never the raw request body.
+  const isUnexpected =
+    status >= 500 ||
+    severity === ErrorSeverity.HIGH ||
+    severity === ErrorSeverity.CRITICAL;
+  if (isUnexpected) {
+    reportError(processedError, {
+      context: { code, layer, ...context },
+      method: req.method,
+      requestId: req.requestId,
+      route: req.path,
+    });
   }
 
   // Client response. requestId is always safe to expose and lets a user quote

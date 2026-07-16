@@ -25,7 +25,13 @@ import { paginationQuery } from '#validations/common-validation.js';
 /** PUT /users/:userId — every field optional, legacy messages kept. NO
  * password (a `password` key in the body is simply stripped): passwords
  * rotate only through the authenticated POST /auth/change-password, so a
- * staff session can never overwrite another account's credential. */
+ * staff session can never overwrite another account's credential.
+ *
+ * email/phone stay in the schema for edits of OTHER accounts (administrative
+ * override, cross-principal-checked in the service), but a staff member
+ * editing their OWN profile may not change them here: zod cannot know the
+ * actor, so the service 400s a self-service change and points at the
+ * verified flows (POST /auth/change-email / /auth/change-phone). */
 export const updateUserProfileSchema = z.object({
   address: z
     .string('Address must be a string up to only 100 characters')

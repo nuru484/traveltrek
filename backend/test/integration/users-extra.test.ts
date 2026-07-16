@@ -52,11 +52,16 @@ describe('PUT /api/v1/users/:userId (gates and rules)', () => {
     expect(res.body.data.password).toBeUndefined();
   });
 
+  // Contact-uniqueness 409s are now exercised via ANOTHER staff member's
+  // administrative edit: self-service email/phone changes moved to the
+  // verified /auth/change-email / /auth/change-phone flows (see
+  // contact-change.test.ts for the self-service 400 rule).
   it('rejects an update to an email already taken by another user with 409', async () => {
+    const editor = await createAgent();
     const user = await createAgent();
     const other = await createAgent();
 
-    const res = await authedApi(user)
+    const res = await authedApi(editor)
       .put(`/api/v1/users/${user.id}`)
       .send({ email: other.email });
 
@@ -65,10 +70,11 @@ describe('PUT /api/v1/users/:userId (gates and rules)', () => {
   });
 
   it('rejects an update to a phone already taken by another user with 409', async () => {
+    const editor = await createAgent();
     const user = await createAgent();
     const other = await createAgent();
 
-    const res = await authedApi(user)
+    const res = await authedApi(editor)
       .put(`/api/v1/users/${user.id}`)
       .send({ phone: other.phone });
 

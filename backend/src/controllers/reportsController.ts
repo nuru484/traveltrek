@@ -13,19 +13,29 @@
 // rules existed in the legacy controller.
 import { Request, RequestHandler, Response } from 'express';
 
-import { asyncHandler } from '#middlewares/error-handler.js';
+import {
+  asyncHandler,
+  UnauthorizedError,
+} from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
+  getAgentActivity as getAgentActivityService,
+  getCustomerSelfReport,
   getMonthlyBookingsSummary as getMonthlyBookingsSummaryService,
   getPaymentsSummary as getPaymentsSummaryService,
   getTopToursByBookings as getTopToursByBookingsService,
 } from '#services/report.service.js';
 import { sendSuccess } from '#utils/http-response.js';
+import { toBookingDTO } from '#utils/mappers/booking.mapper.js';
 import {
+  agentActivityQuery,
+  AgentActivityQueryInput,
   monthlyBookingsQuery,
   MonthlyBookingsQueryInput,
   paymentsSummaryQuery,
   PaymentsSummaryQueryInput,
+  selfReportQuery,
+  SelfReportQueryInput,
   topToursQuery,
   TopToursQueryInput,
 } from '#validations/report-validation.js';
@@ -76,4 +86,55 @@ const handleGetTopToursByBookings = asyncHandler(
 export const getTopToursByBookings: RequestHandler[] = [
   ...zodValidation.query(topToursQuery),
   handleGetTopToursByBookings,
+];
+
+// GET /reports/me — route-gated to CUSTOMER, so the actor id is a customer
+// id; the service scopes every read to it.
+const handleGetMyReport = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { user } = req;
+    if (!user) throw new UnauthorizedError('Unauthorized, no user provided');
+
+    const query = req.query as unknown as SelfReportQueryInput;
+    const report = await getCustomerSelfReport(user.id, query);
+
+    sendSuccess(res, {
+      data: {
+        ...report,
+        recentBookings: report.recentBookings.map(toBookingDTO),
+      },
+      message: 'Your travel report retrieved successfully',
+    });
+  },
+);
+export const getMyReport: RequestHandler[] = [
+  ...zodValidation.query(selfReportQuery),
+  handleGetMyReport,
+];
+
+// GET /reports/agent-activity — ADMIN/AGENT; the agents-only-themselves /
+// admin ?userId= override rule lives in the service.
+const handleGetAgentActivity = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { user } = req;
+    if (!user) throw new UnauthorizedError('Unauthorized, no user provided');
+
+    const query = req.query as unknown as AgentActivityQueryInput;
+    const report = await getAgentActivityService(
+      { id: user.id, role: user.role },
+      query,
+    );
+
+    sendSuccess(res, {
+      data: {
+        ...report,
+        recentBookings: report.recentBookings.map(toBookingDTO),
+      },
+      message: 'Agent activity report retrieved successfully',
+    });
+  },
+);
+export const getAgentActivity: RequestHandler[] = [
+  ...zodValidation.query(agentActivityQuery),
+  handleGetAgentActivity,
 ];

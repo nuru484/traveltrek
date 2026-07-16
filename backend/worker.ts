@@ -7,7 +7,11 @@
 // never processed twice.
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
+import { flushSentry, initSentry } from '#lib/sentry.js';
 import logger from '#utils/logger.js';
+
+// Error tracking for the worker process too (no-op without SENTRY_DSN).
+initSentry();
 
 let shuttingDown = false;
 
@@ -24,6 +28,7 @@ const shutdown = async (signal: string): Promise<void> => {
 
   try {
     await stopWorkers();
+    await flushSentry();
     await prisma.$disconnect();
     process.exit(0);
   } catch (error) {

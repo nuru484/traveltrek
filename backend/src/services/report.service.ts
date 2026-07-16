@@ -23,14 +23,44 @@
 //   (legacy object-key insertion order), and recentPayments sorts by
 //   paymentDate descending with null dates treated as epoch 0, as before.
 import {
-  type BookingStatus,
+  BookingStatus,
   type PaymentMethod,
   PaymentStatus,
   type Prisma,
   type TourStatus,
   type TourType,
 } from '#config/prismaClient.js';
+import { UnauthorizedError } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
+import { UserRole } from '#types/user-profile.types.js';
+import {
+  bookingInclude,
+  type BookingWithRelations,
+} from '#utils/mappers/booking.mapper.js';
+
+export interface AgentActivityParams extends ReportPeriodParams {
+  /** ADMIN only: view another staff member's activity. */
+  userId?: number;
+}
+
+/** GET /reports/agent-activity — a staff member's recorded-booking activity
+ * (scoped via Booking.createdByUserId). */
+export interface AgentActivityReport {
+  /** Zero-filled month buckets spanning the period (12 for a year window):
+   * bookings recorded that month + COMPLETED-payment revenue from them. */
+  monthly: { bookings: number; month: string; revenue: number }[];
+  recentBookings: BookingWithRelations[];
+  summary: {
+    bookingsRecorded: number;
+    /** Distinct customers among the recorded bookings. */
+    customersServed: number;
+    /** Pipeline value: totalPrice of recorded bookings still PENDING. */
+    pendingFromRecorded: number;
+    period: ReportPeriod;
+    /** COMPLETED payments of the recorded bookings. */
+    revenueFromRecorded: number;
+  };
+}
 
 /** {amount, count} bucket used by the payment status/method breakdowns. */
 export interface AmountCountBucket {
@@ -43,6 +73,28 @@ export interface BookingMonthBucket {
   bookingCount: number;
   month: string;
   revenue: number;
+}
+
+/** GET /reports/me — the authenticated customer's own travel activity. */
+export interface CustomerSelfReport {
+  /** Booking count + totalPrice value per booked-item type in the period. */
+  byType: Partial<Record<'FLIGHT' | 'ROOM' | 'TOUR', AmountCountBucket>>;
+  /** Zero-filled month buckets spanning the period (12 for a year window):
+   * COMPLETED-payment spend + bookings made that month. */
+  monthlySpend: { amount: number; bookings: number; month: string }[];
+  recentBookings: BookingWithRelations[];
+  summary: {
+    /** Average booking totalPrice over the period's bookings (2dp). */
+    averageBookingValue: number;
+    cancelledBookings: number;
+    period: ReportPeriod;
+    /** COMPLETED payments in the period. */
+    totalSpent: number;
+    /** COMPLETED bookings in the period. */
+    totalTrips: number;
+    /** PENDING/CONFIRMED bookings whose trip start is still ahead. */
+    upcomingTrips: number;
+  };
 }
 
 export type MonthlyBookingRow = Prisma.BookingGetPayload<{
@@ -326,6 +378,30 @@ const windowClause = (window: PeriodWindow): Prisma.DateTimeFilter => ({
   gte: window.start,
   lte: window.end,
 });
+
+/**
+ * Every "YYYY-MM" key the window spans (UTC months, matching the
+ * toISOString-based bucket keys used across the reports) — the zero-filled
+ * bucket skeleton for the self reports: 12 buckets for a year window, one
+ * per month of a custom range.
+ */
+const monthKeysBetween = (window: PeriodWindow): string[] => {
+  const keys: string[] = [];
+  let year = window.start.getUTCFullYear();
+  let month = window.start.getUTCMonth();
+  const endYear = window.end.getUTCFullYear();
+  const endMonth = window.end.getUTCMonth();
+
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    keys.push(`${year}-${String(month + 1).padStart(2, '0')}`);
+    month += 1;
+    if (month === 12) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return keys;
+};
 
 const periodEcho = (
   params: ReportPeriodParams,
@@ -630,7 +706,220 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
     };
   };
 
+  /**
+   * GET /reports/me — the authenticated customer's own activity for the
+   * period (same startDate/endDate/month/year window semantics as the admin
+   * reports). Three reads: the period's booking slice (every booking-derived
+   * stat reduces over it), the period's COMPLETED payments (spend), and the
+   * 5 most recent bookings with full relations for the DTO list.
+   */
+  const getCustomerSelfReport = async (
+    customerId: number,
+    params: ReportPeriodParams,
+  ): Promise<CustomerSelfReport> => {
+    const year = resolveYear(params.year);
+    const window = periodWindow(params, year);
+
+    const [bookings, payments, recentBookings] = await Promise.all([
+      prisma.booking.findMany({
+        select: {
+          bookingDate: true,
+          flight: { select: { departure: true } },
+          flightId: true,
+          roomId: true,
+          startDate: true,
+          status: true,
+          totalPrice: true,
+          tour: { select: { startDate: true } },
+          tourId: true,
+        },
+        where: { bookingDate: windowClause(window), customerId },
+      }),
+      prisma.payment.findMany({
+        select: { amount: true, paymentDate: true },
+        where: {
+          customerId,
+          paymentDate: windowClause(window),
+          status: PaymentStatus.COMPLETED,
+        },
+      }),
+      prisma.booking.findMany({
+        include: bookingInclude,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        where: { bookingDate: windowClause(window), customerId },
+      }),
+    ]);
+
+    const now = clock.timestamp();
+    let totalTrips = 0;
+    let cancelledBookings = 0;
+    let upcomingTrips = 0;
+    let totalBookingValue = 0;
+    const byType: CustomerSelfReport['byType'] = {};
+
+    // Zero-filled skeleton first so every month of the period reports, even
+    // with no activity; bucket order is chronological.
+    const monthlyBuckets = new Map<
+      string,
+      { amount: number; bookings: number; month: string }
+    >();
+    for (const month of monthKeysBetween(window)) {
+      monthlyBuckets.set(month, { amount: 0, bookings: 0, month });
+    }
+
+    for (const booking of bookings) {
+      totalBookingValue += booking.totalPrice;
+
+      if (booking.status === BookingStatus.COMPLETED) totalTrips += 1;
+      if (booking.status === BookingStatus.CANCELLED) cancelledBookings += 1;
+
+      if (
+        booking.status === BookingStatus.PENDING ||
+        booking.status === BookingStatus.CONFIRMED
+      ) {
+        const tripStart =
+          booking.tour?.startDate ??
+          booking.flight?.departure ??
+          booking.startDate;
+        if (tripStart && tripStart.getTime() > now) upcomingTrips += 1;
+      }
+
+      const type = booking.tourId
+        ? 'TOUR'
+        : booking.roomId
+          ? 'ROOM'
+          : 'FLIGHT';
+      const typeBucket = (byType[type] ??= { amount: 0, count: 0 });
+      typeBucket.count += 1;
+      typeBucket.amount += booking.totalPrice;
+
+      const monthBucket = monthlyBuckets.get(
+        booking.bookingDate.toISOString().slice(0, 7),
+      );
+      if (monthBucket) monthBucket.bookings += 1;
+    }
+
+    let totalSpent = 0;
+    for (const payment of payments) {
+      totalSpent += payment.amount;
+      if (!payment.paymentDate) continue;
+      const monthBucket = monthlyBuckets.get(
+        payment.paymentDate.toISOString().slice(0, 7),
+      );
+      if (monthBucket) monthBucket.amount += payment.amount;
+    }
+
+    const averageBookingValue =
+      bookings.length > 0
+        ? Math.round((totalBookingValue / bookings.length) * 100) / 100
+        : 0;
+
+    return {
+      byType,
+      monthlySpend: [...monthlyBuckets.values()],
+      recentBookings,
+      summary: {
+        averageBookingValue,
+        cancelledBookings,
+        period: periodEcho(params, year),
+        totalSpent,
+        totalTrips,
+        upcomingTrips,
+      },
+    };
+  };
+
+  /**
+   * GET /reports/agent-activity — bookings the staff actor recorded on behalf
+   * of customers (Booking.createdByUserId) for the period. Agents see only
+   * themselves; an ADMIN may pass ?userId= to inspect another agent.
+   */
+  const getAgentActivity = async (
+    actor: { id: number; role: UserRole },
+    params: AgentActivityParams,
+  ): Promise<AgentActivityReport> => {
+    const targetUserId = params.userId ?? actor.id;
+    if (actor.role !== UserRole.ADMIN && targetUserId !== actor.id) {
+      throw new UnauthorizedError('You can only view your own activity');
+    }
+
+    const year = resolveYear(params.year);
+    const window = periodWindow(params, year);
+    const where: Prisma.BookingWhereInput = {
+      bookingDate: windowClause(window),
+      createdByUserId: targetUserId,
+    };
+
+    const [bookings, recentBookings] = await Promise.all([
+      prisma.booking.findMany({
+        select: {
+          bookingDate: true,
+          customerId: true,
+          payment: { select: { amount: true, status: true } },
+          status: true,
+          totalPrice: true,
+        },
+        where,
+      }),
+      prisma.booking.findMany({
+        include: bookingInclude,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        where,
+      }),
+    ]);
+
+    const customers = new Set<number>();
+    let revenueFromRecorded = 0;
+    let pendingFromRecorded = 0;
+
+    const monthlyBuckets = new Map<
+      string,
+      { bookings: number; month: string; revenue: number }
+    >();
+    for (const month of monthKeysBetween(window)) {
+      monthlyBuckets.set(month, { bookings: 0, month, revenue: 0 });
+    }
+
+    for (const booking of bookings) {
+      customers.add(booking.customerId);
+
+      const paidAmount =
+        booking.payment?.status === PaymentStatus.COMPLETED
+          ? booking.payment.amount
+          : 0;
+      revenueFromRecorded += paidAmount;
+
+      if (booking.status === BookingStatus.PENDING) {
+        pendingFromRecorded += booking.totalPrice;
+      }
+
+      const monthBucket = monthlyBuckets.get(
+        booking.bookingDate.toISOString().slice(0, 7),
+      );
+      if (monthBucket) {
+        monthBucket.bookings += 1;
+        monthBucket.revenue += paidAmount;
+      }
+    }
+
+    return {
+      monthly: [...monthlyBuckets.values()],
+      recentBookings,
+      summary: {
+        bookingsRecorded: bookings.length,
+        customersServed: customers.size,
+        pendingFromRecorded,
+        period: periodEcho(params, year),
+        revenueFromRecorded,
+      },
+    };
+  };
+
   return {
+    getAgentActivity,
+    getCustomerSelfReport,
     getMonthlyBookingsSummary,
     getPaymentsSummary,
     getTopToursByBookings,
@@ -640,6 +929,8 @@ export const makeReportService = (d: Pick<AppDeps, 'clock' | 'prisma'>) => {
 export const reportService = makeReportService(defaultDeps);
 
 export const {
+  getAgentActivity,
+  getCustomerSelfReport,
   getMonthlyBookingsSummary,
   getPaymentsSummary,
   getTopToursByBookings,

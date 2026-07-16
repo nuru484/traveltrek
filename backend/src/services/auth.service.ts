@@ -34,7 +34,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 
-import { BCRYPT_SALT_ROUNDS } from '#config/constants.js';
+import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   type Customer,
   type Prisma,
@@ -44,10 +44,12 @@ import {
 } from '#config/prismaClient.js';
 import {
   BadRequestError,
+  CustomError,
   ServiceUnavailableError,
   TooManyRequestsError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
+import { makeDispatch } from '#notifications/dispatch.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import {
   AccessTokenPayload,
@@ -101,6 +103,13 @@ const OTP_RESEND_COOLDOWN_SECONDS = 60;
 /** Password-reset links are longer-lived than OTPs but still single-use. */
 const PASSWORD_RESET_TTL_MINUTES = 30;
 
+/** Email-change confirmation links: same lifetime as reset links, single-use. */
+const EMAIL_CHANGE_TTL_MINUTES = 30;
+
+/** Phone-change OTPs: same lifetime/attempt shape as login OTPs. */
+const PHONE_CHANGE_TTL_MINUTES = 10;
+const PHONE_CHANGE_MAX_ATTEMPTS = 5;
+
 /** TWO_FACTOR codes: same lifetime/attempt/cooldown shape as OTP login codes.
  * The pending-cookie TTL (utils/two-factor-pending.ts) matches the code TTL. */
 const TWO_FACTOR_TTL_MINUTES = 10;
@@ -118,12 +127,28 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+/** POST /auth/change-email body. Re-auth proof: accounts WITH a password send
+ * currentPassword; passwordless accounts send the code a prior
+ * POST /auth/reauth/challenge delivered to their current contact. */
+export interface ChangeEmailInput {
+  code?: string;
+  currentPassword?: string;
+  newEmail: string;
+}
+
 /** POST /auth/change-password body, resolved against the authenticated actor. */
 export interface ChangePasswordInput {
   /** Required when the account already has a password; must be ABSENT when it
    * is passwordless (this call then sets the first password). */
   currentPassword?: string;
   newPassword: string;
+}
+
+/** POST /auth/change-phone body — same re-auth proof rule as ChangeEmailInput. */
+export interface ChangePhoneInput {
+  code?: string;
+  currentPassword?: string;
+  newPhone: string;
 }
 
 export interface LoginInput {
@@ -273,9 +298,13 @@ export const makeAuthService = (d: AuthDeps) => {
     kind: PrincipalKind,
     id: number,
     data: {
+      email?: string;
       failedLoginAttempts?: number;
       lockedUntil?: Date | null;
       password?: string;
+      pendingEmail?: null | string;
+      pendingPhone?: null | string;
+      phone?: string;
       tokenVersion?: { increment: number };
       twoFactorEnabled?: boolean;
     },
@@ -696,12 +725,9 @@ export const makeAuthService = (d: AuthDeps) => {
   // ---- Passwordless OTP login, password reset, Google sign-in ----
 
   /** Fire-and-forget delivery: a slow/failed send never blocks or fails the
-   * request (and keeps request-OTP / forgot-password timing uniform). */
-  const dispatch = (delivery: Promise<void>, what: string): void => {
-    void delivery.catch((error: unknown) => {
-      logger.error({ err: error }, `${what} dispatch threw`);
-    });
-  };
+   * request (and keeps request-OTP / forgot-password timing uniform). Shared
+   * with the notification modules — see src/notifications/dispatch.ts. */
+  const dispatch = makeDispatch(logger);
 
   /** Resolves the CUSTOMER an OTP request/verify identifies (email or phone).
    * OTP login is a customer-only surface — staff use passwords. */
@@ -1408,9 +1434,384 @@ export const makeAuthService = (d: AuthDeps) => {
     };
   };
 
+  // ---- Self-service contact changes (dms email-change pattern) ----
+  //
+  // Email and phone are LOGIN IDENTIFIERS, so self-service profile updates no
+  // longer write them directly. Changing one is a three-proof flow:
+  //   1. a live session (authenticate-jwt),
+  //   2. re-auth: the current password — or, for passwordless accounts, a
+  //      TWO_FACTOR-style code sent to the CURRENT contact by
+  //      POST /auth/reauth/challenge (the existing 2FA challenge engine),
+  //   3. possession of the NEW contact: a confirmation link emailed to the
+  //      new address (EMAIL_CHANGE, unauthenticated confirm — the link is the
+  //      credential, like reset-password) / an OTP texted to the new phone
+  //      (PHONE_CHANGE, authenticated confirm).
+  // The requested value parks on pendingEmail/pendingPhone and is applied
+  // ONLY at confirm time, with uniqueness re-checked in both principal tables
+  // (the contact may have been claimed between request and confirm — that
+  // conflict clears the pending change and 409s). Applying bumps the session
+  // epoch: every live session must sign in again with the new identifier.
+  // ADMIN edits of other accounts keep direct email/phone writes (an
+  // administrative override, still cross-principal-checked in the services).
+
+  /**
+   * Re-auth proof for a contact change: accounts WITH a password must present
+   * it (same lockout/counter discipline as login — a hijacked session can't
+   * grind the password here); passwordless accounts must present the code
+   * POST /auth/reauth/challenge sent to their CURRENT contact.
+   */
+  const assertReauthenticated = async (
+    principal: AuthPrincipal,
+    proof: { code?: string; currentPassword?: string },
+  ): Promise<void> => {
+    const row = authState(principal);
+
+    if (row.password !== null) {
+      if (proof.currentPassword === undefined) {
+        throw new BadRequestError(
+          'Enter your current password to change your contact details.',
+        );
+      }
+      if (row.lockedUntil && row.lockedUntil.getTime() > clock.timestamp()) {
+        throw new TooManyRequestsError(
+          'Too many failed attempts. Please wait a few minutes and try again.',
+          { code: 'ACCOUNT_LOCKED', layer: 'auth' },
+        );
+      }
+      const valid = await bcrypt.compare(proof.currentPassword, row.password);
+      if (!valid) {
+        await registerFailedLogin(principal);
+        throw new UnauthorizedError('Invalid credentials', {
+          code: 'INVALID_CREDENTIALS',
+          layer: 'auth',
+        });
+      }
+      return;
+    }
+
+    if (proof.code === undefined) {
+      throw new BadRequestError(
+        'This account has no password — request a verification code first (POST /auth/reauth/challenge) and send it as "code".',
+      );
+    }
+    await consumeSecurityCode(
+      principal.kind,
+      row.id,
+      TokenType.TWO_FACTOR,
+      proof.code,
+      TWO_FACTOR_MAX_ATTEMPTS,
+      invalidTwoFactorError,
+    );
+  };
+
+  /**
+   * 409 when another row of the SAME principal table already holds the
+   * contact. findUnique on purpose (unscoped): soft-deleted rows keep their
+   * unique contact (khadys convention), so a tombstone still blocks the
+   * claim. The cross-table half is assertContactFreeAcrossPrincipals.
+   */
+  const assertContactFreeSameTable = async (
+    kind: PrincipalKind,
+    principalId: number,
+    contact: { email?: string; phone?: string },
+  ): Promise<void> => {
+    if (contact.email) {
+      const holder =
+        kind === 'customer'
+          ? await prisma.customer.findUnique({
+              select: { id: true },
+              where: { email: contact.email },
+            })
+          : await prisma.user.findUnique({
+              select: { id: true },
+              where: { email: contact.email },
+            });
+      if (holder && holder.id !== principalId) {
+        throw new CustomError(
+          HTTP_STATUS_CODES.CONFLICT,
+          'An account with this email already exists.',
+        );
+      }
+    }
+
+    if (contact.phone) {
+      const holder =
+        kind === 'customer'
+          ? await prisma.customer.findUnique({
+              select: { id: true },
+              where: { phone: contact.phone },
+            })
+          : await prisma.user.findUnique({
+              select: { id: true },
+              where: { phone: contact.phone },
+            });
+      if (holder && holder.id !== principalId) {
+        throw new CustomError(
+          HTTP_STATUS_CODES.CONFLICT,
+          'An account with this phone number already exists.',
+        );
+      }
+    }
+  };
+
+  /** Every confirm-link failure mode (unknown/expired/consumed token, gone
+   * account, no pending change) collapses into one uniform 401. */
+  const invalidEmailChangeError = (): UnauthorizedError =>
+    new UnauthorizedError(
+      'This confirmation link is invalid or has expired. Request the email change again.',
+      { code: 'INVALID_EMAIL_CHANGE_TOKEN', layer: 'auth' },
+    );
+
+  /** Uniform 401 for phone-change codes, mirroring the OTP discipline. */
+  const invalidPhoneChangeError = (): UnauthorizedError =>
+    new UnauthorizedError(
+      'Your code is invalid or has expired. Request a new one.',
+      { code: 'INVALID_PHONE_CHANGE_CODE', layer: 'auth' },
+    );
+
+  /**
+   * POST /auth/change-email — parks the new address on pendingEmail and sends
+   * the single-use confirmation link (32-byte token, sha256-stored, 30min
+   * TTL) to the NEW address; nothing changes until the link is redeemed.
+   * Uniqueness is pre-checked here for early feedback and RE-checked at
+   * confirm time (the authoritative check).
+   */
+  const requestEmailChange = async (
+    kind: PrincipalKind,
+    principalId: number,
+    input: ChangeEmailInput,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    const row = principalRow(principal);
+    if (row.email === input.newEmail) {
+      throw new BadRequestError('This is already your email address.');
+    }
+
+    await assertReauthenticated(principal, input);
+    await assertContactFreeSameTable(kind, principalId, {
+      email: input.newEmail,
+    });
+    await assertContactFreeAcrossPrincipals(
+      prisma,
+      { email: input.newEmail },
+      kind,
+    );
+
+    await updateAuthState(kind, principalId, { pendingEmail: input.newEmail });
+
+    const token = generateResetToken();
+    await issueSecurityToken(
+      kind,
+      principalId,
+      TokenType.EMAIL_CHANGE,
+      token,
+      EMAIL_CHANGE_TTL_MINUTES,
+    );
+
+    const confirmUrl = `${config.FRONTEND_URL}/confirm-email-change?token=${token}`;
+    dispatch(
+      mail.send({
+        subject: 'Confirm your new TravelTrek email address',
+        text:
+          `Hi ${row.name},\n\n` +
+          `Use the link below within ${EMAIL_CHANGE_TTL_MINUTES} minutes to confirm ` +
+          `${input.newEmail} as the new email address for your TravelTrek account:\n\n` +
+          `${confirmUrl}\n\n` +
+          `Until you confirm, your account keeps its current email. ` +
+          `If you didn't request this change, you can ignore this message.`,
+        to: input.newEmail,
+      }),
+      'Email-change confirmation email',
+    );
+    logger.info({ kind, principalId }, 'Email change requested');
+  };
+
+  /**
+   * POST /auth/confirm-email-change — UNauthenticated (the emailed token is
+   * the credential, like reset-password). Consumes the token (atomic,
+   * single-use), re-checks uniqueness in BOTH tables (a conflict clears the
+   * pending change and 409s), applies pendingEmail → email and bumps the
+   * session epoch so every live session must sign in with the new email.
+   */
+  const confirmEmailChange = async (token: string): Promise<void> => {
+    const record = await prisma.userSecurityToken.findUnique({
+      where: { tokenHash: hashSecurityToken(token) },
+    });
+    if (
+      record?.type !== TokenType.EMAIL_CHANGE ||
+      record.consumedAt !== null ||
+      record.expiresAt.getTime() < clock.timestamp()
+    ) {
+      throw invalidEmailChangeError();
+    }
+    const consumed = await prisma.userSecurityToken.updateMany({
+      data: { consumedAt: clock.now() },
+      where: { consumedAt: null, id: record.id },
+    });
+    if (consumed.count === 0) throw invalidEmailChangeError();
+
+    const kind: PrincipalKind =
+      record.customerId !== null ? 'customer' : 'staff';
+    const principalId = record.customerId ?? record.userId;
+    if (principalId === null) throw invalidEmailChangeError();
+
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) throw invalidEmailChangeError();
+    const pendingEmail = principalRow(principal).pendingEmail;
+    if (!pendingEmail) throw invalidEmailChangeError();
+
+    // The address may have been claimed between request and confirm; a
+    // conflict clears the pending change so the account isn't left wedged.
+    try {
+      await assertContactFreeSameTable(kind, principalId, {
+        email: pendingEmail,
+      });
+      await assertContactFreeAcrossPrincipals(
+        prisma,
+        { email: pendingEmail },
+        kind,
+      );
+    } catch (error) {
+      await updateAuthState(kind, principalId, { pendingEmail: null });
+      throw error;
+    }
+
+    await updateAuthState(kind, principalId, {
+      email: pendingEmail,
+      pendingEmail: null,
+      tokenVersion: { increment: 1 },
+    });
+    // No stale one-time secret survives an identifier change (same sweep as
+    // resetPassword); the epoch bump already killed the JWTs.
+    await prisma.userSecurityToken.deleteMany({
+      where: { consumedAt: null, ...principalFk(kind, principalId) },
+    });
+    invalidateCachedTokenVersion(kind, principalId);
+    logger.info({ kind, principalId }, 'Email change confirmed');
+  };
+
+  /**
+   * POST /auth/change-phone — parks the new number on pendingPhone and texts
+   * a single-use OTP (PHONE_CHANGE) to the NEW phone; confirming the code
+   * proves possession of that number.
+   */
+  const requestPhoneChange = async (
+    kind: PrincipalKind,
+    principalId: number,
+    input: ChangePhoneInput,
+  ): Promise<void> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) {
+      throw new UnauthorizedError('Account no longer exists. Please log in.', {
+        code: 'USER_NOT_FOUND',
+        layer: 'auth',
+      });
+    }
+    const row = principalRow(principal);
+    if (row.phone === input.newPhone) {
+      throw new BadRequestError('This is already your phone number.');
+    }
+
+    await assertReauthenticated(principal, input);
+    await assertContactFreeSameTable(kind, principalId, {
+      phone: input.newPhone,
+    });
+    await assertContactFreeAcrossPrincipals(
+      prisma,
+      { phone: input.newPhone },
+      kind,
+    );
+
+    await updateAuthState(kind, principalId, { pendingPhone: input.newPhone });
+
+    const code = generateOtpCode();
+    await issueSecurityToken(
+      kind,
+      principalId,
+      TokenType.PHONE_CHANGE,
+      code,
+      PHONE_CHANGE_TTL_MINUTES,
+    );
+    dispatch(
+      sms.send({
+        message: `Your TravelTrek verification code is ${code}. It expires in ${PHONE_CHANGE_TTL_MINUTES} minutes.`,
+        to: input.newPhone,
+      }),
+      'Phone-change OTP SMS',
+    );
+    logger.info({ kind, principalId }, 'Phone change requested');
+  };
+
+  /**
+   * POST /auth/confirm-phone-change — AUTHENTICATED (the code proves
+   * possession of the new phone; the session proves the account). Consumes
+   * the PHONE_CHANGE code (attempt-capped), re-checks uniqueness in both
+   * tables, applies pendingPhone → phone and bumps the session epoch. Returns
+   * the new-epoch principal so the controller re-mints THIS session.
+   */
+  const confirmPhoneChange = async (
+    kind: PrincipalKind,
+    principalId: number,
+    code: string,
+  ): Promise<TokenPrincipal> => {
+    const principal = await findPrincipalById(kind, principalId);
+    if (!principal) throw invalidPhoneChangeError();
+    const row = principalRow(principal);
+    if (!row.pendingPhone) throw invalidPhoneChangeError();
+
+    await consumeSecurityCode(
+      kind,
+      principalId,
+      TokenType.PHONE_CHANGE,
+      code,
+      PHONE_CHANGE_MAX_ATTEMPTS,
+      invalidPhoneChangeError,
+    );
+
+    // The number may have been claimed between request and confirm; a
+    // conflict clears the pending change so the account isn't left wedged.
+    try {
+      await assertContactFreeSameTable(kind, principalId, {
+        phone: row.pendingPhone,
+      });
+      await assertContactFreeAcrossPrincipals(
+        prisma,
+        { phone: row.pendingPhone },
+        kind,
+      );
+    } catch (error) {
+      await updateAuthState(kind, principalId, { pendingPhone: null });
+      throw error;
+    }
+
+    await updateAuthState(kind, principalId, {
+      pendingPhone: null,
+      phone: row.pendingPhone,
+      tokenVersion: { increment: 1 },
+    });
+    await prisma.userSecurityToken.deleteMany({
+      where: { consumedAt: null, ...principalFk(kind, principalId) },
+    });
+    invalidateCachedTokenVersion(kind, principalId);
+    logger.info({ kind, principalId }, 'Phone change confirmed');
+
+    return {
+      ...toTokenPrincipal(principal),
+      tokenVersion: authState(principal).tokenVersion + 1,
+    };
+  };
+
   return {
     adminCreateUser,
     changePassword,
+    confirmEmailChange,
+    confirmPhoneChange,
     disableTwoFactor,
     enableTwoFactor,
     getTwoFactorStatus,
@@ -1421,8 +1822,10 @@ export const makeAuthService = (d: AuthDeps) => {
     mintAuthTokens,
     refresh,
     register,
+    requestEmailChange,
     requestOtpLogin,
     requestPasswordReset,
+    requestPhoneChange,
     requestTwoFactorChallenge,
     resendTwoFactorLogin,
     resetPassword,
@@ -1436,6 +1839,8 @@ export const authService = makeAuthService(defaultDeps);
 export const {
   adminCreateUser,
   changePassword,
+  confirmEmailChange,
+  confirmPhoneChange,
   disableTwoFactor,
   enableTwoFactor,
   getTwoFactorStatus,
@@ -1446,8 +1851,10 @@ export const {
   mintAuthTokens,
   refresh,
   register,
+  requestEmailChange,
   requestOtpLogin,
   requestPasswordReset,
+  requestPhoneChange,
   requestTwoFactorChallenge,
   resendTwoFactorLogin,
   resetPassword,

@@ -28,6 +28,12 @@ interface IENV {
   REDIS_URL: string;
   REFRESH_TOKEN_EXPIRY: string;
   REFRESH_TOKEN_SECRET: string;
+  /** Error tracking (Sentry). Optional: unset disables reporting entirely. */
+  SENTRY_DSN?: string;
+  /** Environment tag on Sentry events; defaults to NODE_ENV. */
+  SENTRY_ENVIRONMENT: string;
+  /** Performance-tracing sample rate 0–1; default 0 (errors only). */
+  SENTRY_TRACES_SAMPLE_RATE: number;
   /** SMTP_HOST unset means the mailer logs instead of sending (dev-friendly). */
   SMTP_HOST?: string;
   SMTP_PASSWORD?: string;
@@ -94,6 +100,10 @@ const ENV: IENV = {
     process.env.REFRESH_TOKEN_SECRET,
     'REFRESH_TOKEN_SECRET',
   ),
+  SENTRY_DSN: process.env.SENTRY_DSN,
+  SENTRY_ENVIRONMENT:
+    process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
+  SENTRY_TRACES_SAMPLE_RATE: Number(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0,
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PASSWORD: process.env.SMTP_PASSWORD,
   SMTP_PORT: Number(process.env.SMTP_PORT) || 587,

@@ -1,4 +1,10 @@
 import { changePassword } from '#controllers/authentication/change-password.js';
+import {
+  changeEmail,
+  changePhone,
+  confirmEmailChange,
+  confirmPhoneChange,
+} from '#controllers/authentication/contact-change.js';
 import { googleSignIn } from '#controllers/authentication/google.js';
 import { login } from '#controllers/authentication/login.js';
 import logout from '#controllers/authentication/logout.js';
@@ -27,7 +33,11 @@ import {
 export {
   adminCreateUser,
   challengeTwoFactor,
+  changeEmail,
   changePassword,
+  changePhone,
+  confirmEmailChange,
+  confirmPhoneChange,
   disableTwoFactor,
   enableTwoFactor,
   forgotPassword,

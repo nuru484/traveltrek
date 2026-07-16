@@ -77,6 +77,24 @@ export const paymentsSummaryQuery = z.object({
   year: yearQuery,
 });
 
+/** The shared period window (same params/messages as the admin reports). */
+const periodQueryShape = {
+  endDate: isoDateQuery('End date must be a valid ISO 8601 date'),
+  month: monthQuery,
+  startDate: isoDateQuery('Start date must be a valid ISO 8601 date'),
+  year: yearQuery,
+};
+
+/** GET /reports/me — period params only (the actor scopes the data). */
+export const selfReportQuery = z.object(periodQueryShape);
+
+/** GET /reports/agent-activity — period params + the ADMIN-only userId
+ * override (agents are pinned to themselves in the service). */
+export const agentActivityQuery = z.object({
+  ...periodQueryShape,
+  userId: positiveIntQuery('User ID must be a positive integer'),
+});
+
 /** GET /reports/tours/top-by-bookings */
 export const topToursQuery = z.object({
   endDate: isoDateQuery('End date must be a valid ISO 8601 date'),
@@ -98,6 +116,8 @@ export const topToursQuery = z.object({
   year: yearQuery,
 });
 
+export type AgentActivityQueryInput = z.infer<typeof agentActivityQuery>;
 export type MonthlyBookingsQueryInput = z.infer<typeof monthlyBookingsQuery>;
 export type PaymentsSummaryQueryInput = z.infer<typeof paymentsSummaryQuery>;
+export type SelfReportQueryInput = z.infer<typeof selfReportQuery>;
 export type TopToursQueryInput = z.infer<typeof topToursQuery>;

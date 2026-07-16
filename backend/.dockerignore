@@ -1,0 +1,10 @@
+node_modules
+build
+generated
+.env
+.env.*
+!.env.example
+test
+coverage
+*.md
+.git

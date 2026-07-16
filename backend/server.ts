@@ -4,9 +4,14 @@ import type { Server } from 'node:http';
 import ENV from '#config/env.js';
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
+import { flushSentry, initSentry } from '#lib/sentry.js';
 import logger from '#utils/logger.js';
 
 import app from './app.js';
+
+// Initialize error tracking as the first runtime step (no-op without
+// SENTRY_DSN), so every request the server goes on to serve is covered.
+initSentry();
 
 const port = ENV.PORT || 8080;
 
@@ -59,6 +64,8 @@ const shutdown = async (signal: string): Promise<void> => {
     // Closes every BullMQ worker and queue, which also closes their Redis
     // connections (the web process holds no other Redis clients).
     await stopWorkers();
+    // Flush buffered error reports before the process dies.
+    await flushSentry();
     await prisma.$disconnect();
     logger.info('Shutdown complete');
     process.exit(0);

@@ -1,3 +1,5 @@
+import pMap from 'p-map';
+
 import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
@@ -8,6 +10,7 @@ import {
   type Room,
   type Tour,
   TourStatus,
+  type TransactionClient,
 } from '#config/prismaClient.js';
 import {
   BadRequestError,
@@ -15,6 +18,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
+import { makeBookingNotifications } from '#notifications/booking-notifications.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/booking.service.ts
 //
@@ -50,6 +54,13 @@ import {
 export const BOOKING_TYPES = ['FLIGHT', 'ROOM', 'TOUR'] as const;
 
 export type BookingActor = Pick<IUser, 'id' | 'role'>;
+
+export interface BookingCancelResult {
+  booking: BookingWithRelations;
+  /** True when a COMPLETED payment moved to REFUND_REQUESTED for admins to
+   * action via the refund endpoint. */
+  refundRequested: boolean;
+}
 
 export interface BookingCreateInput {
   /** The customer the booking is FOR: customers must self-book (actor rule);
@@ -132,6 +143,11 @@ export interface BulkBookingDeleteSummary {
   restoredSeats: number;
 }
 
+export interface ExpiredBookingsSweepSummary {
+  cancelledCount: number;
+  failureCount: number;
+}
+
 const DAY_MS = 1000 * 60 * 60 * 24;
 const HOUR_MS = 1000 * 60 * 60;
 
@@ -162,9 +178,10 @@ const calculateRoomBookingPrice = (
 ): number => pricePerNight * numberOfNights * numberOfRooms;
 
 export const makeBookingService = (
-  d: Pick<AppDeps, 'clock' | 'prisma'>,
+  d: Pick<AppDeps, 'clock' | 'config' | 'logger' | 'mail' | 'prisma' | 'sms'>,
 ) => {
-  const { clock, prisma } = d;
+  const { clock, logger, prisma } = d;
+  const notices = makeBookingNotifications(d);
 
   /**
    * Payment deadline tiers by proximity to check-in (legacy bookingHelpers):
@@ -270,6 +287,45 @@ export const makeBookingService = (
       available: availableRooms >= numberOfRoomsNeeded,
       availableRooms,
     };
+  };
+
+  /**
+   * Restores the tour-guest / flight-seat counters a booking holds, inside
+   * the caller's transaction — the single cancel/delete restore path (shared
+   * by deleteBooking, the customer self-cancel and the deadline-expiry
+   * sweep). findUnique on purpose (unscoped): the counter is restored even
+   * when the tour/flight itself has been soft-deleted meanwhile; the guards
+   * keep a drifted counter from going negative / past capacity.
+   */
+  const restoreItemCounters = async (
+    tx: TransactionClient,
+    booking: {
+      flightId: null | number;
+      numberOfGuests: number;
+      tourId: null | number;
+    },
+  ): Promise<void> => {
+    if (booking.tourId) {
+      const tour = await tx.tour.findUnique({ where: { id: booking.tourId } });
+      if (tour && tour.guestsBooked > 0) {
+        await tx.tour.update({
+          data: { guestsBooked: { decrement: booking.numberOfGuests } },
+          where: { id: booking.tourId },
+        });
+      }
+    }
+
+    if (booking.flightId) {
+      const flight = await tx.flight.findUnique({
+        where: { id: booking.flightId },
+      });
+      if (flight && flight.seatsAvailable < flight.capacity) {
+        await tx.flight.update({
+          data: { seatsAvailable: { increment: booking.numberOfGuests } },
+          where: { id: booking.flightId },
+        });
+      }
+    }
   };
 
   /** The tour/room/hotel/flight/user text-search OR list (legacy, verbatim). */
@@ -561,6 +617,25 @@ export const makeBookingService = (
       });
     });
 
+    // Fire-and-forget: the pending-booking notice (with the payment deadline)
+    // never blocks or fails the request. Item details come from the rows
+    // already loaded above; the created row carries the room+hotel summary.
+    notices.bookingCreated(
+      {
+        booking: {
+          endDate: booking.endDate,
+          flight,
+          id: booking.id,
+          room: booking.room,
+          startDate: booking.startDate,
+          totalPrice: booking.totalPrice,
+          tour,
+        },
+        customer: targetCustomer,
+      },
+      { paymentDeadline },
+    );
+
     return {
       booking,
       details: {
@@ -611,9 +686,11 @@ export const makeBookingService = (
 
     const existingBooking = await prisma.booking.findFirst({
       include: {
+        // Contact slice for the status-transition notices below.
+        customer: { select: { email: true, name: true, phone: true } },
         flight: true,
         payment: true,
-        room: true,
+        room: { include: { hotel: true } },
         tour: true,
       },
       where: { id },
@@ -672,7 +749,7 @@ export const makeBookingService = (
     let paymentDeadline = existingBooking.paymentDeadline;
     let requiresImmediatePayment = existingBooking.requiresImmediatePayment;
 
-    return await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
       if (customerId) {
         const targetCustomer = await tx.customer.findFirst({
           where: { id: customerId },
@@ -966,6 +1043,30 @@ export const makeBookingService = (
         where: { id },
       });
     });
+
+    // Status-transition notices (fire-and-forget). Item details come from the
+    // pre-update relations (full rows); price/dates from the updated row.
+    if (status && status !== existingBooking.status) {
+      const noticeInput = {
+        booking: {
+          endDate: updated.endDate,
+          flight: existingBooking.flight,
+          id: updated.id,
+          room: existingBooking.room,
+          startDate: updated.startDate,
+          totalPrice: updated.totalPrice,
+          tour: existingBooking.tour,
+        },
+        customer: existingBooking.customer,
+      };
+      if (status === BookingStatus.CONFIRMED) {
+        notices.bookingConfirmed(noticeInput);
+      } else if (status === BookingStatus.CANCELLED) {
+        notices.bookingCancelled(noticeInput, { reason: 'customer' });
+      }
+    }
+
+    return updated;
   };
 
   /**
@@ -1029,33 +1130,7 @@ export const makeBookingService = (
 
     const deletedAt = clock.now();
     await prisma.$transaction(async (tx) => {
-      if (booking.tourId) {
-        // findUnique on purpose (unscoped): restore the counter even when the
-        // tour itself has been soft-deleted meanwhile.
-        const tour = await tx.tour.findUnique({
-          where: { id: booking.tourId },
-        });
-
-        if (tour && tour.guestsBooked > 0) {
-          await tx.tour.update({
-            data: { guestsBooked: { decrement: booking.numberOfGuests } },
-            where: { id: booking.tourId },
-          });
-        }
-      }
-
-      if (booking.flightId) {
-        const flight = await tx.flight.findUnique({
-          where: { id: booking.flightId },
-        });
-
-        if (flight && flight.seatsAvailable < flight.capacity) {
-          await tx.flight.update({
-            data: { seatsAvailable: { increment: booking.numberOfGuests } },
-            where: { id: booking.flightId },
-          });
-        }
-      }
+      await restoreItemCounters(tx, booking);
 
       // Soft-delete the payment alongside the booking. Legacy removed
       // 'CANCELLED'/FAILED/PENDING payments explicitly and REFUNDED ones via
@@ -1084,6 +1159,155 @@ export const makeBookingService = (
       },
     };
   };
+
+  /**
+   * POST /bookings/:id/cancel — customer self-cancellation (staff may cancel
+   * any booking through it too). Rules:
+   *
+   * - customers may only cancel their OWN bookings;
+   * - already CANCELLED / COMPLETED bookings are refused (400), as is any
+   *   booking whose trip has already started (tour start / room check-in /
+   *   flight departure in the past);
+   * - PENDING (or unpaid CONFIRMED) → cancelled outright, counters restored;
+   * - CONFIRMED with a COMPLETED payment → cancelled, counters restored, and
+   *   the payment moves to REFUND_REQUESTED for an admin to action via
+   *   PATCH /payments/:id/refund (`refundRequested: true` in the result).
+   *
+   * Unlike the generic status-update path (which refuses CANCELLED while a
+   * payment is COMPLETED), this flow owns the paid case by parking the money
+   * on REFUND_REQUESTED — cancel and payment move in one transaction.
+   */
+  const cancelBooking = async (
+    actor: BookingActor,
+    id: number,
+  ): Promise<BookingCancelResult> => {
+    const booking = await prisma.booking.findFirst({
+      include: {
+        customer: { select: { email: true, name: true, phone: true } },
+        flight: true,
+        payment: true,
+        room: { include: { hotel: true } },
+        tour: true,
+      },
+      where: { id },
+    });
+    if (!booking) throw new NotFoundError('Booking not found');
+
+    if (actor.role === UserRole.CUSTOMER && booking.customerId !== actor.id) {
+      throw new UnauthorizedError('You can only cancel your own bookings');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestError('This booking is already cancelled');
+    }
+    if (booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestError('Completed bookings cannot be cancelled');
+    }
+
+    // Cancellation cutoff: once the trip has started there is nothing left
+    // to cancel — the stay/tour/flight is being (or has been) consumed.
+    const tripStart =
+      booking.tour?.startDate ?? booking.flight?.departure ?? booking.startDate;
+    if (tripStart && tripStart.getTime() <= clock.timestamp()) {
+      throw new BadRequestError(
+        'This booking can no longer be cancelled because the trip has already started',
+      );
+    }
+
+    const refundRequested =
+      booking.payment?.status === PaymentStatus.COMPLETED;
+
+    const cancelled = await prisma.$transaction(async (tx) => {
+      await restoreItemCounters(tx, booking);
+
+      if (refundRequested && booking.payment) {
+        await tx.payment.update({
+          data: { status: PaymentStatus.REFUND_REQUESTED },
+          where: { id: booking.payment.id },
+        });
+      }
+
+      return await tx.booking.update({
+        data: { status: BookingStatus.CANCELLED },
+        include: bookingInclude,
+        where: { id },
+      });
+    });
+
+    notices.bookingCancelled(
+      { booking, customer: booking.customer },
+      { reason: 'customer', refundRequested },
+    );
+
+    return { booking: cancelled, refundRequested };
+  };
+
+  /**
+   * The deadline-expiry sweep the bookingDeadlineQueue worker runs: cancels
+   * every PENDING booking whose payment deadline has passed, restoring its
+   * counters (cancel + restores are atomic per booking; one failure never
+   * blocks the rest) and notifying the customer with the deadline-expired
+   * variant. Lives here (not in the worker) so it is unit-testable and the
+   * worker stays a thin trigger.
+   */
+  const cancelExpiredBookings =
+    async (): Promise<ExpiredBookingsSweepSummary> => {
+      const now = clock.now();
+
+      const expiredBookings = await prisma.booking.findMany({
+        include: {
+          customer: { select: { email: true, name: true, phone: true } },
+          flight: true,
+          room: { include: { hotel: true } },
+          tour: true,
+        },
+        where: {
+          paymentDeadline: { lte: now },
+          status: BookingStatus.PENDING,
+        },
+      });
+
+      if (expiredBookings.length === 0) {
+        return { cancelledCount: 0, failureCount: 0 };
+      }
+
+      let cancelledCount = 0;
+      let failureCount = 0;
+
+      await pMap(
+        expiredBookings,
+        async (booking) => {
+          try {
+            await prisma.$transaction(async (tx) => {
+              await tx.booking.update({
+                data: { status: BookingStatus.CANCELLED },
+                where: { id: booking.id },
+              });
+              await restoreItemCounters(tx, booking);
+            });
+
+            cancelledCount++;
+            notices.bookingCancelled(
+              { booking, customer: booking.customer },
+              { reason: 'deadline' },
+            );
+            logger.info(
+              { bookingId: booking.id, customerId: booking.customerId },
+              'Cancelled booking past its payment deadline',
+            );
+          } catch (err) {
+            failureCount++;
+            logger.error(
+              { bookingId: booking.id, err },
+              'Failed to cancel expired booking',
+            );
+          }
+        },
+        { concurrency: 10 },
+      );
+
+      return { cancelledCount, failureCount };
+    };
 
   /** GET /bookings — customers are always scoped to their own rows. */
   const listBookings = async (
@@ -1296,6 +1520,8 @@ export const makeBookingService = (
   };
 
   return {
+    cancelBooking,
+    cancelExpiredBookings,
     createBooking,
     deleteAllBookings,
     deleteBooking,
@@ -1309,6 +1535,8 @@ export const makeBookingService = (
 export const bookingService = makeBookingService(defaultDeps);
 
 export const {
+  cancelBooking,
+  cancelExpiredBookings,
   createBooking,
   deleteAllBookings,
   deleteBooking,

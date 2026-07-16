@@ -1,9 +1,13 @@
 // src/jobs/bookingWorker.ts
+//
+// Thin BullMQ trigger for the booking payment-deadline sweep. The actual
+// domain logic (find expired PENDING bookings, cancel + restore counters
+// atomically, notify the customer) lives in booking.service's
+// cancelExpiredBookings so it is unit-testable without Redis.
 import { Worker } from 'bullmq';
-import pMap from 'p-map';
 
-import prisma from '#config/prismaClient.js';
 import { createRedisConnection } from '#config/redisConnection.js';
+import { cancelExpiredBookings } from '#services/booking.service.js';
 import logger from '#utils/logger.js';
 
 export const bookingDeadlineWorker = new Worker(
@@ -11,94 +15,17 @@ export const bookingDeadlineWorker = new Worker(
   async (_job) => {
     logger.info('🔍 Checking for expired booking payment deadlines...');
 
-    const now = new Date();
+    const summary = await cancelExpiredBookings();
 
-    const expiredBookings = await prisma.booking.findMany({
-      include: {
-        customer: true,
-        flight: true,
-        room: {
-          include: {
-            hotel: true,
-          },
-        },
-        tour: true,
-      },
-      where: {
-        paymentDeadline: {
-          lte: now,
-        },
-        status: 'PENDING',
-      },
-    });
-
-    if (expiredBookings.length === 0) {
+    if (summary.cancelledCount === 0 && summary.failureCount === 0) {
       logger.info('✅ No expired bookings found.');
-      return { cancelledCount: 0 };
+    } else {
+      logger.info(
+        `✅ Booking deadline check completed. Cancelled: ${summary.cancelledCount}, Failures: ${summary.failureCount}`,
+      );
     }
 
-    logger.info(
-      `⚠️  Found ${expiredBookings.length} bookings with expired payment deadlines.`,
-    );
-
-    let cancelledCount = 0;
-    let failureCount = 0;
-
-    // Process bookings in batches with concurrency limit
-    await pMap(
-      expiredBookings,
-      async (booking) => {
-        try {
-          // The cancel and its counter restores are atomic: a failure rolls
-          // everything back, so seats/guests can never drift from bookings.
-          await prisma.$transaction(async (tx) => {
-            await tx.booking.update({
-              data: { status: 'CANCELLED' },
-              where: { id: booking.id },
-            });
-
-            if (booking.tourId && booking.tour) {
-              await tx.tour.update({
-                data: {
-                  guestsBooked: {
-                    decrement: booking.numberOfGuests,
-                  },
-                },
-                where: { id: booking.tourId },
-              });
-            }
-
-            if (booking.flightId && booking.flight) {
-              await tx.flight.update({
-                data: {
-                  seatsAvailable: {
-                    increment: booking.numberOfGuests,
-                  },
-                },
-                where: { id: booking.flightId },
-              });
-            }
-          });
-
-          cancelledCount++;
-          logger.info(
-            `❌ Cancelled booking #${booking.id} for customer ${booking.customer.email ?? `#${booking.customerId}`}`,
-          );
-        } catch (err) {
-          failureCount++;
-          logger.error(
-            `⚠️  Failed to cancel booking #${booking.id}: ${String(err)}`,
-          );
-        }
-      },
-      { concurrency: 10 },
-    );
-
-    logger.info(
-      `✅ Booking deadline check completed. Cancelled: ${cancelledCount}, Failures: ${failureCount}`,
-    );
-
-    return { cancelledCount, failureCount };
+    return summary;
   },
   {
     connection: createRedisConnection(),

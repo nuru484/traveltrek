@@ -52,7 +52,13 @@ export const createCustomerSchema = z
   });
 
 /** PUT /customers/:id — every field optional. No password (stripped if
- * sent) — passwords rotate only through POST /auth/change-password. */
+ * sent) — passwords rotate only through POST /auth/change-password.
+ *
+ * email/phone stay in the schema for STAFF edits (administrative override,
+ * cross-principal-checked in the service), but a customer editing their OWN
+ * profile may not change them here: zod cannot know the actor, so the
+ * service 400s a self-service change and points at the verified flows
+ * (POST /auth/change-email / /auth/change-phone). */
 export const updateCustomerSchema = z.object({
   address: addressField.optional(),
   email: emailField.optional(),

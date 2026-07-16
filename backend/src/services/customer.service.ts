@@ -24,6 +24,7 @@ import {
   type Prisma,
 } from '#config/prismaClient.js';
 import {
+  BadRequestError,
   CustomError,
   NotFoundError,
   UnauthorizedError,
@@ -476,6 +477,27 @@ export const makeCustomerService = (
       });
       if (!existing) {
         throw new NotFoundError('Customer not found');
+      }
+
+      // Email/phone are LOGIN IDENTIFIERS: a customer editing their OWN
+      // profile may no longer change them here — the dedicated verified flows
+      // (POST /auth/change-email / /auth/change-phone, which re-authenticate
+      // and confirm possession of the new contact) are the only self-service
+      // path. Staff edits keep the direct administrative path (zod cannot
+      // know the actor, so the rule lives here). Sending the unchanged
+      // current value stays a no-op so full-profile form submits keep working.
+      const isSelf = actor.kind === 'customer' && actor.id === customerId;
+      if (isSelf) {
+        if (input.email !== undefined && input.email !== existing.email) {
+          throw new BadRequestError(
+            'Your email address cannot be changed here. Use POST /auth/change-email, which confirms the new address.',
+          );
+        }
+        if (input.phone !== undefined && input.phone !== existing.phone) {
+          throw new BadRequestError(
+            'Your phone number cannot be changed here. Use POST /auth/change-phone, which verifies the new number.',
+          );
+        }
       }
 
       await assertContactAvailable(

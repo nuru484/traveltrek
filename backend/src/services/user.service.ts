@@ -175,6 +175,26 @@ export const makeUserService = (
         throw new CustomError(HTTP_STATUS_CODES.NOT_FOUND, 'User not found.');
       }
 
+      // Email/phone are LOGIN IDENTIFIERS: a staff member editing their OWN
+      // profile may no longer change them here — the dedicated verified flows
+      // (POST /auth/change-email / /auth/change-phone, which re-authenticate
+      // and confirm possession of the new contact) are the only self-service
+      // path. Editing ANOTHER account keeps the direct administrative path
+      // (zod cannot know the actor, so the rule lives here). Sending the
+      // unchanged current value stays a no-op so full-profile submits work.
+      if (userId === actor.id) {
+        if (input.email !== undefined && input.email !== existingUser.email) {
+          throw new BadRequestError(
+            'Your email address cannot be changed here. Use POST /auth/change-email, which confirms the new address.',
+          );
+        }
+        if (input.phone !== undefined && input.phone !== existingUser.phone) {
+          throw new BadRequestError(
+            'Your phone number cannot be changed here. Use POST /auth/change-phone, which verifies the new number.',
+          );
+        }
+      }
+
       // Uniqueness pre-checks use findUnique ON PURPOSE (unscoped): the DB
       // unique constraints span soft-deleted rows (khadys convention), so a
       // tombstoned user still holds its email/phone and the pre-check must

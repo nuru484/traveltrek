@@ -12,6 +12,9 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
+import { bookedItemName } from '#notifications/booking-notifications.js';
+import { type CustomerContact } from '#notifications/deliver.js';
+import { makePaymentNotifications } from '#notifications/payment-notifications.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/payment.service.ts
 //
@@ -50,7 +53,9 @@ export const PAYMENT_METHODS = [
   'MOBILE_MONEY',
 ] as const;
 
-/** Statuses updatePaymentStatus accepted (mirrors PaymentStatus). */
+/** Statuses updatePaymentStatus accepts — the manual/admin subset of
+ * PaymentStatus. REFUND_REQUESTED is deliberately absent: it is only ever set
+ * by the customer self-cancel flow and leaves via the refund endpoint. */
 export const PAYMENT_STATUSES = [
   'COMPLETED',
   'FAILED',
@@ -154,9 +159,23 @@ const getPaystackChannel = (paymentMethod: PaymentMethod): string => {
 };
 
 export const makePaymentService = (
-  d: Pick<AppDeps, 'clock' | 'config' | 'logger' | 'paystack' | 'prisma'>,
+  d: Pick<
+    AppDeps,
+    'clock' | 'config' | 'logger' | 'mail' | 'paystack' | 'prisma' | 'sms'
+  >,
 ) => {
   const { clock, config, logger, paystack, prisma } = d;
+  const notices = makePaymentNotifications(d);
+
+  /** Contact slice for receipts/refund notices; null when the customer row
+   * is gone (soft-deleted) — the notice is then skipped. */
+  const customerContact = (
+    customerId: number,
+  ): Promise<CustomerContact | null> =>
+    prisma.customer.findFirst({
+      select: { email: true, name: true, phone: true },
+      where: { id: customerId },
+    });
 
   /** The callback URL Paystack redirects to (legacy env-or-default). */
   const callbackUrl = (): string =>
@@ -397,6 +416,13 @@ export const makePaymentService = (
     const verified = await paystack.verify(reference);
 
     const booking = await prisma.booking.findFirst({
+      include: {
+        // Contact + item slices for the payment receipt sent below.
+        customer: { select: { email: true, name: true, phone: true } },
+        flight: true,
+        room: { include: { hotel: true } },
+        tour: true,
+      },
       where: { id: bookingId },
     });
 
@@ -428,6 +454,17 @@ export const makePaymentService = (
     await prisma.booking.update({
       data: { status: BookingStatus.CONFIRMED },
       where: { id: bookingId },
+    });
+
+    // Fire-and-forget receipt. The callback flow deliberately sends nothing —
+    // Paystack fires this webhook for the same charge, so both completing
+    // would double the receipt.
+    notices.paymentReceipt({
+      amount: booking.totalPrice,
+      bookingId,
+      customer: booking.customer,
+      itemName: bookedItemName(booking),
+      reference,
     });
 
     return 'confirmed';
@@ -625,15 +662,30 @@ export const makePaymentService = (
       where: { id: payment.bookingId },
     });
 
+    // Manual/cash completion sends the same receipt the webhook path does.
+    if (status === PaymentStatus.COMPLETED) {
+      const contact = await customerContact(payment.customerId);
+      if (contact) {
+        notices.paymentReceipt({
+          amount: updatedPayment.amount,
+          bookingId: payment.bookingId,
+          customer: contact,
+          itemName: bookedItemName(updatedPayment.booking),
+          reference: updatedPayment.transactionReference,
+        });
+      }
+    }
+
     return { bookingStatus, payment: updatedPayment };
   };
 
   /**
-   * PATCH /payments/:id/refund — admin-only, COMPLETED payments only. Marks
-   * the payment REFUNDED and cancels its booking (the legacy flow never
+   * PATCH /payments/:id/refund — admin-only; COMPLETED payments and
+   * REFUND_REQUESTED ones (a customer self-cancelled a paid booking) only.
+   * Marks the payment REFUNDED and cancels its booking (the legacy flow never
    * called the Paystack refund API — it only recorded the refund locally and
    * logged the request; preserved, with the console.log now on the injected
-   * logger).
+   * logger). The customer gets a refund-processed notice.
    */
   const refundPayment = async (
     actor: PaymentActor,
@@ -653,7 +705,10 @@ export const makePaymentService = (
       throw new NotFoundError('Payment not found');
     }
 
-    if (payment.status !== PaymentStatus.COMPLETED) {
+    if (
+      payment.status !== PaymentStatus.COMPLETED &&
+      payment.status !== PaymentStatus.REFUND_REQUESTED
+    ) {
       throw new CustomError(
         HTTP_STATUS_CODES.CONFLICT,
         'Only completed payments can be refunded',
@@ -686,6 +741,17 @@ export const makePaymentService = (
       },
       `Refund requested for payment ${String(id)}`,
     );
+
+    const contact = await customerContact(payment.customerId);
+    if (contact) {
+      notices.refundProcessed({
+        amount: payment.amount,
+        bookingId: payment.bookingId,
+        customer: contact,
+        itemName: bookedItemName(refundedPayment.booking),
+        reference: payment.transactionReference,
+      });
+    }
 
     return {
       bookingStatus: BookingStatus.CANCELLED,

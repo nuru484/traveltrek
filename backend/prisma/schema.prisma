@@ -64,6 +64,14 @@ model User {
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
 
+  /// Self-service email change in flight: the requested address, applied to
+  /// `email` only when the confirmation link (EMAIL_CHANGE token, sent to the
+  /// NEW address) is redeemed. Cleared on apply or on a conflict at confirm.
+  pendingEmail String?
+  /// Self-service phone change in flight: applied to `phone` only when the
+  /// OTP (PHONE_CHANGE, texted to the NEW number) is verified.
+  pendingPhone String?
+
   securityTokens  UserSecurityToken[]
   /// Bookings this staff member created on behalf of customers (attribution).
   createdBookings Booking[]           @relation("BookingCreatedBy")
@@ -117,6 +125,14 @@ model Customer {
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
 
+  /// Self-service email change in flight: the requested address, applied to
+  /// `email` only when the confirmation link (EMAIL_CHANGE token, sent to the
+  /// NEW address) is redeemed. Cleared on apply or on a conflict at confirm.
+  pendingEmail String?
+  /// Self-service phone change in flight: applied to `phone` only when the
+  /// OTP (PHONE_CHANGE, texted to the NEW number) is verified.
+  pendingPhone String?
+
   bookings       Booking[]
   payments       Payment[]
   reviews        Review[]
@@ -137,7 +153,15 @@ enum TokenType {
   /// 6-digit second-factor code: sent on password login when the principal has
   /// twoFactorEnabled, and by the authed /auth/2fa/challenge step that gates
   /// enabling/disabling the feature. Single-use, attempt-capped (attempts col).
+  /// Also consumed as the re-auth proof for passwordless accounts changing
+  /// their email/phone (issued by POST /auth/reauth/challenge).
   TWO_FACTOR
+  /// Long random opaque token in the confirmation link emailed to the NEW
+  /// address of a pending email change; redeeming it applies pendingEmail.
+  EMAIL_CHANGE
+  /// 6-digit OTP texted to the NEW phone of a pending phone change; redeeming
+  /// it (authenticated) applies pendingPhone. Attempt-capped like OTP_LOGIN.
+  PHONE_CHANGE
 }
 
 /// One security-token row belongs to exactly ONE principal: either a staff
@@ -393,6 +417,10 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+  /// A customer self-cancelled a CONFIRMED booking whose payment had already
+  /// COMPLETED: the money is held pending an admin actioning the refund via
+  /// PATCH /payments/:id/refund (REFUND_REQUESTED → REFUNDED).
+  REFUND_REQUESTED
 }
 
 enum ReviewStatus {

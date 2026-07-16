@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import {
+  cancelBooking,
   createBooking,
   deleteAllBookings,
   deleteBooking,
@@ -30,6 +31,14 @@ bookingRoutes.put(
   '/bookings/:id',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   updateBooking,
+);
+
+// Customer self-cancellation (staff may cancel any booking through it too) —
+// the own-booking rule lives in the service.
+bookingRoutes.post(
+  '/bookings/:id/cancel',
+  authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
+  cancelBooking,
 );
 
 bookingRoutes.delete(

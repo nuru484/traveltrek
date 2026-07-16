@@ -138,16 +138,78 @@ export const changePasswordSchema = z.object({
   newPassword: passwordField,
 });
 
+const codeField = z
+  .string('Code must be the 6-digit number we sent you')
+  .regex(/^\d{6}$/, 'Code must be the 6-digit number we sent you');
+
 /** The 6-digit code bodies of /auth/2fa/{verify,enable,disable} — the same
  * shape OTP login verifies. */
 export const twoFactorCodeSchema = z.object({
-  code: z
-    .string('Code must be the 6-digit number we sent you')
-    .regex(/^\d{6}$/, 'Code must be the 6-digit number we sent you'),
+  code: codeField,
+});
+
+/** Contact changes re-authenticate with exactly ONE proof: currentPassword
+ * (accounts with a password) or the code POST /auth/reauth/challenge sent
+ * (passwordless accounts). Which one an account must use is DB state, so the
+ * service enforces the pairing; the boundary only requires exactly one. */
+const reauthProofRule = (body: {
+  code?: string;
+  currentPassword?: string;
+}): boolean => Boolean(body.currentPassword) !== Boolean(body.code);
+
+/** POST /auth/change-email — parks the new address; a confirmation link goes
+ * to the NEW address (see auth.service.requestEmailChange). */
+export const changeEmailSchema = z
+  .object({
+    code: codeField.optional(),
+    currentPassword: z
+      .string('currentPassword must be a string')
+      .min(1, 'currentPassword must not be empty')
+      .max(255, 'currentPassword must not be empty')
+      .optional(),
+    newEmail: emailField,
+  })
+  .refine(reauthProofRule, {
+    message: 'Provide exactly one of currentPassword or code',
+    path: ['currentPassword'],
+  });
+
+/** POST /auth/change-phone — parks the new number; an OTP goes to the NEW
+ * phone (see auth.service.requestPhoneChange). */
+export const changePhoneSchema = z
+  .object({
+    code: codeField.optional(),
+    currentPassword: z
+      .string('currentPassword must be a string')
+      .min(1, 'currentPassword must not be empty')
+      .max(255, 'currentPassword must not be empty')
+      .optional(),
+    newPhone: phoneField,
+  })
+  .refine(reauthProofRule, {
+    message: 'Provide exactly one of currentPassword or code',
+    path: ['currentPassword'],
+  });
+
+/** POST /auth/confirm-email-change — the emailed link token (unauthenticated,
+ * like reset-password: the token IS the credential). */
+export const confirmEmailChangeSchema = z.object({
+  token: z
+    .string('Confirmation token is required')
+    .min(1, 'Confirmation token is required'),
+});
+
+/** POST /auth/confirm-phone-change — the 6-digit code texted to the NEW phone. */
+export const confirmPhoneChangeSchema = z.object({
+  code: codeField,
 });
 
 export type AdminCreateUserBody = z.infer<typeof adminCreateUserSchema>;
+export type ChangeEmailBody = z.infer<typeof changeEmailSchema>;
 export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
+export type ChangePhoneBody = z.infer<typeof changePhoneSchema>;
+export type ConfirmEmailChangeBody = z.infer<typeof confirmEmailChangeSchema>;
+export type ConfirmPhoneChangeBody = z.infer<typeof confirmPhoneChangeSchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
 export type GoogleSignInBody = z.infer<typeof googleSignInSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;

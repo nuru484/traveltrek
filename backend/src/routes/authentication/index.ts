@@ -2,6 +2,7 @@
 import { Router } from 'express';
 
 import changePasswordRoutes from '#routes/authentication/change-password.js';
+import contactChangeRoutes from '#routes/authentication/contact-change.js';
 import googleRoutes from '#routes/authentication/google.js';
 import loginRoutes from '#routes/authentication/login.js';
 import logoutRoutes from '#routes/authentication/logout.js';
@@ -19,6 +20,7 @@ authenticationRouter.use('/auth', twoFactorRoutes);
 authenticationRouter.use('/auth', otpRoutes);
 authenticationRouter.use('/auth', passwordResetRoutes);
 authenticationRouter.use('/auth', changePasswordRoutes);
+authenticationRouter.use('/auth', contactChangeRoutes);
 authenticationRouter.use('/auth', googleRoutes);
 authenticationRouter.use('/auth', refreshRoutes);
 authenticationRouter.use('/auth', logoutRoutes);

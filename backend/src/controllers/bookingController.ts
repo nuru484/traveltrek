@@ -23,6 +23,7 @@ import {
 } from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
+  cancelBooking as cancelBookingService,
   createBooking as createBookingService,
   deleteAllBookings as deleteAllBookingsService,
   deleteBooking as deleteBookingService,
@@ -133,6 +134,33 @@ export const updateBooking: RequestHandler[] = [
   ...zodValidation.params(bookingIdParam),
   ...zodValidation.body(updateBookingSchema),
   handleUpdateBooking,
+];
+
+// POST /bookings/:id/cancel — customer self-cancellation (staff may cancel
+// any booking through it too). The service owns every rule: ownership,
+// terminal-status and trip-started refusals, counter restores, and moving a
+// COMPLETED payment to REFUND_REQUESTED (surfaced as `refundRequested`).
+const handleCancelBooking = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { user } = req;
+    if (!user) throw new UnauthorizedError('Unauthorized, no user provided');
+
+    const { booking, refundRequested } = await cancelBookingService(
+      { id: user.id, role: user.role },
+      idParam(req),
+    );
+
+    sendSuccess(res, {
+      data: { ...toBookingDTO(booking), refundRequested },
+      message: refundRequested
+        ? 'Booking cancelled — a refund request has been sent to our team'
+        : 'Booking cancelled successfully',
+    });
+  },
+);
+export const cancelBooking: RequestHandler[] = [
+  ...zodValidation.params(bookingIdParam),
+  handleCancelBooking,
 ];
 
 const handleDeleteBooking = asyncHandler(
