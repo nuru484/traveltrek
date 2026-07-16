@@ -22,9 +22,7 @@ import {
   TableHeader,
   TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useDeleteBookingMutation,
-  useDeleteAllBookingsMutation } from "@/redux/bookingApi";
+import { useDeleteBookingMutation } from "@/redux/bookingApi";
 import { createBookingColumns } from "./columns";
 import { BookingActionsDropdown } from "./BookingActionsDropdown";
 import { TableFilters } from "./TableFilters";
@@ -97,10 +95,8 @@ export function BookingsDataTable({
   const [rowSelection, setRowSelection] = React.useState({});
   const [deleteSelectedDialogOpen, setDeleteSelectedDialogOpen] =
     React.useState(false);
-  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = React.useState(false);
 
   const [deleteBooking] = useDeleteBookingMutation();
-  const [deleteAllBookings] = useDeleteAllBookingsMutation();
 
   const shouldShowCustomer =
     showCustomer !== undefined ? showCustomer : showFilters;
@@ -144,14 +140,7 @@ export function BookingsDataTable({
       return;
     }
 
-    const selectedCount = selectedRows.length;
-    const isAllBookingsSelected = selectedCount === totalCount;
-
-    if (isAllBookingsSelected) {
-      setDeleteAllDialogOpen(true);
-    } else {
-      setDeleteSelectedDialogOpen(true);
-    }
+    setDeleteSelectedDialogOpen(true);
   };
 
   const handleDeleteSelectedBookings = async () => {
@@ -171,24 +160,6 @@ export function BookingsDataTable({
       await Promise.all(deletePromises);
       toast.dismiss(toastId);
       toast.success(`${selectedCount} bookings deleted successfully`);
-      setRowSelection({});
-      onRefresh?.();
-    } catch (error) {
-      toast.dismiss(toastId);
-      const { message } = extractApiErrorMessage(error);
-      toast.error(message);
-    }
-  };
-
-  const handleDeleteAllBookings = async () => {
-    const toastId = toast.loading("Deleting all bookings..., please wait");
-
-    try {
-      await deleteAllBookings({
-        confirmDelete: "DELETE_ALL_BOOKINGS" }).unwrap();
-      toast.dismiss(toastId);
-      toast.success("All bookings deleted successfully");
-      setDeleteAllDialogOpen(false);
       setRowSelection({});
       onRefresh?.();
     } catch (error) {
@@ -453,20 +424,6 @@ export function BookingsDataTable({
           confirmText="Delete Selected"
           cancelText="Cancel"
           isDestructive={true}
-        />
-      )}
-
-      {showSelection && (
-        <ConfirmationDialog
-          open={deleteAllDialogOpen}
-          onOpenChange={setDeleteAllDialogOpen}
-          title="Delete All Bookings"
-          description={`Are you sure you want to delete all ${totalCount} bookings? This action cannot be undone.`}
-          onConfirm={handleDeleteAllBookings}
-          confirmText="Delete All Bookings"
-          cancelText="Cancel"
-          isDestructive={true}
-          requireExactMatch="DELETE_ALL_BOOKINGS"
         />
       )}
     </div>

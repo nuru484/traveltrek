@@ -88,15 +88,6 @@ export const hotelApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // Delete all hotels
-    deleteAllHotels: builder.mutation<{ message: string }, void>({
-      query: () => ({
-        url: "/hotels",
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Hotels", "Hotel"],
-    }),
-
     // Get hotels by destination
     getHotelsByDestination: builder.query<
       IHotelsPaginatedResponse,
@@ -131,7 +122,6 @@ export const {
   useGetHotelQuery,
   useUpdateHotelMutation,
   useDeleteHotelMutation,
-  useDeleteAllHotelsMutation,
   useGetHotelsByDestinationQuery,
 
   // Lazy hooks

@@ -167,11 +167,6 @@ export interface IBookingInput {
 
 export type IUpdateBookingInput = Partial<IBookingInput>;
 
-export interface IDeleteBookingsResponse {
-  message: string;
-  deletedCount: number;
-}
-
 export interface IBookingsQueryParams {
   page?: number;
   limit?: number;

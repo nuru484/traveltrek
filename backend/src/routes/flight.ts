@@ -2,7 +2,6 @@ import { Router } from 'express';
 
 import {
   createFlight,
-  deleteAllFlights,
   deleteFlight,
   getAllFlights,
   getFlight,
@@ -40,12 +39,6 @@ flightRoutes.get(
   '/flights',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   getAllFlights,
-);
-
-flightRoutes.delete(
-  '/flights',
-  authorizeRole([UserRole.ADMIN]),
-  deleteAllFlights,
 );
 
 export default flightRoutes;

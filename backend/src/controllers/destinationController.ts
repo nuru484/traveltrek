@@ -17,7 +17,6 @@ import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
   createDestination as createDestinationService,
-  deleteAllDestinations as deleteAllDestinationsService,
   deleteDestination as deleteDestinationService,
   getDestinationById,
   listDestinations,
@@ -190,19 +189,4 @@ const handleGetAllDestinations = asyncHandler(
 export const getAllDestinations: RequestHandler[] = [
   ...zodValidation.query(destinationListQuery),
   handleGetAllDestinations,
-];
-
-const handleDeleteAllDestinations = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const deletedCount = await deleteAllDestinationsService();
-    sendSuccess(res, {
-      message:
-        deletedCount === 0
-          ? 'No destinations found to delete'
-          : 'All destinations deleted successfully',
-    });
-  },
-);
-export const deleteAllDestinations: RequestHandler[] = [
-  handleDeleteAllDestinations,
 ];

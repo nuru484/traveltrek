@@ -3,7 +3,6 @@ import { Router } from 'express';
 import {
   cancelBooking,
   createBooking,
-  deleteAllBookings,
   deleteBooking,
   getAllBookings,
   getBooking,
@@ -59,12 +58,6 @@ bookingRoutes.get(
   '/bookings/customer/:customerId',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   getCustomerBookings,
-);
-
-bookingRoutes.delete(
-  '/bookings',
-  authorizeRole([UserRole.ADMIN]),
-  deleteAllBookings,
 );
 
 export default bookingRoutes;

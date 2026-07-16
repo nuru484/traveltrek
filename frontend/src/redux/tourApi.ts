@@ -100,14 +100,6 @@ export const tourApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Tour"],
     }),
-
-    deleteAllTours: builder.mutation<void, void>({
-      query: () => ({
-        url: "/tours",
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Tour"],
-    }),
   }),
 });
 
@@ -118,5 +110,4 @@ export const {
   useUpdateTourMutation,
   useUpdateTourStatusMutation,
   useDeleteTourMutation,
-  useDeleteAllToursMutation,
 } = tourApi;

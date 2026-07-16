@@ -2,7 +2,6 @@ import { Router } from 'express';
 
 import {
   createRoom,
-  deleteAllRooms,
   deleteRoom,
   getAllRooms,
   getRoom,
@@ -30,7 +29,5 @@ roomRoutes.get(
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   getAllRooms,
 );
-
-roomRoutes.delete('/rooms', authorizeRole([UserRole.ADMIN]), deleteAllRooms);
 
 export default roomRoutes;

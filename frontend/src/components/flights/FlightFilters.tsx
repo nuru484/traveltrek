@@ -19,7 +19,7 @@ interface FlightFiltersProps {
     filters: Partial<Omit<IFlightsQueryParams, "page" | "limit">>
   ) => void;
   destinations: IDestination[];
-  /** Page actions (Create / Delete all) rendered inside the toolbar. */
+  /** Page actions (Create) rendered inside the toolbar. */
   actions?: React.ReactNode;
 }
 

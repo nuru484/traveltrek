@@ -17,7 +17,7 @@ interface TourFiltersProps {
   onFiltersChange: (
     filters: Partial<Omit<IToursQueryParams, "page" | "limit">>
   ) => void;
-  /** Page actions (Create / Delete all) rendered inside the toolbar. */
+  /** Page actions (Create) rendered inside the toolbar. */
   actions?: React.ReactNode;
 }
 

@@ -7,7 +7,6 @@ import { Router } from 'express';
 import { adminCreateUser } from '#controllers/authentication/index.js';
 import {
   changeUserRole,
-  deleteAllUsers,
   deleteUser,
   getAllUsers,
   getUserById,
@@ -53,7 +52,5 @@ userRoutes.delete(
   authorizeRole([UserRole.ADMIN]),
   deleteUser,
 );
-
-userRoutes.delete('/users', authorizeRole([UserRole.ADMIN]), deleteAllUsers);
 
 export default userRoutes;

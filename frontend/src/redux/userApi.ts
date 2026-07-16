@@ -7,7 +7,6 @@ import {
   IUserResponse,
   IUsersPaginatedResponse,
   IUsersQueryParams,
-  IDeleteUsersResponse,
   StaffRole,
 } from "../types/user.types";
 
@@ -101,18 +100,6 @@ export const userApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    deleteAllUsers: builder.mutation<
-      IDeleteUsersResponse,
-      { confirmDelete: string }
-    >({
-      query: (body) => ({
-        url: "/users",
-        method: "DELETE",
-        body,
-      }),
-      invalidatesTags: ["Users"],
-    }),
-
     // Search users
     searchUsers: builder.query<
       IUsersPaginatedResponse,
@@ -144,7 +131,6 @@ export const {
   useUpdateUserProfileMutation,
   useUpdateUserRoleMutation,
   useDeleteUserMutation,
-  useDeleteAllUsersMutation,
   useSearchUsersQuery,
 
   useLazyGetAllUsersQuery,

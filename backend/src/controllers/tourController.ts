@@ -27,7 +27,6 @@ import {
 } from '#services/review.service.js';
 import {
   createTour as createTourService,
-  deleteAllTours as deleteAllToursService,
   deleteTour as deleteTourService,
   getTourById,
   listTours,
@@ -227,14 +226,3 @@ export const getAllTours: RequestHandler[] = [
   ...zodValidation.query(tourListQuery),
   handleGetAllTours,
 ];
-
-const handleDeleteAllTours = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const deletedCount = await deleteAllToursService();
-    sendSuccess(res, {
-      data: { deletedCount },
-      message: `Successfully deleted ${deletedCount} tour${deletedCount > 1 ? 's' : ''}`,
-    });
-  },
-);
-export const deleteAllTours: RequestHandler[] = [handleDeleteAllTours];

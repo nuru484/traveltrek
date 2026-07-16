@@ -79,14 +79,6 @@ export const destinationApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Destination"],
     }),
-
-    deleteAllDestinations: builder.mutation<IApiResponse<null>, void>({
-      query: () => ({
-        url: "/destinations",
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Destination"],
-    }),
   }),
 });
 
@@ -96,5 +88,4 @@ export const {
   useCreateDestinationMutation,
   useUpdateDestinationMutation,
   useDeleteDestinationMutation,
-  useDeleteAllDestinationsMutation,
 } = destinationApi;

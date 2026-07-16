@@ -6,7 +6,6 @@ import {
   IBookingsPaginatedResponse,
   IBookingInput,
   IUpdateBookingInput,
-  IDeleteBookingsResponse,
   IBookingsQueryParams,
 } from "@/types/booking.types";
 
@@ -177,27 +176,6 @@ export const bookingApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // Delete all bookings (Admin only)
-    deleteAllBookings: builder.mutation<
-      IDeleteBookingsResponse,
-      { confirmDelete: string }
-    >({
-      query: (body) => ({
-        url: "/bookings",
-        method: "DELETE",
-        body,
-      }),
-      invalidatesTags: [
-        "Bookings",
-        "CustomerBookings",
-        "Hotels",
-        "Flight",
-        "Flights",
-        "Tours",
-        "Tour",
-      ],
-    }),
-
     // Search bookings
     searchBookings: builder.query<
       IBookingsPaginatedResponse,
@@ -230,7 +208,6 @@ export const {
   useUpdateBookingMutation,
   useCancelBookingMutation,
   useDeleteBookingMutation,
-  useDeleteAllBookingsMutation,
   useSearchBookingsQuery,
 
   useLazyGetAllBookingsQuery,

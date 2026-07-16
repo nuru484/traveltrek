@@ -21,7 +21,6 @@ import zodValidation from '#middlewares/validate-request.js';
 import {
   checkAvailability,
   createRoom as createRoomService,
-  deleteAllRooms as deleteAllRoomsService,
   deleteRoom as deleteRoomService,
   getRoomById,
   listRooms,
@@ -202,16 +201,3 @@ export const deleteRoom: RequestHandler[] = [
   ...zodValidation.params(intParam('id')),
   handleDeleteRoom,
 ];
-
-// routes/room.ts already gates this route with authorizeRole([ADMIN]); the
-// legacy handler never re-checked req.user.role, so nothing was dropped here.
-const handleDeleteAllRooms = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const summary = await deleteAllRoomsService();
-    sendSuccess(res, {
-      data: summary,
-      message: `Successfully deleted ${summary.deleted} room(s)`,
-    });
-  },
-);
-export const deleteAllRooms: RequestHandler[] = [handleDeleteAllRooms];

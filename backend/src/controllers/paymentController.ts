@@ -32,7 +32,6 @@ import {
 } from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
-  deleteAllPayments as deleteAllPaymentsService,
   deletePayment as deletePaymentService,
   getPaymentById,
   handleWebhookEvent,
@@ -329,21 +328,3 @@ export const deletePayment: RequestHandler[] = [
   ...zodValidation.params(intParam('id')),
   handleDeletePayment,
 ];
-
-const handleDeleteAllPayments = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { user } = req;
-    if (!user) throw new UnauthorizedError('Unauthorized access');
-
-    const summary = await deleteAllPaymentsService({
-      id: user.id,
-      role: user.role,
-    });
-
-    sendSuccess(res, {
-      data: summary,
-      message: `Successfully deleted ${String(summary.deletedCount)} payment${summary.deletedCount > 1 ? 's' : ''}`,
-    });
-  },
-);
-export const deleteAllPayments: RequestHandler[] = [handleDeleteAllPayments];

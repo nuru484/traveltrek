@@ -250,31 +250,3 @@ describe('DELETE /api/v1/users/:userId (guards)', () => {
     expect(res.body.message).toBe('User not found');
   });
 });
-
-describe('DELETE /api/v1/users (bulk guards)', () => {
-  it('requires the confirmation phrase', async () => {
-    const admin = await createAdmin();
-    await createAgent();
-
-    const res = await authedApi(admin).delete('/api/v1/users').send({});
-
-    expect(res.status).toBe(400);
-    expect(res.body.message).toContain('requires confirmation');
-  });
-
-  it('deletes every staff user except the acting admin when confirmed', async () => {
-    const admin = await createAdmin();
-    await createAgent();
-    await createAgent();
-
-    const res = await authedApi(admin)
-      .delete('/api/v1/users')
-      .send({ confirmDelete: 'DELETE_ALL_USERS' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.deletedCount).toBe(2);
-
-    const remaining = await prisma.user.findMany();
-    expect(remaining.map((u) => u.id)).toEqual([admin.id]);
-  });
-});

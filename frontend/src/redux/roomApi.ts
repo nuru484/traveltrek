@@ -89,15 +89,6 @@ export const roomApi = apiSlice.injectEndpoints({
         "Hotel",
       ],
     }),
-
-    // Delete all rooms
-    deleteAllRooms: builder.mutation<{ message: string }, void>({
-      query: () => ({
-        url: "/rooms",
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Rooms", "Room", "Hotels", "Hotel"],
-    }),
   }),
 });
 
@@ -107,7 +98,6 @@ export const {
   useGetRoomQuery,
   useUpdateRoomMutation,
   useDeleteRoomMutation,
-  useDeleteAllRoomsMutation,
 
   // Lazy hooks
   useLazyGetAllRoomsQuery,

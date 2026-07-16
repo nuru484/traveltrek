@@ -2,7 +2,6 @@ import { Router } from 'express';
 
 import {
   createTour,
-  deleteAllTours,
   deleteTour,
   getAllTours,
   getTour,
@@ -37,7 +36,5 @@ tourRoutes.get(
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   ...getAllTours,
 );
-
-tourRoutes.delete('/tours', authorizeRole([UserRole.ADMIN]), ...deleteAllTours);
 
 export default tourRoutes;

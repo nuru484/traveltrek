@@ -22,9 +22,7 @@ import {
   TableHeader,
   TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useDeletePaymentMutation,
-  useDeleteAllPaymentsMutation } from "@/redux/paymentApi";
+import { useDeletePaymentMutation } from "@/redux/paymentApi";
 import { createPaymentColumns } from "./columns";
 import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
 import { TableFilters } from "./TableFilters";
@@ -98,10 +96,8 @@ export function PaymentsDataTable({
   const [rowSelection, setRowSelection] = React.useState({});
   const [deleteSelectedDialogOpen, setDeleteSelectedDialogOpen] =
     React.useState(false);
-  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = React.useState(false);
 
   const [deletePayment] = useDeletePaymentMutation();
-  const [deleteAllPayments] = useDeleteAllPaymentsMutation();
 
   const shouldShowUser = showUser !== undefined ? showUser : showFilters;
   const shouldShowBooking =
@@ -147,14 +143,7 @@ export function PaymentsDataTable({
       return;
     }
 
-    const selectedCount = selectedRows.length;
-    const isAllPaymentsSelected = selectedCount === totalCount;
-
-    if (isAllPaymentsSelected) {
-      setDeleteAllDialogOpen(true);
-    } else {
-      setDeleteSelectedDialogOpen(true);
-    }
+    setDeleteSelectedDialogOpen(true);
   };
 
   const handleDeleteSelectedPayments = async () => {
@@ -174,23 +163,6 @@ export function PaymentsDataTable({
       await Promise.all(deletePromises);
       toast.dismiss(toastId);
       toast.success(`${selectedCount} payments deleted successfully`);
-      setRowSelection({});
-      onRefresh?.();
-    } catch (error) {
-      toast.dismiss(toastId);
-      const { message } = extractApiErrorMessage(error);
-      toast.error(message);
-    }
-  };
-
-  const handleDeleteAllPayments = async () => {
-    const toastId = toast.loading("Deleting all payments..., please wait");
-
-    try {
-      await deleteAllPayments().unwrap();
-      toast.dismiss(toastId);
-      toast.success("All payments deleted successfully");
-      setDeleteAllDialogOpen(false);
       setRowSelection({});
       onRefresh?.();
     } catch (error) {
@@ -451,20 +423,6 @@ export function PaymentsDataTable({
           confirmText="Delete Selected"
           cancelText="Cancel"
           isDestructive={true}
-        />
-      )}
-
-      {showSelection && (
-        <ConfirmationDialog
-          open={deleteAllDialogOpen}
-          onOpenChange={setDeleteAllDialogOpen}
-          title="Delete All Payments"
-          description={`Are you sure you want to delete all ${totalCount} payments? This action cannot be undone.`}
-          onConfirm={handleDeleteAllPayments}
-          confirmText="Delete All Payments"
-          cancelText="Cancel"
-          isDestructive={true}
-          requireExactMatch="DELETE_ALL_PAYMENTS"
         />
       )}
     </div>

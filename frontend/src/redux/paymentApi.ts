@@ -9,7 +9,6 @@ import {
   IPaymentInitializeResponse,
   IPaymentVerificationResponse,
   IDeletePaymentResponse,
-  IDeleteAllPaymentsResponse,
   IRefundPaymentInput,
   IRefundPaymentResponse,
   IPaymentsQueryParams,
@@ -145,19 +144,6 @@ export const paymentApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // Delete all payments (ADMIN only; the backend accepts no filters)
-    deleteAllPayments: builder.mutation<IDeleteAllPaymentsResponse, void>({
-      query: () => ({
-        url: "/payments",
-        method: "DELETE",
-      }),
-      invalidatesTags: [
-        { type: "Payments" },
-        { type: "CustomerPayments" },
-        { type: "Bookings" },
-      ],
-    }),
-
     // Refund a payment (ADMIN only)
     refundPayment: builder.mutation<
       IRefundPaymentResponse,
@@ -198,7 +184,6 @@ export const {
   useCreatePaymentMutation,
   useUpdatePaymentStatusMutation,
   useDeletePaymentMutation,
-  useDeleteAllPaymentsMutation,
   useRefundPaymentMutation,
 
   // Lazy queries

@@ -29,7 +29,6 @@ import {
 import zodValidation from '#middlewares/validate-request.js';
 import {
   changeUserRole as changeUserRoleService,
-  deleteAllUsers as deleteAllUsersService,
   deleteUser as deleteUserService,
   getUserById as getUserByIdService,
   listUsers,
@@ -180,25 +179,3 @@ export const deleteUser: RequestHandler[] = [
   ...zodValidation.params(intParam('userId')),
   handleDeleteUser,
 ];
-
-const handleDeleteAllUsers = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { user } = req;
-    if (!user) throw new UnauthorizedError('Unauthorized access');
-
-    const { confirmDelete } = req.body as { confirmDelete?: unknown };
-    const summary = await deleteAllUsersService(
-      { id: user.id, role: user.role },
-      confirmDelete,
-    );
-
-    sendSuccess(res, {
-      data: { deletedCount: summary.deletedCount },
-      message:
-        summary.deletedCount === 0
-          ? 'No users to delete'
-          : `Successfully deleted ${String(summary.deletedCount)} users`,
-    });
-  },
-);
-export const deleteAllUsers: RequestHandler[] = [handleDeleteAllUsers];

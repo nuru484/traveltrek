@@ -2,7 +2,6 @@ import { Router } from 'express';
 
 import {
   createDestination,
-  deleteAllDestinations,
   deleteDestination,
   getAllDestinations,
   getDestination,
@@ -41,12 +40,6 @@ destinationRoutes.get(
   '/destinations',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   getAllDestinations,
-);
-
-destinationRoutes.delete(
-  '/destinations',
-  authorizeRole([UserRole.ADMIN]),
-  deleteAllDestinations,
 );
 
 export default destinationRoutes;

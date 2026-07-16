@@ -19,7 +19,6 @@ import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
 import zodValidation from '#middlewares/validate-request.js';
 import {
   createHotel as createHotelService,
-  deleteAllHotels as deleteAllHotelsService,
   deleteHotel as deleteHotelService,
   getHotelById,
   listHotels,
@@ -226,17 +225,3 @@ export const deleteHotel: RequestHandler[] = [
   ...zodValidation.params(intParam('id')),
   handleDeleteHotel,
 ];
-
-// The legacy handler re-checked req.user/role (ADMIN) inline; routes/hotel.ts
-// already gates this route with authorizeRole([ADMIN]), so the duplicate
-// check was dropped in the refactor.
-const handleDeleteAllHotels = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const deletedCount = await deleteAllHotelsService();
-    sendSuccess(res, {
-      data: { deletedCount },
-      message: `Successfully deleted ${deletedCount} hotel${deletedCount > 1 ? 's' : ''}`,
-    });
-  },
-);
-export const deleteAllHotels: RequestHandler[] = [handleDeleteAllHotels];

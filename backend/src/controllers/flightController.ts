@@ -8,7 +8,7 @@
 // state machine and seat accounting included) lives in
 // services/flight.service.ts; role gates live in routes/flight.ts
 // (authorizeRole), so the legacy in-handler role re-checks on
-// status/delete/delete-all were dropped as duplicates.
+// status/delete were dropped as duplicates.
 import { Request, RequestHandler, Response } from 'express';
 
 import {
@@ -25,7 +25,6 @@ import {
 import zodValidation from '#middlewares/validate-request.js';
 import {
   createFlight as createFlightService,
-  deleteAllFlights as deleteAllFlightsService,
   deleteFlight as deleteFlightService,
   getFlightById,
   getFlightStats as getFlightStatsService,
@@ -265,19 +264,6 @@ export const deleteFlight: RequestHandler[] = [
   ...zodValidation.params(intParam('id')),
   handleDeleteFlight,
 ];
-
-// routes/flight.ts already gates this route with authorizeRole([ADMIN]); the
-// legacy in-handler ADMIN re-check was dropped as a duplicate.
-const handleDeleteAllFlights = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const deletedCount = await deleteAllFlightsService();
-    sendSuccess(res, {
-      data: { deletedCount },
-      message: `Successfully deleted ${deletedCount} flight${deletedCount > 1 ? 's' : ''}`,
-    });
-  },
-);
-export const deleteAllFlights: RequestHandler[] = [handleDeleteAllFlights];
 
 // No route mounts this handler today, so there is no authorizeRole gate to
 // lean on — the legacy in-handler user/role guard is kept (the one deliberate

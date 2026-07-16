@@ -24,10 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useDeleteUserMutation,
-  useDeleteAllUsersMutation,
-} from "@/redux/userApi";
+import { useDeleteUserMutation } from "@/redux/userApi";
 import { createUserColumns } from "./columns";
 import { UserActionsDropdown } from "./UserActionsDropdown";
 import { TableFilters } from "./TableFilters";
@@ -73,10 +70,8 @@ export function UsersDataTable({
   const [rowSelection, setRowSelection] = React.useState({});
   const [deleteSelectedDialogOpen, setDeleteSelectedDialogOpen] =
     React.useState(false);
-  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = React.useState(false);
 
   const [deleteUser] = useDeleteUserMutation();
-  const [deleteAllUsers] = useDeleteAllUsersMutation();
 
   const columns = React.useMemo(() => createUserColumns(), []);
 
@@ -119,14 +114,7 @@ export function UsersDataTable({
       return;
     }
 
-    const selectedCount = selectedRows.length;
-    const isAllUsersSelected = selectedCount === totalCount;
-
-    if (isAllUsersSelected) {
-      setDeleteAllDialogOpen(true);
-    } else {
-      setDeleteSelectedDialogOpen(true);
-    }
+    setDeleteSelectedDialogOpen(true);
   };
 
   const handleDeleteSelectedUsers = async () => {
@@ -146,23 +134,6 @@ export function UsersDataTable({
       await Promise.all(deletePromises);
       toast.dismiss(toastId);
       toast.success(`${selectedCount} users deleted successfully`);
-      setRowSelection({});
-      onRefresh?.();
-    } catch (error) {
-      toast.dismiss(toastId);
-      const { message } = extractApiErrorMessage(error);
-      toast.error(message);
-    }
-  };
-
-  const handleDeleteAllUsers = async () => {
-    const toastId = toast.loading("Deleting all users..., please wait");
-
-    try {
-      await deleteAllUsers({ confirmDelete: "DELETE_ALL_USERS" }).unwrap();
-      toast.dismiss(toastId);
-      toast.success("All users deleted successfully");
-      setDeleteAllDialogOpen(false);
       setRowSelection({});
       onRefresh?.();
     } catch (error) {
@@ -358,19 +329,6 @@ export function UsersDataTable({
         confirmText="Delete Selected"
         cancelText="Cancel"
         isDestructive={true}
-      />
-
-      {/* Delete All Users Dialog */}
-      <ConfirmationDialog
-        open={deleteAllDialogOpen}
-        onOpenChange={setDeleteAllDialogOpen}
-        title="Delete All Users"
-        description={`Are you sure you want to delete all ${totalCount} users? This action cannot be undone.`}
-        onConfirm={handleDeleteAllUsers}
-        confirmText="Delete All Users"
-        cancelText="Cancel"
-        isDestructive={true}
-        requireExactMatch="DELETE_ALL_USERS"
       />
     </div>
   );

@@ -3,7 +3,6 @@ import { Router } from 'express';
 
 import {
   createHotel,
-  deleteAllHotels,
   deleteHotel,
   getAllHotels,
   getHotel,
@@ -31,7 +30,5 @@ hotelRoutes.get(
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),
   getAllHotels,
 );
-
-hotelRoutes.delete('/hotels', authorizeRole([UserRole.ADMIN]), deleteAllHotels);
 
 export default hotelRoutes;

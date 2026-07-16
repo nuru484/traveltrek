@@ -110,22 +110,6 @@ export interface IDeletePaymentResponse {
   };
 }
 
-export interface IDeleteAllPaymentsParams {
-  status?: "PENDING" | "FAILED" | "REFUNDED";
-  paymentMethod?: IPaymentMethod;
-  customerId?: number;
-  beforeDate?: string;
-}
-
-/** DELETE /payments (admin bulk wipe) — no filters; counts only. */
-export interface IDeleteAllPaymentsResponse {
-  message: string;
-  data: {
-    deletedCount: number;
-    bookingsAffected: number;
-  };
-}
-
 export interface IRefundPaymentInput {
   reason?: string;
 }

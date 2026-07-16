@@ -10,7 +10,7 @@
 // Unlike other converted domains, the booking role rules are NOT duplicated
 // by routes/booking.ts, so they were moved into the service as actor-based
 // rules rather than dropped: every handler that had an in-handler check
-// passes `{ id, role }` down (create/get/list/user-list/delete/delete-all);
+// passes `{ id, role }` down (create/get/list/user-list/delete);
 // updateBooking had none and still has none. The `!user` guards below only
 // narrow the optional type (authenticate-jwt always sets req.user) and fail
 // closed with the legacy messages if middleware order ever breaks.
@@ -25,7 +25,6 @@ import zodValidation from '#middlewares/validate-request.js';
 import {
   cancelBooking as cancelBookingService,
   createBooking as createBookingService,
-  deleteAllBookings as deleteAllBookingsService,
   deleteBooking as deleteBookingService,
   getBookingById,
   listBookings,
@@ -233,21 +232,3 @@ export const getAllBookings: RequestHandler[] = [
   ...zodValidation.query(bookingListQuery),
   handleGetAllBookings,
 ];
-
-const handleDeleteAllBookings = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { user } = req;
-    if (!user) throw new UnauthorizedError('Unauthorized access');
-
-    const summary = await deleteAllBookingsService({
-      id: user.id,
-      role: user.role,
-    });
-
-    sendSuccess(res, {
-      data: summary,
-      message: `Successfully deleted ${summary.deletedCount} booking${summary.deletedCount > 1 ? 's' : ''}`,
-    });
-  },
-);
-export const deleteAllBookings: RequestHandler[] = [handleDeleteAllBookings];

@@ -30,7 +30,7 @@ export function FilterBar({
   activeCount?: number;
   /** Resets every filter; renders a "Clear filters" link when any is active. */
   onClear?: () => void;
-  /** Page actions (e.g. Create / Delete all) — right-aligned on every size. */
+  /** Page actions (e.g. Create) — right-aligned on every size. */
   actions?: ReactNode;
   /** The filter controls (selects). */
   children?: ReactNode;

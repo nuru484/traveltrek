@@ -104,14 +104,6 @@ export const flightApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Flight"],
     }),
-
-    deleteAllFlights: builder.mutation<void, void>({
-      query: () => ({
-        url: "/flights",
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Flight"],
-    }),
   }),
 });
 
@@ -122,5 +114,4 @@ export const {
   useUpdateFlightMutation,
   useUpdateFlightStatusMutation,
   useDeleteFlightMutation,
-  useDeleteAllFlightsMutation,
 } = flightApi;

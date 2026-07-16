@@ -146,7 +146,7 @@ export function TableFilters({
                 className="h-8 hover:cursor-pointer"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                {isAllSelected ? "Delete All" : "Delete Selected"}
+                Delete Selected
               </Button>
             </div>
           ) : (

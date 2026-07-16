@@ -52,20 +52,11 @@ export interface IChangeRoleInput {
   role: StaffRole;
 }
 
-export interface IDeleteAllUsersInput {
-  confirmDelete: string;
-}
-
 export interface IUsersQueryParams {
   page?: number;
   limit?: number;
   role?: StaffRole;
   search?: string;
-}
-
-export interface IDeleteUsersResponse {
-  message: string;
-  deletedCount: number;
 }
 
 export interface IUsersDataTableProps {
