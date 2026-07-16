@@ -34,6 +34,12 @@ interface IENV {
   SMTP_PORT: number;
   SMTP_SECURE: boolean;
   SMTP_USER?: string;
+  /**
+   * Workers run in-process with the web server by default (saves a dyno).
+   * Set to true on the WEB process only when a dedicated worker process runs
+   * `build/worker.js`, so jobs are never processed twice.
+   */
+  WEB_DISABLE_WORKERS: boolean;
 }
 
 export function assertEnv<T>(value: T | undefined, name: string): T {
@@ -93,6 +99,7 @@ const ENV: IENV = {
   SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
   SMTP_SECURE: process.env.SMTP_SECURE === 'true',
   SMTP_USER: process.env.SMTP_USER,
+  WEB_DISABLE_WORKERS: process.env.WEB_DISABLE_WORKERS === 'true',
 };
 
 export default ENV;

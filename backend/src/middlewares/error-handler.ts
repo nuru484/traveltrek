@@ -63,6 +63,7 @@ interface ErrorResponse {
   details?: Record<string, unknown>;
   errorId?: string;
   message: string;
+  requestId?: string;
   status: string;
 }
 
@@ -154,33 +155,39 @@ export const errorHandler = (
     params: req.params,
     path: req.path,
     query: req.query,
+    requestId: req.requestId,
     severity,
     stack: !isProduction ? processedError.stack : undefined,
     timestamp: new Date().toISOString(),
   };
 
+  // Prefer the per-request child logger (carries requestId) when present.
+  const log = req.log ?? logger;
+
   // Log at the appropriate level
   switch (severity) {
     case ErrorSeverity.CRITICAL:
     case ErrorSeverity.HIGH:
-      logger.error(logDetails);
+      log.error(logDetails);
       break;
     case ErrorSeverity.LOW:
-      logger.info(logDetails);
+      log.info(logDetails);
       break;
     case ErrorSeverity.MEDIUM:
-      logger.warn(logDetails);
+      log.warn(logDetails);
       break;
     default:
-      logger.error(logDetails);
+      log.error(logDetails);
   }
 
-  // Client response
+  // Client response. requestId is always safe to expose and lets a user quote
+  // it to support so we can find the exact server logs for their failed request.
   const errorResponse: ErrorResponse = {
     message:
       isProduction && status === 500
         ? 'Internal Server Error'
         : processedError.message || 'Internal Server Error',
+    requestId: req.requestId,
     status: 'error',
   };
 

@@ -51,17 +51,20 @@ vi.mock('axios', () => {
   return { default: axiosMock, ...axiosMock };
 });
 
-// Silence application logging during tests.
-vi.mock('#utils/logger.js', () => ({
-  default: {
+// Silence application logging during tests. `child` returns the same silent
+// logger so per-request child loggers (request-id middleware) stay quiet too.
+vi.mock('#utils/logger.js', () => {
+  const silentLogger = {
+    child: vi.fn((): unknown => silentLogger),
     debug: vi.fn(),
     error: vi.fn(),
     fatal: vi.fn(),
     info: vi.fn(),
     trace: vi.fn(),
     warn: vi.fn(),
-  },
-}));
+  };
+  return { default: silentLogger };
+});
 
 let cachedTables: null | string[] = null;
 

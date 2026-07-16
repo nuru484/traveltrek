@@ -46,8 +46,12 @@ export const createRateLimiter = (
       // The integration suite fires hundreds of requests from one IP
       if (process.env.NODE_ENV === 'test') return true;
 
-      // Skip health checks
-      if (req.path === '/health' || req.path === '/ping') return true;
+      // Skip health checks (liveness /health, readiness /health/ready and the
+      // deep /health/db probe) so platform pollers are never throttled.
+      if (req.path === '/health' || req.path.startsWith('/health/')) {
+        return true;
+      }
+      if (req.path === '/ping') return true;
 
       // Skip for internal requests with secret header. Fail closed: with no
       // secret configured there is no bypass (an absent header must never

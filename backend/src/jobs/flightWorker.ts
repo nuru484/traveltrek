@@ -63,7 +63,7 @@ export const flightStatusWorker = new Worker(
             });
 
             updatedCount++;
-            console.log(
+            logger.info(
               `✈️  Updated flight ${flight.flightNumber}: ${flight.status} → ${newStatus}`,
             );
           }

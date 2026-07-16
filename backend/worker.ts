@@ -1,45 +1,50 @@
 // worker.ts
-import { bookingDeadlineWorker } from '#jobs/bookingWorker.js';
-import { flightStatusWorker } from '#jobs/flightWorker.js';
-import { setupJobSchedulers } from '#jobs/schedulers.js';
-import { tourStatusWorker } from '#jobs/tourWorker.js';
+//
+// Thin standalone entrypoint for a dedicated worker process (`npm run worker`).
+// The actual worker lifecycle lives in src/jobs/lifecycle.ts and is shared
+// with server.ts (which runs the workers in-process by default). When running
+// this entry, set WEB_DISABLE_WORKERS=true on the web process so jobs are
+// never processed twice.
+import prisma from '#config/prismaClient.js';
+import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
 import logger from '#utils/logger.js';
 
-async function shutdownWorkers(signal: string) {
+let shuttingDown = false;
+
+const shutdown = async (signal: string): Promise<void> => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   logger.info(`🛑 Received ${signal}, shutting down workers...`);
 
-  await Promise.all([
-    bookingDeadlineWorker.close(),
-    flightStatusWorker.close(),
-    tourStatusWorker.close(),
-  ]);
+  const forceExit = setTimeout(() => {
+    logger.error('Graceful shutdown timed out; forcing exit');
+    process.exit(1);
+  }, 35_000);
+  forceExit.unref();
 
-  logger.info('✅ All workers closed gracefully');
-  process.exit(0);
-}
+  try {
+    await stopWorkers();
+    await prisma.$disconnect();
+    process.exit(0);
+  } catch (error) {
+    logger.error(error, 'Error during worker shutdown');
+    process.exit(1);
+  }
+};
 
-async function startWorker() {
-  logger.info('🚀 Starting background workers...');
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
 
-  await setupJobSchedulers();
-
-  logger.info('✅ All workers started and listening for jobs...');
-  logger.info('📧 Booking Deadline Worker: Active');
-  logger.info('✈️  Flight Status Worker: Active');
-  logger.info('🗺️  Tour Status Worker: Active');
-}
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  void shutdownWorkers('SIGINT');
+process.on('unhandledRejection', (reason) => {
+  logger.error(reason, 'Unhandled promise rejection');
 });
 
-process.on('SIGTERM', () => {
-  void shutdownWorkers('SIGTERM');
+process.on('uncaughtException', (error) => {
+  logger.fatal(error, 'Uncaught exception');
+  void shutdown('uncaughtException');
 });
 
-// Start the worker
-startWorker().catch((err: unknown) => {
+startWorkers().catch((err: unknown) => {
   logger.error({ err }, '❌ Failed to start worker');
   process.exit(1);
 });

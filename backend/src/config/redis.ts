@@ -86,7 +86,7 @@ const invalidateCache = async (client: Redis, patterns: string | string[]) => {
           });
         });
       } catch (error) {
-        console.error(`Error scanning pattern ${pattern}:`, error);
+        logger.error({ error }, `Error scanning pattern ${pattern}`);
         throw error;
       }
     }),
@@ -98,7 +98,7 @@ const invalidateCache = async (client: Redis, patterns: string | string[]) => {
     try {
       return await client.del(...keysArray);
     } catch (error) {
-      console.error('Error deleting keys:', error);
+      logger.error({ error }, 'Error deleting keys');
       throw error;
     }
   }

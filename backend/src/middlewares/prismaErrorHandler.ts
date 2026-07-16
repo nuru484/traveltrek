@@ -1,4 +1,5 @@
 import { CustomError, ErrorSeverity } from '#middlewares/error-handler.js';
+import logger from '#utils/logger.js';
 
 // middleware/prismaErrorHandler.ts
 import { Prisma } from '../../generated/prisma/client.js';
@@ -261,7 +262,9 @@ export const handlePrismaError = (error: unknown): CustomError => {
 
   // Handle validation errors
   if (error instanceof Prisma.PrismaClientValidationError) {
-    console.log(error);
+    // The client response is a generic 400; keep the full Prisma validation
+    // message (which query/field was malformed) in the debug log for devs.
+    logger.debug(error, 'Prisma validation error');
     return new CustomError(400, 'Invalid data provided', {
       code: 'VALIDATION_ERROR',
       layer: 'database',
