@@ -14,7 +14,6 @@ It is both a working product and a portfolio piece: the landing page tells the s
 * [Tech Stack](#-tech-stack)
 * [Architecture Overview](#-architecture-overview)
 * [Data Model](#-data-model)
-* [Screenshots](#-screenshots)
 * [Getting Started](#-getting-started)
 * [Testing](#-testing)
 * [Deployment](#-deployment)
@@ -116,16 +115,6 @@ Soft deletes everywhere (a Prisma client extension auto-scopes reads); `Restrict
 
 ---
 
-## 🖼️ Screenshots
-
-| Section            | Image                                               |
-| ------------------ | --------------------------------------------------- |
-| User Dashboard     | ![User Dashboard](public/docs/user-dashboard.png)   |
-| Admin Dashboard    | ![Admin Dashboard](public/docs/admin-dashboard.png) |
-| Booking Management | ![Booking Management](public/docs/booking.png)      |
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -200,8 +189,6 @@ traveltrek/
 │   ├── server.ts        # web entrypoint
 │   ├── worker.ts        # dedicated-worker entrypoint
 │   └── test/            # supertest integration suite
-│
-└── public/docs/         # screenshots
 ```
 
 ---
