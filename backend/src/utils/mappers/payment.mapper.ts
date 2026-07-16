@@ -9,7 +9,7 @@
 // ROOM / FLIGHT checked in that order, with the same name/description
 // composition, and the same 'Unknown Item' TOUR fallback (carrying the
 // booking id) for a booking with no associated item.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
 /** Relations every payment read fetches; services pass this to Prisma. */
 export const paymentInclude = {

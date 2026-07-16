@@ -5,6 +5,13 @@ import {
   UploadApiResponse,
 } from 'cloudinary';
 
+import { assertEnv } from '#config/env.js';
+import ENV from '#config/env.js';
+import {
+  CustomError,
+  InternalServerError,
+  ValidationError,
+} from '#middlewares/error-handler.js';
 import {
   ICloudinaryConfig,
   ICloudinaryDeletionResponse,
@@ -12,16 +19,9 @@ import {
   ICloudinaryUploadResult,
   ICloudinaryUploadService,
   IUploadedFile,
-} from '../../types/cloudinary.types';
-import {
-  CustomError,
-  InternalServerError,
-  ValidationError,
-} from '../middlewares/error-handler';
-import logger from '../utils/logger';
-import { isValidBase64Image } from '../utils/validate-base64-image';
-import { assertEnv } from './env';
-import ENV from './env';
+} from '#types/cloudinary.types.js';
+import logger from '#utils/logger.js';
+import { isValidBase64Image } from '#utils/validate-base64-image.js';
 
 const MAX_UPLOAD_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;

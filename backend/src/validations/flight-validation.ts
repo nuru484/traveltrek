@@ -9,9 +9,9 @@
 // req.body) live in the controller's photo-file middleware.
 import { z } from 'zod';
 
-import { FlightStatus } from '../config/prismaClient';
-import { FLIGHT_SORT_FIELDS } from '../services/flight.service';
-import { paginationQuery } from './common-validation';
+import { FlightStatus } from '#config/prismaClient.js';
+import { FLIGHT_SORT_FIELDS } from '#services/flight.service.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 /** Cabin classes the legacy validation accepted (the column is a string). */
 export const FLIGHT_CLASSES = [

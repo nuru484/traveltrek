@@ -1,19 +1,23 @@
 // src/controllers/authentication/refreshJwtToken.ts
 import { NextFunction, Request, Response } from 'express';
-import jwt, { TokenExpiredError } from 'jsonwebtoken';
-import { IUser } from 'types/user-profile.types';
+import jwt from 'jsonwebtoken';
 
-import ENV from '../../config/env';
-import { assertEnv } from '../../config/env';
-import prisma from '../../config/prismaClient';
+import ENV from '#config/env.js';
+import { assertEnv } from '#config/env.js';
+import prisma from '#config/prismaClient.js';
 import {
   asyncHandler,
   CustomError,
   NotFoundError,
   UnauthorizedError,
-} from '../../middlewares/error-handler';
-import { CookieManager } from '../../utils/CookieManager';
-import { verifyJwtToken } from '../../utils/verify-jwt-token';
+} from '#middlewares/error-handler.js';
+import { IUser } from '#types/user-profile.types.js';
+import { CookieManager } from '#utils/CookieManager.js';
+import { verifyJwtToken } from '#utils/verify-jwt-token.js';
+
+// jsonwebtoken is CJS — its error classes aren't detectable as named ESM
+// exports, so destructure them off the default export.
+const { TokenExpiredError } = jwt;
 
 /**
  * Refreshes access token using a valid refresh token

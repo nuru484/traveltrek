@@ -6,9 +6,9 @@
 // transitions) live in services/tour.service.ts.
 import { z } from 'zod';
 
-import { TourStatus, TourType } from '../config/prismaClient';
-import { TOUR_SORT_FIELDS } from '../services/tour.service';
-import { boolQuery, paginationQuery } from './common-validation';
+import { TourStatus, TourType } from '#config/prismaClient.js';
+import { TOUR_SORT_FIELDS } from '#services/tour.service.js';
+import { boolQuery, paginationQuery } from '#validations/common-validation.js';
 
 const tourFields = z.object({
   description: z

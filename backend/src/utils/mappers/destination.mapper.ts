@@ -3,7 +3,7 @@
 // Pure DTO mappers for the destination domain. Services return Prisma rows;
 // controllers map them through here so the wire format lives in exactly one
 // place and raw DB records never leak.
-import type { Destination } from '../../config/prismaClient';
+import type { Destination } from '#config/prismaClient.js';
 
 export interface DestinationDTO {
   city: null | string;

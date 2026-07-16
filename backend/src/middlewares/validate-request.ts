@@ -7,7 +7,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, ZodType } from 'zod';
 
-import { ValidationError } from './error-handler';
+import { ValidationError } from '#middlewares/error-handler.js';
 
 /**
  * Middleware factory for Zod validation.

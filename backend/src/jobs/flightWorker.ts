@@ -2,10 +2,11 @@
 import { Worker } from 'bullmq';
 import pMap from 'p-map';
 
-import { FlightStatus } from '../../generated/prisma/client';
-import prisma from '../config/prismaClient';
-import { createRedisConnection } from '../config/redisConnection';
-import logger from '../utils/logger';
+import prisma from '#config/prismaClient.js';
+import { createRedisConnection } from '#config/redisConnection.js';
+import logger from '#utils/logger.js';
+
+import { FlightStatus } from '../../generated/prisma/client.js';
 
 export const flightStatusWorker = new Worker(
   'flightStatusQueue',

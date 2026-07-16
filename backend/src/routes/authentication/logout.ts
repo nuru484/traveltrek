@@ -1,7 +1,7 @@
 // src/routes/authentication/logout.ts
 import { Router } from 'express';
 
-import { logout } from '../../controllers/authentication/index';
+import { logout } from '#controllers/authentication/index.js';
 
 const logoutRoutes = Router();
 

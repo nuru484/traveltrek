@@ -4,7 +4,7 @@ import rateLimit, {
   RateLimitRequestHandler,
 } from 'express-rate-limit';
 
-import { CustomError, ErrorSeverity } from './error-handler';
+import { CustomError, ErrorSeverity } from '#middlewares/error-handler.js';
 
 // Custom rate limit exceeded error
 export class RateLimitExceededError extends CustomError {

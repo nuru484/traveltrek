@@ -13,14 +13,14 @@
 // rules existed in the legacy controller.
 import { Request, RequestHandler, Response } from 'express';
 
-import { asyncHandler } from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+import { asyncHandler } from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   getMonthlyBookingsSummary as getMonthlyBookingsSummaryService,
   getPaymentsSummary as getPaymentsSummaryService,
   getTopToursByBookings as getTopToursByBookingsService,
-} from '../services/report.service';
-import { sendSuccess } from '../utils/http-response';
+} from '#services/report.service.js';
+import { sendSuccess } from '#utils/http-response.js';
 import {
   monthlyBookingsQuery,
   MonthlyBookingsQueryInput,
@@ -28,7 +28,7 @@ import {
   PaymentsSummaryQueryInput,
   topToursQuery,
   TopToursQueryInput,
-} from '../validations/report-validation';
+} from '#validations/report-validation.js';
 
 const handleGetMonthlyBookingsSummary = asyncHandler(
   async (req: Request, res: Response) => {

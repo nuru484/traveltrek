@@ -1,5 +1,13 @@
 import * as bcrypt from 'bcrypt';
 
+// Optimal dev dataset: realistic content at sensible lengths, 25–50 rows per
+// module with a heavier spread of bookings and payments for the reports.
+//
+//   npx tsx prisma/dev-seed-optimal.ts
+//
+// Wipes every module (except the admin login from .env) and reseeds it.
+import prisma from '#config/prismaClient.js';
+
 import {
   BookingStatus,
   FlightStatus,
@@ -8,14 +16,7 @@ import {
   Role,
   TourStatus,
   TourType,
-} from '../generated/prisma/client';
-// Optimal dev dataset: realistic content at sensible lengths, 25–50 rows per
-// module with a heavier spread of bookings and payments for the reports.
-//
-//   npx tsx prisma/dev-seed-optimal.ts
-//
-// Wipes every module (except the admin login from .env) and reseeds it.
-import prisma from '../src/config/prismaClient';
+} from '../generated/prisma/client.js';
 
 // Deterministic PRNG so re-runs produce the same dataset.
 function mulberry32(seed: number) {

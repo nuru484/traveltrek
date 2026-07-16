@@ -1,3 +1,21 @@
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import {
+  BookingStatus,
+  type Flight,
+  FlightStatus,
+  PaymentStatus,
+  type Prisma,
+  type Room,
+  type Tour,
+  TourStatus,
+} from '#config/prismaClient.js';
+import {
+  BadRequestError,
+  CustomError,
+  NotFoundError,
+  UnauthorizedError,
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/booking.service.ts
 //
 // Bookings domain logic, extracted from the legacy fat controller. Pure, DI'd
@@ -22,29 +40,11 @@
 // the non-tx client (the legacy helper closed over the global prisma);
 // deleteBooking/deleteAllBookings check guards outside and wrap the
 // restore-counters + delete writes.
-import { type IUser, UserRole } from '../../types/user-profile.types';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import {
-  BookingStatus,
-  type Flight,
-  FlightStatus,
-  PaymentStatus,
-  type Prisma,
-  type Room,
-  type Tour,
-  TourStatus,
-} from '../config/prismaClient';
-import {
-  BadRequestError,
-  CustomError,
-  NotFoundError,
-  UnauthorizedError,
-} from '../middlewares/error-handler';
+import { type IUser, UserRole } from '#types/user-profile.types.js';
 import {
   bookingInclude,
   type BookingWithRelations,
-} from '../utils/mappers/booking.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#utils/mappers/booking.mapper.js';
 
 /** Booking "type" filter values — derived from which relation is set. */
 export const BOOKING_TYPES = ['FLIGHT', 'ROOM', 'TOUR'] as const;

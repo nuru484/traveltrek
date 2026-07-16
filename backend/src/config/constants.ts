@@ -1,5 +1,5 @@
 // Constants for configuration
-import { ICloudinaryUploadOptions } from 'types/cloudinary.types';
+import { ICloudinaryUploadOptions } from '#types/cloudinary.types.js';
 
 export const HTTP_STATUS_CODES = {
   BAD_REQUEST: 400,

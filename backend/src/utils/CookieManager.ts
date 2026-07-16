@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
-import ENV from '../config/env';
-import { UnauthorizedError } from '../middlewares/error-handler';
+import ENV from '#config/env.js';
+import { UnauthorizedError } from '#middlewares/error-handler.js';
 
 export interface CookieOptions {
   domain?: string;

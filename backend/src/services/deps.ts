@@ -7,16 +7,16 @@
 //
 // `defaultDeps` is the production wiring; controllers import the default-wired
 // singletons, so they need no knowledge of this indirection.
-import { cloudinaryService } from '../config/claudinary';
-import ENV from '../config/env';
-import prismaClient from '../config/prismaClient';
-import { Clock, systemClock } from '../lib/clock';
+import { cloudinaryService } from '#config/claudinary.js';
+import ENV from '#config/env.js';
+import prismaClient from '#config/prismaClient.js';
+import { Clock, systemClock } from '#lib/clock.js';
 import {
   initializePaystackTransaction,
   refundPaystackTransaction,
   verifyPaystackTransaction,
-} from '../lib/paystack';
-import loggerInstance from '../utils/logger';
+} from '#lib/paystack.js';
+import loggerInstance from '#utils/logger.js';
 
 /** Config values services read; injected so tests can vary them. */
 export interface AppConfig {

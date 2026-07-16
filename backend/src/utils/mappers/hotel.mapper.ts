@@ -3,7 +3,7 @@
 // Pure DTO mappers for the hotel domain. Services return Prisma rows (with
 // `hotelInclude` relations); controllers map them through here so the wire
 // format lives in exactly one place and raw DB records never leak.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
 /** Destination fields exposed on hotel responses. */
 export const hotelDestinationSelect = {

@@ -12,11 +12,11 @@ import { Request, RequestHandler, Response } from 'express';
 import {
   CLOUDINARY_UPLOAD_OPTIONS,
   HTTP_STATUS_CODES,
-} from '../config/constants';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { asyncHandler, ValidationError } from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#config/constants.js';
+import multerUpload from '#config/multer.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
+import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   createHotel as createHotelService,
   deleteAllHotels as deleteAllHotelsService,
@@ -25,10 +25,10 @@ import {
   listHotels,
   listHotelsByDestination,
   updateHotel as updateHotelService,
-} from '../services/hotel.service';
-import { sendPaginated, sendSuccess } from '../utils/http-response';
-import { toHotelDTO } from '../utils/mappers/hotel.mapper';
-import { intParam, paginationQuery } from '../validations/common-validation';
+} from '#services/hotel.service.js';
+import { sendPaginated, sendSuccess } from '#utils/http-response.js';
+import { toHotelDTO } from '#utils/mappers/hotel.mapper.js';
+import { intParam, paginationQuery } from '#validations/common-validation.js';
 import {
   CreateHotelBody,
   createHotelSchema,
@@ -36,7 +36,7 @@ import {
   hotelListQuery,
   UpdateHotelBody,
   updateHotelSchema,
-} from '../validations/hotel-validation';
+} from '#validations/hotel-validation.js';
 
 const ALLOWED_PHOTO_MIME_TYPES = [
   'image/jpeg',

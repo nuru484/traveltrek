@@ -1,17 +1,17 @@
 import express from 'express';
 
-import authenticateJWT from '../middlewares/authenticate-jwt';
-import { authenticationRouter } from './authentication';
-import bookingRoutes from './booking';
-import dashboardRoutes from './dashboard';
-import destinationRoutes from './destination';
-import flightRoutes from './flight';
-import hotelRoutes from './hotel';
-import paymentRoutes from './payment';
-import reportsRoutes from './reports';
-import roomRoutes from './room';
-import tourRoutes from './tour';
-import userRoutes from './user';
+import authenticateJWT from '#middlewares/authenticate-jwt.js';
+import { authenticationRouter } from '#routes/authentication/index.js';
+import bookingRoutes from '#routes/booking.js';
+import dashboardRoutes from '#routes/dashboard.js';
+import destinationRoutes from '#routes/destination.js';
+import flightRoutes from '#routes/flight.js';
+import hotelRoutes from '#routes/hotel.js';
+import paymentRoutes from '#routes/payment.js';
+import reportsRoutes from '#routes/reports.js';
+import roomRoutes from '#routes/room.js';
+import tourRoutes from '#routes/tour.js';
+import userRoutes from '#routes/user.js';
 
 const routes = express.Router();
 

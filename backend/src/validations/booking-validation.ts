@@ -18,9 +18,9 @@
 // with the legacy messages ('Check-in date cannot be in the past', ...).
 import { z } from 'zod';
 
-import { BookingStatus } from '../config/prismaClient';
-import { BOOKING_TYPES } from '../services/booking.service';
-import { paginationQuery } from './common-validation';
+import { BookingStatus } from '#config/prismaClient.js';
+import { BOOKING_TYPES } from '#services/booking.service.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 const BOOKING_STATUSES = [
   'PENDING',

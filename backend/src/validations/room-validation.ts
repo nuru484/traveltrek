@@ -11,8 +11,8 @@
 // middleware.
 import { z } from 'zod';
 
-import { ROOM_SORT_FIELDS } from '../services/room.service';
-import { paginationQuery } from './common-validation';
+import { ROOM_SORT_FIELDS } from '#services/room.service.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 const amenityItem = z
   .string('Each amenity must be a non-empty string with maximum 50 characters')

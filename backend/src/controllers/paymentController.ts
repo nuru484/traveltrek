@@ -24,17 +24,13 @@
 //   legacy `{ message, success, data? }` shape with its exact status codes.
 import { Request, RequestHandler, Response } from 'express';
 
-import {
-  IPaymentStatus,
-  IPaymentVerificationResponse,
-} from '../../types/payment.types';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { verifyPaystackSignature } from '../lib/paystack';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import { verifyPaystackSignature } from '#lib/paystack.js';
 import {
   asyncHandler,
   UnauthorizedError,
-} from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   deleteAllPayments as deleteAllPaymentsService,
   deletePayment as deletePaymentService,
@@ -47,10 +43,14 @@ import {
   refundPayment as refundPaymentService,
   updatePaymentStatus as updatePaymentStatusService,
   verifyPaymentCallback,
-} from '../services/payment.service';
-import { buildPaginationMeta, sendSuccess } from '../utils/http-response';
-import { toPaymentDTO } from '../utils/mappers/payment.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#services/payment.service.js';
+import {
+  IPaymentStatus,
+  IPaymentVerificationResponse,
+} from '#types/payment.types.js';
+import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
+import { toPaymentDTO } from '#utils/mappers/payment.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   CreatePaymentBody,
   createPaymentSchema,
@@ -62,7 +62,7 @@ import {
   updatePaymentStatusSchema,
   userPaymentsQuery,
   UserPaymentsQueryInput,
-} from '../validations/payment-validation';
+} from '#validations/payment-validation.js';
 
 /** Reads the payment id that `intParam('id')` validated and coerced. */
 const idParam = (req: Request): number =>

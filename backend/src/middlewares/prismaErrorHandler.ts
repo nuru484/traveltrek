@@ -1,6 +1,7 @@
+import { CustomError, ErrorSeverity } from '#middlewares/error-handler.js';
+
 // middleware/prismaErrorHandler.ts
-import { Prisma } from '../../generated/prisma/client';
-import { CustomError, ErrorSeverity } from './error-handler';
+import { Prisma } from '../../generated/prisma/client.js';
 
 /**
  * Prisma-specific error codes mapping to user-friendly messages

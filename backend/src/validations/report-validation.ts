@@ -22,7 +22,7 @@ import {
   PaymentStatus,
   TourStatus,
   TourType,
-} from '../config/prismaClient';
+} from '#config/prismaClient.js';
 
 /** ISO 8601 date ("2026-03-01") or datetime, like validator.js isISO8601. */
 const isoDateQuery = (message: string) =>

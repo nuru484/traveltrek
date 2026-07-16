@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
-import { refreshToken } from '../../controllers/authentication/index';
-import { verifyAccessToken } from '../../middlewares/verify-access-token';
+import { refreshToken } from '#controllers/authentication/index.js';
+import { verifyAccessToken } from '#middlewares/verify-access-token.js';
 
 const refreshRoutes = Router();
 

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 
-import { UserRole } from '../../types/user-profile.types';
 import {
   createBooking,
   deleteAllBookings,
@@ -9,8 +8,9 @@ import {
   getBooking,
   getUserBookings,
   updateBooking,
-} from '../controllers/index';
-import { authorizeRole } from '../middlewares/authorize-roles';
+} from '#controllers/index.js';
+import { authorizeRole } from '#middlewares/authorize-roles.js';
+import { UserRole } from '#types/user-profile.types.js';
 
 const bookingRoutes = Router();
 

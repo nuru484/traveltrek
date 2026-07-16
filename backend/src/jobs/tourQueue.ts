@@ -1,7 +1,7 @@
 // src/jobs/tourQueue.ts
 import { Queue } from 'bullmq';
 
-import { createRedisConnection } from '../config/redisConnection';
+import { createRedisConnection } from '#config/redisConnection.js';
 
 export const tourStatusQueue = new Queue('tourStatusQueue', {
   connection: createRedisConnection(),

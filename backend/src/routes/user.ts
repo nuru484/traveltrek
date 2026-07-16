@@ -1,8 +1,7 @@
 // src/routes/user.ts
 import { Router } from 'express';
 
-import { UserRole } from '../../types/user-profile.types';
-import { registerUser } from '../controllers/authentication/index';
+import { registerUser } from '#controllers/authentication/index.js';
 import {
   changeUserRole,
   deleteAllUsers,
@@ -10,8 +9,9 @@ import {
   getAllUsers,
   getUserById,
   updateUserProfile,
-} from '../controllers/index';
-import { authorizeRole } from '../middlewares/authorize-roles';
+} from '#controllers/index.js';
+import { authorizeRole } from '#middlewares/authorize-roles.js';
+import { UserRole } from '#types/user-profile.types.js';
 
 const userRoutes = Router();
 

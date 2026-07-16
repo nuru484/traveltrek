@@ -10,9 +10,9 @@
     "strict": true, 
     "skipLibCheck": false, 
     "noImplicitAny": true, 
-    "baseUrl": ".",
     "paths": {
-            "@/*": ["./src/*", "./generated/*"]
+      "#types/*": ["./types/*"],
+      "#*": ["./src/*"]
     }
     
   },

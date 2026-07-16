@@ -1,3 +1,9 @@
+import {
+  BookingStatus,
+  Role,
+  TourStatus,
+} from '#config/prismaClient.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/dashboard.service.ts
 //
 // Dashboard domain logic, extracted from the legacy fat controller. A single
@@ -6,13 +12,7 @@
 // legacy `data` payload bit-for-bit — base inventory stats for everyone,
 // plus the bookings/users blocks only when the actor is ADMIN or AGENT
 // (customers never see them; the keys are absent, not empty).
-import { UserRole } from '../../types/user-profile.types';
-import {
-  BookingStatus,
-  Role,
-  TourStatus,
-} from '../config/prismaClient';
-import { type AppDeps, defaultDeps } from './deps';
+import { UserRole } from '#types/user-profile.types.js';
 
 export interface DashboardStats {
   /** ADMIN/AGENT only. */

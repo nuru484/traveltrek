@@ -1,13 +1,13 @@
 // src/routes/reports.ts
 import { Router } from 'express';
 
-import { UserRole } from '../../types/user-profile.types';
 import {
   getMonthlyBookingsSummary,
   getPaymentsSummary,
   getTopToursByBookings,
-} from '../controllers/index';
-import { authorizeRole } from '../middlewares/authorize-roles';
+} from '#controllers/index.js';
+import { authorizeRole } from '#middlewares/authorize-roles.js';
+import { UserRole } from '#types/user-profile.types.js';
 
 const reportsRoutes = Router();
 

@@ -11,19 +11,18 @@
 // status/delete/delete-all were dropped as duplicates.
 import { Request, RequestHandler, Response } from 'express';
 
-import { UserRole } from '../../types/user-profile.types';
 import {
   CLOUDINARY_UPLOAD_OPTIONS,
   HTTP_STATUS_CODES,
-} from '../config/constants';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+} from '#config/constants.js';
+import multerUpload from '#config/multer.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
 import {
   asyncHandler,
   UnauthorizedError,
   ValidationError,
-} from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   createFlight as createFlightService,
   deleteAllFlights as deleteAllFlightsService,
@@ -33,14 +32,15 @@ import {
   listFlights,
   updateFlight as updateFlightService,
   updateFlightStatus as updateFlightStatusService,
-} from '../services/flight.service';
-import { buildPaginationMeta, sendSuccess } from '../utils/http-response';
+} from '#services/flight.service.js';
+import { UserRole } from '#types/user-profile.types.js';
+import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
 import {
   toFlightDetailDTO,
   toFlightDTO,
   toFlightListItemDTO,
-} from '../utils/mappers/flight.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#utils/mappers/flight.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   CreateFlightBody,
   createFlightSchema,
@@ -50,7 +50,7 @@ import {
   flightStatusSchema,
   UpdateFlightBody,
   updateFlightSchema,
-} from '../validations/flight-validation';
+} from '#validations/flight-validation.js';
 
 const ALLOWED_PHOTO_MIME_TYPES = [
   'image/jpeg',

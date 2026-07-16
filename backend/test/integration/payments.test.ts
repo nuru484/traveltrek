@@ -16,13 +16,14 @@
 import crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
 
-import prisma from '../../src/config/prismaClient';
-import { api, authedApi } from '../helpers/auth';
-import { createAdmin, createTour, createUser } from '../helpers/factories';
+import prisma from '#config/prismaClient.js';
 
-vi.mock('../../src/lib/paystack', async (importOriginal) => {
+import { api, authedApi } from '../helpers/auth.js';
+import { createAdmin, createTour, createUser } from '../helpers/factories.js';
+
+vi.mock('#lib/paystack.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../src/lib/paystack')>();
+    await importOriginal<typeof import('#lib/paystack.js')>();
   const charged = new Map<
     string,
     { amount: number; metadata?: Record<string, unknown> }

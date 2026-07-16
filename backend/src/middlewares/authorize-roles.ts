@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
-import { UserRole } from 'types/user-profile.types';
 
-import { ForbiddenError } from './error-handler';
+import { ForbiddenError } from '#middlewares/error-handler.js';
+import { UserRole } from '#types/user-profile.types.js';
 
 /**
  * Role-based authorization middleware

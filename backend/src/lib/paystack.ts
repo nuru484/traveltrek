@@ -6,7 +6,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 
-import ENV from '../config/env';
+import ENV from '#config/env.js';
 
 const PAYSTACK_API_BASE_URL =
   process.env.PAYSTACK_API_BASE_URL ?? 'https://api.paystack.co';

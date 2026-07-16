@@ -5,8 +5,8 @@
 // inline) so the refactor can prove it changed nothing unintentionally.
 import { describe, expect, it } from 'vitest';
 
-import { api, authedApi, cookieValue } from '../helpers/auth';
-import { createUser, TEST_PASSWORD } from '../helpers/factories';
+import { api, authedApi, cookieValue } from '../helpers/auth.js';
+import { createUser, TEST_PASSWORD } from '../helpers/factories.js';
 
 describe('POST /api/v1/auth/register-user', () => {
   const payload = {

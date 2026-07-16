@@ -1,13 +1,14 @@
 import * as bcrypt from 'bcrypt';
 
+// Dev-only sample users, bookings, and payments for UI visualisation.
+import prisma from '#config/prismaClient.js';
+
 import {
   BookingStatus,
   PaymentMethod,
   PaymentStatus,
   Role,
-} from '../generated/prisma/client';
-// Dev-only sample users, bookings, and payments for UI visualisation.
-import prisma from '../src/config/prismaClient';
+} from '../generated/prisma/client.js';
 
 async function run() {
   const password = await bcrypt.hash('Password123!', 10);

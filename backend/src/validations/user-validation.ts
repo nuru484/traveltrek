@@ -20,8 +20,8 @@
 //   so the exact legacy message and error shape survive.
 import { z } from 'zod';
 
-import { Role } from '../config/prismaClient';
-import { paginationQuery } from './common-validation';
+import { Role } from '#config/prismaClient.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 /** PUT /users/:userId — every field optional, legacy messages kept. */
 export const updateUserProfileSchema = z.object({

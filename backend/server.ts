@@ -1,8 +1,9 @@
+import ENV from '#config/env.js';
+import logger from '#utils/logger.js';
+
 // server.ts
-import app from './app';
-import ENV from './src/config/env';
-import logger from './src/utils/logger';
-import './worker';
+import app from './app.js';
+import './worker.js';
 
 const port = ENV.PORT || 8080;
 

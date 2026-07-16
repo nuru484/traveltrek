@@ -9,9 +9,9 @@
 // order), where the ROOM variant folds the booking-level stay fields
 // (startDate/endDate/numberOfNights/numberOfRooms) into the room object. A
 // booking with no associated item throws the same 400 the legacy helper did.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
-import { BadRequestError } from '../../middlewares/error-handler';
+import { BadRequestError } from '#middlewares/error-handler.js';
 
 /** Destination summary embedded in tour/room-hotel/flight relations. */
 const bookingDestinationSelect = {

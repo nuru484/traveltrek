@@ -7,8 +7,8 @@
 // services/destination.service.ts and the controller's photo-file middleware.
 import { z } from 'zod';
 
-import { DESTINATION_SORT_FIELDS } from '../services/destination.service';
-import { paginationQuery } from './common-validation';
+import { DESTINATION_SORT_FIELDS } from '#services/destination.service.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 /** Letters, spaces, hyphens and apostrophes — the legacy place-name pattern. */
 const PLACE_NAME_PATTERN = /^[a-zA-Z\s\-']+$/;

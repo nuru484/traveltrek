@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
 
-import ENV from '../config/env';
-import logger from '../utils/logger';
-import { handlePrismaError, isPrismaError } from './prismaErrorHandler';
+import ENV from '#config/env.js';
+import { handlePrismaError, isPrismaError } from '#middlewares/prismaErrorHandler.js';
+import logger from '#utils/logger.js';
 
 /**
  * Error severity levels for better logging and monitoring

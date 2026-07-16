@@ -11,8 +11,8 @@ import {
   handleWebhook,
   refundPayment,
   updatePaymentStatus,
-} from '../controllers/index';
-import authenticateJWT from '../middlewares/authenticate-jwt';
+} from '#controllers/index.js';
+import authenticateJWT from '#middlewares/authenticate-jwt.js';
 
 const paymentRoutes = Router();
 

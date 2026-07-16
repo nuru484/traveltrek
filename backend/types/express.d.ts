@@ -1,7 +1,7 @@
 // types/express.d.ts
 import 'express';
 
-import { IUser } from './user-profile.types';
+import { IUser } from './user-profile.types.js';
 
 declare module 'express' {
   export interface Request {

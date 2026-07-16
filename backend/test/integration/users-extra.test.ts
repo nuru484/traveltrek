@@ -12,15 +12,16 @@ import { describe, expect, it } from 'vitest';
 import prisma, {
   PaymentStatus,
   Role,
-} from '../../src/config/prismaClient';
-import { authedApi } from '../helpers/auth';
+} from '#config/prismaClient.js';
+
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createAgent,
   createTour,
   createUser,
   TEST_PASSWORD,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 /** A booking + payment pair for the delete-guard tests. */
 const createPaymentFor = async (userId: number, status: PaymentStatus) => {

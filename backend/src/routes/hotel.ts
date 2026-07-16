@@ -1,7 +1,6 @@
 // src/routes/hotel.ts
 import { Router } from 'express';
 
-import { UserRole } from '../../types/user-profile.types';
 import {
   createHotel,
   deleteAllHotels,
@@ -9,8 +8,9 @@ import {
   getAllHotels,
   getHotel,
   updateHotel,
-} from '../controllers/index';
-import { authorizeRole } from '../middlewares/authorize-roles';
+} from '#controllers/index.js';
+import { authorizeRole } from '#middlewares/authorize-roles.js';
+import { UserRole } from '#types/user-profile.types.js';
 
 const hotelRoutes = Router();
 

@@ -4,13 +4,13 @@
 // refactor: role gates, validation, pagination and filters.
 import { describe, expect, it } from 'vitest';
 
-import { authedApi } from '../helpers/auth';
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createDestination,
   createTour,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 const tourPayload = (destinationId: number) => ({
   description: 'Seven days across the Volta highlands',

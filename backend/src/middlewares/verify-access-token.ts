@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 
-import ENV from '../config/env';
-import { assertEnv } from '../config/env';
-import { CookieManager } from '../utils/CookieManager';
-import { verifyJwtToken } from '../utils/verify-jwt-token';
+import ENV from '#config/env.js';
+import { assertEnv } from '#config/env.js';
+import { CookieManager } from '#utils/CookieManager.js';
+import { verifyJwtToken } from '#utils/verify-jwt-token.js';
 
 export const verifyAccessToken = async (
   req: Request,

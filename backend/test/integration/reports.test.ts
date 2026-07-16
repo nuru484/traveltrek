@@ -13,8 +13,9 @@ import prisma, {
   BookingStatus,
   PaymentMethod,
   PaymentStatus,
-} from '../../src/config/prismaClient';
-import { api, authedApi } from '../helpers/auth';
+} from '#config/prismaClient.js';
+
+import { api, authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createFlight,
@@ -22,7 +23,7 @@ import {
   createRoom,
   createTour,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 /** One booking per (user, tour) — the schema enforces that pair unique. */
 const createBooking = async (input: {

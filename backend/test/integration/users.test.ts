@@ -4,8 +4,8 @@
 // listing, admin user creation with roles, role changes, self-updates.
 import { describe, expect, it } from 'vitest';
 
-import { authedApi } from '../helpers/auth';
-import { createAdmin, createUser } from '../helpers/factories';
+import { authedApi } from '../helpers/auth.js';
+import { createAdmin, createUser } from '../helpers/factories.js';
 
 describe('GET /api/v1/users', () => {
   it('lets an admin list users', async () => {

@@ -1,10 +1,11 @@
 import * as bcrypt from 'bcrypt';
 
+import ENV from '#config/env.js';
+import prisma from '#config/prismaClient.js';
+import logger from '#utils/logger.js';
+
 // prisma/seed.ts
-import { Role } from '../generated/prisma/client';
-import ENV from '../src/config/env';
-import prisma from '../src/config/prismaClient';
-import logger from '../src/utils/logger';
+import { Role } from '../generated/prisma/client.js';
 
 async function main() {
   logger.info('🌱 Starting database seeding...');

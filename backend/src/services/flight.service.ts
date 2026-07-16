@@ -15,27 +15,27 @@
 // (ADMIN/AGENT gates on status/delete). Those duplicates were deliberately
 // dropped in this refactor — routes/flight.ts already enforces roles via
 // authorizeRole, which is the single authorization boundary.
-import type { IUser } from '../../types/user-profile.types';
+import type { IUser } from '#types/user-profile.types.js';
 
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   FlightStatus,
   PaymentStatus,
   type Prisma,
-} from '../config/prismaClient';
+} from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
   NotFoundError,
-} from '../middlewares/error-handler';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 import {
   flightFullInclude,
   flightSummaryInclude,
   type FlightWithFullRelations,
   type FlightWithSummaryRelations,
-} from '../utils/mappers/flight.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#utils/mappers/flight.mapper.js';
 
 /**
  * Whitelisted `sortBy` fields for flight listings — the columns the legacy

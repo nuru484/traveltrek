@@ -10,23 +10,23 @@
 // (ADMIN/AGENT gates on delete and status updates). Those duplicates were
 // deliberately dropped in this refactor — routes/tour.ts already enforces
 // roles via authorizeRole, which is the single authorization boundary.
-import type { IUser } from '../../types/user-profile.types';
+import type { IUser } from '#types/user-profile.types.js';
 
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   PaymentStatus,
   type Prisma,
   TourStatus,
   type TourType,
-} from '../config/prismaClient';
+} from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
   NotFoundError,
-} from '../middlewares/error-handler';
-import { tourInclude } from '../utils/mappers/tour.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
+import { tourInclude } from '#utils/mappers/tour.mapper.js';
 
 /** Whitelisted `sortBy` fields for tour listings (all indexed-or-scalar). */
 export const TOUR_SORT_FIELDS = [

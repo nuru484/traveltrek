@@ -19,14 +19,14 @@
 // and is borrowed by routes/user.ts unchanged — it converts in a later phase.
 import { Request, RequestHandler, Response } from 'express';
 
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '#config/constants.js';
+import multerUpload from '#config/multer.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
 import {
   asyncHandler,
   UnauthorizedError,
-} from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   changeUserRole as changeUserRoleService,
   deleteAllUsers as deleteAllUsersService,
@@ -34,10 +34,10 @@ import {
   getUserById as getUserByIdService,
   listUsers,
   updateUserProfile as updateUserProfileService,
-} from '../services/user.service';
-import { sendPaginated, sendSuccess } from '../utils/http-response';
-import { toUserDTO } from '../utils/mappers/user.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#services/user.service.js';
+import { sendPaginated, sendSuccess } from '#utils/http-response.js';
+import { toUserDTO } from '#utils/mappers/user.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   ChangeUserRoleBody,
   changeUserRoleSchema,
@@ -45,7 +45,7 @@ import {
   updateUserProfileSchema,
   userListQuery,
   UserListQueryInput,
-} from '../validations/user-validation';
+} from '#validations/user-validation.js';
 
 /** Reads the user id that `intParam('userId')` validated and coerced. */
 const userIdParam = (req: Request): number =>

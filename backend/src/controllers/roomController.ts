@@ -13,11 +13,11 @@ import { Request, RequestHandler, Response } from 'express';
 import {
   CLOUDINARY_UPLOAD_OPTIONS,
   HTTP_STATUS_CODES,
-} from '../config/constants';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { asyncHandler, ValidationError } from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#config/constants.js';
+import multerUpload from '#config/multer.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
+import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   checkAvailability,
   createRoom as createRoomService,
@@ -26,10 +26,10 @@ import {
   getRoomById,
   listRooms,
   updateRoom as updateRoomService,
-} from '../services/room.service';
-import { sendPaginated, sendSuccess } from '../utils/http-response';
-import { toRoomDTO } from '../utils/mappers/room.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#services/room.service.js';
+import { sendPaginated, sendSuccess } from '#utils/http-response.js';
+import { toRoomDTO } from '#utils/mappers/room.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   CreateRoomBody,
   createRoomSchema,
@@ -39,7 +39,7 @@ import {
   roomListQuery,
   UpdateRoomBody,
   updateRoomSchema,
-} from '../validations/room-validation';
+} from '#validations/room-validation.js';
 
 const ALLOWED_PHOTO_MIME_TYPES = [
   'image/jpeg',

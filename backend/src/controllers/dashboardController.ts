@@ -7,9 +7,9 @@
 // counts/aggregates live in services/dashboard.service.ts.
 import { Request, RequestHandler, Response } from 'express';
 
-import { asyncHandler } from '../middlewares/error-handler';
-import { getDashboardStats as getDashboardStatsService } from '../services/dashboard.service';
-import { sendSuccess } from '../utils/http-response';
+import { asyncHandler } from '#middlewares/error-handler.js';
+import { getDashboardStats as getDashboardStatsService } from '#services/dashboard.service.js';
+import { sendSuccess } from '#utils/http-response.js';
 
 const handleGetDashboardStats = asyncHandler(
   async (req: Request, res: Response) => {

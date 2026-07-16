@@ -1,10 +1,10 @@
 // src/middlewares/handle-cloudinary-upload.ts
 import { NextFunction, Request, Response } from 'express';
-import { ICloudinaryUploadOptions } from 'types/cloudinary.types';
 
-import { cloudinaryService } from '../config/claudinary';
-import { isValidBase64Image } from '../utils/validate-base64-image';
-import { asyncHandler, ValidationError } from './error-handler';
+import { cloudinaryService } from '#config/claudinary.js';
+import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
+import { ICloudinaryUploadOptions } from '#types/cloudinary.types.js';
+import { isValidBase64Image } from '#utils/validate-base64-image.js';
 
 // Custom request interface that extends Express Request
 interface MulterRequest extends Request {

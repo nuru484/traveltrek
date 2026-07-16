@@ -6,11 +6,12 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
-import type { User } from '../../src/config/prismaClient';
+import type { User } from '#config/prismaClient.js';
 
-import app from '../../app';
-import { assertEnv } from '../../src/config/env';
-import ENV from '../../src/config/env';
+import { assertEnv } from '#config/env.js';
+import ENV from '#config/env.js';
+
+import app from '../../app.js';
 
 export const api = () => request(app);
 

@@ -1,9 +1,9 @@
 // worker.ts
-import { bookingDeadlineWorker } from './src/jobs/bookingWorker';
-import { flightStatusWorker } from './src/jobs/flightWorker';
-import { setupJobSchedulers } from './src/jobs/schedulers';
-import { tourStatusWorker } from './src/jobs/tourWorker';
-import logger from './src/utils/logger';
+import { bookingDeadlineWorker } from '#jobs/bookingWorker.js';
+import { flightStatusWorker } from '#jobs/flightWorker.js';
+import { setupJobSchedulers } from '#jobs/schedulers.js';
+import { tourStatusWorker } from '#jobs/tourWorker.js';
+import logger from '#utils/logger.js';
 
 async function shutdownWorkers(signal: string) {
   logger.info(`🛑 Received ${signal}, shutting down workers...`);

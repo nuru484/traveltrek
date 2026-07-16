@@ -10,13 +10,13 @@
 // deliberately dropped in this refactor — routes/destination.ts already
 // enforces roles via authorizeRole, which is the single authorization
 // boundary.
-import type { Prisma } from '../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
 import {
   BadRequestError,
   NotFoundError,
-} from '../middlewares/error-handler';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 
 /** Whitelisted `sortBy` fields for destination listings (all scalar). */
 export const DESTINATION_SORT_FIELDS = [

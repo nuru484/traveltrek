@@ -2,7 +2,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { ValidationError, validationResult } from 'express-validator';
 
-import { ValidationError as CustomValidationError } from './error-handler';
+import { ValidationError as CustomValidationError } from '#middlewares/error-handler.js';
 
 /**
  * Middleware to check validation results and pass errors to error handler

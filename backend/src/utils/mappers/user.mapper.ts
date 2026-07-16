@@ -8,9 +8,9 @@
 // never appear in a DTO. toUserDTO reproduces the legacy read responses
 // bit-for-bit: nullable columns are mapped to undefined (dropped from the
 // JSON), and role is narrowed to the shared UserRole enum.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
-import { UserRole } from '../../../types/user-profile.types';
+import { UserRole } from '#types/user-profile.types.js';
 
 /** Every user column except password; services pass this to Prisma. */
 export const userSelect = {

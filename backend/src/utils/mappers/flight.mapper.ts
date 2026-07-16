@@ -9,7 +9,7 @@
 // and omitted originId/destinationId; the detail read used the four-field
 // destination summaries and added the ids; the list used the summaries and
 // ids but omitted capacity. All three are preserved bit-for-bit.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
 /** Destination fields exposed on flight read (detail + list) responses. */
 export const flightDestinationSelect = {

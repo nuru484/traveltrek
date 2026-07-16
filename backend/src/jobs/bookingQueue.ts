@@ -1,7 +1,7 @@
 // src/jobs/bookingQueue.ts
 import { Queue } from 'bullmq';
 
-import { createRedisConnection } from '../config/redisConnection';
+import { createRedisConnection } from '#config/redisConnection.js';
 
 export const bookingDeadlineQueue = new Queue('bookingDeadlineQueue', {
   connection: createRedisConnection(),

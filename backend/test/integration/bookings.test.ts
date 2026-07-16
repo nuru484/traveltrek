@@ -4,13 +4,14 @@
 // self-booking rules, capacity guards, duplicate protection, role-scoped reads.
 import { describe, expect, it } from 'vitest';
 
-import prisma from '../../src/config/prismaClient';
-import { authedApi } from '../helpers/auth';
+import prisma from '#config/prismaClient.js';
+
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createTour,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 describe('POST /api/v1/bookings', () => {
   it('lets a customer book a tour for themselves', async () => {

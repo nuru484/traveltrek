@@ -2,17 +2,17 @@ import { compare } from 'bcrypt';
 // src/controllers/authentication/login.ts
 import { NextFunction, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { ILoginRequest } from 'types/auth.types';
 
-import ENV from '../../config/env';
-import { assertEnv } from '../../config/env';
-import prisma from '../../config/prismaClient';
+import ENV from '#config/env.js';
+import { assertEnv } from '#config/env.js';
+import prisma from '#config/prismaClient.js';
 import {
   asyncHandler,
   NotFoundError,
   UnauthorizedError,
-} from '../../middlewares/error-handler';
-import { CookieManager } from '../../utils/CookieManager';
+} from '#middlewares/error-handler.js';
+import { ILoginRequest } from '#types/auth.types.js';
+import { CookieManager } from '#utils/CookieManager.js';
 
 const login = asyncHandler(
   async (

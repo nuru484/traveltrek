@@ -15,8 +15,8 @@
 //   filters instead of rejecting them; `.catch(undefined)` preserves that.
 import { z } from 'zod';
 
-import { PaymentMethod, PaymentStatus } from '../config/prismaClient';
-import { paginationQuery } from './common-validation';
+import { PaymentMethod, PaymentStatus } from '#config/prismaClient.js';
+import { paginationQuery } from '#validations/common-validation.js';
 
 /** POST /payments — the method enum is enforced in the service (see above). */
 export const createPaymentSchema = z.object({

@@ -21,18 +21,18 @@
 // dead code (each cleanup catches internally), so it was dropped.
 import bcrypt from 'bcrypt';
 
-import { type IUser, UserRole } from '../../types/user-profile.types';
-import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '../config/constants';
-import { PaymentStatus, type Prisma, type Role } from '../config/prismaClient';
+import { BCRYPT_SALT_ROUNDS, HTTP_STATUS_CODES } from '#config/constants.js';
+import { PaymentStatus, type Prisma, type Role } from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
-} from '../middlewares/error-handler';
-import { type SafeUser, userSelect } from '../utils/mappers/user.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
+import { type IUser, UserRole } from '#types/user-profile.types.js';
+import { type SafeUser, userSelect } from '#utils/mappers/user.mapper.js';
 
 export type UserActor = Pick<IUser, 'id' | 'role'>;
 

@@ -10,15 +10,15 @@
 // req.user.role inline (ADMIN gate). That duplicate was deliberately dropped
 // in this refactor — routes/hotel.ts already enforces roles via
 // authorizeRole, which is the single authorization boundary.
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { type Prisma } from '../config/prismaClient';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import { type Prisma } from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
   NotFoundError,
-} from '../middlewares/error-handler';
-import { hotelInclude } from '../utils/mappers/hotel.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
+import { hotelInclude } from '#utils/mappers/hotel.mapper.js';
 
 /**
  * Whitelisted `sortBy` fields for hotel listings. `city` and `country` live

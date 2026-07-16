@@ -7,7 +7,7 @@
 // pagination math in one place.
 import { Response } from 'express';
 
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 
 export interface PaginationMeta {
   limit: number;

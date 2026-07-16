@@ -1,6 +1,6 @@
 import { Request } from 'express';
 
-import { UserRole } from './user-profile.types';
+import { UserRole } from './user-profile.types.js';
 
 export interface ILoginRequest extends Request {
   body: {

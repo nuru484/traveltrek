@@ -4,7 +4,7 @@
 // `roomInclude` relations) plus the availability counts computed for the
 // requested date window; controllers map both through here so the wire format
 // lives in exactly one place and raw DB records never leak.
-import type { Prisma } from '../../config/prismaClient';
+import type { Prisma } from '#config/prismaClient.js';
 
 /** Hotel fields exposed on room responses. */
 export const roomHotelSelect = {

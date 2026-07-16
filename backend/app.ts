@@ -4,13 +4,13 @@ import cors from 'cors';
 import express from 'express';
 import morgan from 'morgan';
 
-import ENV from './src/config/env';
+import ENV from '#config/env.js';
 import {
   errorHandler,
   UnauthorizedError,
-} from './src/middlewares/error-handler';
-import rateLimiter from './src/middlewares/rateLimit';
-import routes from './src/routes';
+} from '#middlewares/error-handler.js';
+import rateLimiter from '#middlewares/rateLimit.js';
+import routes from '#routes/index.js';
 
 const app = express();
 

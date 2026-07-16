@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 // src/config/redis.ts
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
-import ENV from '../config/env';
-import logger from '../utils/logger';
+import ENV from '#config/env.js';
+import logger from '#utils/logger.js';
 
 // Factory function to create and configure Redis client
 const redisClient = () => {

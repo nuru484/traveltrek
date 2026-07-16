@@ -3,28 +3,28 @@ import bcrypt from 'bcrypt';
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { cloudinaryService } from '#config/claudinary.js';
+import { CLOUDINARY_UPLOAD_OPTIONS } from '#config/constants.js';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import { BCRYPT_SALT_ROUNDS } from '#config/constants.js';
+import { assertEnv } from '#config/env.js';
+import ENV from '#config/env.js';
+import multerUpload from '#config/multer.js';
+import prisma from '#config/prismaClient.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
+import {
+  BadRequestError,
+  UnauthorizedError,
+} from '#middlewares/error-handler.js';
+import validationMiddleware from '#middlewares/validation.js';
 import {
   IUserRegistrationInput,
   IUserResponseData,
   UserRole,
-} from '../../../types/user-profile.types';
-import { cloudinaryService } from '../../config/claudinary';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../../config/constants';
-import { HTTP_STATUS_CODES } from '../../config/constants';
-import { BCRYPT_SALT_ROUNDS } from '../../config/constants';
-import { assertEnv } from '../../config/env';
-import ENV from '../../config/env';
-import multerUpload from '../../config/multer';
-import prisma from '../../config/prismaClient';
-import conditionalCloudinaryUpload from '../../middlewares/conditional-cloudinary-upload';
-import {
-  BadRequestError,
-  UnauthorizedError,
-} from '../../middlewares/error-handler';
-import validationMiddleware from '../../middlewares/validation';
-import { CookieManager } from '../../utils/CookieManager';
-import logger from '../../utils/logger';
-import { registerUserValidation } from '../../validations/auth-validations';
+} from '#types/user-profile.types.js';
+import { CookieManager } from '#utils/CookieManager.js';
+import logger from '#utils/logger.js';
+import { registerUserValidation } from '#validations/auth-validations.js';
 
 /**
  * Controller function for user registration

@@ -1,7 +1,7 @@
 import { ValidationChain } from 'express-validator';
 
 // src/validations/auth-validations.ts
-import { validator } from './validation-factory';
+import { validator } from '#validations/validation-factory.js';
 
 // Validator for creating a new user
 export const registerUserValidation: ValidationChain[] = [

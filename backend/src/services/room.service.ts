@@ -12,23 +12,23 @@
 // of those bookings. This is preserved bit-for-bit from the legacy
 // getAvailableRoomsCount helper, including returning {0, 0} for a missing
 // room (checkAvailability 404s afterwards, matching the legacy order).
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   PaymentStatus,
   type Prisma,
-} from '../config/prismaClient';
+} from '#config/prismaClient.js';
 import {
   BadRequestError,
   CustomError,
   NotFoundError,
-} from '../middlewares/error-handler';
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 import {
   type RoomAvailabilityCounts,
   roomInclude,
   type RoomWithRelations,
-} from '../utils/mappers/room.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#utils/mappers/room.mapper.js';
 
 /**
  * Whitelisted `sortBy` fields for room listings — the columns the legacy

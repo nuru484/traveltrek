@@ -4,12 +4,12 @@
 // isolated, and disconnects Prisma when the worker is done.
 import { afterAll, beforeEach, vi } from 'vitest';
 
-import prisma from '../src/config/prismaClient';
+import prisma from '#config/prismaClient.js';
 
 // Fake Cloudinary so uploads never hit the network. Each upload mints a unique
 // fake secure_url; deleteImage records what was reclaimed so tests can assert
 // cleanup behaviour.
-vi.mock('../src/config/claudinary', () => {
+vi.mock('#config/claudinary.js', () => {
   let uploadCount = 0;
   return {
     cloudinaryService: {
@@ -41,7 +41,7 @@ vi.mock('axios', () => {
 });
 
 // Silence application logging during tests.
-vi.mock('../src/utils/logger', () => ({
+vi.mock('#utils/logger.js', () => ({
   default: {
     debug: vi.fn(),
     error: vi.fn(),

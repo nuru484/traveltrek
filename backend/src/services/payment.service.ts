@@ -1,3 +1,18 @@
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import {
+  BookingStatus,
+  type PaymentMethod,
+  PaymentStatus,
+  type Prisma,
+} from '#config/prismaClient.js';
+import {
+  BadRequestError,
+  CustomError,
+  InternalServerError,
+  NotFoundError,
+  UnauthorizedError,
+} from '#middlewares/error-handler.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/payment.service.ts
 //
 // Payments domain logic, extracted from the legacy fat controller. Pure, DI'd
@@ -21,26 +36,11 @@
 // for every branch. The single exception is the webhook amount mismatch,
 // which the legacy code raised as a bare `Error` (an unhandled 500) — it is
 // now an InternalServerError with the same message and the same 500.
-import { type IUser, UserRole } from '../../types/user-profile.types';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import {
-  BookingStatus,
-  type PaymentMethod,
-  PaymentStatus,
-  type Prisma,
-} from '../config/prismaClient';
-import {
-  BadRequestError,
-  CustomError,
-  InternalServerError,
-  NotFoundError,
-  UnauthorizedError,
-} from '../middlewares/error-handler';
+import { type IUser, UserRole } from '#types/user-profile.types.js';
 import {
   paymentInclude,
   type PaymentWithRelations,
-} from '../utils/mappers/payment.mapper';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#utils/mappers/payment.mapper.js';
 
 /** Payment methods the legacy handler accepted (mirrors PaymentMethod). */
 export const PAYMENT_METHODS = [

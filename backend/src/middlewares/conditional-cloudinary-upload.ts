@@ -1,7 +1,7 @@
 // src/middlewares/conditional-cloudinary-upload.ts
 import { NextFunction, Request, Response } from 'express';
 
-import { handleCloudinaryUpload } from './handle-cloudinary-upload';
+import { handleCloudinaryUpload } from '#middlewares/handle-cloudinary-upload.js';
 
 const conditionalCloudinaryUpload = (
   options: Parameters<typeof handleCloudinaryUpload>[0],

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { IUser } from 'types/user-profile.types';
+
+import { IUser } from '#types/user-profile.types.js';
 
 export const verifyJwtToken = <T = IUser>(
   token: string,

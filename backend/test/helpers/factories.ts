@@ -5,7 +5,7 @@
 // about. bcrypt cost is 4 — fast, and login still verifies for real.
 import bcrypt from 'bcrypt';
 
-import prisma, { Role, TourType } from '../../src/config/prismaClient';
+import prisma, { Role, TourType } from '#config/prismaClient.js';
 
 export const TEST_PASSWORD = 'Password1!';
 

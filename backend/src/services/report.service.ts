@@ -29,8 +29,8 @@ import {
   type Prisma,
   type TourStatus,
   type TourType,
-} from '../config/prismaClient';
-import { type AppDeps, defaultDeps } from './deps';
+} from '#config/prismaClient.js';
+import { type AppDeps, defaultDeps } from '#services/deps.js';
 
 /** {amount, count} bucket used by the payment status/method breakdowns. */
 export interface AmountCountBucket {

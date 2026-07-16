@@ -16,12 +16,12 @@
 // closed with the legacy messages if middleware order ever breaks.
 import { Request, RequestHandler, Response } from 'express';
 
-import { HTTP_STATUS_CODES } from '../config/constants';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   asyncHandler,
   UnauthorizedError,
-} from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+} from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   createBooking as createBookingService,
   deleteAllBookings as deleteAllBookingsService,
@@ -30,9 +30,9 @@ import {
   listBookings,
   listUserBookings,
   updateBooking as updateBookingService,
-} from '../services/booking.service';
-import { buildPaginationMeta, sendSuccess } from '../utils/http-response';
-import { toBookingDTO } from '../utils/mappers/booking.mapper';
+} from '#services/booking.service.js';
+import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
+import { toBookingDTO } from '#utils/mappers/booking.mapper.js';
 import {
   bookingIdParam,
   bookingListQuery,
@@ -42,7 +42,7 @@ import {
   createBookingSchema,
   UpdateBookingBody,
   updateBookingSchema,
-} from '../validations/booking-validation';
+} from '#validations/booking-validation.js';
 
 /** Reads the booking id that `bookingIdParam` validated and coerced. */
 const idParam = (req: Request): number =>

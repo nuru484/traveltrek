@@ -5,14 +5,15 @@
 // booking-aware delete guards.
 import { describe, expect, it } from 'vitest';
 
-import prisma, { BookingStatus } from '../../src/config/prismaClient';
-import { authedApi } from '../helpers/auth';
+import prisma, { BookingStatus } from '#config/prismaClient.js';
+
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createHotel,
   createRoom,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 const roomPayload = (hotelId: number) => ({
   amenities: ['wifi', 'tv'],

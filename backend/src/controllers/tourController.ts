@@ -8,9 +8,9 @@
 // (authorizeRole), so no handler re-checks req.user.role.
 import { Request, RequestHandler, Response } from 'express';
 
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { asyncHandler, UnauthorizedError } from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+import { HTTP_STATUS_CODES } from '#config/constants.js';
+import { asyncHandler, UnauthorizedError } from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   createTour as createTourService,
   deleteAllTours as deleteAllToursService,
@@ -19,10 +19,10 @@ import {
   listTours,
   updateTour as updateTourService,
   updateTourStatus as updateTourStatusService,
-} from '../services/tour.service';
-import { sendPaginated, sendSuccess } from '../utils/http-response';
-import { toTourDTO, toTourStatusDTO } from '../utils/mappers/tour.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#services/tour.service.js';
+import { sendPaginated, sendSuccess } from '#utils/http-response.js';
+import { toTourDTO, toTourStatusDTO } from '#utils/mappers/tour.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   CreateTourBody,
   createTourSchema,
@@ -32,7 +32,7 @@ import {
   tourStatusSchema,
   UpdateTourBody,
   updateTourSchema,
-} from '../validations/tour-validation';
+} from '#validations/tour-validation.js';
 
 /** Reads the tour id that `intParam('id')` validated and coerced to a number. */
 const tourIdParam = (req: Request): number =>

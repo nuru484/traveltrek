@@ -4,14 +4,14 @@
 // gates, validation, pagination, filters and the delete-with-rooms guard.
 import { describe, expect, it } from 'vitest';
 
-import { authedApi } from '../helpers/auth';
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createDestination,
   createHotel,
   createRoom,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 const hotelPayload = (destinationId: number) => ({
   address: '12 Beachside Avenue, Accra',

@@ -10,11 +10,11 @@
 // req.user.role.
 import { Request, RequestHandler, Response } from 'express';
 
-import { CLOUDINARY_UPLOAD_OPTIONS, HTTP_STATUS_CODES } from '../config/constants';
-import multerUpload from '../config/multer';
-import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
-import { asyncHandler, ValidationError } from '../middlewares/error-handler';
-import zodValidation from '../middlewares/validate-request';
+import { CLOUDINARY_UPLOAD_OPTIONS, HTTP_STATUS_CODES } from '#config/constants.js';
+import multerUpload from '#config/multer.js';
+import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
+import { asyncHandler, ValidationError } from '#middlewares/error-handler.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
   createDestination as createDestinationService,
   deleteAllDestinations as deleteAllDestinationsService,
@@ -22,10 +22,10 @@ import {
   getDestinationById,
   listDestinations,
   updateDestination as updateDestinationService,
-} from '../services/destination.service';
-import { buildPaginationMeta, sendSuccess } from '../utils/http-response';
-import { toDestinationDTO } from '../utils/mappers/destination.mapper';
-import { intParam } from '../validations/common-validation';
+} from '#services/destination.service.js';
+import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
+import { toDestinationDTO } from '#utils/mappers/destination.mapper.js';
+import { intParam } from '#validations/common-validation.js';
 import {
   CreateDestinationBody,
   createDestinationSchema,
@@ -33,7 +33,7 @@ import {
   destinationListQuery,
   UpdateDestinationBody,
   updateDestinationSchema,
-} from '../validations/destination-validation';
+} from '#validations/destination-validation.js';
 
 const ALLOWED_PHOTO_MIME_TYPES = [
   'image/jpeg',

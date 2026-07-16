@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 
-import { CookieManager } from '../../utils/CookieManager';
+import { CookieManager } from '#utils/CookieManager.js';
 
 const logout = (req: Request, res: Response): void => {
   CookieManager.clearAllTokens(res);

@@ -5,14 +5,15 @@
 // booking-aware delete guards.
 import { describe, expect, it } from 'vitest';
 
-import prisma, { BookingStatus } from '../../src/config/prismaClient';
-import { authedApi } from '../helpers/auth';
+import prisma, { BookingStatus } from '#config/prismaClient.js';
+
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createDestination,
   createFlight,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;

@@ -6,15 +6,16 @@
 // rails), and the role rules on the per-user listing endpoint.
 import { describe, expect, it } from 'vitest';
 
-import prisma from '../../src/config/prismaClient';
-import { authedApi } from '../helpers/auth';
+import prisma from '#config/prismaClient.js';
+
+import { authedApi } from '../helpers/auth.js';
 import {
   createAdmin,
   createFlight,
   createRoom,
   createTour,
   createUser,
-} from '../helpers/factories';
+} from '../helpers/factories.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const inDays = (days: number) => new Date(Date.now() + days * DAY_MS);
