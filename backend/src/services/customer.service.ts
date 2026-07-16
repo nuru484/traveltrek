@@ -28,6 +28,7 @@ import { type AppDeps, defaultDeps } from '#services/deps.js';
 import { type PrincipalKind } from '#types/auth.types.js';
 import { UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
+import { assertContactFreeAcrossPrincipals } from '#utils/cross-principal-contact.js';
 import {
   bookingInclude,
   type BookingWithRelations,
@@ -148,6 +149,10 @@ export const makeCustomerService = (
         );
       }
     }
+
+    // Login/reset resolve contacts customer-first, so a contact held by a
+    // STAFF account must be just as unavailable as one held by a customer.
+    await assertContactFreeAcrossPrincipals(prisma, input, 'customer');
   };
 
   /** POST /customers — staff-side creation (walk-in / phone customers). */

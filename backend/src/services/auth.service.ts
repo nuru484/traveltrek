@@ -47,6 +47,7 @@ import {
 } from '#types/auth.types.js';
 import { UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
+import { assertContactFreeAcrossPrincipals } from '#utils/cross-principal-contact.js';
 import { customerSelect } from '#utils/mappers/customer.mapper.js';
 import { userSelect } from '#utils/mappers/user.mapper.js';
 import {
@@ -227,6 +228,9 @@ export const makeAuthService = (d: AuthDeps) => {
   const register = async (
     input: RegisterInput,
   ): Promise<RegisteredCustomer> => {
+    // A staff member's contact must never be claimable by a public signup —
+    // the customer row would shadow the staff account at login.
+    await assertContactFreeAcrossPrincipals(prisma, input, 'customer');
     const hashedPassword =
       input.password === undefined
         ? null
@@ -251,6 +255,8 @@ export const makeAuthService = (d: AuthDeps) => {
     input: RegisterInput,
     role: Role,
   ): Promise<RegisteredUser> => {
+    // Symmetric guard: a staff account must not claim a customer's contact.
+    await assertContactFreeAcrossPrincipals(prisma, input, 'staff');
     const hashedPassword =
       input.password === undefined
         ? null
@@ -941,6 +947,14 @@ export const makeAuthService = (d: AuthDeps) => {
         where: { id: byEmail.id },
       });
     }
+
+    // The verified Google email may still belong to a STAFF account — a
+    // fresh customer row would shadow it at login, so refuse the mint.
+    await assertContactFreeAcrossPrincipals(
+      prisma,
+      { email: identity.email },
+      'customer',
+    );
 
     return prisma.customer.create({
       data: {

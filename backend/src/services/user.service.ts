@@ -33,6 +33,7 @@ import {
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import { type IUser, UserRole } from '#types/user-profile.types.js';
 import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
+import { assertContactFreeAcrossPrincipals } from '#utils/cross-principal-contact.js';
 import { type SafeUser, userSelect } from '#utils/mappers/user.mapper.js';
 
 export type UserActor = Pick<IUser, 'id' | 'role'>;
@@ -204,6 +205,17 @@ export const makeUserService = (
           );
         }
       }
+
+      // Cross-table guard: staff must not claim a customer's contact (and
+      // vice versa) — login precedence makes collisions dangerous.
+      await assertContactFreeAcrossPrincipals(
+        prisma,
+        {
+          email: input.email !== existingUser.email ? input.email : undefined,
+          phone: input.phone !== existingUser.phone ? input.phone : undefined,
+        },
+        'staff',
+      );
 
       // Prisma ignores undefined keys, so omitted fields stay untouched. An
       // empty password string is skipped, like the legacy falsy check.
