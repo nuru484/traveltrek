@@ -50,12 +50,18 @@ export default tseslint.config(
     },
   },
   {
-    // TEMPORARY: the legacy fat controllers and express-validator chains are
-    // being replaced wholesale by the service-layer + zod refactor. Relax the
-    // type-safety rules there until each domain is rewritten, instead of
-    // hand-typing code that is about to be deleted. Remove entries from this
-    // block as domains migrate; delete the whole block when the refactor lands.
-    files: ['src/controllers/**', 'src/validations/**', 'src/middlewares/validation.ts'],
+    // TEMPORARY: only the legacy authentication files remain unconverted —
+    // the auth controllers, their express-validator chains, and the
+    // validation-factory/middleware those chains run through. Relax the
+    // type-safety rules for just those files until the auth-hardening phase
+    // rewrites them; delete this whole block (and the factory/middleware)
+    // when that lands.
+    files: [
+      'src/controllers/authentication/**',
+      'src/middlewares/validation.ts',
+      'src/validations/auth-validations.ts',
+      'src/validations/validation-factory.ts',
+    ],
     rules: {
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
