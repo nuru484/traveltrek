@@ -9,7 +9,7 @@ import {
   hasLiveInventory,
   hasTestimonials,
   reviewTargetLine,
-} from "@/components/index/showcase-logic";
+} from "@/components/demo/showcase-logic";
 import type { IShowcaseData } from "@/lib/public-api";
 import type { ITour } from "@/types/tour.types";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";

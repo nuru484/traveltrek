@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { label: "Overview", shortLabel: "Overview", href: "/#overview", icon: Compass },
   { label: "Engineering", shortLabel: "Specs", href: "/#engineering", icon: Cog },
   { label: "Stack", shortLabel: "Stack", href: "/#stack", icon: Layers },
-  { label: "Live demo", shortLabel: "Demo", href: "/#demo", icon: Ticket },
+  { label: "Live demo", shortLabel: "Demo", href: "/demo", icon: Ticket },
   { label: "Contact", shortLabel: "Contact", href: "/#contact", icon: Mail },
 ];
 

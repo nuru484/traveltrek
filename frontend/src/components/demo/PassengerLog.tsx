@@ -1,20 +1,21 @@
 // The passenger log: latest published reviews from /public/reviews/recent,
 // rendered as stamped log entries. Renders nothing when no reviews have been
-// published (or the backend is down) — the static portfolio carries the page.
+// published (or the backend is down). Moved from the landing page's
+// TestimonialsSection when the demo got its own page.
 import { RatingValue } from "@/components/ui/rating";
 import type { IPublicReview } from "@/types/review.types";
 import { reviewTargetLine } from "./showcase-logic";
 
-const TestimonialsSection = ({ reviews }: { reviews: IPublicReview[] }) => {
+const PassengerLog = ({ reviews }: { reviews: IPublicReview[] }) => {
   if (reviews.length === 0) return null;
 
   return (
-    <section id="reviews" className="scroll-mt-20 bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+    <section className="bg-hero-band">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-          05 · Passenger log
+          Passenger log
         </p>
-        <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
+        <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
           What travellers <span className="italic">wrote back.</span>
         </h2>
         <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -22,7 +23,7 @@ const TestimonialsSection = ({ reviews }: { reviews: IPublicReview[] }) => {
           only review trips they actually took.
         </p>
 
-        <ul className="mt-10 grid grid-cols-1 gap-4 sm:mt-14 sm:grid-cols-2">
+        <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {reviews.map((review) => (
             <li
               key={review.id}
@@ -55,4 +56,4 @@ const TestimonialsSection = ({ reviews }: { reviews: IPublicReview[] }) => {
   );
 };
 
-export default TestimonialsSection;
+export default PassengerLog;

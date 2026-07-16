@@ -1,32 +1,25 @@
-// The live showcase: real rows from the running demo, fetched server-side
-// from the unauthenticated /public API with a 5-minute ISR window. This is
-// still a portfolio section — the system exhibiting itself, not a storefront.
-// Every sub-block renders only when its data arrived; when the backend is
-// down the whole band degrades to a one-line "demo idle" note and the static
-// portfolio sections carry the page.
+// Inventory cards for the live demo page: real rows from the public API,
+// each linking through the login redirect into the dashboard. Moved from the
+// landing page's LiveShowcaseSection when the demo got its own page.
 import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowRight, Hotel, MapPin, Plane } from "lucide-react";
 import { RatingStars } from "@/components/ui/rating";
 import { formatMoney } from "@/utils/format-money";
-import type { IShowcaseData, IPublicDestination } from "@/lib/public-api";
+import type { IPublicDestination } from "@/lib/public-api";
 import type { IFlight } from "@/types/flight.types";
 import type { IHotel } from "@/types/hotel.types";
 import type { ITour } from "@/types/tour.types";
-import {
-  demoHref,
-  destinationLine,
-  hasLiveInventory,
-} from "./showcase-logic";
+import { demoHref, destinationLine } from "./showcase-logic";
 
-const Eyebrow = ({ children }: { children: React.ReactNode }) => (
+export const Eyebrow = ({ children }: { children: React.ReactNode }) => (
   <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
     {children}
   </p>
 );
 
-const TourCard = ({ tour }: { tour: ITour }) => (
+export const TourCard = ({ tour }: { tour: ITour }) => (
   <Link
     href={demoHref(`/dashboard/tours/${tour.id}/detail`)}
     className="group flex h-full flex-col overflow-hidden rounded-xl border border-foreground/15 bg-card transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -81,7 +74,7 @@ const TourCard = ({ tour }: { tour: ITour }) => (
   </Link>
 );
 
-const DestinationChip = ({
+export const DestinationChip = ({
   destination,
 }: {
   destination: IPublicDestination;
@@ -114,7 +107,7 @@ const DestinationChip = ({
   </li>
 );
 
-const HotelCard = ({ hotel }: { hotel: IHotel }) => (
+export const HotelCard = ({ hotel }: { hotel: IHotel }) => (
   <Link
     href={demoHref(`/dashboard/hotels/${hotel.id}/detail`)}
     className="group flex h-full gap-3.5 rounded-xl border border-foreground/15 bg-card p-3.5 transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -152,7 +145,7 @@ const HotelCard = ({ hotel }: { hotel: IHotel }) => (
   </Link>
 );
 
-const FlightCard = ({ flight }: { flight: IFlight }) => (
+export const FlightCard = ({ flight }: { flight: IFlight }) => (
   <Link
     href={demoHref(`/dashboard/flights/${flight.id}/detail`)}
     className="group flex h-full gap-3.5 rounded-xl border border-foreground/15 bg-card p-3.5 transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -190,100 +183,3 @@ const FlightCard = ({ flight }: { flight: IFlight }) => (
     </span>
   </Link>
 );
-
-const LiveShowcaseSection = ({ data }: { data: IShowcaseData }) => {
-  const live = hasLiveInventory(data);
-
-  return (
-    <section id="demo" className="scroll-mt-20 bg-hero-band">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-              04 · Now boarding
-            </p>
-            <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
-              The demo is <span className="italic">live.</span>
-            </h2>
-          </div>
-          <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Real rows from the running system, served by its public API and
-            revalidated every five minutes. Sign in to book any of them.
-          </p>
-        </div>
-
-        {!live && (
-          <div className="mt-10 rounded-xl border border-dashed border-foreground/25 bg-card/60 p-8 text-center sm:mt-14">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Demo idle
-            </p>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-              The demo backend isn&apos;t reachable right now, so there&apos;s
-              nothing at the gate. The sections above still tell the whole
-              story — check back shortly for the live inventory.
-            </p>
-          </div>
-        )}
-
-        {data.tours.length > 0 && (
-          <div className="mt-10 sm:mt-14">
-            <div className="flex items-baseline justify-between gap-4 border-b border-foreground/15 pb-2">
-              <Eyebrow>Departing soon · Tours</Eyebrow>
-              <Link
-                href={demoHref("/dashboard/tours")}
-                className="font-mono text-[10px] uppercase tracking-[0.15em] text-foreground/70 transition-colors hover:text-foreground"
-              >
-                Browse all
-              </Link>
-            </div>
-            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {data.tours.map((tour) => (
-                <li key={tour.id}>
-                  <TourCard tour={tour} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {data.destinations.length > 0 && (
-          <div className="mt-10">
-            <div className="border-b border-foreground/15 pb-2">
-              <Eyebrow>On the route map · Destinations</Eyebrow>
-            </div>
-            <ul className="no-scrollbar mt-5 flex gap-3 overflow-x-auto pb-1">
-              {data.destinations.map((destination) => (
-                <DestinationChip
-                  key={destination.id}
-                  destination={destination}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {(data.hotels.length > 0 || data.flights.length > 0) && (
-          <div className="mt-10">
-            <div className="border-b border-foreground/15 pb-2">
-              <Eyebrow>Also on the board · Hotels &amp; flights</Eyebrow>
-            </div>
-            <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {data.hotels.map((hotel) => (
-                <li key={`hotel-${hotel.id}`}>
-                  <HotelCard hotel={hotel} />
-                </li>
-              ))}
-              {data.flights.map((flight) => (
-                <li key={`flight-${flight.id}`}>
-                  <FlightCard flight={flight} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-};
-
-export default LiveShowcaseSection;

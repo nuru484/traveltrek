@@ -4,11 +4,16 @@ import { ArrowUpRight } from "lucide-react";
 
 const CONTACT_EMAIL = "abdulmajeednurudeen48@gmail.com";
 
-const Footer = () => (
+/**
+ * `numbered` keeps the landing page's section sequence (…04 · Now boarding,
+ * 05 · Crew of one); the demo page renders the same footer without a number
+ * since its sections aren't part of that sequence.
+ */
+const Footer = ({ numbered = true }: { numbered?: boolean }) => (
   <footer id="contact" className="scroll-mt-20 bg-night text-night-foreground">
     <div className="mx-auto max-w-6xl px-4 pt-16 sm:px-6 sm:pt-24">
       <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[oklch(0.75_0.13_230)]">
-        06 · Crew of one
+        {numbered ? "05 · Crew of one" : "Crew of one"}
       </p>
 
       <div className="mt-3 grid grid-cols-1 gap-10 pb-14 lg:grid-cols-[1.2fr_1fr] lg:gap-16 sm:pb-20">

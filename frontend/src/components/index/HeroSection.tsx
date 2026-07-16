@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowRight, Github, Plane } from "lucide-react";
+import { ArrowRight, Github, Plane } from "lucide-react";
 
 /**
  * Dashed flight path drawn under the hero's italic line, ending in a small
@@ -210,11 +210,11 @@ const HeroSection = () => {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em]">
               <Link
-                href="/#demo"
+                href="/demo"
                 className="inline-flex items-center gap-1.5 text-foreground/70 transition-colors hover:text-foreground"
               >
                 Explore the live demo
-                <ArrowDown className="h-3 w-3" aria-hidden />
+                <ArrowRight className="h-3 w-3" aria-hidden />
               </Link>
               <Link
                 href="https://github.com/nuru484/traveltrek"

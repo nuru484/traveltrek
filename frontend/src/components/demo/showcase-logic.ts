@@ -1,6 +1,6 @@
-// src/components/index/showcase-logic.ts
+// src/components/demo/showcase-logic.ts
 //
-// Pure decisions for the landing page's live showcase — extracted so the
+// Pure decisions for the live-demo showcase — extracted so the
 // degrade-when-the-backend-is-down behaviour is unit-testable without
 // rendering server components.
 import type { IShowcaseData } from "@/lib/public-api";
