@@ -10,7 +10,7 @@ import {
   useDeleteTourMutation,
   useUpdateTourStatusMutation } from "@/redux/tourApi";
 import {
-  useGetAllUserBookingsQuery,
+  useGetAllCustomerBookingsQuery,
   useCreateBookingMutation,
   useUpdateBookingMutation } from "@/redux/bookingApi";
 import { ITour } from "@/types/tour.types";
@@ -119,10 +119,11 @@ export function TourDetail({ tour }: ITourDetailProps) {
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings,
     isError: isBookingsError,
-    error: bookingsError } = useGetAllUserBookingsQuery(
-    { userId: user?.id, params: { page: 1, limit: 1000 } },
+    error: bookingsError } = useGetAllCustomerBookingsQuery(
+    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
     {
-      skip: !user,
+      // Customer-only: staff have no booking history of their own.
+      skip: !user || isAdmin || isAgent,
       refetchOnMountOrArgChange: 30 }
   );
 
@@ -135,8 +136,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
   const userBooking = bookingsData?.data.find(
     (booking) =>
-      booking.tour?.id === tour.id &&
-      booking.userId === parseInt(user?.id || "0")
+      booking.tour?.id === tour.id && booking.customerId === Number(user?.id)
   );
 
   const bookingStatus = userBooking?.status;
@@ -214,7 +214,7 @@ export function TourDetail({ tour }: ITourDetailProps) {
 
     try {
       await createBooking({
-        userId: parseInt(user.id),
+        customerId: Number(user.id),
         tourId: tour.id,
         totalPrice: tour.price }).unwrap();
       toast.success("Tour booked successfully");

@@ -31,6 +31,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IBookingsDataTableProps } from "@/types/booking.types";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { roleOf } from "@/utils/roles";
 import EmptyState from "@/components/ui/EmptyState";
 
 interface BookingsDataTableProps extends IBookingsDataTableProps {
@@ -60,7 +61,8 @@ export function BookingsDataTable({
   showCustomer,
   isRecentsView = false }: BookingsDataTableProps) {
   const user = useSelector((state: RootState) => state.auth.user);
-  const userRole = user.role;
+  // Customer sessions carry no role field; missing role reads as CUSTOMER.
+  const userRole = roleOf(user);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []

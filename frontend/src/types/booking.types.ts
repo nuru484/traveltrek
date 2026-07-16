@@ -1,8 +1,11 @@
 import { IDestinationSummary } from "./flight.types";
-export interface IBookingUser {
+
+/** Customer summary embedded in a booking (backend bookingInclude.customer). */
+export interface IBookingCustomer {
   id: number;
   name: string;
-  email: string;
+  /** Nullable column — phone-only customers have no email. */
+  email: string | null;
 }
 
 export interface IBookingTour {
@@ -67,8 +70,8 @@ export interface IBookingPayment {
 
 export interface IBookingBase {
   id: number;
-  userId: number;
-  user: IBookingUser;
+  customerId: number;
+  customer: IBookingCustomer;
   numberOfGuests: number;
   specialRequests: string | null;
   paymentDeadline: string;
@@ -131,7 +134,8 @@ export interface IBookingsPaginatedResponse {
 }
 
 export interface IBookingInput {
-  userId: number;
+  /** Bookings belong to Customers; staff book on behalf of a customer. */
+  customerId: number;
   tourId?: number | null;
   roomId?: number | null;
   flightId?: number | null;
@@ -162,6 +166,7 @@ export interface IBookingsQueryParams {
   status?: BookingStatus;
   search?: string;
   type?: "TOUR" | "ROOM" | "FLIGHT";
+  customerId?: number;
   tourId?: number;
   roomId?: number;
   flightId?: number;

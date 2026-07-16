@@ -1,11 +1,14 @@
 // src/redux/userApi.ts
+//
+// STAFF management: /users is staff-only on the backend (ADMIN/AGENT
+// accounts). Customers are managed under /customers (see customerApi).
 import { apiSlice } from "./apiSlice";
 import {
   IUserResponse,
   IUsersPaginatedResponse,
   IUsersQueryParams,
   IDeleteUsersResponse,
-  UserRole,
+  StaffRole,
 } from "../types/user.types";
 
 export const userApi = apiSlice.injectEndpoints({
@@ -70,10 +73,10 @@ export const userApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // Update user role
+    // Update staff role (backend restricts to ADMIN | AGENT)
     updateUserRole: builder.mutation<
       IUserResponse,
-      { userId: number; role: UserRole }
+      { userId: number; role: StaffRole }
     >({
       query: ({ userId, role }) => ({
         url: `/users/${userId}/role`,

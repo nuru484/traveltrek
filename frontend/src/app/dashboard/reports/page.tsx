@@ -39,7 +39,7 @@ const ReportsPage = () => {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const tourId = searchParams.get("tourId");
-    const userId = searchParams.get("userId");
+    const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
     const paymentMethod = searchParams.get("paymentMethod");
     const currency = searchParams.get("currency");
@@ -53,7 +53,7 @@ const ReportsPage = () => {
     if (startDate) initialParams.startDate = startDate;
     if (endDate) initialParams.endDate = endDate;
     if (tourId) initialParams.tourId = parseInt(tourId);
-    if (userId) initialParams.userId = parseInt(userId);
+    if (customerId) initialParams.customerId = parseInt(customerId);
     if (status)
       initialParams.status = status as "PENDING" | "CONFIRMED" | "CANCELLED";
     if (paymentMethod)

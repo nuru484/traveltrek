@@ -106,17 +106,17 @@ export const createBookingColumns = (
   // Conditionally add customer column
   if (showCustomer) {
     columns.push({
-      accessorKey: "user",
+      accessorKey: "customer",
       header: "Customer",
       cell: ({ row }) => {
-        const user = row.original.user;
+        const customer = row.original.customer;
         return (
           <div className="max-w-[200px] sm:max-w-[300px]">
             <div className="font-medium truncate text-sm sm:text-base">
-              {user.name}
+              {customer.name}
             </div>
-            <div className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mt-1">
-              {user.email}
+            <div className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mt-1 break-all">
+              {customer.email || "No email"}
             </div>
           </div>
         );

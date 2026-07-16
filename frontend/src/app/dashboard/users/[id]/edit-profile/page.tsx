@@ -33,10 +33,10 @@ export default function EditUserPage() {
 
   // ✅ Dynamic title based on search params
   const isMyProfile = Boolean(searchUserId);
-  const pageTitle = isMyProfile ? "Update My Profile" : "Edit User";
+  const pageTitle = isMyProfile ? "Update My Profile" : "Edit Staff";
   const pageSubtitle = isMyProfile
     ? "Update your personal details below"
-    : "Update user details below";
+    : "Update staff details below";
 
   if (isLoading) {
     return (
@@ -65,7 +65,7 @@ export default function EditUserPage() {
         title={pageTitle}
         description={pageSubtitle}
         backHref="/dashboard/users"
-        backLabel="Back to Users"
+        backLabel="Back to Staff"
       />
 
       <UserForm mode="edit" user={user} />

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useDeleteRoomMutation } from "@/redux/roomApi";
-import { useGetAllUserBookingsQuery } from "@/redux/bookingApi";
+import { useGetAllCustomerBookingsQuery } from "@/redux/bookingApi";
 import { IRoom } from "@/types/room.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { isAdmin as isAdminUser, isStaff } from "@/utils/roles";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import { Money } from "@/components/ui/Money";
@@ -38,8 +39,9 @@ interface IRoomDetailProps {
 export function RoomDetail({ room }: IRoomDetailProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN";
-  const canManageRooms = isAdmin;
+  const isAdmin = isAdminUser(user);
+  // Staff (admin or agent) book on behalf of a customer; only customers self-book.
+  const canManageRooms = isStaff(user);
 
   const [deleteRoom, { isLoading: isDeleting }] = useDeleteRoomMutation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -50,8 +52,8 @@ export function RoomDetail({ room }: IRoomDetailProps) {
     data: bookingsData,
     isLoading: isLoadingBookings,
     isFetching: isFetchingBookings,
-  } = useGetAllUserBookingsQuery(
-    { userId: user?.id, params: { page: 1, limit: 1000 } },
+  } = useGetAllCustomerBookingsQuery(
+    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
     {
       skip: !user || canManageRooms,
       refetchOnMountOrArgChange: 30,
@@ -62,7 +64,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
   const userBooking = bookingsData?.data.find(
     (booking) =>
       booking?.room?.id === room.id &&
-      booking.userId === parseInt(user?.id || "0") &&
+      booking.customerId === Number(user?.id) &&
       booking.status !== "CANCELLED" &&
       booking.status !== "COMPLETED"
   );
@@ -164,7 +166,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                 </button>
               )}
             </div>
-            {canManageRooms && (
+            {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -362,7 +364,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                           <BookingButton
                             roomId={room.id}
                             price={room.pricePerNight}
-                            userId={user?.id ? parseInt(user.id) : undefined}
+                            customerId={user?.id ? Number(user.id) : undefined}
                             variant="default"
                             size="lg"
                             className="w-full cursor-pointer"

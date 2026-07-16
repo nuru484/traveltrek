@@ -86,7 +86,7 @@ export function UsersDataTable({
   const handleDeleteSelected = () => {
     const selectedRows = table.getSelectedRowModel().rows;
     if (selectedRows.length === 0) {
-      toast.error("Please select users to delete");
+      toast.error("Please select staff to delete");
       return;
     }
 
@@ -231,7 +231,7 @@ export function UsersDataTable({
                   >
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <div className="text-muted-foreground">
-                        No users found
+                        No staff found
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Try adjusting your search or filter criteria

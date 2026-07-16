@@ -17,10 +17,20 @@ import { useLogoutMutation } from "@/redux/auth/authApi";
 import toast from "react-hot-toast";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { useRouter } from "next/navigation";
+import { isStaff } from "@/utils/roles";
 
 export function UserProfileDropdown() {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
+
+  // Customers (no role field) live under /customers; staff under /users.
+  const staff = isStaff(user);
+  const profileHref = staff
+    ? `/dashboard/users/${user?.id}/user-profile`
+    : `/dashboard/customers/${user?.id}`;
+  const editHref = staff
+    ? `/dashboard/users/${user?.id}/edit-profile?userId=${user?.id}`
+    : `/dashboard/customers/${user?.id}/edit`;
 
   const [logout, { isLoading }] = useLogoutMutation();
 
@@ -58,25 +68,19 @@ export function UserProfileDropdown() {
           <div className="flex min-w-0 flex-col space-y-1">
             <p className="truncate text-sm font-medium leading-none">{user.name}</p>
             <p className="truncate text-xs leading-none text-muted-foreground">
-              {user.email}
+              {user.email || user.phone || ""}
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link
-            href={`/dashboard/users/${user.id}/user-profile`}
-            className="cursor-pointer"
-          >
+          <Link href={profileHref} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             <span>View Profile</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link
-            href={`/dashboard/users/${user.id}/edit-profile?userId=${user.id}`}
-            className="cursor-pointer"
-          >
+          <Link href={editHref} className="cursor-pointer">
             <Edit className="mr-2 h-4 w-4" />
             <span>Edit Profile</span>
           </Link>

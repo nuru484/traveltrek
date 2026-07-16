@@ -1,8 +1,11 @@
 // src/components/users/UserForm.tsx
+//
+// STAFF form: /users is staff-only on the backend. Create requires the role
+// (ADMIN | AGENT) plus name/email/address (backend adminCreateUserSchema);
+// password is optional in both modes. Customers are managed by CustomerForm.
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -16,6 +19,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, X, Upload } from "lucide-react";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -25,19 +35,11 @@ import {
 } from "@/redux/userApi";
 import { IUserResponse } from "@/types/user.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
-
-const userFormSchema = z.object({
-  name: z.string().min(1, "Full name is required"),
-  email: z.string().email("Invalid email"),
-  phone: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  password: z.string().optional(),
-  profilePicture: z.any().optional(),
-});
-
-type UserFormValues = z.infer<typeof userFormSchema>;
+import {
+  staffCreateFormSchema,
+  staffUpdateFormSchema,
+  IStaffCreateFormSchema,
+} from "@/validation/user-validation";
 
 interface IUserFormProps {
   mode: "create" | "edit";
@@ -46,72 +48,55 @@ interface IUserFormProps {
 
 export default function UserForm({ mode, user }: IUserFormProps) {
   const router = useRouter();
-  const authUser = useSelector((state: RootState) => state.auth.user);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     user?.profilePicture || null
   );
+  const [pictureFile, setPictureFile] = useState<File | undefined>(undefined);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const [registerUser, { isLoading: isCreating }] = useCreateUserMutation();
+  const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] =
     useUpdateUserProfileMutation();
 
-  const defaultValues: Partial<UserFormValues> = useMemo(
+  const defaultValues: Partial<IStaffCreateFormSchema> = useMemo(
     () => ({
       name: user?.name || "",
       email: user?.email || "",
       phone: user?.phone || "",
       address: user?.address || "",
-      profilePicture: undefined,
+      role: user?.role,
+      password: "",
     }),
     [user]
   );
 
-  const form = useForm<UserFormValues>({
+  const form = useForm<IStaffCreateFormSchema>({
+    // The edit schema is the create schema minus the role requirement; the
+    // cast reconciles the two zod output types for react-hook-form.
     resolver: zodResolver(
-      mode === "create"
-        ? userFormSchema.extend({
-            password: z
-              .string()
-              .min(4, "Password is required and must be at least 4 characters"),
-          })
-        : userFormSchema
-    ),
+      mode === "create" ? staffCreateFormSchema : staffUpdateFormSchema
+    ) as Resolver<IStaffCreateFormSchema>,
     defaultValues,
   });
 
   const handleImageChange = (file: File | undefined) => {
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        form.setError("profilePicture", {
-          type: "manual",
-          message: "Please select a valid image file",
-        });
-        return;
-      }
-
-      // Validate file size (e.g., max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        form.setError("profilePicture", {
-          type: "manual",
-          message: "Image size should be less than 5MB",
-        });
-        return;
-      }
-
-      if (previewUrl && previewUrl !== user?.profilePicture) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-
-      // Update form field
-      form.setValue("profilePicture", file);
-      form.clearErrors("profilePicture");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    if (previewUrl && previewUrl !== user?.profilePicture) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setPreviewUrl(URL.createObjectURL(file));
+    setPictureFile(file);
   };
 
   const removeImage = () => {
@@ -120,7 +105,7 @@ export default function UserForm({ mode, user }: IUserFormProps) {
     }
 
     setPreviewUrl(null);
-    form.setValue("profilePicture", undefined);
+    setPictureFile(undefined);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -135,59 +120,42 @@ export default function UserForm({ mode, user }: IUserFormProps) {
     };
   }, [previewUrl, user?.profilePicture]);
 
-  const onSubmit = async (values: UserFormValues) => {
+  const onSubmit = async (values: IStaffCreateFormSchema) => {
     try {
       const formData = new FormData();
       formData.append("name", values.name);
       formData.append("email", values.email);
+      if (mode === "create") formData.append("role", values.role);
       if (values.phone) formData.append("phone", values.phone);
       if (values.address) formData.append("address", values.address);
       if (values.password) formData.append("password", values.password);
-      if (values.profilePicture)
-        formData.append("profilePicture", values.profilePicture);
-
-      let resultUser: IUserResponse["data"];
+      if (pictureFile) formData.append("profilePicture", pictureFile);
 
       if (mode === "create") {
-        const res = await registerUser(formData).unwrap();
-        resultUser = res.data;
-        toast.success("User created successfully");
+        await createUser(formData).unwrap();
+        toast.success("Staff account created successfully");
       } else {
-        const res = await updateUser({
+        await updateUser({
           userId: user!.id,
           data: formData,
         }).unwrap();
-        resultUser = res.data;
-        toast.success("User updated successfully");
+        toast.success("Staff account updated successfully");
       }
 
-      if (resultUser.role === "CUSTOMER") {
-        router.push(`/dashboard/users/${resultUser.id}/user-profile`);
-      } else if (
-        (resultUser.role === "ADMIN" || resultUser.role === "AGENT") &&
-        resultUser.id !== authUser?.id
-      ) {
-        router.push("/dashboard/users");
-      } else {
-        router.push(`/dashboard/users/${resultUser.id}/user-profile`);
-      }
+      router.push("/dashboard/users");
     } catch (error) {
-
-      // Extract message and field-level errors
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
       if (hasFieldErrors && fieldErrors) {
         Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof UserFormValues, {
+          form.setError(field as keyof IStaffCreateFormSchema, {
             message: errorMessage,
           });
         });
-
-        toast.error(message);
-      } else {
-        toast.error(message || "Operation failed");
       }
+
+      toast.error(message || "Operation failed");
     }
   };
 
@@ -222,7 +190,7 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="user@example.com"
+                        placeholder="staff@example.com"
                         {...field}
                       />
                     </FormControl>
@@ -230,6 +198,33 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                   </FormItem>
                 )}
               />
+
+              {mode === "create" && (
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a staff role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="ADMIN">Admin</SelectItem>
+                          <SelectItem value="AGENT">Agent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -254,7 +249,9 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address (Optional)</FormLabel>
+                    <FormLabel>
+                      {mode === "create" ? "Address" : "Address (Optional)"}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="123 Main Street, City, Region"
@@ -267,89 +264,87 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                 )}
               />
 
-              {mode === "create" && (
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Create a strong password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
               <FormField
                 control={form.control}
-                name="profilePicture"
-                render={() => (
+                name="password"
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Profile Picture (Optional)</FormLabel>
+                    <FormLabel>
+                      {mode === "create"
+                        ? "Password (Optional)"
+                        : "Set New Password (Optional)"}
+                    </FormLabel>
                     <FormControl>
-                      <div className="space-y-3">
-                        {/* Image Preview */}
-                        {previewUrl && (
-                          <div className="relative w-24 h-24 mx-auto">
-                            <div className="relative w-full h-full rounded-full overflow-hidden border border-muted-foreground/20">
-                              <Image
-                                src={previewUrl}
-                                alt="Profile preview"
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={removeImage}
-                              className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
-                              aria-label="Remove image"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* File Input */}
-                        <div className="relative">
-                          <Input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleImageChange(e.target.files?.[0])
-                            }
-                            disabled={isLoading}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full bg-muted border-dashed border hover:bg-muted/80"
-                            disabled={isLoading}
-                          >
-                            <Upload className="mr-2 h-4 w-4" />
-                            {previewUrl ? "Change Picture" : "Upload Picture"}
-                          </Button>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground text-center">
-                          Supported formats: JPG, PNG, GIF (Max 5MB)
-                        </p>
-                      </div>
+                      <Input
+                        type="password"
+                        placeholder={
+                          mode === "create"
+                            ? "Leave blank to let them set it via reset"
+                            : "Leave blank to keep the current password"
+                        }
+                        {...field}
+                        value={field.value ?? ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <FormItem>
+                <FormLabel>Profile Picture (Optional)</FormLabel>
+                <FormControl>
+                  <div className="space-y-3">
+                    {/* Image Preview */}
+                    {previewUrl && (
+                      <div className="relative w-24 h-24 mx-auto">
+                        <div className="relative w-full h-full rounded-full overflow-hidden border border-muted-foreground/20">
+                          <Image
+                            src={previewUrl}
+                            alt="Profile preview"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
+                          aria-label="Remove image"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* File Input */}
+                    <div className="relative">
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageChange(e.target.files?.[0])}
+                        disabled={isLoading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full bg-muted border-dashed border hover:bg-muted/80"
+                        disabled={isLoading}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {previewUrl ? "Change Picture" : "Upload Picture"}
+                      </Button>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground text-center">
+                      Supported formats: JPG, PNG, GIF (Max 5MB)
+                    </p>
+                  </div>
+                </FormControl>
+              </FormItem>
 
               <div className="flex gap-3 pt-4">
                 <Button
@@ -369,7 +364,7 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                   {isLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {mode === "create" ? "Create User" : "Update User"}
+                  {mode === "create" ? "Create Staff" : "Update Staff"}
                 </Button>
               </div>
             </form>

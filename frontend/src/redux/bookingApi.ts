@@ -44,11 +44,12 @@ export const bookingApi = apiSlice.injectEndpoints({
           : ["Bookings"],
     }),
 
-    getAllUserBookings: builder.query<
+    // Bookings hang off Customers (backend: GET /bookings/customer/:customerId)
+    getAllCustomerBookings: builder.query<
       IBookingsPaginatedResponse,
-      { userId: number; params?: IBookingsQueryParams }
+      { customerId: number; params?: IBookingsQueryParams }
     >({
-      query: ({ userId, params = {} }) => {
+      query: ({ customerId, params = {} }) => {
         const searchParams = new URLSearchParams();
 
         Object.entries(params).forEach(([key, value]) => {
@@ -58,22 +59,23 @@ export const bookingApi = apiSlice.injectEndpoints({
         });
 
         return {
-          url: `/bookings/user/${userId}${
+          url: `/bookings/customer/${customerId}${
             searchParams.toString() ? `?${searchParams.toString()}` : ""
           }`,
           method: "GET",
         };
       },
-      providesTags: (result) =>
+      providesTags: (result, error, { customerId }) =>
         result
           ? [
               ...result.data.map(({ id }) => ({
-                type: "UserBooking" as const,
+                type: "Booking" as const,
                 id,
               })),
-              "UserBookings",
+              { type: "CustomerBookings" as const, id: customerId },
+              "Bookings",
             ]
-          : ["UserBookings"],
+          : [{ type: "CustomerBookings" as const, id: customerId }],
     }),
 
     // Get booking by ID
@@ -96,13 +98,12 @@ export const bookingApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [
         "Bookings",
+        "CustomerBookings",
         "Hotels",
         "Flight",
         "Flights",
         "Tours",
         "Tour",
-        "UserBooking",
-        "UserBookings",
         "Rooms",
         "Room",
       ],
@@ -121,13 +122,12 @@ export const bookingApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { bookingId }) => [
         { type: "Booking", id: bookingId },
         "Bookings",
+        "CustomerBookings",
         "Hotels",
         "Flight",
         "Flights",
         "Tours",
         "Tour",
-        "UserBooking",
-        "UserBookings",
       ],
     }),
 
@@ -140,13 +140,12 @@ export const bookingApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, bookingId) => [
         { type: "Booking", id: bookingId },
         "Bookings",
+        "CustomerBookings",
         "Hotels",
         "Flight",
         "Flights",
         "Tours",
         "Tour",
-        "UserBooking",
-        "UserBookings",
       ],
     }),
 
@@ -162,13 +161,12 @@ export const bookingApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [
         "Bookings",
+        "CustomerBookings",
         "Hotels",
         "Flight",
         "Flights",
         "Tours",
         "Tour",
-        "UserBooking",
-        "UserBookings",
       ],
     }),
 
@@ -198,7 +196,7 @@ export const bookingApi = apiSlice.injectEndpoints({
 
 export const {
   useGetAllBookingsQuery,
-  useGetAllUserBookingsQuery,
+  useGetAllCustomerBookingsQuery,
   useGetBookingQuery,
   useCreateBookingMutation,
   useUpdateBookingMutation,
@@ -207,6 +205,6 @@ export const {
   useSearchBookingsQuery,
 
   useLazyGetAllBookingsQuery,
-  useLazyGetAllUserBookingsQuery,
+  useLazyGetAllCustomerBookingsQuery,
   useLazySearchBookingsQuery,
 } = bookingApi;

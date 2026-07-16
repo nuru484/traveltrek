@@ -82,10 +82,10 @@ const UsersManagePage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold truncate">
-              Users Management
+              Staff Management
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Manage all registered users and their roles
+              Manage staff accounts (admins and agents) and their roles
             </p>
           </div>
 
@@ -93,7 +93,7 @@ const UsersManagePage = () => {
             href="/dashboard/users/create-user"
             className="px-3 py-2 sm:px-4 sm:py-2 bg-foreground text-background rounded-md cursor-pointer transition-colors duration-200 hover:bg-foreground/90 text-sm sm:text-base font-medium text-center whitespace-nowrap flex-shrink-0"
           >
-            Add User
+            Add Staff
           </Link>
         </div>
 

@@ -4,10 +4,12 @@
 // GH₵ 1.00 = 100. Averages may carry 2-dp fractions of a pesewa.
 // types/reports.types.ts
 import { IDestinationSummary } from "./tour.types";
-export interface IUserSummary {
+
+/** Customer summary embedded in report rows (nullable email column). */
+export interface ICustomerSummary {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
 }
 
 export interface ITourSummary {
@@ -21,7 +23,7 @@ export interface IBookingSummary {
   bookingDate: Date;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   tour: ITourSummary | null;
-  user: IUserSummary;
+  customer: ICustomerSummary;
 }
 
 export interface IPaymentSummary {
@@ -36,7 +38,7 @@ export interface IPaymentSummary {
     | "BANK_TRANSFER";
   paymentDate: Date | null;
   transactionReference: string | null;
-  user: IUserSummary;
+  customer: ICustomerSummary;
   booking: {
     id: number;
     totalPrice: number;
@@ -62,8 +64,6 @@ export interface ITourTopStats {
     totalBookings: number;
     confirmedBookings: number;
     totalRevenue: number;
-    averageRating: number;
-    reviewCount: number;
   };
 }
 
@@ -73,7 +73,7 @@ export interface IReportsQueryParams {
   startDate?: string;
   endDate?: string;
   tourId?: number;
-  userId?: number;
+  customerId?: number;
   status?: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   paymentMethod?:
     | "CREDIT_CARD"
@@ -113,9 +113,9 @@ export interface IMonthlyBookingsResponse {
       revenue: number;
       averageValue: number;
     }>;
-    statusBreakdown: Record<
-      "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED",
-      number
+    /** Only statuses that occurred are present (backend Partial<Record>). */
+    statusBreakdown: Partial<
+      Record<"PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED", number>
     >;
     bookings: IBookingSummary[];
   };
@@ -138,13 +138,18 @@ export interface IPaymentsSummaryResponse {
         endDate: string | null;
       };
     };
-    statusBreakdown: Record<
-      "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED",
-      { count: number; amount: number }
+    /** Only statuses/methods that occurred are present (backend Partial<Record>). */
+    statusBreakdown: Partial<
+      Record<
+        "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED",
+        { count: number; amount: number }
+      >
     >;
-    methodBreakdown: Record<
-      "CREDIT_CARD" | "DEBIT_CARD" | "MOBILE_MONEY" | "BANK_TRANSFER",
-      { count: number; amount: number }
+    methodBreakdown: Partial<
+      Record<
+        "CREDIT_CARD" | "DEBIT_CARD" | "MOBILE_MONEY" | "BANK_TRANSFER",
+        { count: number; amount: number }
+      >
     >;
     monthlyBreakdown: Array<{
       month: string;

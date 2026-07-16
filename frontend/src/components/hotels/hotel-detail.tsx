@@ -6,7 +6,7 @@ import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import { RootState } from "@/redux/store";
 import { useDeleteHotelMutation } from "@/redux/hotelApi";
-import { useGetAllUserBookingsQuery } from "@/redux/bookingApi";
+import { useGetAllCustomerBookingsQuery } from "@/redux/bookingApi";
 import { IHotel } from "@/types/hotel.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { ConfirmationDialog } from "../ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { isAdmin as isAdminUser, isStaff } from "@/utils/roles";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import { BookingButton } from "../bookings/BookingButton";
@@ -48,16 +49,19 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = isAdminUser(user);
+  // Staff (admin or agent) book on behalf of a customer; only customers self-book.
+  const staff = isStaff(user);
   const [deleteHotel, { isLoading: isDeleting }] = useDeleteHotelMutation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const {
     data: bookingsData,
     isError: isBookingsError,
-    error: bookingsError } = useGetAllUserBookingsQuery(
-    { userId: user?.id, params: { page: 1, limit: 1000 } },
-    { skip: !user }
+    error: bookingsError } = useGetAllCustomerBookingsQuery(
+    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
+    // Customer-only: staff have no booking history of their own.
+    { skip: !user || staff }
   );
 
   useEffect(() => {
@@ -99,7 +103,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
     return bookingsData?.data.some(
       (booking) =>
         booking.room?.id === roomId &&
-        booking.userId === parseInt(user?.id || "0")
+        booking.customerId === Number(user?.id)
     );
   };
 
@@ -374,7 +378,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                 <span className="sm:hidden">Details</span>
                               </Button>
 
-                              {isAdmin ? (
+                              {staff ? (
                                 <BookingButton
                                   roomId={room.id}
                                   price={room.pricePerNight}
@@ -382,7 +386,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                   size="sm"
                                   className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"
                                   disabled={isDeleting}
-                                  label="Book for User"
+                                  label="Book for Customer"
                                 />
                               ) : (
                                 <>
@@ -400,7 +404,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                                     <BookingButton
                                       roomId={room.id}
                                       price={room.pricePerNight}
-                                      userId={parseInt(user?.id || "0")}
+                                      customerId={Number(user?.id) || undefined}
                                       variant="default"
                                       size="sm"
                                       className="flex-1 sm:flex-none sm:min-w-[100px] cursor-pointer"

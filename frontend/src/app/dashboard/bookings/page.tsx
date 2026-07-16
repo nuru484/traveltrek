@@ -5,22 +5,23 @@ import { useSearchParams } from "next/navigation";
 import { BookingsDataTable } from "@/components/bookings/table/BookingsDataTable";
 import {
   useGetAllBookingsQuery,
-  useGetAllUserBookingsQuery,
+  useGetAllCustomerBookingsQuery,
 } from "@/redux/bookingApi";
 import { IBookingsQueryParams } from "@/types/booking.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { isAdmin as isAdminUser, isAgent as isAgentUser } from "@/utils/roles";
 
 const BookingsPage = () => {
   const searchParams = useSearchParams();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN";
-  const isAgent = user?.role === "AGENT";
+  const isAdmin = isAdminUser(user);
+  const isAgent = isAgentUser(user);
   const canViewAllBookings = isAdmin || isAgent;
 
-  const urlUserId = Number(searchParams.get("userId"));
+  const urlCustomerId = Number(searchParams.get("customerId"));
 
   const [params, setParams] = React.useState<IBookingsQueryParams>({
     page: 1,
@@ -35,7 +36,7 @@ const BookingsPage = () => {
     isLoading: isAdminLoading,
     refetch: adminRefetch,
   } = useGetAllBookingsQuery(params, {
-    skip: !canViewAllBookings || !!urlUserId,
+    skip: !canViewAllBookings || !!urlCustomerId,
   });
 
   const {
@@ -44,20 +45,22 @@ const BookingsPage = () => {
     isError: isUserError,
     isLoading: isUserLoading,
     refetch: userRefetch,
-  } = useGetAllUserBookingsQuery(
+  } = useGetAllCustomerBookingsQuery(
     {
-      userId: urlUserId || user?.id || 0,
+      customerId: urlCustomerId || user?.id || 0,
       params,
     },
     {
-      skip: (!urlUserId && !user?.id) || (!canViewAllBookings && !user?.id),
+      // Used for an explicit ?customerId (staff drill-down) or for a
+      // customer's own bookings; staff without a target skip it.
+      skip: urlCustomerId ? false : !user?.id || canViewAllBookings,
     }
   );
 
   // Decide which data to show
   let bookingsData, error, isError, isLoading, refetch;
 
-  if (urlUserId) {
+  if (urlCustomerId) {
     bookingsData = userBookingsData;
     error = userError;
     isError = isUserError;
@@ -115,15 +118,15 @@ const BookingsPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">
-            {urlUserId && canViewAllBookings
-              ? `All Bookings for User #${urlUserId}`
-              : canViewAllBookings && !urlUserId
+            {urlCustomerId && canViewAllBookings
+              ? `All Bookings for Customer #${urlCustomerId}`
+              : canViewAllBookings && !urlCustomerId
               ? "All Bookings"
               : "My Bookings"}
           </h1>
           <p className="text-muted-foreground">
-            {urlUserId
-              ? "Manage bookings for the selected user"
+            {urlCustomerId
+              ? "Manage bookings for the selected customer"
               : canViewAllBookings
               ? "Manage all customer bookings"
               : "View and manage your bookings"}

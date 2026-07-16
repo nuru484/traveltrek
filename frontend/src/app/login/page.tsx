@@ -8,6 +8,9 @@ import {
   ILoginFormSchema,
 } from "@/validation/auth-validation";
 import LoginForm from "@/components/authentication/LoginForm";
+import OtpLoginForm from "@/components/authentication/OtpLoginForm";
+import GoogleSignInButton from "@/components/authentication/GoogleSignInButton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { useLoginMutation } from "@/redux/auth/authApi";
@@ -163,11 +166,31 @@ export default function LoginPage() {
             </div>
 
             <div className="px-5 py-7 sm:px-6 sm:py-8">
-              <LoginForm
-                form={form}
-                onSubmit={onSubmit}
-                isLoading={isLoading}
-              />
+              <Tabs defaultValue="password" className="w-full">
+                <TabsList className="mb-6 grid w-full grid-cols-2">
+                  <TabsTrigger value="password" className="cursor-pointer">
+                    Password
+                  </TabsTrigger>
+                  <TabsTrigger value="otp" className="cursor-pointer">
+                    Email me a code
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="password">
+                  <LoginForm
+                    form={form}
+                    onSubmit={onSubmit}
+                    isLoading={isLoading}
+                  />
+                </TabsContent>
+                <TabsContent value="otp">
+                  <OtpLoginForm />
+                </TabsContent>
+              </Tabs>
+
+              {/* Google sign-in (rendered only when configured) */}
+              <div className="mt-6">
+                <GoogleSignInButton />
+              </div>
             </div>
           </div>
         </div>

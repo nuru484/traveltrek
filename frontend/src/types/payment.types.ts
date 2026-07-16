@@ -20,16 +20,18 @@ export interface IBookedItem {
   type: "TOUR" | "HOTEL" | "ROOM" | "FLIGHT";
 }
 
-export interface IPaymentUser {
+/** Customer summary embedded in a payment (backend paymentInclude.customer). */
+export interface IPaymentCustomer {
   id: number;
   name: string;
-  email: string;
+  /** Nullable column — phone-only customers have no email. */
+  email: string | null;
 }
 
 export interface IPayment {
   id: number;
   bookingId: number;
-  userId: number;
+  customerId: number;
   /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
   amount: number;
   currency: string;
@@ -40,7 +42,7 @@ export interface IPayment {
   createdAt: Date;
   updatedAt: Date;
   bookedItem: IBookedItem;
-  user: IPaymentUser;
+  customer: IPaymentCustomer;
 }
 
 export interface IPaymentsPaginatedResponse {
@@ -105,21 +107,16 @@ export interface IDeletePaymentResponse {
 export interface IDeleteAllPaymentsParams {
   status?: "PENDING" | "FAILED" | "REFUNDED";
   paymentMethod?: IPaymentMethod;
-  userId?: number;
+  customerId?: number;
   beforeDate?: string;
 }
 
+/** DELETE /payments (admin bulk wipe) — no filters; counts only. */
 export interface IDeleteAllPaymentsResponse {
   message: string;
   data: {
     deletedCount: number;
-    bookingsAffected: number[];
-    filters: {
-      status?: string;
-      paymentMethod?: string;
-      userId?: number;
-      beforeDate?: string;
-    };
+    bookingsAffected: number;
   };
 }
 
@@ -145,8 +142,7 @@ export interface IPaymentsQueryParams {
   limit?: number;
   status?: IPaymentStatus;
   paymentMethod?: IPaymentMethod;
-  userId?: number;
-  bookingType?: "TOUR" | "HOTEL" | "ROOM" | "FLIGHT";
+  customerId?: number;
   search?: string;
   bookingId?: number;
 }

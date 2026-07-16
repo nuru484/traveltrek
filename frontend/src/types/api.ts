@@ -1,6 +1,9 @@
 // src/types/api.ts
 export const apiSliceTags = [
   "Customer",
+  "Customers",
+  "CustomerBookings",
+  "CustomerPayments",
   "Flight",
   "Flights",
   "Destination",
@@ -10,12 +13,8 @@ export const apiSliceTags = [
   "Tours",
   "Booking",
   "Bookings",
-  "UserBooking",
-  "UserBookings",
   "Payment",
   "Payments",
-  "UserPayment",
-  "UserPayments",
   "User",
   "Users",
   "Dashboard",
@@ -27,8 +26,16 @@ export const apiSliceTags = [
   "BookingsReport",
 ] as const;
 
+/** Success envelope: { message, data, meta? } (lists put pagination in meta). */
 export interface IApiResponse<T> {
   message: string;
   data: T;
   meta?: unknown;
+}
+
+export interface IPaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

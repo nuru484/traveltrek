@@ -1,14 +1,22 @@
 // src/types/user.ts
+//
+// /users is STAFF-ONLY (backend Phase 5b): every User row is an ADMIN or
+// AGENT account. Customers are a separate principal under /customers.
 export type UserRole = "ADMIN" | "CUSTOMER" | "AGENT";
 
+/** The only roles a User row may carry (customers are not users anymore). */
+export type StaffRole = "ADMIN" | "AGENT";
+
+/** Mirrors backend UserDTO (src/utils/mappers/user.mapper.ts). */
 export interface IUser {
   id: number;
   name: string;
-  email: string;
-  role: UserRole;
-  phone: string;
-  profilePicture: string | null;
-  address: string;
+  /** Absent for phone-only accounts. */
+  email?: string;
+  role: StaffRole;
+  phone?: string;
+  profilePicture?: string;
+  address?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,8 +46,9 @@ export interface IUserUpdateInput {
   profilePicture?: string;
 }
 
+/** PATCH /users/:userId/role — staff-only enum on the backend. */
 export interface IChangeRoleInput {
-  role: UserRole;
+  role: StaffRole;
 }
 
 export interface IDeleteAllUsersInput {
@@ -49,7 +58,7 @@ export interface IDeleteAllUsersInput {
 export interface IUsersQueryParams {
   page?: number;
   limit?: number;
-  role?: UserRole;
+  role?: StaffRole;
   search?: string;
 }
 

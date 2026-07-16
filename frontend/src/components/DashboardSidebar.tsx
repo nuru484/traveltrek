@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "../redux/store";
+import { isAdmin, isAgent } from "@/utils/roles";
 import Image from "next/image";
 import {
   MapPin,
@@ -14,6 +15,7 @@ import {
   LayoutDashboard,
   Home,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,9 +37,14 @@ const adminNavigationItems = [
     icon: LayoutDashboard,
   },
   {
-    name: "Users",
-    path: "/dashboard/users",
+    name: "Customers",
+    path: "/dashboard/customers",
     icon: Users,
+  },
+  {
+    name: "Staff",
+    path: "/dashboard/users",
+    icon: ShieldCheck,
   },
   {
     name: "Tours",
@@ -82,6 +89,11 @@ const agentNavigationItems = [
     name: "Dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    name: "Customers",
+    path: "/dashboard/customers",
+    icon: Users,
   },
   {
     name: "Tours",
@@ -150,12 +162,12 @@ export default function DashboardSidebar() {
 
   const { isMobile, setOpenMobile } = useSidebar();
 
-  const navigationItems =
-    user?.role === "ADMIN"
-      ? adminNavigationItems
-      : user?.role === "AGENT"
-      ? agentNavigationItems
-      : customerNavigationItems;
+  // Missing role means CUSTOMER (customer sessions carry no role field).
+  const navigationItems = isAdmin(user)
+    ? adminNavigationItems
+    : isAgent(user)
+    ? agentNavigationItems
+    : customerNavigationItems;
 
   const handleLinkClick = () => {
     if (isMobile) {

@@ -16,7 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import { IUser, UserRole } from "@/types/user.types";
+import { IUser, StaffRole } from "@/types/user.types";
 import {
   useUpdateUserRoleMutation,
   useDeleteUserMutation,
@@ -33,7 +33,7 @@ export function UserActionsDropdown({ user }: UserActionsDropdownProps) {
   const [updateUserRole] = useUpdateUserRoleMutation();
   const [deleteUser] = useDeleteUserMutation();
 
-  const handleChangeRole = async (newRole: UserRole) => {
+  const handleChangeRole = async (newRole: StaffRole) => {
     const toastId = toast.loading(`Changing role to ${newRole}...`);
 
     try {
@@ -63,10 +63,9 @@ export function UserActionsDropdown({ user }: UserActionsDropdownProps) {
     }
   };
 
-  const roleOptions: { value: UserRole; label: string }[] = [
+  const roleOptions: { value: StaffRole; label: string }[] = [
     { value: "ADMIN", label: "Admin" },
     { value: "AGENT", label: "Agent" },
-    { value: "CUSTOMER", label: "Customer" },
   ];
 
   return (
@@ -139,7 +138,7 @@ export function UserActionsDropdown({ user }: UserActionsDropdownProps) {
             onClick={() => setDeleteDialogOpen(true)}
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Delete User
+            Delete Staff
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -148,7 +147,7 @@ export function UserActionsDropdown({ user }: UserActionsDropdownProps) {
       <ConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Delete User"
+        title="Delete Staff"
         description={`Are you sure you want to delete "${user.name}"? This action cannot be undone.`}
         onConfirm={handleDeleteUser}
         confirmText="Delete"

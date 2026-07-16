@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useCreateBookingMutation } from "@/redux/bookingApi";
-import { useGetAllUsersQuery, useLazySearchUsersQuery } from "@/redux/userApi";
+import {
+  useGetAllCustomersQuery,
+  useLazyGetAllCustomersQuery,
+} from "@/redux/customerApi";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,7 +36,8 @@ interface IBookingButtonProps {
   flightId?: number;
   roomId?: number;
   price: number;
-  userId?: number;
+  /** Self-booking: the logged-in customer's id. Staff omit it and pick a customer. */
+  customerId?: number;
   disabled?: boolean;
   variant?:
     | "default"
@@ -52,7 +56,7 @@ export function BookingButton({
   flightId,
   roomId,
   price,
-  userId,
+  customerId,
   disabled = false,
   variant = "default",
   size = "default",
@@ -60,18 +64,19 @@ export function BookingButton({
   label,
 }: IBookingButtonProps) {
   const [createBooking, { isLoading }] = useCreateBookingMutation();
-  const { data: usersData, isLoading: isUsersLoading } = useGetAllUsersQuery({
-    page: 1,
-    limit: 50,
-  });
+  // Staff pick a customer to book for; skip the staff-only list for self-booking.
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useGetAllCustomersQuery({ page: 1, limit: 50 }, { skip: Boolean(customerId) });
 
   const [
-    searchUsers,
+    searchCustomers,
     { data: searchData, isError: isSearchError, error: searchError },
-  ] = useLazySearchUsersQuery();
+  ] = useLazyGetAllCustomersQuery();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
+    null
+  );
   const [searchTerm, setSearchTerm] = useState("");
 
   // New state for additional booking details. The counts are kept as raw
@@ -95,7 +100,7 @@ export function BookingButton({
   useEffect(() => {
     if (isSearchError && searchError) {
       const { message } = extractApiErrorMessage(searchError);
-      toast.error(message || "Failed to search users");
+      toast.error(message || "Failed to search customers");
     }
   }, [isSearchError, searchError]);
 
@@ -104,7 +109,7 @@ export function BookingButton({
   const handleDialogOpenChange = (nextOpen: boolean) => {
     setIsDialogOpen(nextOpen);
     if (!nextOpen) {
-      setSelectedUserId(null);
+      setSelectedCustomerId(null);
       setSearchTerm("");
       setNumberOfGuests("1");
       setSpecialRequests("");
@@ -114,7 +119,7 @@ export function BookingButton({
     }
   };
 
-  const handleBook = async (finalUserId: number) => {
+  const handleBook = async (finalCustomerId: number) => {
     try {
       // Validate room booking dates
       if (roomId && (!startDate || !endDate)) {
@@ -125,7 +130,7 @@ export function BookingButton({
       }
 
       const payload: IBookingInput = {
-        userId: finalUserId,
+        customerId: finalCustomerId,
         totalPrice: calculatedTotalPrice,
         numberOfGuests: guestsCount,
         specialRequests: specialRequests.trim() || null,
@@ -170,24 +175,24 @@ export function BookingButton({
     setSearchTerm(val);
     if (val.trim().length > 1) {
       const delayDebounce = setTimeout(() => {
-        searchUsers({ search: val, page: 1, limit: 50 });
+        searchCustomers({ search: val, page: 1, limit: 50 });
       }, 400);
       return () => clearTimeout(delayDebounce);
     }
   };
 
-  const availableUsers =
+  const availableCustomers =
     searchTerm.trim().length > 1
       ? searchData?.data || []
-      : usersData?.data || [];
+      : customersData?.data || [];
 
   // Get minimum date (today)
   const minDate = new Date().toISOString().split("T")[0];
 
   return (
     <>
-      {userId ? (
-        // Normal user: Show dialog for additional details
+      {customerId ? (
+        // Customer self-booking: show dialog for additional details
         <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button
@@ -363,7 +368,7 @@ export function BookingButton({
                 Cancel
               </Button>
               <Button
-                onClick={() => handleBook(userId)}
+                onClick={() => handleBook(customerId)}
                 disabled={isLoading || Boolean(roomId && (!startDate || !endDate))}
                 className="w-full sm:w-auto"
               >
@@ -383,7 +388,7 @@ export function BookingButton({
           </DialogContent>
         </Dialog>
       ) : (
-        // Admin/agent: select user via dialog with additional fields
+        // Admin/agent: select a customer via dialog with additional fields
         <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button
@@ -403,7 +408,7 @@ export function BookingButton({
                 Create Booking
               </DialogTitle>
               <DialogDescription className="text-left text-sm text-muted-foreground break-words">
-                Select a user and provide booking details.
+                Select a customer and provide booking details.
               </DialogDescription>
             </DialogHeader>
 
@@ -411,16 +416,16 @@ export function BookingButton({
               {/* Search Input */}
               <div className="space-y-2">
                 <Label
-                  htmlFor="user-search"
+                  htmlFor="customer-search"
                   className="text-sm font-medium break-words"
                 >
-                  Search Users
+                  Search Customers
                 </Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <Input
-                    id="user-search"
-                    placeholder="Search by name or email..."
+                    id="customer-search"
+                    placeholder="Search by name, email or phone..."
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     className="pl-9 w-full"
@@ -429,39 +434,39 @@ export function BookingButton({
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {/* User Selection */}
+                {/* Customer Selection */}
                 <div className="space-y-2">
                   <Label
-                    htmlFor="user-select"
+                    htmlFor="customer-select"
                     className="text-sm font-medium break-words"
                   >
-                    Select User
+                    Select Customer
                   </Label>
                   <Select
-                    value={selectedUserId ? String(selectedUserId) : ""}
-                    onValueChange={(val) => setSelectedUserId(Number(val))}
+                    value={selectedCustomerId ? String(selectedCustomerId) : ""}
+                    onValueChange={(val) => setSelectedCustomerId(Number(val))}
                   >
-                    <SelectTrigger id="user-select" className="w-full">
-                      <SelectValue placeholder="Choose a user to book for" />
+                    <SelectTrigger id="customer-select" className="w-full">
+                      <SelectValue placeholder="Choose a customer to book for" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px] max-w-[calc(100vw-4rem)] sm:max-w-[468px]">
-                      {isUsersLoading ? (
+                      {isCustomersLoading ? (
                         <div className="flex items-center justify-center py-6">
                           <Loader2 className="h-5 w-5 animate-spin" />
                         </div>
-                      ) : availableUsers.length > 0 ? (
-                        availableUsers.map((u) => (
+                      ) : availableCustomers.length > 0 ? (
+                        availableCustomers.map((c) => (
                           <SelectItem
-                            key={u.id}
-                            value={String(u.id)}
+                            key={c.id}
+                            value={String(c.id)}
                             className="py-3"
                           >
                             <div className="flex flex-col gap-0.5 min-w-0 w-full">
                               <span className="font-medium text-sm break-all line-clamp-2">
-                                {u.name}
+                                {c.name}
                               </span>
                               <span className="text-xs text-muted-foreground break-all line-clamp-1">
-                                {u.email}
+                                {c.email || c.phone || "No contact"}
                               </span>
                             </div>
                           </SelectItem>
@@ -469,7 +474,7 @@ export function BookingButton({
                       ) : (
                         <div className="flex flex-col items-center py-8">
                           <User className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                          <p className="text-sm">No users found</p>
+                          <p className="text-sm">No customers found</p>
                         </div>
                       )}
                     </SelectContent>
@@ -626,9 +631,11 @@ export function BookingButton({
                 Cancel
               </Button>
               <Button
-                onClick={() => selectedUserId && handleBook(selectedUserId)}
+                onClick={() =>
+                  selectedCustomerId && handleBook(selectedCustomerId)
+                }
                 disabled={
-                  !selectedUserId ||
+                  !selectedCustomerId ||
                   isLoading ||
                   Boolean(roomId && (!startDate || !endDate))
                 }

@@ -10,7 +10,7 @@ import {
   useDeleteFlightMutation,
   useUpdateFlightStatusMutation } from "@/redux/flightApi";
 import {
-  useGetAllUserBookingsQuery,
+  useGetAllCustomerBookingsQuery,
   useCreateBookingMutation,
   useUpdateBookingMutation } from "@/redux/bookingApi";
 import { IFlight } from "@/types/flight.types";
@@ -140,17 +140,18 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   const {
     data: bookingsData,
     isLoading: isLoadingBookings,
-    isFetching: isFetchingBookings } = useGetAllUserBookingsQuery(
-    { userId: user?.id, params: { page: 1, limit: 1000 } },
+    isFetching: isFetchingBookings } = useGetAllCustomerBookingsQuery(
+    { customerId: Number(user?.id), params: { page: 1, limit: 1000 } },
     {
-      skip: !user,
+      // Customer-only: staff have no booking history of their own.
+      skip: !user || isAdmin || isAgent,
       refetchOnMountOrArgChange: 30 }
   );
 
   const userBooking = bookingsData?.data.find(
     (booking) =>
       booking.flight?.id === flight.id &&
-      booking.userId === parseInt(user?.id || "0")
+      booking.customerId === Number(user?.id)
   );
 
   const bookingStatus = userBooking?.status;
@@ -329,7 +330,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
     try {
       await createBooking({
-        userId: parseInt(user.id),
+        customerId: Number(user.id),
         flightId: flight.id,
         totalPrice: flight.price }).unwrap();
       toast.success("Flight booked successfully");

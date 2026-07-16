@@ -2,6 +2,7 @@
 "use client";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { isStaff } from "@/utils/roles";
 import { useGetDashboardStatsQuery } from "@/redux/dashboardApi";
 import { StatsCard } from "./stats-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,7 +71,8 @@ export function DashboardOverview() {
     refetch,
   } = useGetDashboardStatsQuery();
 
-  const isAdmin = user?.role === "ADMIN";
+  // Backend sends the bookings/users blocks to ADMIN and AGENT alike.
+  const staff = isStaff(user);
   const stats = dashboardData?.data;
 
   if (isLoading) {
@@ -149,7 +151,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Admin-only stats */}
-      {isAdmin && stats.bookings && stats.users && (
+      {staff && stats.bookings && stats.users && (
         <div className="space-y-4">
           <SectionLabel>Management overview</SectionLabel>
           <div className="grid gap-4 md:grid-cols-2">
@@ -226,7 +228,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Customer summary */}
-      {!isAdmin && user && (
+      {!staff && user && (
         <div className="overflow-hidden rounded-xl border border-foreground/15 bg-card">
           <div className="px-6 py-10 text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -241,7 +243,7 @@ export function DashboardOverview() {
             </p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <Button asChild className="cursor-pointer">
-                <Link href={`/dashboard/bookings?userId=${user.id}`}>
+                <Link href="/dashboard/bookings">
                   View my bookings
                 </Link>
               </Button>

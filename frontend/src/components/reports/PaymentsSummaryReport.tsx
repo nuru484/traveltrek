@@ -267,7 +267,7 @@ const PaymentItem: React.FC<{ payment: IPaymentSummary }> = ({ payment }) => {
             {payment.status}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">{payment.user.name}</p>
+        <p className="text-sm text-muted-foreground">{payment.customer.name}</p>
         <p className="text-sm text-muted-foreground">
           {payment.paymentMethod.replace("_", " ")} •{" "}
           {payment.booking.tour?.name || "No tour"}

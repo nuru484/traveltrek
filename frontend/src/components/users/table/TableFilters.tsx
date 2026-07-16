@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { IUser, IUsersQueryParams, UserRole } from "@/types/user.types";
+import { IUser, IUsersQueryParams, StaffRole } from "@/types/user.types";
 import { useDebounce } from "@/hooks/useDebounce";
 
 interface ITableFiltersProps {
@@ -59,15 +59,13 @@ export function TableFilters({
   const getRoleFilterValue = () => {
     if (filters.role === "ADMIN") return "admin";
     if (filters.role === "AGENT") return "agent";
-    if (filters.role === "CUSTOMER") return "customer";
     return "all";
   };
 
   const handleRoleFilterChange = (value: string) => {
-    let role: UserRole | undefined;
+    let role: StaffRole | undefined;
     if (value === "admin") role = "ADMIN";
     else if (value === "agent") role = "AGENT";
-    else if (value === "customer") role = "CUSTOMER";
     else role = undefined;
 
     onFiltersChange({ role });
@@ -107,7 +105,7 @@ export function TableFilters({
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">
-              {totalCount} total users
+              {totalCount} total staff
             </div>
           )}
         </div>
@@ -118,7 +116,7 @@ export function TableFilters({
         {/* Search Input */}
         <div className="w-full min-w-0 md:max-w-sm">
           <Input
-            placeholder="Search users by name or email..."
+            placeholder="Search staff by name or email..."
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             className="w-full"
@@ -139,7 +137,6 @@ export function TableFilters({
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="agent">Agent</SelectItem>
-              <SelectItem value="customer">Customer</SelectItem>
             </SelectContent>
           </Select>
 

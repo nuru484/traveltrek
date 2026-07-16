@@ -179,7 +179,7 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4 @3xl/main:grid-cols-4 mb-4">
+        <div className="grid grid-cols-2 gap-4 @3xl/main:grid-cols-3 mb-4">
           <div className="min-w-0">
             <p className="text-sm font-medium">{statistics.totalBookings}</p>
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Total Bookings</p>
@@ -199,17 +199,6 @@ const TourStatsCard: React.FC<{ tourStats: ITourTopStats; rank: number }> = ({
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Revenue</p>
           </div>
 
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
-              {statistics.averageRating > 0
-                ? statistics.averageRating.toFixed(1)
-                : "N/A"}
-            </p>
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              {statistics.reviewCount} review
-              {statistics.reviewCount !== 1 ? "s" : ""}
-            </p>
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-4 border-t">

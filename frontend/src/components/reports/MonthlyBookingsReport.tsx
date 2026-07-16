@@ -212,7 +212,7 @@ const BookingItem: React.FC<{ booking: IBookingSummary }> = ({ booking }) => {
             {booking.status}
           </Badge>
         </div>
-        <p className="truncate text-sm text-muted-foreground">{booking.user.name}</p>
+        <p className="truncate text-sm text-muted-foreground">{booking.customer.name}</p>
         <p className="truncate text-sm text-muted-foreground">
           {booking.tour?.name || "No tour"}
         </p>

@@ -1,8 +1,9 @@
 // src/components/authentication/SignupForm.tsx
 "use client";
+import React from "react";
 import Link from "next/link";
 import { UseFormReturn } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ISignupFormSchema } from "@/validation/auth-validation";
 
 const INPUT_CLASS =
@@ -25,15 +27,31 @@ interface SignupFormProps {
 }
 
 /**
- * Minimal registration in the landing page's document voice: a name and at
- * least one contact channel. The system sends a default password to that
- * channel; the profile is completed later inside the app.
+ * Minimal registration mirroring the backend contract: a name plus ONE
+ * contact channel (email or phone — toggled), and an optional password.
+ * Passwordless accounts sign in with a one-time code sent to that channel.
  */
 export default function SignupForm({
   form,
   onSubmit,
   isLoading,
 }: SignupFormProps) {
+  const [showPassword, setShowPassword] = React.useState(false);
+  const contactMethod = form.watch("contactMethod");
+
+  const handleContactMethodChange = (value: string) => {
+    const method = value === "phone" ? "phone" : "email";
+    form.setValue("contactMethod", method);
+    // Clear the channel that is no longer in play (and its error).
+    if (method === "email") {
+      form.setValue("phone", "");
+      form.clearErrors("phone");
+    } else {
+      form.setValue("email", "");
+      form.clearErrors("email");
+    }
+  };
+
   return (
     <div className="w-full">
       <Form {...form}>
@@ -61,57 +79,111 @@ export default function SignupForm({
             )}
           />
 
-          {/* Side by side where the card is wide — reads as "either/or". */}
-          <div className="grid grid-cols-1 gap-6 min-[480px]:grid-cols-2 min-[480px]:gap-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="you@example.com"
-                      autoComplete="email"
-                      className={INPUT_CLASS}
-                      disabled={isLoading}
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
+          {/* Contact channel toggle: email OR phone */}
+          <div className="space-y-3">
+            <Tabs
+              value={contactMethod}
+              onValueChange={handleContactMethodChange}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="email" className="cursor-pointer">
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="phone" className="cursor-pointer">
+                  Phone
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="tel"
-                      placeholder="+233 54 000 0000"
-                      autoComplete="tel"
-                      className={INPUT_CLASS}
-                      disabled={isLoading}
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
+            {contactMethod === "email" ? (
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                        className={INPUT_CLASS}
+                        disabled={isLoading}
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="+233540000000"
+                        autoComplete="tel"
+                        className={INPUT_CLASS}
+                        disabled={isLoading}
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
 
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password (optional)</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Leave blank to sign in with a code"
+                      autoComplete="new-password"
+                      className={`${INPUT_CLASS} pr-11`}
+                      disabled={isLoading}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      tabIndex={-1}
+                      disabled={isLoading}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage className="text-xs" />
+              </FormItem>
+            )}
+          />
+
           <p className="text-xs leading-relaxed text-muted-foreground">
-            One contact is enough — email or phone. We&apos;ll send your
-            default password there, and you can complete your profile once
-            you&apos;re in.
+            One contact is enough — skip the password and we&apos;ll sign you
+            in with a one-time code sent to it.
           </p>
 
           <Button

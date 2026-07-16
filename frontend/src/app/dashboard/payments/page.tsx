@@ -5,20 +5,21 @@ import { useSearchParams } from "next/navigation";
 import { PaymentsDataTable } from "@/components/payments/table/PaymentsDataTable";
 import {
   useGetAllPaymentsQuery,
-  useGetAllUserPaymentsQuery,
+  useGetAllCustomerPaymentsQuery,
 } from "@/redux/paymentApi";
 import { IPaymentsQueryParams } from "@/types/payment.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { isStaff } from "@/utils/roles";
 
 const PaymentsPage = () => {
   const searchParams = useSearchParams();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isAdmin = user?.role === "ADMIN";
+  const staff = isStaff(user);
 
-  const urlUserId = Number(searchParams.get("userId"));
+  const urlCustomerId = Number(searchParams.get("customerId"));
 
   const [params, setParams] = React.useState<IPaymentsQueryParams>({
     page: 1,
@@ -33,7 +34,8 @@ const PaymentsPage = () => {
     isLoading: isAdminLoading,
     refetch: adminRefetch,
   } = useGetAllPaymentsQuery(params, {
-    skip: !isAdmin || !!urlUserId,
+    // Staff (admin or agent) see the global list; the backend scopes rows.
+    skip: !staff || !!urlCustomerId,
   });
 
   // User query
@@ -43,32 +45,34 @@ const PaymentsPage = () => {
     isError: isUserError,
     isLoading: isUserLoading,
     refetch: userRefetch,
-  } = useGetAllUserPaymentsQuery(
+  } = useGetAllCustomerPaymentsQuery(
     {
-      userId: urlUserId || user?.id || 0,
+      customerId: urlCustomerId || user?.id || 0,
       params,
     },
     {
-      skip: (!urlUserId && !user?.id) || (!isAdmin && !user?.id),
+      // Used for an explicit ?customerId (staff drill-down) or for a
+      // customer's own payments; staff without a target skip it.
+      skip: urlCustomerId ? false : !user?.id || staff,
     }
   );
 
   // Decide which data to show
   let paymentsData, error, isError, isLoading, refetch;
 
-  if (urlUserId) {
+  if (urlCustomerId) {
     paymentsData = userPaymentsData;
     error = userError;
     isError = isUserError;
     isLoading = isUserLoading;
     refetch = userRefetch;
-  } else if (user && !isAdmin) {
+  } else if (user && !staff) {
     paymentsData = userPaymentsData;
     error = userError;
     isError = isUserError;
     isLoading = isUserLoading;
     refetch = userRefetch;
-  } else if (isAdmin) {
+  } else if (staff) {
     paymentsData = adminPaymentsData;
     error = adminError;
     isError = isAdminError;
@@ -97,14 +101,14 @@ const PaymentsPage = () => {
       search: params.search,
       status: params.status,
       paymentMethod: params.paymentMethod,
-      userId: params.userId,
+      customerId: params.customerId,
       bookingId: params.bookingId,
     }),
     [
       params.search,
       params.status,
       params.paymentMethod,
-      params.userId,
+      params.customerId,
       params.bookingId,
     ]
   );
@@ -123,16 +127,16 @@ const PaymentsPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">
-            {urlUserId && isAdmin
-              ? `All Payments for User #${urlUserId}`
-              : isAdmin && !urlUserId
+            {urlCustomerId && staff
+              ? `All Payments for Customer #${urlCustomerId}`
+              : staff && !urlCustomerId
               ? "All Payments"
               : "My Payments"}
           </h1>
           <p className="text-muted-foreground">
-            {urlUserId
-              ? "Manage payments for the selected user"
-              : isAdmin
+            {urlCustomerId
+              ? "Manage payments for the selected customer"
+              : staff
               ? "Manage all customer payments"
               : "View and manage your payments"}
           </p>
@@ -154,7 +158,7 @@ const PaymentsPage = () => {
         showActions={true}
         showPagination={true}
         showSelection={true}
-        showUser={isAdmin}
+        showUser={staff}
         showBooking={true}
       />
     </div>

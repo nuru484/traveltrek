@@ -10,7 +10,6 @@ import {
   IPaymentVerificationResponse,
   IDeletePaymentResponse,
   IDeleteAllPaymentsResponse,
-  IDeleteAllPaymentsParams,
   IRefundPaymentInput,
   IRefundPaymentResponse,
   IPaymentsQueryParams,
@@ -53,12 +52,12 @@ export const paymentApi = apiSlice.injectEndpoints({
           : [{ type: "Payments" as const }],
     }),
 
-    // Get all payments for a specific user
-    getAllUserPayments: builder.query<
+    // Payments hang off Customers (backend: GET /payments/customer/:customerId)
+    getAllCustomerPayments: builder.query<
       IPaymentsPaginatedResponse,
-      { userId: number; params?: IPaymentsQueryParams }
+      { customerId: number; params?: IPaymentsQueryParams }
     >({
-      query: ({ userId, params }) => {
+      query: ({ customerId, params }) => {
         const searchParams = new URLSearchParams();
 
         if (params) {
@@ -70,23 +69,23 @@ export const paymentApi = apiSlice.injectEndpoints({
         }
 
         return {
-          url: `/payments/user/${userId}${
+          url: `/payments/customer/${customerId}${
             searchParams.toString() ? `?${searchParams.toString()}` : ""
           }`,
           method: "GET",
         };
       },
-      providesTags: (result, error, { userId }) =>
+      providesTags: (result, error, { customerId }) =>
         result
           ? [
               ...result.data.map(({ id }) => ({
                 type: "Payment" as const,
                 id,
               })),
-              { type: "UserPayments" as const, id: userId },
+              { type: "CustomerPayments" as const, id: customerId },
               { type: "Payments" as const },
             ]
-          : [{ type: "UserPayments" as const, id: userId }],
+          : [{ type: "CustomerPayments" as const, id: customerId }],
     }),
 
     // Get payment by ID
@@ -107,7 +106,11 @@ export const paymentApi = apiSlice.injectEndpoints({
         method: "POST",
         body: paymentData,
       }),
-      invalidatesTags: [{ type: "Payments" }, { type: "Bookings" }],
+      invalidatesTags: [
+        { type: "Payments" },
+        { type: "CustomerPayments" },
+        { type: "Bookings" },
+      ],
     }),
 
     // Update payment status (ADMIN only)
@@ -123,6 +126,7 @@ export const paymentApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { paymentId }) => [
         { type: "Payment" as const, id: paymentId },
         { type: "Payments" },
+        { type: "CustomerPayments" },
         { type: "Bookings" },
       ],
     }),
@@ -136,34 +140,22 @@ export const paymentApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, paymentId) => [
         { type: "Payment" as const, id: paymentId },
         { type: "Payments" },
+        { type: "CustomerPayments" },
         { type: "Bookings" },
       ],
     }),
 
-    // Delete all payments with filters (ADMIN only)
-    deleteAllPayments: builder.mutation<
-      IDeleteAllPaymentsResponse,
-      IDeleteAllPaymentsParams | void
-    >({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-
-        if (params) {
-          Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== "") {
-              searchParams.append(key, String(value));
-            }
-          });
-        }
-
-        return {
-          url: `/payments${
-            searchParams.toString() ? `?${searchParams.toString()}` : ""
-          }`,
-          method: "DELETE",
-        };
-      },
-      invalidatesTags: [{ type: "Payments" }, { type: "Bookings" }],
+    // Delete all payments (ADMIN only; the backend accepts no filters)
+    deleteAllPayments: builder.mutation<IDeleteAllPaymentsResponse, void>({
+      query: () => ({
+        url: "/payments",
+        method: "DELETE",
+      }),
+      invalidatesTags: [
+        { type: "Payments" },
+        { type: "CustomerPayments" },
+        { type: "Bookings" },
+      ],
     }),
 
     // Refund a payment (ADMIN only)
@@ -179,6 +171,7 @@ export const paymentApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { paymentId }) => [
         { type: "Payment" as const, id: paymentId },
         { type: "Payments" },
+        { type: "CustomerPayments" },
         { type: "Bookings" },
       ],
     }),
@@ -197,7 +190,7 @@ export const paymentApi = apiSlice.injectEndpoints({
 export const {
   // Queries
   useGetAllPaymentsQuery,
-  useGetAllUserPaymentsQuery,
+  useGetAllCustomerPaymentsQuery,
   useGetPaymentQuery,
   usePaymentCallbackQuery,
 
@@ -210,6 +203,6 @@ export const {
 
   // Lazy queries
   useLazyGetAllPaymentsQuery,
-  useLazyGetAllUserPaymentsQuery,
+  useLazyGetAllCustomerPaymentsQuery,
   useLazyPaymentCallbackQuery,
 } = paymentApi;

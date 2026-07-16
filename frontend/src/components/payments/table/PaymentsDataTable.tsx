@@ -31,6 +31,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IPaymentsDataTableProps } from "@/types/payment.types";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { roleOf } from "@/utils/roles";
 import EmptyState from "@/components/ui/EmptyState";
 
 interface PaymentsDataTableProps extends IPaymentsDataTableProps {
@@ -62,7 +63,8 @@ export function PaymentsDataTable({
   showBooking,
   isRecentsView = false }: PaymentsDataTableProps) {
   const user = useSelector((state: RootState) => state.auth.user);
-  const userRole = user.role;
+  // Customer sessions carry no role field; missing role reads as CUSTOMER.
+  const userRole = roleOf(user);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -161,7 +163,7 @@ export function PaymentsDataTable({
     const toastId = toast.loading("Deleting all payments..., please wait");
 
     try {
-      await deleteAllPayments({}).unwrap();
+      await deleteAllPayments().unwrap();
       toast.dismiss(toastId);
       toast.success("All payments deleted successfully");
       setDeleteAllDialogOpen(false);

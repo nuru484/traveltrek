@@ -121,13 +121,15 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
             Customer
           </p>
           <div className="space-y-2.5">
-            <Row label="Name">{payment.user.name}</Row>
+            <Row label="Name">{payment.customer.name}</Row>
             <Row label="Email">
-              <span className="break-all">{payment.user.email}</span>
+              <span className="break-all">
+                {payment.customer.email || "No email"}
+              </span>
             </Row>
             <Row label="Profile">
               <Link
-                href={`/dashboard/users/${payment.userId}/user-profile`}
+                href={`/dashboard/customers/${payment.customerId}`}
                 className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
               >
                 View profile

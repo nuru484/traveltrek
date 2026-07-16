@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { IUser, UserRole } from "@/types/user.types";
+import { IUser, StaffRole } from "@/types/user.types";
 import { UserActionsDropdown } from "./UserActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
 
@@ -71,7 +71,7 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
     ),
     cell: ({ row }) => {
       const name = row.getValue("name") as string;
-      const email = row.original.email;
+      const email = row.original.email || "No email";
       return (
         <div className="max-w-[200px] sm:max-w-[300px]">
           <div className="font-medium truncate text-sm sm:text-base">
@@ -87,16 +87,10 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
     accessorKey: "role",
     header: "Role",
     cell: ({ row }) => {
-      const role = row.getValue("role") as UserRole;
+      const role = row.getValue("role") as StaffRole;
       return (
         <Badge
-          variant={
-            role === "ADMIN"
-              ? "default"
-              : role === "AGENT"
-              ? "secondary"
-              : "outline"
-          }
+          variant={role === "ADMIN" ? "default" : "secondary"}
           className="text-xs"
         >
           {role}
@@ -107,14 +101,14 @@ export const createUserColumns = (): ColumnDef<IUser>[] => [
     accessorKey: "phone",
     header: "Phone",
     cell: ({ row }) => {
-      const phone = row.getValue("phone") as string;
-      return <span className="text-xs sm:text-sm">{phone}</span>;
+      const phone = row.getValue("phone") as string | undefined;
+      return <span className="text-xs sm:text-sm">{phone || "\u2014"}</span>;
     } },
   {
     accessorKey: "address",
     header: () => <span className="hidden lg:inline">Address</span>,
     cell: ({ row }) => {
-      const address = row.getValue("address") as string;
+      const address = row.getValue("address") as string | undefined;
       return (
         <span title={address} className="text-xs sm:text-sm text-muted-foreground hidden lg:block truncate max-w-[180px]">
           {address}

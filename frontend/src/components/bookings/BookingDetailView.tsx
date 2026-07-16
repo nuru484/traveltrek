@@ -164,19 +164,21 @@ const BookingDetailView: React.FC<BookingDetailViewProps> = ({
                   Name
                 </label>
                 <p className="text-sm font-medium break-words [overflow-wrap:anywhere]">
-                  {booking.user.name}
+                  {booking.customer.name}
                 </p>
               </div>
               <div className="min-w-0">
                 <label className="text-sm font-medium text-muted-foreground">
                   Email
                 </label>
-                <p className="text-sm break-all">{booking.user.email}</p>
+                <p className="text-sm break-all">
+                  {booking.customer.email || "No email"}
+                </p>
               </div>
             </div>
             <Separator />
             <Link
-              href={`/dashboard/users/${booking.userId}/user-profile`}
+              href={`/dashboard/customers/${booking.customerId}`}
               className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium"
             >
               View Customer Profile
