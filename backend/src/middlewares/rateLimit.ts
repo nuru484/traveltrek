@@ -91,6 +91,14 @@ export const rateLimiter = createRateLimiter(
   'Too many authentication attempts, please try again later.',
 );
 
+// The unauthenticated /public browse surface: generous enough for a landing
+// page session, tight enough to bound anonymous scraping.
+export const publicBrowseLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  300, // 300 requests
+  'Too many requests, please try again later.',
+);
+
 export const passwordResetLimiter = createRateLimiter(
   60 * 60 * 1000, // 1 hour
   5, // 5 requests

@@ -16,6 +16,16 @@ export interface DestinationDTO {
   updatedAt: Date;
 }
 
+/** Minimal shape for the unauthenticated browse surface: no timestamps. */
+export interface PublicDestinationDTO {
+  city: null | string;
+  country: string;
+  description: null | string;
+  id: number;
+  name: string;
+  photo: null | string;
+}
+
 export const toDestinationDTO = (
   destination: Destination,
 ): DestinationDTO => ({
@@ -27,4 +37,15 @@ export const toDestinationDTO = (
   name: destination.name,
   photo: destination.photo,
   updatedAt: destination.updatedAt,
+});
+
+export const toPublicDestinationDTO = (
+  destination: Destination,
+): PublicDestinationDTO => ({
+  city: destination.city,
+  country: destination.country,
+  description: destination.description,
+  id: destination.id,
+  name: destination.name,
+  photo: destination.photo,
 });

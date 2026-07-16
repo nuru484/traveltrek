@@ -16,17 +16,23 @@ const tourFields = z.object({
     .trim()
     .max(5000, 'Description must not exceed 5000 characters')
     .optional(),
-  destinationId: z.number().int().min(1),
+  // Multipart form fields (photo uploads) arrive as strings, so numbers are
+  // coerced — same as the hotel/flight schemas.
+  destinationId: z.coerce.number().int().min(1),
   endDate: z.coerce.date('endDate must be a valid date'),
-  maxGuests: z.number().int().min(1).max(1000),
+  maxGuests: z.coerce.number().int().min(1).max(1000),
   name: z
     .string('Tour name must be between 3 and 200 characters')
     .trim()
     .min(3, 'Tour name must be between 3 and 200 characters')
     .max(200, 'Tour name must be between 3 and 200 characters'),
   // Integer minor units (pesewas): GH₵ 1.00 = 100. Max 10,000,000 GHS.
-  price: z.number().int().min(0).max(1_000_000_000),
+  price: z.coerce.number().int().min(0).max(1_000_000_000),
   startDate: z.coerce.date('startDate must be a valid date'),
+  // Either a client-sent URL or, after the Cloudinary middleware runs, the
+  // uploaded image URL. A multipart file upload arrives as req.file instead
+  // and is guarded by the controller's photo-file middleware.
+  tourPhoto: z.string().optional(),
   type: z.enum(TourType),
 });
 

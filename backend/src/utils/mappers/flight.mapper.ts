@@ -8,8 +8,10 @@
 // mutations (create/update/status) embedded the FULL origin/destination rows
 // and omitted originId/destinationId; the detail read used the four-field
 // destination summaries and added the ids; the list used the summaries and
-// ids but omitted capacity. All three are preserved bit-for-bit.
+// ids but omitted capacity. All three are preserved bit-for-bit, with the
+// detail/list read shapes gaining an aggregate `rating` block.
 import type { Prisma } from '#config/prismaClient.js';
+import type { RatingSummary } from '#utils/mappers/review.mapper.js';
 
 /** Destination fields exposed on flight read (detail + list) responses. */
 export const flightDestinationSelect = {
@@ -80,6 +82,8 @@ export interface FlightListItemDTO {
   originId: number;
   photo: null | string;
   price: number;
+  /** Aggregate of PUBLISHED reviews; {average: null, count: 0} when none. */
+  rating: RatingSummary;
   seatsAvailable: number;
   status: FlightWithSummaryRelations['status'];
   stops: number;
@@ -116,13 +120,15 @@ export const toFlightDTO = (flight: FlightWithFullRelations): FlightDTO => ({
 
 export const toFlightDetailDTO = (
   flight: FlightWithSummaryRelations,
+  rating: RatingSummary,
 ): FlightDetailDTO => ({
-  ...toFlightListItemDTO(flight),
+  ...toFlightListItemDTO(flight, rating),
   capacity: flight.capacity,
 });
 
 export const toFlightListItemDTO = (
   flight: FlightWithSummaryRelations,
+  rating: RatingSummary,
 ): FlightListItemDTO => ({
   airline: flight.airline,
   arrival: flight.arrival,
@@ -138,6 +144,7 @@ export const toFlightListItemDTO = (
   originId: flight.originId,
   photo: flight.photo,
   price: flight.price,
+  rating,
   seatsAvailable: flight.seatsAvailable,
   status: flight.status,
   stops: flight.stops,

@@ -4,6 +4,7 @@
 // `hotelInclude` relations); controllers map them through here so the wire
 // format lives in exactly one place and raw DB records never leak.
 import type { Prisma } from '#config/prismaClient.js';
+import type { RatingSummary } from '#utils/mappers/review.mapper.js';
 
 /** Destination fields exposed on hotel responses. */
 export const hotelDestinationSelect = {
@@ -43,6 +44,8 @@ export interface HotelDTO {
   name: string;
   phone: null | string;
   photo: null | string;
+  /** Aggregate of PUBLISHED reviews of this hotel's rooms. */
+  rating: RatingSummary;
   rooms: HotelRoomSummary[];
   starRating: number;
   updatedAt: Date;
@@ -56,7 +59,10 @@ export type HotelWithRelations = Prisma.HotelGetPayload<{
   include: typeof hotelInclude;
 }>;
 
-export const toHotelDTO = (hotel: HotelWithRelations): HotelDTO => ({
+export const toHotelDTO = (
+  hotel: HotelWithRelations,
+  rating: RatingSummary,
+): HotelDTO => ({
   address: hotel.address,
   amenities: hotel.amenities,
   createdAt: hotel.createdAt,
@@ -66,6 +72,7 @@ export const toHotelDTO = (hotel: HotelWithRelations): HotelDTO => ({
   name: hotel.name,
   phone: hotel.phone,
   photo: hotel.photo,
+  rating,
   rooms: hotel.rooms,
   starRating: hotel.starRating,
   updatedAt: hotel.updatedAt,

@@ -283,3 +283,49 @@ describe('GET /api/v1/bookings/customer/:customerId', () => {
     expect(res.body.data[0].customerId).toBe(customer.id);
   });
 });
+
+describe('booking staff attribution (createdBy)', () => {
+  it('records the staff creator when an admin books on behalf of a customer', async () => {
+    const admin = await createAdmin();
+    const customer = await createCustomer();
+    const tour = await createTour();
+
+    const res = await authedApi(admin).post('/api/v1/bookings').send({
+      customerId: customer.id,
+      numberOfGuests: 1,
+      totalPrice: 500,
+      tourId: tour.id,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.createdBy).toEqual({
+      id: admin.id,
+      name: admin.name,
+    });
+
+    const row = await prisma.booking.findUnique({
+      where: { id: res.body.data.id },
+    });
+    expect(row?.createdByUserId).toBe(admin.id);
+  });
+
+  it('leaves createdBy null for a customer self-booking', async () => {
+    const customer = await createCustomer();
+    const tour = await createTour();
+
+    const res = await authedApi(customer).post('/api/v1/bookings').send({
+      customerId: customer.id,
+      numberOfGuests: 1,
+      totalPrice: 500,
+      tourId: tour.id,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.createdBy).toBeNull();
+
+    const row = await prisma.booking.findUnique({
+      where: { id: res.body.data.id },
+    });
+    expect(row?.createdByUserId).toBeNull();
+  });
+});

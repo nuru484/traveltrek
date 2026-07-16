@@ -112,6 +112,15 @@ export interface FlightUpdateInput extends Partial<FlightInput> {
   status?: FlightStatus;
 }
 
+/** Filters accepted by the public (unauthenticated) flight listing. */
+export interface PublicFlightListParams {
+  destinationId?: number;
+  limit: number;
+  originId?: number;
+  page: number;
+  search?: string;
+}
+
 /** Statuses that block a single-flight delete (and count against bulk deletes). */
 const NON_DELETABLE_STATUSES: FlightStatus[] = [
   FlightStatus.DEPARTED,
@@ -506,6 +515,50 @@ export const makeFlightService = (
       prisma.flight.findMany({
         include: flightSummaryInclude,
         orderBy,
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        where,
+      }),
+      prisma.flight.count({ where }),
+    ]);
+
+    return { flights, total };
+  };
+
+  /**
+   * Public (unauthenticated) browse listing: bookable inventory only —
+   * SCHEDULED flights that have not departed yet, soonest departure first.
+   * Modest filters (search, origin, destination); everything else stays on
+   * the authed listing.
+   */
+  const listPublicFlights = async (
+    params: PublicFlightListParams,
+  ): Promise<{ flights: FlightWithSummaryRelations[]; total: number }> => {
+    const where: Prisma.FlightWhereInput = {
+      departure: { gt: clock.now() },
+      status: FlightStatus.SCHEDULED,
+    };
+    if (params.originId !== undefined) where.originId = params.originId;
+    if (params.destinationId !== undefined) {
+      where.destinationId = params.destinationId;
+    }
+    if (params.search) {
+      where.OR = [
+        { airline: { contains: params.search, mode: 'insensitive' } },
+        { flightNumber: { contains: params.search, mode: 'insensitive' } },
+        {
+          destination: {
+            name: { contains: params.search, mode: 'insensitive' },
+          },
+        },
+        { origin: { name: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [flights, total] = await Promise.all([
+      prisma.flight.findMany({
+        include: flightSummaryInclude,
+        orderBy: { departure: 'asc' },
         skip: (params.page - 1) * params.limit,
         take: params.limit,
         where,
@@ -1135,6 +1188,7 @@ export const makeFlightService = (
     getFlightById,
     getFlightStats,
     listFlights,
+    listPublicFlights,
     updateFlight,
     updateFlightStatus,
   };
@@ -1149,6 +1203,7 @@ export const {
   getFlightById,
   getFlightStats,
   listFlights,
+  listPublicFlights,
   updateFlight,
   updateFlightStatus,
 } = flightService;

@@ -26,8 +26,13 @@ import {
   listHotelsByDestination,
   updateHotel as updateHotelService,
 } from '#services/hotel.service.js';
+import {
+  ratingSummariesFor,
+  ratingSummaryForHotel,
+} from '#services/review.service.js';
 import { sendPaginated, sendSuccess } from '#utils/http-response.js';
 import { toHotelDTO } from '#utils/mappers/hotel.mapper.js';
+import { EMPTY_RATING } from '#utils/mappers/review.mapper.js';
 import { intParam, paginationQuery } from '#validations/common-validation.js';
 import {
   CreateHotelBody,
@@ -103,7 +108,8 @@ const handleCreateHotel = asyncHandler(async (req: Request, res: Response) => {
     starRating: body.starRating,
   });
   sendSuccess(res, {
-    data: toHotelDTO(hotel),
+    // A brand-new hotel cannot have reviews yet — no aggregate query needed.
+    data: toHotelDTO(hotel, EMPTY_RATING),
     message: 'Hotel created successfully',
     status: HTTP_STATUS_CODES.CREATED,
   });
@@ -128,8 +134,9 @@ const handleUpdateHotel = asyncHandler(async (req: Request, res: Response) => {
     photo: body.hotelPhoto,
     starRating: body.starRating,
   });
+  const rating = await ratingSummaryForHotel(hotel.id);
   sendSuccess(res, {
-    data: toHotelDTO(hotel),
+    data: toHotelDTO(hotel, rating),
     message: 'Hotel updated successfully',
   });
 });
@@ -144,8 +151,9 @@ export const updateHotel: RequestHandler[] = [
 
 const handleGetHotel = asyncHandler(async (req: Request, res: Response) => {
   const hotel = await getHotelById(hotelIdParam(req));
+  const rating = await ratingSummaryForHotel(hotel.id);
   sendSuccess(res, {
-    data: toHotelDTO(hotel),
+    data: toHotelDTO(hotel, rating),
     message: 'Hotel retrieved successfully',
   });
 });
@@ -158,8 +166,15 @@ const handleGetAllHotels = asyncHandler(
   async (req: Request, res: Response) => {
     const query = req.query as unknown as HotelListQuery;
     const { hotels, total } = await listHotels(query);
+    // One aggregate query over the page's ids — no per-row rating lookups.
+    const ratings = await ratingSummariesFor(
+      'hotel',
+      hotels.map((h) => h.id),
+    );
     sendPaginated(res, {
-      data: hotels.map(toHotelDTO),
+      data: hotels.map((hotel) =>
+        toHotelDTO(hotel, ratings.get(hotel.id) ?? EMPTY_RATING),
+      ),
       limit: query.limit,
       message: 'Hotels retrieved successfully',
       page: query.page,
@@ -182,8 +197,14 @@ const handleGetHotelsByDestination = asyncHandler(
       destinationId,
       query,
     );
+    const ratings = await ratingSummariesFor(
+      'hotel',
+      hotels.map((h) => h.id),
+    );
     sendPaginated(res, {
-      data: hotels.map(toHotelDTO),
+      data: hotels.map((hotel) =>
+        toHotelDTO(hotel, ratings.get(hotel.id) ?? EMPTY_RATING),
+      ),
       limit: query.limit,
       message: 'Hotels retrieved successfully',
       page: query.page,

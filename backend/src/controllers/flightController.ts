@@ -33,6 +33,10 @@ import {
   updateFlight as updateFlightService,
   updateFlightStatus as updateFlightStatusService,
 } from '#services/flight.service.js';
+import {
+  ratingSummariesFor,
+  ratingSummaryForFlight,
+} from '#services/review.service.js';
 import { UserRole } from '#types/user-profile.types.js';
 import { buildPaginationMeta, sendSuccess } from '#utils/http-response.js';
 import {
@@ -40,6 +44,7 @@ import {
   toFlightDTO,
   toFlightListItemDTO,
 } from '#utils/mappers/flight.mapper.js';
+import { EMPTY_RATING } from '#utils/mappers/review.mapper.js';
 import { intParam } from '#validations/common-validation.js';
 import {
   CreateFlightBody,
@@ -137,8 +142,9 @@ export const createFlight: RequestHandler[] = [
 
 const handleGetFlight = asyncHandler(async (req: Request, res: Response) => {
   const flight = await getFlightById(flightIdParam(req));
+  const rating = await ratingSummaryForFlight(flight.id);
   sendSuccess(res, {
-    data: toFlightDetailDTO(flight),
+    data: toFlightDetailDTO(flight, rating),
     message: 'Flight retrieved successfully',
   });
 });
@@ -183,6 +189,11 @@ const handleGetAllFlights = asyncHandler(
   async (req: Request, res: Response) => {
     const query = req.query as unknown as FlightListQuery;
     const { flights, total } = await listFlights(query);
+    // One aggregate query over the page's ids — no per-row rating lookups.
+    const ratings = await ratingSummariesFor(
+      'flight',
+      flights.map((f) => f.id),
+    );
     // The legacy list meta also echoed the applied filters; keep that shape.
     const meta = {
       ...buildPaginationMeta(total, query.page, query.limit),
@@ -204,7 +215,9 @@ const handleGetAllFlights = asyncHandler(
       },
     };
     sendSuccess(res, {
-      data: flights.map(toFlightListItemDTO),
+      data: flights.map((flight) =>
+        toFlightListItemDTO(flight, ratings.get(flight.id) ?? EMPTY_RATING),
+      ),
       message: 'Flights retrieved successfully',
       meta,
     });

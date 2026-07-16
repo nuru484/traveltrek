@@ -25,6 +25,11 @@ const bookingDestinationSelect = {
 
 /** Shared include for every booking read/write — the legacy bookingInclude. */
 export const bookingInclude = {
+  // Staff attribution: who created the booking on the customer's behalf
+  // (null for customer self-bookings).
+  createdBy: {
+    select: { id: true, name: true },
+  },
   customer: {
     select: { email: true, id: true, name: true },
   },
@@ -113,6 +118,8 @@ export interface TourBookingDTO extends BookingBaseDTO {
 interface BookingBaseDTO {
   bookingDate: BookingWithRelations['bookingDate'];
   createdAt: BookingWithRelations['createdAt'];
+  /** Staff member who created the booking; null for self-bookings. */
+  createdBy: BookingWithRelations['createdBy'];
   customer: BookingWithRelations['customer'];
   customerId: number;
   id: number;
@@ -129,6 +136,7 @@ export const toBookingDTO = (booking: BookingWithRelations): BookingDTO => {
   const baseResponse: BookingBaseDTO = {
     bookingDate: booking.bookingDate,
     createdAt: booking.createdAt,
+    createdBy: booking.createdBy,
     customer: booking.customer,
     customerId: booking.customerId,
     id: booking.id,

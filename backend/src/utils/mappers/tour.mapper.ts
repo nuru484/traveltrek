@@ -4,6 +4,7 @@
 // `tourInclude` relations); controllers map them through here so the wire
 // format lives in exactly one place and raw DB records never leak.
 import type { Prisma } from '#config/prismaClient.js';
+import type { RatingSummary } from '#utils/mappers/review.mapper.js';
 
 /** Destination fields exposed on tour responses. */
 export const destinationSummarySelect = {
@@ -32,7 +33,10 @@ export interface TourDTO {
   id: number;
   maxGuests: number;
   name: string;
+  photo: null | string;
   price: number;
+  /** Aggregate of PUBLISHED reviews; {average: null, count: 0} when none. */
+  rating: RatingSummary;
   startDate: Date;
   status: TourWithDestination['status'];
   type: TourWithDestination['type'];
@@ -53,7 +57,10 @@ export type TourWithDestination = Prisma.TourGetPayload<{
   include: typeof tourInclude;
 }>;
 
-export const toTourDTO = (tour: TourWithDestination): TourDTO => ({
+export const toTourDTO = (
+  tour: TourWithDestination,
+  rating: RatingSummary,
+): TourDTO => ({
   createdAt: tour.createdAt,
   description: tour.description,
   destination: tour.destination,
@@ -63,7 +70,9 @@ export const toTourDTO = (tour: TourWithDestination): TourDTO => ({
   id: tour.id,
   maxGuests: tour.maxGuests,
   name: tour.name,
+  photo: tour.photo,
   price: tour.price,
+  rating,
   startDate: tour.startDate,
   status: tour.status,
   type: tour.type,

@@ -3,8 +3,8 @@
 // Tours domain logic, extracted from the legacy fat controller. Pure, DI'd
 // functions: they take typed inputs, own every Prisma access and domain
 // invariant (date guards, capacity rules, status transitions, delete
-// protections), throw the typed CustomError subclasses and never touch
-// req/res.
+// protections, Cloudinary photo cleanup), throw the typed CustomError
+// subclasses and never touch req/res.
 //
 // Role enforcement note: the legacy handlers re-checked req.user.role inline
 // (ADMIN/AGENT gates on delete and status updates). Those duplicates were
@@ -41,6 +41,15 @@ export const TOUR_SORT_FIELDS = [
   'updatedAt',
 ] as const;
 
+/** Filters accepted by the public (unauthenticated) tour listing. */
+export interface PublicTourListParams {
+  destinationId?: number;
+  limit: number;
+  page: number;
+  search?: string;
+  type?: TourType;
+}
+
 /** Who performed a mutation, for the audit log line. */
 export type TourActor = Pick<IUser, 'id' | 'role'>;
 
@@ -50,6 +59,8 @@ export interface TourInput {
   endDate: Date;
   maxGuests: number;
   name: string;
+  /** Cloudinary URL, already uploaded by the route's middleware. */
+  photo?: string;
   price: number;
   startDate: Date;
   type: TourType;
@@ -90,9 +101,21 @@ const durationInDays = (start: Date, end: Date): number =>
   Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
 
 export const makeTourService = (
-  d: Pick<AppDeps, 'clock' | 'logger' | 'prisma'>,
+  d: Pick<AppDeps, 'clock' | 'cloudinary' | 'logger' | 'prisma'>,
 ) => {
-  const { clock, logger, prisma } = d;
+  const { clock, cloudinary, logger, prisma } = d;
+
+  /** Best-effort Cloudinary delete; a cleanup failure never fails the request. */
+  const cleanupPhoto = async (
+    photo: string,
+    context: string,
+  ): Promise<void> => {
+    try {
+      await cloudinary.deleteImage(photo);
+    } catch (cleanupError) {
+      logger.warn({ err: cleanupError, photo }, context);
+    }
+  };
 
   // findFirst (not findUnique) so the soft-delete extension scopes the read:
   // a soft-deleted destination cannot host new tours.
@@ -115,25 +138,53 @@ export const makeTourService = (
   };
 
   const createTour = async (input: TourInput) => {
-    await requireDestination(input.destinationId);
+    try {
+      await requireDestination(input.destinationId);
 
-    return prisma.tour.create({
-      data: {
-        description: input.description,
-        destinationId: input.destinationId,
-        duration: durationInDays(input.startDate, input.endDate),
-        endDate: input.endDate,
-        maxGuests: input.maxGuests,
-        name: input.name,
-        price: input.price,
-        startDate: input.startDate,
-        type: input.type,
-      },
-      include: tourInclude,
-    });
+      return await prisma.tour.create({
+        data: {
+          description: input.description,
+          destinationId: input.destinationId,
+          duration: durationInDays(input.startDate, input.endDate),
+          endDate: input.endDate,
+          maxGuests: input.maxGuests,
+          name: input.name,
+          photo: input.photo ?? null,
+          price: input.price,
+          startDate: input.startDate,
+          type: input.type,
+        },
+        include: tourInclude,
+      });
+    } catch (error) {
+      // The photo was already uploaded by the route middleware; don't orphan
+      // it on Cloudinary when the create is refused.
+      if (input.photo) {
+        await cleanupPhoto(input.photo, 'Failed to clean up Cloudinary image');
+      }
+      throw error;
+    }
   };
 
   const updateTour = async (id: number, input: Partial<TourInput>) => {
+    const uploadedPhotoUrl = input.photo;
+
+    try {
+      return await updateTourGuarded(id, input);
+    } catch (error) {
+      // Cloudinary upload succeeded but the update was refused: clean up the
+      // freshly uploaded image before rethrowing.
+      if (uploadedPhotoUrl) {
+        await cleanupPhoto(
+          uploadedPhotoUrl,
+          'Failed to clean up Cloudinary image',
+        );
+      }
+      throw error;
+    }
+  };
+
+  const updateTourGuarded = async (id: number, input: Partial<TourInput>) => {
     const existing = await prisma.tour.findFirst({
       include: {
         bookings: { select: { id: true } },
@@ -189,7 +240,7 @@ export const makeTourService = (
         ? durationInDays(newStartDate, newEndDate)
         : undefined;
 
-    return prisma.tour.update({
+    const updated = await prisma.tour.update({
       data: {
         description: input.description,
         destinationId: input.destinationId,
@@ -197,6 +248,7 @@ export const makeTourService = (
         endDate: input.endDate,
         maxGuests: input.maxGuests,
         name: input.name,
+        photo: input.photo,
         price: input.price,
         startDate: input.startDate,
         type: input.type,
@@ -204,6 +256,13 @@ export const makeTourService = (
       include: tourInclude,
       where: { id },
     });
+
+    // Replaced photo: drop the old image now that the row points elsewhere.
+    if (input.photo && existing.photo && existing.photo !== input.photo) {
+      await cleanupPhoto(existing.photo, 'Failed to clean up old tour photo');
+    }
+
+    return updated;
   };
 
   /**
@@ -350,6 +409,13 @@ export const makeTourService = (
       data: { deletedAt: clock.now() },
       where: { id },
     });
+
+    if (tour.photo) {
+      await cleanupPhoto(
+        tour.photo,
+        'Failed to clean up tour photo from Cloudinary',
+      );
+    }
   };
 
   /**
@@ -428,6 +494,18 @@ export const makeTourService = (
       where: { deletedAt: null },
     });
 
+    const photosToClean = tours.flatMap((tour) =>
+      tour.photo ? [{ ...tour, photo: tour.photo }] : [],
+    );
+    await Promise.allSettled(
+      photosToClean.map((tour) =>
+        cleanupPhoto(
+          tour.photo,
+          `Failed to clean up photo for tour ${tour.id} (${tour.name})`,
+        ),
+      ),
+    );
+
     return tours.length;
   };
 
@@ -494,6 +572,45 @@ export const makeTourService = (
     return where;
   };
 
+  /**
+   * Public (unauthenticated) browse listing: bookable inventory only —
+   * UPCOMING or ONGOING tours, soonest start first. Modest filters (search,
+   * type, destination); everything else stays on the authed listing.
+   */
+  const listPublicTours = async (params: PublicTourListParams) => {
+    const where: Prisma.TourWhereInput = {
+      status: { in: [TourStatus.ONGOING, TourStatus.UPCOMING] },
+    };
+    if (params.type) where.type = params.type;
+    if (params.destinationId !== undefined) {
+      where.destinationId = params.destinationId;
+    }
+    if (params.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+        {
+          destination: {
+            name: { contains: params.search, mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    const [tours, total] = await Promise.all([
+      prisma.tour.findMany({
+        include: tourInclude,
+        orderBy: { startDate: 'asc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        where,
+      }),
+      prisma.tour.count({ where }),
+    ]);
+
+    return { total, tours };
+  };
+
   const listTours = async (params: TourListParams) => {
     const where = buildWhere(params);
     const orderBy: Prisma.TourOrderByWithRelationInput = {
@@ -519,6 +636,7 @@ export const makeTourService = (
     deleteAllTours,
     deleteTour,
     getTourById,
+    listPublicTours,
     listTours,
     updateTour,
     updateTourStatus,
@@ -532,6 +650,7 @@ export const {
   deleteAllTours,
   deleteTour,
   getTourById,
+  listPublicTours,
   listTours,
   updateTour,
   updateTourStatus,

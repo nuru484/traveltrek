@@ -13,6 +13,7 @@ import {
   FlightStatus,
   PaymentMethod,
   PaymentStatus,
+  ReviewStatus,
   Role,
   TourStatus,
   TourType,
@@ -76,6 +77,16 @@ const FLIGHT_PHOTOS = [
   'photo-1556388158-158ea5ccacbd',
   'photo-1569154941061-e231b4725ef1',
   'photo-1503146234398-d71f6a914cd4',
+];
+const TOUR_PHOTOS = [
+  'photo-1533105079780-92b9be482077',
+  'photo-1500530855697-b586d89ba3ee',
+  'photo-1469854523086-cc02fe5d8800',
+  'photo-1504598318550-17eba1008a68',
+  'photo-1516426122078-c23e76319801',
+  'photo-1473625247510-8ceb1760943f',
+  'photo-1488646953014-85cb44e25828',
+  'photo-1530521954074-e64f6810b32d',
 ];
 
 // [name, country, city, description]
@@ -654,6 +665,7 @@ async function main() {
           guestsBooked: between(0, Math.floor(maxGuests * 0.8)),
           maxGuests,
           name: `${dest.name} ${tpl}`,
+          photo: unsplash(TOUR_PHOTOS[i % TOUR_PHOTOS.length]),
           price: money(900, 14500),
           startDate: start,
           status,
@@ -843,10 +855,50 @@ async function main() {
   }
 
   console.log(`bookings: ${bookings}, payments: ${payments}`);
+
+  // ---------- Reviews (~60% of completed bookings, one per booking)
+  const REVIEW_TITLES = [
+    'Exceeded every expectation',
+    'A trip we still talk about',
+    'Smooth from booking to return',
+    'Great value for the price',
+    'Would happily book again',
+    'Well organised, friendly guides',
+    null,
+  ];
+  const REVIEW_COMMENTS = [
+    'Everything was handled for us — pickups on time, great rooms and a guide who clearly loved the place.',
+    'Booking was painless and the itinerary matched exactly what was promised. Highly recommended.',
+    'Beautiful views, comfortable transport and honest pricing. My only wish is that it lasted longer.',
+    'The team checked in with us before departure and again mid-trip. Small touches like that matter.',
+    'Solid experience overall. One hiccup with timing on day two, but the crew recovered it quickly.',
+    null,
+  ];
+  let reviews = 0;
+  const completedBookings = await prisma.booking.findMany({
+    select: { customerId: true, id: true },
+    where: { status: BookingStatus.COMPLETED },
+  });
+  for (const booking of completedBookings) {
+    if (rand() < 0.4) continue;
+    await prisma.review.create({
+      data: {
+        bookingId: booking.id,
+        comment: pick(REVIEW_COMMENTS),
+        customerId: booking.customerId,
+        rating: pick([3, 4, 4, 5, 5, 5]),
+        status: rand() < 0.06 ? ReviewStatus.HIDDEN : ReviewStatus.PUBLISHED,
+        title: pick(REVIEW_TITLES),
+      },
+    });
+    reviews++;
+  }
+  console.log(`reviews: ${reviews}`);
   console.log('SEEDED optimal dataset');
 }
 
 async function wipe(adminEmail: string) {
+  await prisma.review.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.room.deleteMany();

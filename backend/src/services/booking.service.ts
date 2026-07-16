@@ -534,6 +534,12 @@ export const makeBookingService = (
 
       return await tx.booking.create({
         data: {
+          // Staff attribution: an ADMIN/AGENT booking on a customer's behalf
+          // is recorded as the creator; customer self-bookings stay null.
+          createdBy:
+            actor.role === UserRole.CUSTOMER
+              ? undefined
+              : { connect: { id: actor.id } },
           customer: { connect: { id: customerId } },
           endDate: roomId && endDate ? new Date(endDate) : null,
           flight: flightId ? { connect: { id: flightId } } : undefined,

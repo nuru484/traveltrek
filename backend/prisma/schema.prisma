@@ -64,7 +64,9 @@ model User {
   /// extension (src/lib/soft-delete-extension.ts).
   deletedAt DateTime?
 
-  securityTokens UserSecurityToken[]
+  securityTokens  UserSecurityToken[]
+  /// Bookings this staff member created on behalf of customers (attribution).
+  createdBookings Booking[]           @relation("BookingCreatedBy")
 
   @@index([deletedAt])
 }
@@ -117,6 +119,7 @@ model Customer {
 
   bookings       Booking[]
   payments       Payment[]
+  reviews        Review[]
   securityTokens UserSecurityToken[]
 
   @@index([deletedAt])
@@ -190,6 +193,7 @@ model Tour {
   id           Int        @id @default(autoincrement())
   name         String
   description  String?
+  photo        String?
   type         TourType
   status       TourStatus @default(UPCOMING)
   duration     Int
@@ -344,6 +348,12 @@ model Booking {
   flight   Flight? @relation(fields: [flightId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   flightId Int?
 
+  /// Staff attribution: the ADMIN/AGENT who created this booking on behalf of
+  /// the customer; null for customer self-bookings. Restrict is safe because
+  /// staff deletes are soft (deletedAt) — the FK never actually blocks.
+  createdBy       User? @relation("BookingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdByUserId Int?
+
   status BookingStatus @default(PENDING)
 
   numberOfGuests  Int     @default(1)
@@ -365,10 +375,12 @@ model Booking {
   deletedAt   DateTime?
 
   payment Payment?
+  review  Review?
 
   @@unique([customerId, tourId])
   @@unique([customerId, roomId, startDate, endDate])
   @@unique([customerId, flightId])
+  @@index([createdByUserId])
   @@index([deletedAt])
   @@index([customerId, tourId, roomId, flightId], name: "booking_customer_tour_hotel_room_flight_idx")
   @@index([status])
@@ -381,6 +393,39 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+}
+
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+/// A customer's review of ONE completed booking (bookingId is unique). The
+/// review's target (tour / room / flight) is derived from the booking's
+/// relations — no separate target columns. Moderation is a status flip
+/// (PUBLISHED ↔ HIDDEN); only PUBLISHED, non-deleted rows feed the public
+/// surface and the rating aggregates.
+model Review {
+  id         Int      @id @default(autoincrement())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customerId Int
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  bookingId  Int      @unique
+
+  /// 1–5 stars, validated at the boundary and in the service.
+  rating  Int
+  title   String? @db.VarChar(120)
+  comment String? @db.VarChar(2000)
+
+  status ReviewStatus @default(PUBLISHED)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([customerId])
+  @@index([status, deletedAt])
+  @@index([deletedAt])
 }
 
 enum PaymentMethod {
