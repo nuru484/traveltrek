@@ -65,11 +65,6 @@ export const PAYMENT_STATUSES = [
 
 export type PaymentActor = Pick<IUser, 'id' | 'role'>;
 
-export interface PaymentBulkDeleteSummary {
-  bookingsAffected: number;
-  deletedCount: number;
-}
-
 /**
  * Outcome of the GET /payments/callback verification. `no_booking_id` and
  * `booking_not_found` were legacy early-return responses (400/404); the
@@ -161,7 +156,7 @@ const getPaystackChannel = (paymentMethod: PaymentMethod): string => {
 export const makePaymentService = (
   d: Pick<
     AppDeps,
-    'clock' | 'config' | 'logger' | 'mail' | 'paystack' | 'prisma' | 'sms'
+    'clock' | 'config' | 'logger' | 'notify' | 'paystack' | 'prisma'
   >,
 ) => {
   const { clock, config, logger, paystack, prisma } = d;
@@ -314,6 +309,49 @@ export const makePaymentService = (
   };
 
   /**
+   * Transactionally completes the payment for a verified successful charge
+   * and confirms its booking. The guarded updateMany is the idempotency
+   * seam: only a PENDING/FAILED payment row transitions to COMPLETED, so a
+   * duplicate webhook (or the callback racing the webhook) matches zero rows
+   * and reports 'already_completed' instead of re-confirming and re-sending
+   * the receipt — and a REFUNDED/REFUND_REQUESTED payment is never flipped
+   * back. When no payment row exists for the reference, nothing is written:
+   * a booking is never confirmed on the strength of an unknown reference.
+   */
+  const completeVerifiedPayment = async (
+    reference: string,
+    bookingId: number,
+  ): Promise<'already_completed' | 'completed' | 'unknown_reference'> =>
+    prisma.$transaction(async (tx) => {
+      const { count } = await tx.payment.updateMany({
+        data: {
+          paymentDate: clock.now(),
+          status: PaymentStatus.COMPLETED,
+        },
+        where: {
+          status: { in: [PaymentStatus.FAILED, PaymentStatus.PENDING] },
+          transactionReference: reference,
+        },
+      });
+
+      if (count === 0) {
+        // findUnique on purpose (unscoped): the unique reference stays the
+        // idempotency key even if the row was soft-deleted meanwhile.
+        const existing = await tx.payment.findUnique({
+          where: { transactionReference: reference },
+        });
+        return existing ? 'already_completed' : 'unknown_reference';
+      }
+
+      await tx.booking.update({
+        data: { status: BookingStatus.CONFIRMED },
+        where: { id: bookingId },
+      });
+
+      return 'completed';
+    });
+
+  /**
    * GET /payments/callback — verify a transaction after Paystack redirects
    * back. Marks the payment FAILED on an unsuccessful charge or an amount
    * mismatch, COMPLETED (+ booking CONFIRMED) on success; the controller
@@ -347,10 +385,15 @@ export const makePaymentService = (
     // Paystack reports amounts in minor units — the same unit totalPrice now
     // stores (pesewas), so both the comparison and the returned amount are
     // unit-for-unit (the legacy ÷100 GHS conversions were removed).
+    // The FAILED writes below only touch unsettled rows so a stray re-verify
+    // can never clobber a payment that already COMPLETED or refunded.
     if (verified.status !== 'success') {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
-        where: { transactionReference: reference },
+        where: {
+          status: PaymentStatus.PENDING,
+          transactionReference: reference,
+        },
       });
 
       return {
@@ -364,7 +407,10 @@ export const makePaymentService = (
     if (verified.amount !== booking.totalPrice) {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
-        where: { transactionReference: reference },
+        where: {
+          status: PaymentStatus.PENDING,
+          transactionReference: reference,
+        },
       });
 
       return {
@@ -375,19 +421,13 @@ export const makePaymentService = (
       };
     }
 
-    await prisma.payment.updateMany({
-      data: {
-        paymentDate: clock.now(),
-        status: PaymentStatus.COMPLETED,
-      },
-      where: { transactionReference: reference },
-    });
+    const outcome = await completeVerifiedPayment(reference, bookingId);
 
-    await prisma.booking.update({
-      data: { status: BookingStatus.CONFIRMED },
-      where: { id: bookingId },
-    });
+    if (outcome === 'unknown_reference') {
+      throw new NotFoundError('Payment not found for transaction reference');
+    }
 
+    // 'already_completed' (the webhook won the race) reads as success too.
     return {
       amount: verified.amount,
       bookingId,
@@ -430,11 +470,16 @@ export const makePaymentService = (
       throw new NotFoundError('Booking not found');
     }
 
-    // Both sides are integer minor units (pesewas); no ÷100.
+    // Both sides are integer minor units (pesewas); no ÷100. Only an
+    // unsettled row is marked FAILED — a mismatch replay can't clobber a
+    // payment that already COMPLETED or refunded.
     if (verified.amount !== booking.totalPrice) {
       await prisma.payment.updateMany({
         data: { status: PaymentStatus.FAILED },
-        where: { transactionReference: reference },
+        where: {
+          status: PaymentStatus.PENDING,
+          transactionReference: reference,
+        },
       });
       // Legacy threw a bare Error here (an unhandled 500); same status and
       // message, now as a typed CustomError.
@@ -443,22 +488,25 @@ export const makePaymentService = (
       );
     }
 
-    await prisma.payment.updateMany({
-      data: {
-        paymentDate: clock.now(),
-        status: PaymentStatus.COMPLETED,
-      },
-      where: { transactionReference: reference },
-    });
+    const outcome = await completeVerifiedPayment(reference, bookingId);
 
-    await prisma.booking.update({
-      data: { status: BookingStatus.CONFIRMED },
-      where: { id: bookingId },
-    });
+    if (outcome === 'unknown_reference') {
+      // No payment row for this reference: never confirm the booking on the
+      // strength of an unknown reference. 404 lets Paystack retry a few
+      // times in case the initialize write is lagging.
+      throw new NotFoundError('Payment not found for transaction reference');
+    }
 
-    // Fire-and-forget receipt. The callback flow deliberately sends nothing —
-    // Paystack fires this webhook for the same charge, so both completing
-    // would double the receipt.
+    if (outcome === 'already_completed') {
+      // Duplicate delivery (or the callback already settled it): acknowledge
+      // without re-confirming the booking or re-sending the receipt.
+      return 'ignored';
+    }
+
+    // Fire-and-forget receipt, sent exactly once — only by the delivery that
+    // actually transitioned the payment. The callback flow deliberately
+    // sends nothing: Paystack fires this webhook for the same charge, so
+    // both completing would double the receipt.
     notices.paymentReceipt({
       amount: booking.totalPrice,
       bookingId,
@@ -804,61 +852,7 @@ export const makePaymentService = (
     return { bookingId: payment.bookingId, paymentId: id };
   };
 
-  /**
-   * DELETE /payments — admin-only bulk wipe, refused entirely (409) while any
-   * COMPLETED payment exists. The deleteMany and the booking status resets
-   * share one transaction, as before.
-   */
-  const deleteAllPayments = async (
-    actor: PaymentActor,
-  ): Promise<PaymentBulkDeleteSummary> => {
-    if (actor.role !== UserRole.ADMIN) {
-      throw new UnauthorizedError('Admin privileges required');
-    }
-
-    const paymentCount = await prisma.payment.count();
-
-    if (paymentCount === 0) {
-      throw new BadRequestError('No payments to delete');
-    }
-
-    const payments = await prisma.payment.findMany({
-      include: { booking: true },
-    });
-
-    const completedPayments = payments.filter(
-      (p) => p.status === PaymentStatus.COMPLETED,
-    );
-
-    if (completedPayments.length > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete payments: ${String(completedPayments.length)} completed payment${completedPayments.length > 1 ? 's' : ''} must be refunded first`,
-      );
-    }
-
-    const bookingIds = payments.map((p) => p.bookingId);
-
-    await prisma.$transaction(async (tx) => {
-      await tx.payment.updateMany({
-        data: { deletedAt: clock.now() },
-        where: { deletedAt: null },
-      });
-
-      await tx.booking.updateMany({
-        data: { status: BookingStatus.PENDING },
-        where: { id: { in: bookingIds } },
-      });
-    });
-
-    return {
-      bookingsAffected: bookingIds.length,
-      deletedCount: payments.length,
-    };
-  };
-
   return {
-    deleteAllPayments,
     deletePayment,
     getPaymentById,
     handleWebhookEvent,
@@ -874,7 +868,6 @@ export const makePaymentService = (
 export const paymentService = makePaymentService(defaultDeps);
 
 export const {
-  deleteAllPayments,
   deletePayment,
   getPaymentById,
   handleWebhookEvent,

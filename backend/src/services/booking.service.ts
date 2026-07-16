@@ -1,6 +1,5 @@
 import pMap from 'p-map';
 
-import { HTTP_STATUS_CODES } from '#config/constants.js';
 import {
   BookingStatus,
   type Flight,
@@ -14,7 +13,6 @@ import {
 } from '#config/prismaClient.js';
 import {
   BadRequestError,
-  CustomError,
   NotFoundError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
@@ -34,16 +32,18 @@ import { type AppDeps, defaultDeps } from '#services/deps.js';
 // duplicated by routes/booking.ts (authorizeRole admits ADMIN/AGENT/CUSTOMER
 // on most routes), so the legacy in-handler checks are preserved as explicit
 // actor-based rules — customers may only create/read their own bookings, only
-// admins/agents may delete, only admins may bulk-delete. Functions that had
-// no in-handler rule (updateBooking) keep having none, as before.
+// admins/agents may delete. Functions that had no in-handler rule
+// (updateBooking) keep having none, as before.
 //
-// Transaction note (preserved from the legacy handlers): createBooking runs
-// its existence/availability checks OUTSIDE the transaction and only wraps
-// the counter updates + booking.create; updateBooking wraps its whole flow in
-// one transaction but the room-availability read inside it deliberately uses
-// the non-tx client (the legacy helper closed over the global prisma);
-// deleteBooking/deleteAllBookings check guards outside and wrap the
-// restore-counters + delete writes.
+// Transaction note: createBooking/updateBooking run friendly
+// existence/availability pre-checks outside (or at the top of) the
+// transaction for good error messages, but inventory is actually consumed by
+// concurrency-safe writes inside it — guarded atomic updateMany for tour
+// slots and flight seats (claimTourSlots/claimFlightSeats), and a
+// room-row lock + in-transaction recount for room inventory
+// (lockAndCountRoomsHeld) — so concurrent requests can never oversell.
+// deleteBooking checks guards outside and wraps the restore-counters +
+// delete writes.
 import { type IUser, UserRole } from '#types/user-profile.types.js';
 import {
   bookingInclude,
@@ -137,12 +137,6 @@ export interface BookingUpdateInput {
   tourId?: number;
 }
 
-export interface BulkBookingDeleteSummary {
-  deletedCount: number;
-  restoredGuests: number;
-  restoredSeats: number;
-}
-
 export interface ExpiredBookingsSweepSummary {
   cancelledCount: number;
   failureCount: number;
@@ -178,7 +172,7 @@ const calculateRoomBookingPrice = (
 ): number => pricePerNight * numberOfNights * numberOfRooms;
 
 export const makeBookingService = (
-  d: Pick<AppDeps, 'clock' | 'config' | 'logger' | 'mail' | 'prisma' | 'sms'>,
+  d: Pick<AppDeps, 'clock' | 'config' | 'logger' | 'notify' | 'prisma'>,
 ) => {
   const { clock, logger, prisma } = d;
   const notices = makeBookingNotifications(d);
@@ -287,6 +281,80 @@ export const makeBookingService = (
       available: availableRooms >= numberOfRoomsNeeded,
       availableRooms,
     };
+  };
+
+  /**
+   * Atomically claims tour slots inside the caller's transaction. The
+   * increment only lands while it keeps guestsBooked within maxGuests, so
+   * two concurrent bookings can never both pass an earlier read-then-check
+   * and oversell the tour. Returns false when concurrent bookings consumed
+   * the slots between the friendly pre-check and this write.
+   */
+  const claimTourSlots = async (
+    tx: TransactionClient,
+    tourId: number,
+    maxGuests: number,
+    guests: number,
+  ): Promise<boolean> => {
+    const { count } = await tx.tour.updateMany({
+      data: { guestsBooked: { increment: guests } },
+      where: { guestsBooked: { lte: maxGuests - guests }, id: tourId },
+    });
+    return count === 1;
+  };
+
+  /**
+   * Atomically claims flight seats inside the caller's transaction: the
+   * decrement only lands while seatsAvailable covers it, so the counter can
+   * never go negative under concurrent bookings.
+   */
+  const claimFlightSeats = async (
+    tx: TransactionClient,
+    flightId: number,
+    seats: number,
+  ): Promise<boolean> => {
+    const { count } = await tx.flight.updateMany({
+      data: { seatsAvailable: { decrement: seats } },
+      where: { id: flightId, seatsAvailable: { gte: seats } },
+    });
+    return count === 1;
+  };
+
+  /**
+   * Concurrency-safe variant of checkRoomAvailability for use inside the
+   * transaction that creates/updates the booking row: takes a row lock on
+   * the room so concurrent bookings for it serialize, then recounts
+   * overlapping holds through the transaction (a competing booking commits
+   * before our count runs, or waits behind our lock). Returns the number of
+   * rooms already held for the window, excluding `excludeBookingId` when the
+   * booking being updated already holds rooms in it.
+   */
+  const lockAndCountRoomsHeld = async (
+    tx: TransactionClient,
+    roomId: number,
+    startDate: Date,
+    endDate: Date,
+    excludeBookingId?: number,
+  ): Promise<number> => {
+    await tx.$queryRaw`SELECT id FROM "Room" WHERE id = ${roomId} FOR UPDATE`;
+
+    const overlappingBookings = await tx.booking.findMany({
+      select: { numberOfRooms: true },
+      where: {
+        ...(excludeBookingId !== undefined && {
+          id: { not: excludeBookingId },
+        }),
+        endDate: { gte: startDate },
+        roomId: roomId,
+        startDate: { lte: endDate },
+        status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+      },
+    });
+
+    return overlappingBookings.reduce(
+      (sum, booking) => sum + booking.numberOfRooms,
+      0,
+    );
   };
 
   /**
@@ -458,6 +526,8 @@ export const makeBookingService = (
     let numberOfNights = 1;
     let paymentDeadline: Date | null = null;
     let requiresImmediatePayment = false;
+    let checkInDate: Date | null = null;
+    let checkOutDate: Date | null = null;
 
     if (tourId) {
       tour = await prisma.tour.findFirst({ where: { id: tourId } });
@@ -493,8 +563,8 @@ export const makeBookingService = (
         );
       }
 
-      const checkInDate = new Date(startDate);
-      const checkOutDate = new Date(endDate);
+      checkInDate = new Date(startDate);
+      checkOutDate = new Date(endDate);
 
       const dateValidation = validateBookingDates(checkInDate, checkOutDate);
       if (!dateValidation.valid) {
@@ -568,24 +638,51 @@ export const makeBookingService = (
 
     // Counter updates ride the same transaction as the create, so a failed
     // insert (e.g. the duplicate-booking unique constraint) rolls them back.
+    // The checks above give friendly errors on plainly unavailable inventory;
+    // the guarded claims below are what actually prevent overselling when
+    // concurrent requests pass those checks together.
     // Note: the duplicate-booking unique constraints span soft-deleted rows
     // (khadys convention) — a soft-deleted booking still holds its
     // customer+tour/room/flight slot until it is restored or hard-purged.
     const booking = await prisma.$transaction(async (tx) => {
       if (tourId && tour) {
         const guestsToBook = numberOfGuests ?? 1;
-        await tx.tour.update({
-          data: { guestsBooked: { increment: guestsToBook } },
-          where: { id: tourId },
-        });
+        const claimed = await claimTourSlots(
+          tx,
+          tourId,
+          tour.maxGuests,
+          guestsToBook,
+        );
+        if (!claimed) {
+          throw new BadRequestError(
+            'The remaining slots for this tour were just booked. Please try again.',
+          );
+        }
       }
 
       if (flightId && flight) {
         const seatsNeeded = numberOfGuests ?? 1;
-        await tx.flight.update({
-          data: { seatsAvailable: { decrement: seatsNeeded } },
-          where: { id: flightId },
-        });
+        const claimed = await claimFlightSeats(tx, flightId, seatsNeeded);
+        if (!claimed) {
+          throw new BadRequestError(
+            'The remaining seats on this flight were just booked. Please try again.',
+          );
+        }
+      }
+
+      if (roomId && room && checkInDate && checkOutDate) {
+        const roomsNeeded = numberOfRooms ?? 1;
+        const roomsHeld = await lockAndCountRoomsHeld(
+          tx,
+          roomId,
+          checkInDate,
+          checkOutDate,
+        );
+        if (room.totalRooms - roomsHeld < roomsNeeded) {
+          throw new BadRequestError(
+            'The remaining rooms for the selected dates were just booked. Please try again.',
+          );
+        }
       }
 
       return await tx.booking.create({
@@ -795,22 +892,36 @@ export const makeBookingService = (
 
         if (tourId === existingBooking.tourId) {
           const guestDifference = guestsToBook - existingBooking.numberOfGuests;
-          if (guestDifference !== 0) {
+          if (guestDifference > 0) {
+            const claimed = await claimTourSlots(
+              tx,
+              tourId,
+              tour.maxGuests,
+              guestDifference,
+            );
+            if (!claimed) {
+              throw new BadRequestError(
+                'The remaining slots for this tour were just booked. Please try again.',
+              );
+            }
+          } else if (guestDifference < 0) {
             await tx.tour.update({
-              data: {
-                guestsBooked:
-                  guestDifference > 0
-                    ? { increment: guestDifference }
-                    : { decrement: Math.abs(guestDifference) },
-              },
+              data: { guestsBooked: { decrement: Math.abs(guestDifference) } },
               where: { id: tourId },
             });
           }
         } else {
-          await tx.tour.update({
-            data: { guestsBooked: { increment: guestsToBook } },
-            where: { id: tourId },
-          });
+          const claimed = await claimTourSlots(
+            tx,
+            tourId,
+            tour.maxGuests,
+            guestsToBook,
+          );
+          if (!claimed) {
+            throw new BadRequestError(
+              'The remaining slots for this tour were just booked. Please try again.',
+            );
+          }
         }
 
         calculatedTotalPrice = tour.price * guestsToBook;
@@ -837,14 +948,21 @@ export const makeBookingService = (
         }
 
         const guestDifference = guestsToBook - existingBooking.numberOfGuests;
-        if (guestDifference !== 0) {
+        if (guestDifference > 0) {
+          const claimed = await claimTourSlots(
+            tx,
+            existingBooking.tourId,
+            tour.maxGuests,
+            guestDifference,
+          );
+          if (!claimed) {
+            throw new BadRequestError(
+              'The remaining slots for this tour were just booked. Please try again.',
+            );
+          }
+        } else if (guestDifference < 0) {
           await tx.tour.update({
-            data: {
-              guestsBooked:
-                guestDifference > 0
-                  ? { increment: guestDifference }
-                  : { decrement: Math.abs(guestDifference) },
-            },
+            data: { guestsBooked: { decrement: Math.abs(guestDifference) } },
             where: { id: existingBooking.tourId },
           });
         }
@@ -893,21 +1011,20 @@ export const makeBookingService = (
           );
         }
 
-        const availability = await checkRoomAvailability(
+        // Excluding this booking's id makes the count ignore the rooms it
+        // already holds (a no-op when it held a different room).
+        const roomsHeld = await lockAndCountRoomsHeld(
+          tx,
           roomId,
           checkInDate,
           checkOutDate,
-          roomsNeeded,
+          id,
         );
+        const availableRooms = room.totalRooms - roomsHeld;
 
-        let adjustedAvailableRooms = availability.availableRooms;
-        if (roomId === existingBooking.roomId) {
-          adjustedAvailableRooms += existingBooking.numberOfRooms;
-        }
-
-        if (adjustedAvailableRooms < roomsNeeded) {
+        if (availableRooms < roomsNeeded) {
           throw new BadRequestError(
-            `Only ${adjustedAvailableRooms} room(s) available for the selected dates. ` +
+            `Only ${availableRooms} room(s) available for the selected dates. ` +
               `You requested ${roomsNeeded} room(s).`,
           );
         }
@@ -960,22 +1077,32 @@ export const makeBookingService = (
 
         if (flightId === existingBooking.flightId) {
           const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
-          if (seatDifference !== 0) {
+          if (seatDifference > 0) {
+            const claimed = await claimFlightSeats(
+              tx,
+              flightId,
+              seatDifference,
+            );
+            if (!claimed) {
+              throw new BadRequestError(
+                'The remaining seats on this flight were just booked. Please try again.',
+              );
+            }
+          } else if (seatDifference < 0) {
             await tx.flight.update({
               data: {
-                seatsAvailable:
-                  seatDifference > 0
-                    ? { decrement: seatDifference }
-                    : { increment: Math.abs(seatDifference) },
+                seatsAvailable: { increment: Math.abs(seatDifference) },
               },
               where: { id: flightId },
             });
           }
         } else {
-          await tx.flight.update({
-            data: { seatsAvailable: { decrement: seatsNeeded } },
-            where: { id: flightId },
-          });
+          const claimed = await claimFlightSeats(tx, flightId, seatsNeeded);
+          if (!claimed) {
+            throw new BadRequestError(
+              'The remaining seats on this flight were just booked. Please try again.',
+            );
+          }
         }
 
         calculatedTotalPrice = flight.price * seatsNeeded;
@@ -1002,13 +1129,21 @@ export const makeBookingService = (
         }
 
         const seatDifference = seatsNeeded - existingBooking.numberOfGuests;
-        if (seatDifference !== 0) {
+        if (seatDifference > 0) {
+          const claimed = await claimFlightSeats(
+            tx,
+            existingBooking.flightId,
+            seatDifference,
+          );
+          if (!claimed) {
+            throw new BadRequestError(
+              'The remaining seats on this flight were just booked. Please try again.',
+            );
+          }
+        } else if (seatDifference < 0) {
           await tx.flight.update({
             data: {
-              seatsAvailable:
-                seatDifference > 0
-                  ? { decrement: seatDifference }
-                  : { increment: Math.abs(seatDifference) },
+              seatsAvailable: { increment: Math.abs(seatDifference) },
             },
             where: { id: existingBooking.flightId },
           });
@@ -1348,182 +1483,10 @@ export const makeBookingService = (
     return findPage(where, params.page, params.limit);
   };
 
-  /**
-   * Wipes every booking, but only when NONE of them has a blocking condition
-   * (completed/confirmed status, completed/pending payment, future active
-   * booking); a single blocked booking refuses the whole operation with a 409
-   * summarising every issue. Counter restores and the deleteMany share one
-   * transaction.
-   */
-  const deleteAllBookings = async (
-    actor: BookingActor,
-  ): Promise<BulkBookingDeleteSummary> => {
-    if (actor.role !== UserRole.ADMIN) {
-      throw new UnauthorizedError('Admin privileges required');
-    }
-
-    const bookingCount = await prisma.booking.count();
-    if (bookingCount === 0) {
-      throw new BadRequestError('No bookings to delete');
-    }
-
-    const bookings = await prisma.booking.findMany({
-      include: {
-        flight: true,
-        payment: true,
-        room: true,
-        tour: true,
-      },
-    });
-
-    const completedBookings: number[] = [];
-    const confirmedBookings: number[] = [];
-    const bookingsWithCompletedPayment: number[] = [];
-    const bookingsWithPendingPayment: number[] = [];
-    const futureActiveBookings: number[] = [];
-
-    const now = clock.now();
-
-    for (const booking of bookings) {
-      if (booking.status === BookingStatus.COMPLETED) {
-        completedBookings.push(booking.id);
-      }
-
-      if (booking.status === BookingStatus.CONFIRMED) {
-        confirmedBookings.push(booking.id);
-      }
-
-      if (booking.payment?.status === PaymentStatus.COMPLETED) {
-        bookingsWithCompletedPayment.push(booking.id);
-      }
-
-      if (booking.payment?.status === PaymentStatus.PENDING) {
-        bookingsWithPendingPayment.push(booking.id);
-      }
-
-      if (
-        booking.status === BookingStatus.CONFIRMED ||
-        booking.status === BookingStatus.PENDING
-      ) {
-        let isFutureBooking = false;
-
-        if (booking.tour && booking.tour.startDate > now) {
-          isFutureBooking = true;
-        } else if (booking.flight && booking.flight.departure > now) {
-          isFutureBooking = true;
-        } else if (
-          booking.room &&
-          booking.startDate &&
-          booking.startDate > now
-        ) {
-          isFutureBooking = true;
-        }
-
-        if (isFutureBooking) {
-          futureActiveBookings.push(booking.id);
-        }
-      }
-    }
-
-    const blockingIssues: string[] = [];
-
-    if (completedBookings.length > 0) {
-      blockingIssues.push(
-        `${completedBookings.length} completed booking${completedBookings.length > 1 ? 's' : ''}`,
-      );
-    }
-
-    if (confirmedBookings.length > 0) {
-      blockingIssues.push(
-        `${confirmedBookings.length} confirmed booking${confirmedBookings.length > 1 ? 's' : ''}`,
-      );
-    }
-
-    if (bookingsWithCompletedPayment.length > 0) {
-      blockingIssues.push(
-        `${bookingsWithCompletedPayment.length} paid booking${bookingsWithCompletedPayment.length > 1 ? 's' : ''}`,
-      );
-    }
-
-    if (bookingsWithPendingPayment.length > 0) {
-      blockingIssues.push(
-        `${bookingsWithPendingPayment.length} booking${bookingsWithPendingPayment.length > 1 ? 's' : ''} with pending payment${bookingsWithPendingPayment.length > 1 ? 's' : ''}`,
-      );
-    }
-
-    if (futureActiveBookings.length > 0) {
-      blockingIssues.push(
-        `${futureActiveBookings.length} future active booking${futureActiveBookings.length > 1 ? 's' : ''}`,
-      );
-    }
-
-    if (blockingIssues.length > 0) {
-      throw new CustomError(
-        HTTP_STATUS_CODES.CONFLICT,
-        `Cannot delete bookings: ${blockingIssues.join(', ')} must be cancelled or refunded first`,
-      );
-    }
-
-    let totalRestoredGuests = 0;
-    let totalRestoredSeats = 0;
-
-    await prisma.$transaction(async (tx) => {
-      for (const booking of bookings) {
-        if (booking.tourId && booking.tour) {
-          const guestsToRestore = booking.numberOfGuests || 1;
-          if (booking.tour.guestsBooked >= guestsToRestore) {
-            await tx.tour.update({
-              data: { guestsBooked: { decrement: guestsToRestore } },
-              where: { id: booking.tourId },
-            });
-            totalRestoredGuests += guestsToRestore;
-          }
-        }
-
-        if (booking.flightId && booking.flight) {
-          const seatsToRestore = booking.numberOfGuests || 1;
-          if (
-            booking.flight.seatsAvailable + seatsToRestore <=
-            booking.flight.capacity
-          ) {
-            await tx.flight.update({
-              data: { seatsAvailable: { increment: seatsToRestore } },
-              where: { id: booking.flightId },
-            });
-            totalRestoredSeats += seatsToRestore;
-          }
-        }
-      }
-
-      // Soft-delete the bookings and (mirroring the legacy FK cascade) their
-      // remaining FAILED/REFUNDED payments — COMPLETED/PENDING ones are
-      // blocked above.
-      const deletedAt = clock.now();
-      await tx.payment.updateMany({
-        data: { deletedAt },
-        where: {
-          bookingId: { in: bookings.map((b) => b.id) },
-          deletedAt: null,
-        },
-      });
-      await tx.booking.updateMany({
-        data: { deletedAt },
-        where: { deletedAt: null },
-      });
-    });
-
-    return {
-      deletedCount: bookings.length,
-      restoredGuests: totalRestoredGuests,
-      restoredSeats: totalRestoredSeats,
-    };
-  };
-
   return {
     cancelBooking,
     cancelExpiredBookings,
     createBooking,
-    deleteAllBookings,
     deleteBooking,
     getBookingById,
     listBookings,
@@ -1538,7 +1501,6 @@ export const {
   cancelBooking,
   cancelExpiredBookings,
   createBooking,
-  deleteAllBookings,
   deleteBooking,
   getBookingById,
   listBookings,
