@@ -2,7 +2,7 @@
 "use client";
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { BookingsDataTable } from "@/components/bookings/table/BookingsDataTable";
+import { BookingsDataTable } from "@/components/bookings/table/bookings-data-table";
 import {
   useGetAllBookingsQuery,
   useGetAllCustomerBookingsQuery,

@@ -15,6 +15,7 @@ import { z } from "zod";
 import toast from "react-hot-toast";
 import { useLoginMutation } from "@/redux/auth/authApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import { useRouter } from "next/navigation";
 import Header from "@/components/index/Header";
 
@@ -34,7 +35,7 @@ export default function LoginPage() {
     try {
       await loginUser(data).unwrap();
       toast.success("Login successful! Redirecting...");
-      router.push("/dashboard");
+      router.push(loginRedirectPath(window.location.search));
     } catch (err) {
 
       const { message, fieldErrors, hasFieldErrors } =

@@ -1,7 +1,7 @@
 // src/components/customers/CustomerPayments.tsx
 "use client";
 import * as React from "react";
-import { PaymentsDataTable } from "@/components/payments/table/PaymentsDataTable";
+import { PaymentsDataTable } from "@/components/payments/table/payments-data-table";
 import { useGetCustomerPaymentHistoryQuery } from "@/redux/customerApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

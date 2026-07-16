@@ -1,6 +1,8 @@
-// src/components/bookings/table/BookingsDataTable.tsx
+// src/components/bookings/table/bookings-data-table.tsx
 "use client";
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   ColumnFiltersState,
   flexRender,
@@ -24,6 +26,7 @@ import {
   useDeleteBookingMutation,
   useDeleteAllBookingsMutation } from "@/redux/bookingApi";
 import { createBookingColumns } from "./columns";
+import { BookingActionsDropdown } from "./BookingActionsDropdown";
 import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -33,6 +36,21 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { roleOf } from "@/utils/roles";
 import EmptyState from "@/components/ui/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Money } from "@/components/ui/Money";
+import {
+  ROW_BADGE,
+  RowCard,
+  RowCardEmpty,
+  RowCardList,
+  SkeletonRowCards,
+} from "@/components/ui/table-bits";
+import {
+  bookingServiceName,
+  getPaymentStatusVariant,
+  getStatusVariant,
+} from "./bookings-table-logic";
 
 interface BookingsDataTableProps extends IBookingsDataTableProps {
   showFilters?: boolean;
@@ -60,6 +78,7 @@ export function BookingsDataTable({
   showSelection = true,
   showCustomer,
   isRecentsView = false }: BookingsDataTableProps) {
+  const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   // Customer sessions carry no role field; missing role reads as CUSTOMER.
   const userRole = roleOf(user);
@@ -203,9 +222,91 @@ export function BookingsDataTable({
         />
       )}
 
-      {/* Table */}
+      {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Phones: dense tappable row cards — no side-scroll. */}
+        <RowCardList>
+          {loading ? (
+            <SkeletonRowCards rows={Math.min(pageSize, 8)} />
+          ) : hasData ? (
+            table.getRowModel().rows.map((row) => {
+              const booking = row.original;
+              return (
+                <RowCard
+                  key={row.id}
+                  onOpen={() => router.push(`/dashboard/bookings/${booking.id}`)}
+                  leading={
+                    showSelection ? (
+                      <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                      />
+                    ) : undefined
+                  }
+                  action={
+                    showActions ? (
+                      <BookingActionsDropdown
+                        booking={booking}
+                        userRole={userRole}
+                      />
+                    ) : undefined
+                  }
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                      {shouldShowCustomer
+                        ? booking.customer.name
+                        : bookingServiceName(booking)}
+                    </span>
+                    <span className="flex-none text-sm font-medium">
+                      <Money amount={booking.totalPrice} />
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {shouldShowCustomer
+                        ? `${bookingServiceName(booking)} · ${format(
+                            new Date(booking.bookingDate),
+                            "MMM d, yyyy"
+                          )}`
+                        : `${booking.type} · ${format(
+                            new Date(booking.bookingDate),
+                            "MMM d, yyyy"
+                          )}`}
+                    </span>
+                    <span className="flex flex-none gap-1">
+                      <Badge
+                        variant={getStatusVariant(booking.status)}
+                        className={ROW_BADGE}
+                      >
+                        {booking.status}
+                      </Badge>
+                      {booking.payment && (
+                        <Badge
+                          variant={getPaymentStatusVariant(
+                            booking.payment.status
+                          )}
+                          className={ROW_BADGE}
+                        >
+                          {booking.payment.status}
+                        </Badge>
+                      )}
+                    </span>
+                  </div>
+                </RowCard>
+              );
+            })
+          ) : (
+            <RowCardEmpty
+              title="No bookings found"
+              hint="Try adjusting your search or filter criteria"
+            />
+          )}
+        </RowCardList>
+
+        {/* ≥md: the full table. */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

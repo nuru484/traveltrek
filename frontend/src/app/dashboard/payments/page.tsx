@@ -2,7 +2,7 @@
 "use client";
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { PaymentsDataTable } from "@/components/payments/table/PaymentsDataTable";
+import { PaymentsDataTable } from "@/components/payments/table/payments-data-table";
 import {
   useGetAllPaymentsQuery,
   useGetAllCustomerPaymentsQuery,

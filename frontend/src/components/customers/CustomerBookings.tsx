@@ -1,7 +1,7 @@
 // src/components/customers/CustomerBookings.tsx
 "use client";
 import * as React from "react";
-import { BookingsDataTable } from "@/components/bookings/table/BookingsDataTable";
+import { BookingsDataTable } from "@/components/bookings/table/bookings-data-table";
 import { useGetCustomerBookingHistoryQuery } from "@/redux/customerApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -10,11 +10,11 @@ import ProtectRoutes from "@/components/authentication/ProtectRoutes";
 import { UserProfileDropdown } from "@/components/users/UserProfileDropDown";
 import { DashboardGreeting } from "@/components/dashboard/DashboardGreeting";
 
-interface AgriLayoutProps {
+interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-export default function DashboardLayout({ children }: AgriLayoutProps) {
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <ProtectRoutes>
       <SidebarProvider>

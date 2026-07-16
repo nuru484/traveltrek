@@ -38,7 +38,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { isAdmin as isAdminUser, isStaff } from "@/utils/roles";
 import toast from "react-hot-toast";
 import Image from "next/image";
-import { BookingButton } from "../bookings/BookingButton";
+import { BookingButton } from "../bookings/booking-button";
 import { Money } from "@/components/ui/Money";
 
 interface IHotelDetailProps {

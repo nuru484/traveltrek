@@ -30,7 +30,7 @@ import { isAdmin as isAdminUser, isStaff } from "@/utils/roles";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import { Money } from "@/components/ui/Money";
-import { BookingButton } from "../bookings/BookingButton";
+import { BookingButton } from "../bookings/booking-button";
 
 interface IRoomDetailProps {
   room: IRoom;

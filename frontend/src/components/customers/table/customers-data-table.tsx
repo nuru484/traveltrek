@@ -1,6 +1,8 @@
-// src/components/customers/table/CustomersDataTable.tsx
+// src/components/customers/table/customers-data-table.tsx
 "use client";
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   ColumnFiltersState,
   flexRender,
@@ -25,9 +27,16 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { isAdmin as isAdminUser } from "@/utils/roles";
 import { createCustomerColumns } from "./columns";
+import { CustomerActionsDropdown } from "./CustomerActionsDropdown";
 import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { ICustomersDataTableProps } from "@/types/customer.types";
+import {
+  RowCard,
+  RowCardEmpty,
+  RowCardList,
+  SkeletonRowCards,
+} from "@/components/ui/table-bits";
 
 export function CustomersDataTable({
   data,
@@ -40,6 +49,7 @@ export function CustomersDataTable({
   onPageSizeChange,
   onFiltersChange,
 }: ICustomersDataTableProps) {
+  const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = isAdminUser(user);
 
@@ -83,9 +93,56 @@ export function CustomersDataTable({
         totalCount={totalCount}
       />
 
-      {/* Table */}
+      {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Phones: dense tappable row cards — no side-scroll. */}
+        <RowCardList>
+          {loading ? (
+            <SkeletonRowCards rows={Math.min(pageSize, 8)} />
+          ) : table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => {
+              const customer = row.original;
+              return (
+                <RowCard
+                  key={row.id}
+                  onOpen={() =>
+                    router.push(`/dashboard/customers/${customer.id}`)
+                  }
+                  action={
+                    <CustomerActionsDropdown
+                      customer={customer}
+                      isAdmin={isAdmin}
+                    />
+                  }
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                      {customer.name}
+                    </span>
+                    <span className="flex-none text-xs text-muted-foreground">
+                      {customer.createdAt
+                        ? format(new Date(customer.createdAt), "MMM d, yyyy")
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {customer.email || customer.phone || "No contact"}
+                    </span>
+                  </div>
+                </RowCard>
+              );
+            })
+          ) : (
+            <RowCardEmpty
+              title="No customers found"
+              hint="Try adjusting your search criteria"
+            />
+          )}
+        </RowCardList>
+
+        {/* ≥md: the full table. */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

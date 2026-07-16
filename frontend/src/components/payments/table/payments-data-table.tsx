@@ -1,6 +1,8 @@
-// src/components/payments/table/PaymentsDataTable.tsx
+// src/components/payments/table/payments-data-table.tsx
 "use client";
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   ColumnFiltersState,
   flexRender,
@@ -24,6 +26,7 @@ import {
   useDeletePaymentMutation,
   useDeleteAllPaymentsMutation } from "@/redux/paymentApi";
 import { createPaymentColumns } from "./columns";
+import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
 import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -33,6 +36,17 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { roleOf } from "@/utils/roles";
 import EmptyState from "@/components/ui/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Money } from "@/components/ui/Money";
+import {
+  ROW_BADGE,
+  RowCard,
+  RowCardEmpty,
+  RowCardList,
+  SkeletonRowCards,
+} from "@/components/ui/table-bits";
+import { getPaymentMethodLabel, getStatusVariant } from "./payments-table-logic";
 
 interface PaymentsDataTableProps extends IPaymentsDataTableProps {
   showFilters?: boolean;
@@ -62,6 +76,7 @@ export function PaymentsDataTable({
   showUser,
   showBooking,
   isRecentsView = false }: PaymentsDataTableProps) {
+  const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   // Customer sessions carry no role field; missing role reads as CUSTOMER.
   const userRole = roleOf(user);
@@ -206,9 +221,79 @@ export function PaymentsDataTable({
         />
       )}
 
-      {/* Table */}
+      {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Phones: dense tappable row cards — no side-scroll. */}
+        <RowCardList>
+          {loading ? (
+            <SkeletonRowCards rows={Math.min(pageSize, 8)} />
+          ) : hasData ? (
+            table.getRowModel().rows.map((row) => {
+              const payment = row.original;
+              const paymentDate = payment.paymentDate ?? payment.createdAt;
+              return (
+                <RowCard
+                  key={row.id}
+                  onOpen={() => router.push(`/dashboard/payments/${payment.id}`)}
+                  leading={
+                    showSelection ? (
+                      <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                      />
+                    ) : undefined
+                  }
+                  action={
+                    showActions ? (
+                      <PaymentActionsDropdown
+                        payment={payment}
+                        userRole={userRole}
+                      />
+                    ) : undefined
+                  }
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                      {shouldShowUser
+                        ? payment.customer.name
+                        : payment.transactionReference}
+                    </span>
+                    <span className="flex-none text-sm font-medium">
+                      <Money amount={payment.amount} />
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {shouldShowUser
+                        ? payment.transactionReference
+                        : getPaymentMethodLabel(payment.paymentMethod)}
+                      {paymentDate
+                        ? ` · ${format(new Date(paymentDate), "MMM d, yyyy")}`
+                        : ""}
+                    </span>
+                    <span className="flex flex-none gap-1">
+                      <Badge
+                        variant={getStatusVariant(payment.status)}
+                        className={ROW_BADGE}
+                      >
+                        {payment.status}
+                      </Badge>
+                    </span>
+                  </div>
+                </RowCard>
+              );
+            })
+          ) : (
+            <RowCardEmpty
+              title="No payments found"
+              hint="Try adjusting your search or filter criteria"
+            />
+          )}
+        </RowCardList>
+
+        {/* ≥md: the full table. */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

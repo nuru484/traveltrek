@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useGoogleSignInMutation } from "@/redux/auth/authApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const GSI_SRC = "https://accounts.google.com/gsi/client";
@@ -58,7 +59,7 @@ export default function GoogleSignInButton() {
       try {
         await googleSignIn({ idToken: response.credential }).unwrap();
         toast.success("Login successful! Redirecting...");
-        router.push("/dashboard");
+        router.push(loginRedirectPath(window.location.search));
       } catch (err) {
         toast.error(
           extractApiErrorMessage(err).message ||

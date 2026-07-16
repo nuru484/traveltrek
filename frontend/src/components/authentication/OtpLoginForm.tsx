@@ -25,6 +25,7 @@ import {
   useOtpVerifyMutation,
 } from "@/redux/auth/authApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import {
   contactToPayload,
   IOtpRequestFormSchema,
@@ -76,7 +77,7 @@ export default function OtpLoginForm() {
         code: data.code,
       }).unwrap();
       toast.success("Login successful! Redirecting...");
-      router.push("/dashboard");
+      router.push(loginRedirectPath(window.location.search));
     } catch (err) {
       toast.error(
         extractApiErrorMessage(err).message ||

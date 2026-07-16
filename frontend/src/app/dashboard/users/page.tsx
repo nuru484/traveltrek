@@ -2,7 +2,7 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
-import { UsersDataTable } from "@/components/users/table/UsersDataTable";
+import { UsersDataTable } from "@/components/users/table/users-data-table";
 import { DataTableSkeleton } from "@/components/ui/DataTableSkeleton";
 import { useGetAllUsersQuery } from "@/redux/userApi";
 import ErrorMessage from "@/components/ui/ErrorMessage";

@@ -14,6 +14,7 @@ import { IPayment } from "@/types/payment.types";
 import { PaymentActionsDropdown } from "./PaymentActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
 import { Money } from "@/components/ui/Money";
+import { getPaymentMethodLabel, getStatusVariant } from "./payments-table-logic";
 
 const getPaymentMethodIcon = (method: string) => {
   switch (method) {
@@ -27,25 +28,6 @@ const getPaymentMethodIcon = (method: string) => {
     default:
       return <CreditCard className="w-4 h-4" />;
   }
-};
-
-const getStatusVariant = (status: IPayment["status"]) => {
-  switch (status) {
-    case "COMPLETED":
-      return "default";
-    case "PENDING":
-      return "outline";
-    case "FAILED":
-      return "destructive";
-    case "REFUNDED":
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-const getPaymentMethodLabel = (method: string) => {
-  return method.replace(/_/g, " ");
 };
 
 export const createPaymentColumns = (

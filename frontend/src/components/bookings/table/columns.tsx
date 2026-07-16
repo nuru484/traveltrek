@@ -10,6 +10,11 @@ import { IBooking } from "@/types/booking.types";
 import { BookingActionsDropdown } from "./BookingActionsDropdown";
 import DateCell from "@/components/ui/DateCell";
 import { Money } from "@/components/ui/Money";
+import {
+  bookingServiceName,
+  getPaymentStatusVariant,
+  getStatusVariant,
+} from "./bookings-table-logic";
 
 const getBookingTypeIcon = (type: IBooking["type"]) => {
   switch (type) {
@@ -21,38 +26,6 @@ const getBookingTypeIcon = (type: IBooking["type"]) => {
       return <Plane className="w-4 h-4" />;
     default:
       return null;
-  }
-};
-
-const getStatusVariant = (status: IBooking["status"]) => {
-  switch (status) {
-    case "CONFIRMED":
-      return "default";
-    case "COMPLETED":
-      return "secondary";
-    case "PENDING":
-      return "outline";
-    case "CANCELLED":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
-const getPaymentStatusVariant = (
-  paymentStatus: NonNullable<IBooking["payment"]>["status"] | undefined
-) => {
-  switch (paymentStatus) {
-    case "COMPLETED":
-      return "default";
-    case "PENDING":
-      return "outline";
-    case "FAILED":
-      return "destructive";
-    case "REFUNDED":
-      return "secondary";
-    default:
-      return "outline";
   }
 };
 
@@ -129,22 +102,7 @@ export const createBookingColumns = (
       accessorKey: "service",
       header: "Service",
       cell: ({ row }) => {
-        const booking = row.original;
-        let serviceName = "";
-
-        switch (booking.type) {
-          case "TOUR":
-            serviceName = booking.tour.name;
-            break;
-          case "ROOM":
-            serviceName = `${booking.room?.roomType ?? ""} - ${
-              booking?.room?.hotel?.name ?? ""
-            }`;
-            break;
-          case "FLIGHT":
-            serviceName = `${booking.flight.airline} ${booking.flight.flightNumber}`;
-            break;
-        }
+        const serviceName = bookingServiceName(row.original);
 
         return (
           <div className="max-w-[200px] truncate text-sm">{serviceName}</div>

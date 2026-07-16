@@ -1,6 +1,8 @@
-// src/components/users/table/UsersDataTable.tsx
+// src/components/users/table/users-data-table.tsx
 "use client";
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   ColumnFiltersState,
   flexRender,
@@ -27,11 +29,21 @@ import {
   useDeleteAllUsersMutation,
 } from "@/redux/userApi";
 import { createUserColumns } from "./columns";
+import { UserActionsDropdown } from "./UserActionsDropdown";
 import { TableFilters } from "./TableFilters";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { IUsersDataTableProps } from "@/types/user.types";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ROW_BADGE,
+  RowCard,
+  RowCardEmpty,
+  RowCardList,
+  SkeletonRowCards,
+} from "@/components/ui/table-bits";
 
 export function UsersDataTable({
   data,
@@ -45,6 +57,7 @@ export function UsersDataTable({
   onFiltersChange,
   onRefresh,
 }: IUsersDataTableProps) {
+  const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -156,9 +169,66 @@ export function UsersDataTable({
         onDeleteSelected={handleDeleteSelected}
       />
 
-      {/* Table */}
+      {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Phones: dense tappable row cards — no side-scroll. */}
+        <RowCardList>
+          {loading ? (
+            <SkeletonRowCards rows={Math.min(pageSize, 8)} />
+          ) : table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => {
+              const staff = row.original;
+              return (
+                <RowCard
+                  key={row.id}
+                  onOpen={() =>
+                    router.push(`/dashboard/users/${staff.id}/user-profile`)
+                  }
+                  leading={
+                    <Checkbox
+                      checked={row.getIsSelected()}
+                      onCheckedChange={(value) => row.toggleSelected(!!value)}
+                      aria-label="Select row"
+                    />
+                  }
+                  action={<UserActionsDropdown user={staff} />}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                      {staff.name}
+                    </span>
+                    <span className="flex flex-none gap-1">
+                      <Badge
+                        variant={staff.role === "ADMIN" ? "default" : "secondary"}
+                        className={ROW_BADGE}
+                      >
+                        {staff.role}
+                      </Badge>
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {staff.email || staff.phone || "No contact"}
+                    </span>
+                    <span className="flex-none text-xs text-muted-foreground">
+                      {staff.createdAt
+                        ? format(new Date(staff.createdAt), "MMM d, yyyy")
+                        : "—"}
+                    </span>
+                  </div>
+                </RowCard>
+              );
+            })
+          ) : (
+            <RowCardEmpty
+              title="No staff found"
+              hint="Try adjusting your search or filter criteria"
+            />
+          )}
+        </RowCardList>
+
+        {/* ≥md: the full table. */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="min-w-full">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
