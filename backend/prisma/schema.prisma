@@ -10,13 +10,11 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Staff roles only. Customers have no role — they live in the separate
+/// Customer model; the app-level UserRole type still uses 'CUSTOMER' as the
+/// role customers present on their access tokens, but no User row carries it.
 enum Role {
   ADMIN
-  /// Legacy-reserved (Phase 5b): customers moved to their own Customer model,
-  /// so no User row carries this value anymore. The enum member stays because
-  /// removing a Postgres enum value is painful; the shared UserRole type still
-  /// uses 'CUSTOMER' as the role customers present on their access tokens.
-  CUSTOMER
   AGENT
 }
 
@@ -33,7 +31,8 @@ model User {
   /// Nullable: minimal signups and Google-created accounts have no password —
   /// they authenticate via OTP login or Google until they set one.
   password       String?
-  role           Role     @default(CUSTOMER)
+  /// Defaults to the least-privileged staff role; ADMIN is always explicit.
+  role           Role     @default(AGENT)
   phone          String?  @unique
   address        String?
   profilePicture String?

@@ -6,7 +6,6 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
-import type { Role } from '#config/prismaClient.js';
 import type { PrincipalKind } from '#types/auth.types.js';
 
 import ENV from '#config/env.js';
@@ -22,7 +21,9 @@ import app from '../../app.js';
 interface TokenUser {
   id: number;
   kind?: PrincipalKind;
-  role?: Role;
+  /** Token-level role: staff DB roles plus the app-level 'CUSTOMER' role
+   * customers present on their access tokens (not a Prisma Role anymore). */
+  role?: 'ADMIN' | 'AGENT' | 'CUSTOMER';
   tokenVersion?: number;
 }
 

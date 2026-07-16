@@ -15,8 +15,6 @@
 //   moved here — same 400, now in the standard validation envelope.
 // - list query: an invalid role FILTER was silently ignored by the legacy
 //   handler (an includes() check), so `.catch(undefined)` preserves that.
-// - deleteAllUsers has no schema: its confirmDelete gate stays in the service
-//   so the exact legacy message and error shape survive.
 import { z } from 'zod';
 
 import { Role } from '#config/prismaClient.js';
@@ -55,7 +53,7 @@ export const updateUserProfileSchema = z.object({
   profilePicture: z.string('profilePicture must be a string').optional(),
   // Accepted (the legacy chain validated it) but nothing reads it.
   role: z
-    .enum(Role, 'role must be one of: ADMIN, CUSTOMER, AGENT')
+    .enum(Role, 'role must be one of: ADMIN, AGENT')
     .optional(),
 });
 
