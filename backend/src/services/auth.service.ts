@@ -493,7 +493,10 @@ export const makeAuthService = (d: AuthDeps) => {
    * (same response as known ones — no enumeration); for a real account a
    * 6-digit code is issued (replacing any prior live one) and sent to the
    * channel the caller identified themselves by. Re-requests inside the
-   * cooldown are refused with a 429 (khadys's resend behaviour).
+   * cooldown are silently dropped: a 429 here would only ever fire for
+   * contacts that HAVE an account, leaking existence — the response must be
+   * indistinguishable from the unknown-contact path. Abuse control is the
+   * per-IP rate limiter on the route.
    */
   const requestOtpLogin = async (contact: OtpContact): Promise<void> => {
     const user = await findUserByContact(contact);
@@ -517,10 +520,11 @@ export const makeAuthService = (d: AuthDeps) => {
       clock.timestamp() - latest.createdAt.getTime() <
         OTP_RESEND_COOLDOWN_SECONDS * 1000
     ) {
-      throw new TooManyRequestsError(
-        'Please wait a moment before requesting another code.',
-        { code: 'RESEND_COOLDOWN', layer: 'auth' },
+      logger.info(
+        { event: 'otp_login_cooldown', userId: user.id },
+        'OTP re-request inside cooldown dropped',
       );
+      return;
     }
 
     const code = generateOtpCode();

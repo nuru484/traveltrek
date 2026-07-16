@@ -216,7 +216,7 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
     expect(sentSms()).toHaveLength(0);
   });
 
-  it('refuses a re-request inside the 60s cooldown with 429', async () => {
+  it('silently drops a re-request inside the 60s cooldown (no enumeration)', async () => {
     const user = await createUser();
 
     const first = await api()
@@ -224,10 +224,16 @@ describe('POST /api/v1/auth/otp/{request,verify}', () => {
       .send({ email: user.email });
     expect(first.status).toBe(200);
 
+    // A 429 here would only ever fire for existing accounts, leaking
+    // existence — the cooldown must answer exactly like the unknown-contact
+    // path and just not send.
     const second = await api()
       .post('/api/v1/auth/otp/request')
       .send({ email: user.email });
-    expect(second.status).toBe(429);
+    expect(second.status).toBe(200);
+    expect(second.body.message).toBe(
+      'If an account exists for that contact, a login code is on its way.',
+    );
     // Only the first request produced an email.
     expect(sentEmails()).toHaveLength(1);
   });
