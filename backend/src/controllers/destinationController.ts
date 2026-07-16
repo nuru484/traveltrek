@@ -1,520 +1,208 @@
-// src/controllers/destination/destination-controller.ts
-import { NextFunction, Request, RequestHandler, Response } from 'express';
-import { param } from 'express-validator';
-import {
-  IDestinationInput,
-  IDestinationResponse,
-  IDestinationUpdateInput,
-} from 'types/destination.types';
+// src/controllers/destinationController.ts
+//
+// Thin HTTP adapters for the destination domain: each export is a
+// RequestHandler bundle of [multer/photo middleware where relevant, zod
+// validation middleware, asyncHandler(handler)]. Handlers read the typed
+// req.query/body/params the middleware wrote back, call the destination
+// service, and reply through the standard envelope helpers. All domain logic
+// lives in services/destination.service.ts; role gates live in
+// routes/destination.ts (authorizeRole), so no handler re-checks
+// req.user.role.
+import { Request, RequestHandler, Response } from 'express';
 
-import { cloudinaryService } from '../config/claudinary';
-import { HTTP_STATUS_CODES } from '../config/constants';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '../config/constants';
+import { CLOUDINARY_UPLOAD_OPTIONS, HTTP_STATUS_CODES } from '../config/constants';
 import multerUpload from '../config/multer';
-import prisma from '../config/prismaClient';
 import conditionalCloudinaryUpload from '../middlewares/conditional-cloudinary-upload';
+import { asyncHandler, ValidationError } from '../middlewares/error-handler';
+import zodValidation from '../middlewares/validate-request';
 import {
-  asyncHandler,
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from '../middlewares/error-handler';
-import validationMiddleware from '../middlewares/validation';
+  createDestination as createDestinationService,
+  deleteAllDestinations as deleteAllDestinationsService,
+  deleteDestination as deleteDestinationService,
+  getDestinationById,
+  listDestinations,
+  updateDestination as updateDestinationService,
+} from '../services/destination.service';
+import { buildPaginationMeta, sendSuccess } from '../utils/http-response';
+import { toDestinationDTO } from '../utils/mappers/destination.mapper';
+import { intParam } from '../validations/common-validation';
 import {
-  createDestinationValidation,
-  destinationPhotoValidation,
-  getDestinationsValidation,
-  updateDestinationValidation,
+  CreateDestinationBody,
+  createDestinationSchema,
+  DestinationListQuery,
+  destinationListQuery,
+  UpdateDestinationBody,
+  updateDestinationSchema,
 } from '../validations/destination-validation';
 
-/**
- * Create a new destination
- */
-const handleCreateDestination = asyncHandler(
-  async (
-    req: Request<{}, {}, IDestinationInput>,
-    res: Response,
-    _next: NextFunction,
-  ): Promise<void> => {
-    const { city, country, description, name } = req.body;
-    const user = req.user;
-
-    if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
-    }
-
-    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
-      throw new UnauthorizedError(
-        'Only admins and agents can create destinations',
-      );
-    }
-
-    const photoUrl = req.body.destinationPhoto;
-
-    const destination = await prisma.destination.create({
-      data: {
-        city,
-        country,
-        description,
-        name,
-        photo: typeof photoUrl === 'string' ? photoUrl : null,
-      },
-    });
-
-    const response: IDestinationResponse = {
-      city: destination.city,
-      country: destination.country,
-      createdAt: destination.createdAt,
-      description: destination.description,
-      id: destination.id,
-      name: destination.name,
-      photo: destination.photo,
-      updatedAt: destination.updatedAt,
-    };
-
-    res.status(HTTP_STATUS_CODES.CREATED).json({
-      data: response,
-      message: 'Destination created successfully',
-    });
-  },
-);
+const ALLOWED_PHOTO_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
- * Get a single destination by ID
+ * Guards the multer-parsed photo file (type + size) before the Cloudinary
+ * upload middleware runs. Zod validates req.body only, so this keeps the
+ * legacy destinationPhotoValidation checks — same messages, same
+ * validation-error envelope.
  */
-const handleGetDestination = asyncHandler(
-  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const { id } = req.params;
+const validatePhotoFile: RequestHandler = (req, _res, next) => {
+  const { file } = req;
+  if (!file) {
+    next();
+    return;
+  }
 
-    const destination = await prisma.destination.findUnique({
-      where: { id: parseInt(id) },
+  const errors: { field: string; message: string }[] = [];
+  if (!ALLOWED_PHOTO_MIME_TYPES.includes(file.mimetype)) {
+    errors.push({
+      field: 'destinationPhoto',
+      message: 'Photo must be a valid image file (JPEG, PNG, or WebP)',
     });
-
-    if (!destination) {
-      throw new NotFoundError('Destination not found');
-    }
-
-    const response: IDestinationResponse = {
-      city: destination.city,
-      country: destination.country,
-      createdAt: destination.createdAt,
-      description: destination.description,
-      id: destination.id,
-      name: destination.name,
-      photo: destination.photo,
-      updatedAt: destination.updatedAt,
-    };
-
-    res.status(HTTP_STATUS_CODES.OK).json({
-      data: response,
-      message: 'Destination retrieved successfully',
+  }
+  if (file.size > MAX_PHOTO_SIZE_BYTES) {
+    errors.push({
+      field: 'destinationPhoto',
+      message: 'Photo size must not exceed 5MB',
     });
-  },
-);
+  }
 
-/**
- * Update a destination with photo handling
- */
-const handleUpdateDestination = asyncHandler(
-  async (
-    req: Request<{ id?: string }, {}, IDestinationUpdateInput>,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    const { id } = req.params;
-    const { city, country, description, name } = req.body;
-    const user = req.user;
-
-    if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
-    }
-
-    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
-      throw new UnauthorizedError(
-        'Only admins and agents can update destinations',
-      );
-    }
-
-    if (!id) {
-      throw new NotFoundError('Destination ID is required');
-    }
-
-    // Track the uploaded image URL for cleanup if needed
-    let uploadedImageUrl: string | undefined;
-    let oldPhoto: null | string = null;
-
-    try {
-      // First, get the current destination to check for existing photo
-      const existingDestination = await prisma.destination.findUnique({
-        select: { photo: true },
-        where: { id: parseInt(id) },
-      });
-
-      if (!existingDestination) {
-        throw new NotFoundError('Destination not found');
-      }
-
-      oldPhoto = existingDestination.photo;
-
-      // Prepare update data
-      const updateData: any = {};
-
-      // Only update fields that are provided
-      if (name !== undefined) {
-        updateData.name = name;
-      }
-      if (description !== undefined) {
-        updateData.description = description;
-      }
-      if (country !== undefined) {
-        updateData.country = country;
-      }
-      if (city !== undefined) {
-        updateData.city = city;
-      }
-
-      // Handle photo - it should be a string URL after middleware processing
-      if (
-        req.body.destinationPhoto &&
-        typeof req.body.destinationPhoto === 'string'
-      ) {
-        updateData.photo = req.body.destinationPhoto;
-        uploadedImageUrl = req.body.destinationPhoto;
-      }
-
-      // Update destination in database
-      const updatedDestination = await prisma.destination.update({
-        data: updateData,
-        where: { id: parseInt(id) },
-      });
-
-      // If we successfully updated with a new photo, clean up the old one
-      if (uploadedImageUrl && oldPhoto && oldPhoto !== uploadedImageUrl) {
-        try {
-          await cloudinaryService.deleteImage(oldPhoto);
-        } catch (cleanupError) {
-          console.warn(
-            'Failed to clean up old destination photo:',
-            cleanupError,
-          );
-          // Don't throw here as the main operation succeeded
-        }
-      }
-
-      const response: IDestinationResponse = {
-        city: updatedDestination.city,
-        country: updatedDestination.country,
-        createdAt: updatedDestination.createdAt,
-        description: updatedDestination.description,
-        id: updatedDestination.id,
-        name: updatedDestination.name,
-        photo: updatedDestination.photo,
-        updatedAt: updatedDestination.updatedAt,
-      };
-
-      res.status(HTTP_STATUS_CODES.OK).json({
-        data: response,
-        message: 'Destination updated successfully',
-      });
-    } catch (error) {
-      // If Cloudinary upload succeeded but DB update failed, clean up uploaded image
-      if (uploadedImageUrl) {
-        try {
-          await cloudinaryService.deleteImage(uploadedImageUrl);
-        } catch (cleanupError) {
-          console.error('Failed to clean up Cloudinary image:', cleanupError);
-        }
-      }
-      next(error);
-    }
-  },
-);
-
-/**
- * Delete a destination with photo cleanup
- */
-const handleDeleteDestination = asyncHandler(
-  async (
-    req: Request<{ id?: string }>,
-    res: Response,
-    _next: NextFunction,
-  ): Promise<void> => {
-    const { id } = req.params;
-    const user = req.user;
-
-    if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
-    }
-
-    if (user.role !== 'ADMIN' && user.role !== 'AGENT') {
-      throw new UnauthorizedError(
-        'Only admins and agents can delete destinations',
-      );
-    }
-
-    if (!id) {
-      throw new NotFoundError('Destination ID is required');
-    }
-
-    const destinationId = parseInt(id);
-
-    const destination = await prisma.destination.findUnique({
-      include: {
-        destinationFlights: true,
-        hotels: true,
-        originFlights: true,
-        tours: true,
-      },
-      where: { id: destinationId },
-    });
-
-    if (!destination) {
-      throw new NotFoundError('Destination not found');
-    }
-
-    // Check dependencies
-    const dependentItems: string[] = [];
-    if (destination.hotels.length > 0) dependentItems.push('Hotels');
-    if (destination.tours.length > 0) dependentItems.push('Tours');
-    if (
-      destination.originFlights.length > 0 ||
-      destination.destinationFlights.length > 0
-    )
-      dependentItems.push('Flights');
-
-    if (dependentItems.length > 0) {
-      throw new BadRequestError(
-        `This destination cannot be deleted because it has associated: ${dependentItems.join(
-          ', ',
-        )}. Please remove or reassign them before deleting the destination.`,
-      );
-    }
-
-    // Delete from database
-    await prisma.destination.delete({
-      where: { id: destinationId },
-    });
-
-    // Clean up photo from Cloudinary if it exists
-    if (destination.photo) {
-      try {
-        await cloudinaryService.deleteImage(destination.photo);
-      } catch (cleanupError) {
-        console.warn(
-          'Failed to clean up destination photo from Cloudinary:',
-          cleanupError,
-        );
-        // Don't throw here as the main operation succeeded
-      }
-    }
-
-    res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'Destination deleted successfully',
-    });
-  },
-);
-
-/**
- * Get all destinations with pagination and filtering
- */
-const handleGetAllDestinations = asyncHandler(
-  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const skip = (page - 1) * limit;
-
-    // Extract search and filter parameters
-    const search = req.query.search as string;
-    const country = req.query.country as string;
-    const city = req.query.city as string;
-    const sortBy = (req.query.sortBy as string) || 'createdAt';
-    const sortOrder = (req.query.sortOrder as string) || 'desc';
-
-    // Build where clause for filtering
-    const where: any = {};
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { country: { contains: search, mode: 'insensitive' } },
-        { city: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    if (country) {
-      where.country = { contains: country, mode: 'insensitive' };
-    }
-
-    if (city) {
-      where.city = { contains: city, mode: 'insensitive' };
-    }
-
-    // Build orderBy clause
-    const orderBy: any = {};
-    orderBy[sortBy] = sortOrder;
-
-    const [destinations, total] = await Promise.all([
-      prisma.destination.findMany({
-        orderBy,
-        skip,
-        take: limit,
-        where,
-      }),
-      prisma.destination.count({ where }),
-    ]);
-
-    const response: IDestinationResponse[] = destinations.map(
-      (destination) => ({
-        city: destination.city,
-        country: destination.country,
-        createdAt: destination.createdAt,
-        description: destination.description,
-        id: destination.id,
-        name: destination.name,
-        photo: destination.photo,
-        updatedAt: destination.updatedAt,
+  if (errors.length > 0) {
+    next(
+      new ValidationError('Validation Error', {
+        code: 'VALIDATION_ERROR',
+        context: { errors },
+        layer: 'Request Validation',
       }),
     );
+    return;
+  }
+  next();
+};
 
-    res.status(HTTP_STATUS_CODES.OK).json({
-      data: response,
-      message: 'Destinations retrieved successfully',
-      meta: {
-        filters: {
-          city,
-          country,
-          search,
-          sortBy,
-          sortOrder,
-        },
-        limit,
-        page,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+/** Reads the destination id that `intParam('id')` validated and coerced. */
+const destinationIdParam = (req: Request): number =>
+  (req.params as unknown as { id: number }).id;
+
+const handleCreateDestination = asyncHandler(
+  async (req: Request, res: Response) => {
+    const body = req.body as CreateDestinationBody;
+    const destination = await createDestinationService({
+      city: body.city,
+      country: body.country,
+      description: body.description,
+      name: body.name,
+      photo: body.destinationPhoto,
+    });
+    sendSuccess(res, {
+      data: toDestinationDTO(destination),
+      message: 'Destination created successfully',
+      status: HTTP_STATUS_CODES.CREATED,
     });
   },
 );
-
-/**
- * Delete all destinations with photo cleanup
- */
-const handleDeleteAllDestinations = asyncHandler(
-  async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
-    const user = req.user;
-
-    if (!user) {
-      throw new UnauthorizedError('Unauthorized, no user provided');
-    }
-
-    if (user.role !== 'ADMIN') {
-      throw new UnauthorizedError('Only admins can delete all destinations');
-    }
-
-    const destinations = await prisma.destination.findMany({
-      include: {
-        destinationFlights: true,
-        hotels: true,
-        originFlights: true,
-        tours: true,
-      },
-    });
-
-    if (destinations.length === 0) {
-      res.status(HTTP_STATUS_CODES.OK).json({
-        message: 'No destinations found to delete',
-      });
-      return;
-    }
-
-    const blocked: { deps: string[]; id: number; name: string }[] = [];
-
-    for (const dest of destinations) {
-      const deps: string[] = [];
-      if (dest.hotels.length > 0) deps.push('Hotels');
-      if (dest.tours.length > 0) deps.push('Tours');
-      if (dest.originFlights.length > 0 || dest.destinationFlights.length > 0) {
-        deps.push('Flights');
-      }
-      if (deps.length > 0) {
-        blocked.push({ deps, id: dest.id, name: dest.name });
-      }
-    }
-
-    if (blocked.length > 0) {
-      throw new BadRequestError(
-        `Cannot delete all destinations. ${blocked.length} destination${blocked.length > 1 ? 's have' : ' has'} associated dependencies (Hotels, Tours, or Flights). Please remove these dependencies first.`,
-      );
-    }
-
-    const photos = destinations
-      .map((dest) => dest.photo)
-      .filter((photo): photo is string => Boolean(photo));
-
-    await prisma.destination.deleteMany({});
-
-    const cleanupPromises = photos.map(async (photo) => {
-      try {
-        await cloudinaryService.deleteImage(photo);
-      } catch (cleanupError) {
-        console.warn(`Failed to clean up photo ${photo}:`, cleanupError);
-      }
-    });
-
-    await Promise.allSettled(cleanupPromises);
-
-    res.status(HTTP_STATUS_CODES.OK).json({
-      message: 'All destinations deleted successfully',
-    });
-  },
-);
-
-// Middleware arrays with validations
 export const createDestination: RequestHandler[] = [
   multerUpload.single('destinationPhoto'),
-  ...validationMiddleware.create([
-    ...createDestinationValidation,
-    ...destinationPhotoValidation,
-  ]),
+  validatePhotoFile,
+  ...zodValidation.body(createDestinationSchema),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'destinationPhoto'),
   handleCreateDestination,
 ];
 
+const handleGetDestination = asyncHandler(
+  async (req: Request, res: Response) => {
+    const destination = await getDestinationById(destinationIdParam(req));
+    sendSuccess(res, {
+      data: toDestinationDTO(destination),
+      message: 'Destination retrieved successfully',
+    });
+  },
+);
 export const getDestination: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Destination ID must be a positive integer'),
-  ...validationMiddleware.create([]),
+  ...zodValidation.params(intParam('id')),
   handleGetDestination,
 ];
 
+const handleUpdateDestination = asyncHandler(
+  async (req: Request, res: Response) => {
+    const body = req.body as UpdateDestinationBody;
+    const destination = await updateDestinationService(
+      destinationIdParam(req),
+      {
+        city: body.city,
+        country: body.country,
+        description: body.description,
+        name: body.name,
+        photo: body.destinationPhoto,
+      },
+    );
+    sendSuccess(res, {
+      data: toDestinationDTO(destination),
+      message: 'Destination updated successfully',
+    });
+  },
+);
 export const updateDestination: RequestHandler[] = [
   multerUpload.single('destinationPhoto'),
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Destination ID must be a positive integer'),
-  ...validationMiddleware.create([
-    ...updateDestinationValidation,
-    ...destinationPhotoValidation,
-  ]),
+  ...zodValidation.params(intParam('id')),
+  validatePhotoFile,
+  ...zodValidation.body(updateDestinationSchema),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'destinationPhoto'),
   handleUpdateDestination,
 ];
 
+const handleDeleteDestination = asyncHandler(
+  async (req: Request, res: Response) => {
+    await deleteDestinationService(destinationIdParam(req));
+    sendSuccess(res, { message: 'Destination deleted successfully' });
+  },
+);
 export const deleteDestination: RequestHandler[] = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Destination ID must be a positive integer'),
-  ...validationMiddleware.create([]),
+  ...zodValidation.params(intParam('id')),
   handleDeleteDestination,
 ];
 
+const handleGetAllDestinations = asyncHandler(
+  async (req: Request, res: Response) => {
+    const query = req.query as unknown as DestinationListQuery;
+    const { destinations, total } = await listDestinations(query);
+    // The legacy list meta also echoed the applied filters; keep that shape.
+    const meta = {
+      ...buildPaginationMeta(total, query.page, query.limit),
+      filters: {
+        city: query.city,
+        country: query.country,
+        search: query.search,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+      },
+    };
+    sendSuccess(res, {
+      data: destinations.map(toDestinationDTO),
+      message: 'Destinations retrieved successfully',
+      meta,
+    });
+  },
+);
 export const getAllDestinations: RequestHandler[] = [
-  ...validationMiddleware.create(getDestinationsValidation),
+  ...zodValidation.query(destinationListQuery),
   handleGetAllDestinations,
 ];
 
+const handleDeleteAllDestinations = asyncHandler(
+  async (_req: Request, res: Response) => {
+    const deletedCount = await deleteAllDestinationsService();
+    sendSuccess(res, {
+      message:
+        deletedCount === 0
+          ? 'No destinations found to delete'
+          : 'All destinations deleted successfully',
+    });
+  },
+);
 export const deleteAllDestinations: RequestHandler[] = [
   handleDeleteAllDestinations,
 ];
