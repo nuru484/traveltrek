@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "clean": "rm -rf build",
-    "build": "npm run clean && npx tsc --diagnostics && cp -r generated build/ && echo 'Build completed successfully!'",
+    "build": "npm run clean && npx tsc -p tsconfig.build.json --diagnostics && cp -r generated build/ && echo 'Build completed successfully!'",
     "start": "node build/server.js",
     "start:dev": "node --env-file .env build/server.js",
     "type-check": "tsc --noEmit",
@@ -22,7 +22,9 @@
     "migrate:deploy:local": "node --env-file .env ./node_modules/.bin/prisma migrate deploy",
     "studio": "node --env-file .env ./node_modules/.bin/prisma studio",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "travel",
@@ -41,13 +43,18 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^24.1.0",
     "@types/pg": "8.20.0",
+    "@types/supertest": "^7.2.1",
+    "dotenv": "^17.4.2",
     "eslint": "^9.31.0",
     "eslint-plugin-perfectionist": "^5.9.1",
     "prettier": "^3.6.2",
     "prisma": "7.8.0",
+    "supertest": "^7.2.2",
     "tsx": "4.23.1",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.53.0"
+    "typescript-eslint": "^8.53.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
      "target": "es2024", 
-    "module": "commonjs", 
+    "module": "nodenext",
+    "moduleResolution": "nodenext", 
     "rootDir": "./",
     "outDir": "./build",
     "esModuleInterop": true,
@@ -20,7 +21,11 @@
     "app.ts",
     "worker.ts",
     "./src/**/*",
-    "types"
+    "types",
+    "test",
+    "vitest.config.ts",
+    "prisma.config.ts",
+    "prisma"
   ],
   "exclude": ["node_modules", "build", ".env"]
 }

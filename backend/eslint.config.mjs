@@ -14,10 +14,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: {
-          // Root-level prisma scripts are not part of the build tsconfig
-          allowDefaultProject: ['prisma.config.ts', 'prisma/*.ts'],
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -43,10 +40,13 @@ export default tseslint.config(
   },
   {
     // Test scaffolding and root config files may assert non-null on fixtures
-    // they just created / know are present.
+    // they just created / know are present. Supertest response bodies are
+    // typed `any`, so the unsafe-* family is off for assertions on them.
     files: ['test/**', '*.config.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
     },
   },
   {

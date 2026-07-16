@@ -42,12 +42,18 @@ export const createRateLimiter = (
 
     // Skip rate limiting for certain requests
     skip: (req: Request) => {
+      // The integration suite fires hundreds of requests from one IP
+      if (process.env.NODE_ENV === 'test') return true;
+
       // Skip health checks
       if (req.path === '/health' || req.path === '/ping') return true;
 
-      // Skip for internal requests with secret header
+      // Skip for internal requests with secret header. Fail closed: with no
+      // secret configured there is no bypass (an absent header must never
+      // match an absent secret).
+      const secret = process.env.RATE_LIMIT_BYPASS_SECRET;
       const bypassToken = req.get('X-Rate-Limit-Bypass');
-      return bypassToken === process.env.RATE_LIMIT_BYPASS_SECRET;
+      return Boolean(secret) && bypassToken === secret;
     },
 
     standardHeaders: true,
