@@ -22,6 +22,7 @@ export const createRateLimiter = (
   windowMs: number = 15 * 60 * 1000,
   maxRequests = 100,
   message = 'Too many requests, please try again later.',
+  options: { skipSuccessfulRequests?: boolean } = {},
 ): RateLimitRequestHandler => {
   return rateLimit({
     // Custom handler for rate limit exceeded
@@ -56,6 +57,11 @@ export const createRateLimiter = (
       return Boolean(secret) && bypassToken === secret;
     },
 
+    // When set, only FAILED requests count toward the limit — the right shape
+    // for brute-force protection: a legitimate user signing in all day never
+    // locks themselves out, while a password-guesser still hits the wall.
+    skipSuccessfulRequests: options.skipSuccessfulRequests ?? false,
+
     standardHeaders: true,
 
     windowMs,
@@ -64,6 +70,15 @@ export const createRateLimiter = (
     // (Set app.set('trust proxy', true) in your main server file)
   });
 };
+
+// Brute-force cap for the credential endpoints (login / register / refresh).
+// Successful sign-ins don't count — only failures feed the limit.
+export const authRateLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  10, // 10 failed attempts
+  'Too many failed attempts, please try again later.',
+  { skipSuccessfulRequests: true },
+);
 
 // Different limiters for different endpoints
 export const rateLimiter = createRateLimiter(

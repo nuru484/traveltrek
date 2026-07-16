@@ -1,9 +1,7 @@
 // src/middlewares/validate-request.ts
 //
-// Zod validation at the route boundary. Replaces the express-validator
-// ValidationFactory as domains migrate to the service-layer architecture;
-// once every domain is converted, the legacy validation.ts and
-// validation-factory.ts are deleted.
+// Zod validation at the route boundary — the single request-validation
+// mechanism (the legacy express-validator ValidationFactory is gone).
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, ZodType } from 'zod';
 

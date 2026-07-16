@@ -263,6 +263,19 @@ export class NotFoundError extends CustomError {
   }
 }
 
+export class TooManyRequestsError extends CustomError {
+  constructor(
+    message = 'Too many requests',
+    options?: {
+      code?: string;
+      context?: Record<string, unknown>;
+      layer?: string;
+    },
+  ) {
+    super(429, message, { ...options, severity: ErrorSeverity.MEDIUM });
+  }
+}
+
 export class UnauthorizedError extends CustomError {
   constructor(
     message = 'Unauthorized access',

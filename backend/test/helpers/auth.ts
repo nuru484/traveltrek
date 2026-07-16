@@ -8,29 +8,24 @@ import request from 'supertest';
 
 import type { User } from '#config/prismaClient.js';
 
-import { assertEnv } from '#config/env.js';
 import ENV from '#config/env.js';
 
 import app from '../../app.js';
 
+/** What the token helpers need; tokenVersion defaults to 0 (a fresh user). */
+type TokenUser = Pick<User, 'id' | 'role'> & { tokenVersion?: number };
+
 export const api = () => request(app);
 
-export const mintAccessToken = (user: Pick<User, 'id' | 'role'>): string =>
+export const mintAccessToken = (user: TokenUser): string =>
   jwt.sign(
-    { id: user.id, role: user.role },
-    assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
+    { id: user.id, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
+    ENV.ACCESS_TOKEN_SECRET,
     { expiresIn: '30m' },
   );
 
-export const mintRefreshToken = (user: Pick<User, 'id' | 'role'>): string =>
-  jwt.sign(
-    { id: user.id, role: user.role },
-    assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
-    { expiresIn: '7d' },
-  );
-
 /** Supertest wrapper whose requests carry the user's access-token cookie. */
-export const authedApi = (user: Pick<User, 'id' | 'role'>) => {
+export const authedApi = (user: TokenUser) => {
   const token = mintAccessToken(user);
   const cookie = `accessToken=${token}`;
   return {

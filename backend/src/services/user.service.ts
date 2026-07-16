@@ -32,6 +32,7 @@ import {
 } from '#middlewares/error-handler.js';
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 import { type IUser, UserRole } from '#types/user-profile.types.js';
+import { invalidateCachedTokenVersion } from '#utils/authz-cache.js';
 import { type SafeUser, userSelect } from '#utils/mappers/user.mapper.js';
 
 export type UserActor = Pick<IUser, 'id' | 'role'>;
@@ -272,11 +273,17 @@ export const makeUserService = (
       throw new BadRequestError(`User already has the role: ${role}`);
     }
 
-    return prisma.user.update({
+    const updated = await prisma.user.update({
       data: { role },
       select: userSelect,
       where: { id: userId },
     });
+
+    // Drop the cached session epoch so the next authenticated request
+    // re-reads the user's live row rather than a pre-change cache entry.
+    invalidateCachedTokenVersion(userId);
+
+    return updated;
   };
 
   /**
@@ -331,6 +338,10 @@ export const makeUserService = (
     }
 
     await prisma.user.delete({ where: { id: userId } });
+
+    // Deleted accounts must lose access at once, not at cache expiry: the
+    // next request re-reads the DB, finds no row, and is rejected.
+    invalidateCachedTokenVersion(userId);
 
     if (existingUser.profilePicture) {
       await cleanupPicture(

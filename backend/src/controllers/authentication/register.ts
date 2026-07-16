@@ -1,128 +1,132 @@
-import bcrypt from 'bcrypt';
 // src/controllers/authentication/register.ts
-import { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+//
+// Two thin bundles over the auth service's user creation:
+//
+// - registerUser — the PUBLIC signup (POST /auth/register-user). No
+//   authentication runs before it, so it NEVER trusts a role from the body:
+//   every public signup is a CUSTOMER, and a session is issued immediately.
+// - adminCreateUser — POST /users (borrowed by routes/user.ts, behind
+//   authenticate-jwt + authorizeRole). Only an ADMIN actor may create users
+//   (agents pass the route gate but are refused here, as in the legacy
+//   handler), the body's role is honoured, and NO session cookies are issued
+//   for the created account.
+//
+// Both share the multer -> zod -> Cloudinary pipeline; if user creation fails
+// after the middleware already uploaded a picture, that upload is reclaimed
+// best-effort before rethrowing (legacy behaviour).
+import { Request, RequestHandler, Response } from 'express';
 
 import { cloudinaryService } from '#config/claudinary.js';
-import { CLOUDINARY_UPLOAD_OPTIONS } from '#config/constants.js';
-import { HTTP_STATUS_CODES } from '#config/constants.js';
-import { BCRYPT_SALT_ROUNDS } from '#config/constants.js';
-import { assertEnv } from '#config/env.js';
-import ENV from '#config/env.js';
+import {
+  CLOUDINARY_UPLOAD_OPTIONS,
+  HTTP_STATUS_CODES,
+} from '#config/constants.js';
 import multerUpload from '#config/multer.js';
-import prisma from '#config/prismaClient.js';
 import conditionalCloudinaryUpload from '#middlewares/conditional-cloudinary-upload.js';
 import {
-  BadRequestError,
+  asyncHandler,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
-import validationMiddleware from '#middlewares/validation.js';
+import zodValidation from '#middlewares/validate-request.js';
 import {
-  IUserRegistrationInput,
-  IUserResponseData,
-  UserRole,
-} from '#types/user-profile.types.js';
+  adminCreateUser as adminCreateUserService,
+  mintAuthTokens,
+  type RegisteredUser,
+  type RegisterInput,
+  register as registerService,
+} from '#services/auth.service.js';
+import { UserRole } from '#types/user-profile.types.js';
 import { CookieManager } from '#utils/CookieManager.js';
+import { sendSuccess } from '#utils/http-response.js';
 import logger from '#utils/logger.js';
-import { registerUserValidation } from '#validations/auth-validations.js';
+import { toUserDTO } from '#utils/mappers/user.mapper.js';
+import {
+  RegisterUserBody,
+  registerUserSchema,
+} from '#validations/auth-validation.js';
 
-/**
- * Controller function for user registration
- */
-const handleRegisterUser = async (
-  req: Request<{}, {}, IUserRegistrationInput>,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  const userDetails = req.body;
-  let uploadedImageUrl: string | undefined;
+const toRegisterInput = (body: RegisterUserBody): RegisterInput => ({
+  address: body.address,
+  email: body.email,
+  name: body.name,
+  password: body.password,
+  // Written by conditionalCloudinaryUpload when a file was uploaded.
+  profilePicture: body.profilePicture,
+  ...(body.phone !== undefined && { phone: body.phone }),
+});
 
+/** Runs the given creation; if it fails after the middleware already uploaded
+ * a profile picture, reclaims that upload best-effort before rethrowing. */
+const createReclaimingUpload = async (
+  body: RegisterUserBody,
+  create: () => Promise<RegisteredUser>,
+): Promise<RegisteredUser> => {
   try {
-    let userRole: UserRole;
-    let isAdminCreatingUser = false;
-
-    if (req.user) {
-      if (req.user.role !== UserRole.ADMIN) {
-        throw new UnauthorizedError('Unauthorized. Only admins can add users.');
-      }
-
-      isAdminCreatingUser = true;
-      userRole = userDetails.role ?? UserRole.CUSTOMER;
-    } else {
-      userRole = UserRole.CUSTOMER;
-    }
-
-    const hashedPassword = await bcrypt.hash(
-      userDetails.password,
-      BCRYPT_SALT_ROUNDS,
-    );
-
-    const profilePicture = req.body.profilePicture;
-    if (profilePicture && typeof profilePicture !== 'string') {
-      throw new BadRequestError(
-        'Invalid profile picture format. Expected a string URL.',
-      );
-    }
-
-    uploadedImageUrl = profilePicture;
-
-    const userCreationData: IUserRegistrationInput = {
-      ...userDetails,
-      password: hashedPassword,
-      profilePicture: profilePicture || undefined,
-      role: userRole,
-    };
-
-    const user = await prisma.user.create({
-      data: userCreationData,
-    });
-
-    const { password: _password, ...userWithoutPassword } = user;
-
-    if (!isAdminCreatingUser) {
-      const accessToken = jwt.sign(
-        { id: user.id, role: user.role },
-        assertEnv(ENV.ACCESS_TOKEN_SECRET, 'ACCESS_TOKEN_SECRET'),
-        { expiresIn: '30m' },
-      );
-
-      const refreshToken = jwt.sign(
-        { id: user.id, role: user.role },
-        assertEnv(ENV.REFRESH_TOKEN_SECRET, 'REFRESH_TOKEN_SECRET'),
-        {
-          expiresIn: '7d',
-        },
-      );
-
-      CookieManager.clearAllTokens(res);
-      CookieManager.setAccessToken(res, accessToken);
-      CookieManager.setRefreshToken(res, refreshToken);
-    }
-
-    res.status(HTTP_STATUS_CODES.CREATED).json({
-      data: userWithoutPassword as IUserResponseData,
-      message: isAdminCreatingUser
-        ? 'User created successfully.'
-        : 'Registration successful.',
-    });
+    return await create();
   } catch (error) {
-    if (uploadedImageUrl) {
+    if (body.profilePicture) {
       try {
-        await cloudinaryService.deleteImage(uploadedImageUrl);
+        await cloudinaryService.deleteImage(body.profilePicture);
       } catch (cleanupError) {
         logger.error('Failed to clean up Cloudinary image:', cleanupError);
       }
     }
-    next(error);
+    throw error;
   }
 };
 
-/**
- * Middleware array for user registration
- */
-export const registerUser = [
+const handleRegisterUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const body = req.body as RegisterUserBody;
+
+    // Public signup: the body's role is deliberately ignored.
+    const user = await createReclaimingUpload(body, () =>
+      registerService(toRegisterInput(body)),
+    );
+    const tokens = await mintAuthTokens(user);
+
+    CookieManager.setAuthTokens(res, tokens);
+    sendSuccess(res, {
+      data: toUserDTO(user),
+      message: 'Registration successful.',
+      status: HTTP_STATUS_CODES.CREATED,
+    });
+  },
+);
+
+const handleAdminCreateUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    // authorizeRole lets AGENT through to this route; the legacy handler
+    // narrowed it to ADMIN with a 401 — preserved.
+    if (req.user?.role !== UserRole.ADMIN) {
+      throw new UnauthorizedError('Unauthorized. Only admins can add users.');
+    }
+
+    const body = req.body as RegisterUserBody;
+    const user = await createReclaimingUpload(body, () =>
+      adminCreateUserService(toRegisterInput(body), body.role),
+    );
+
+    sendSuccess(res, {
+      data: toUserDTO(user),
+      message: 'User created successfully.',
+      status: HTTP_STATUS_CODES.CREATED,
+    });
+  },
+);
+
+const creationPipeline = [
   multerUpload.single('profilePicture'),
-  validationMiddleware.create(registerUserValidation),
+  ...zodValidation.body(registerUserSchema),
   conditionalCloudinaryUpload(CLOUDINARY_UPLOAD_OPTIONS, 'profilePicture'),
+];
+
+export const registerUser: RequestHandler[] = [
+  ...creationPipeline,
   handleRegisterUser,
-] as const;
+];
+
+export const adminCreateUser: RequestHandler[] = [
+  ...creationPipeline,
+  handleAdminCreateUser,
+];

@@ -130,6 +130,19 @@ export const CookieManager = {
   },
 
   /**
+   * Replaces both auth cookies with a freshly issued pair — the single way a
+   * session lands in the browser (register, login, refresh).
+   */
+  setAuthTokens(
+    res: Response,
+    tokens: { accessToken: string; refreshToken: string },
+  ): void {
+    CookieManager.clearAllTokens(res);
+    CookieManager.setAccessToken(res, tokens.accessToken);
+    CookieManager.setRefreshToken(res, tokens.refreshToken);
+  },
+
+  /**
    * Sets the httpOnly refresh token cookie with a 7-day expiration.
    */
   setRefreshToken(res: Response, token: string): void {

@@ -5,6 +5,7 @@
 import { afterAll, beforeEach, vi } from 'vitest';
 
 import prisma from '#config/prismaClient.js';
+import { clearAuthzCaches } from '#utils/authz-cache.js';
 
 // Fake Cloudinary so uploads never hit the network. Each upload mints a unique
 // fake secure_url; deleteImage records what was reclaimed so tests can assert
@@ -74,6 +75,9 @@ async function getTables(): Promise<string[]> {
 
 beforeEach(async () => {
   await resetDatabase();
+  // TRUNCATE ... RESTART IDENTITY reuses user ids across tests, so the
+  // session-epoch cache from a previous test would poison this one.
+  clearAuthzCaches();
 });
 
 afterAll(async () => {

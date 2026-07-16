@@ -20,8 +20,11 @@ import loggerInstance from '#utils/logger.js';
 
 /** Config values services read; injected so tests can vary them. */
 export interface AppConfig {
+  ACCESS_TOKEN_EXPIRY: string;
+  ACCESS_TOKEN_SECRET: string;
   PAYSTACK_CALLBACK_URL?: string;
   REFRESH_TOKEN_EXPIRY: string;
+  REFRESH_TOKEN_SECRET: string;
 }
 
 export interface AppDeps {
@@ -57,8 +60,11 @@ export const defaultDeps: AppDeps = {
     uploadImage: cloudinaryService.uploadImage.bind(cloudinaryService),
   },
   config: {
+    ACCESS_TOKEN_EXPIRY: ENV.ACCESS_TOKEN_EXPIRY,
+    ACCESS_TOKEN_SECRET: ENV.ACCESS_TOKEN_SECRET,
     PAYSTACK_CALLBACK_URL: ENV.PAYSTACK_CALLBACK_URL,
-    REFRESH_TOKEN_EXPIRY: ENV.REFRESH_TOKEN_EXPIRY ?? '7d',
+    REFRESH_TOKEN_EXPIRY: ENV.REFRESH_TOKEN_EXPIRY,
+    REFRESH_TOKEN_SECRET: ENV.REFRESH_TOKEN_SECRET,
   },
   logger: loggerInstance,
   paystack: {

@@ -1,6 +1,6 @@
 interface IENV {
-  ACCESS_TOKEN_EXPIRY?: string;
-  ACCESS_TOKEN_SECRET?: string;
+  ACCESS_TOKEN_EXPIRY: string;
+  ACCESS_TOKEN_SECRET: string;
   ADMIN_EMAIL: string;
   ADMIN_NAME: string;
   ADMIN_PASSWORD: string;
@@ -16,8 +16,8 @@ interface IENV {
   PAYSTACK_SECRET_KEY: string;
   PORT: number;
   REDIS_URL: string;
-  REFRESH_TOKEN_EXPIRY?: string;
-  REFRESH_TOKEN_SECRET?: string;
+  REFRESH_TOKEN_EXPIRY: string;
+  REFRESH_TOKEN_SECRET: string;
 }
 
 export function assertEnv<T>(value: T | undefined, name: string): T {
@@ -29,7 +29,10 @@ export function assertEnv<T>(value: T | undefined, name: string): T {
 
 const ENV: IENV = {
   ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY ?? '30m',
-  ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET,
+  ACCESS_TOKEN_SECRET: assertEnv(
+    process.env.ACCESS_TOKEN_SECRET,
+    'ACCESS_TOKEN_SECRET',
+  ),
   ADMIN_EMAIL: assertEnv(process.env.ADMIN_EMAIL, 'ADMIN_EMAIL'),
   ADMIN_NAME: assertEnv(process.env.ADMIN_NAME, 'ADMIN_NAME'),
   ADMIN_PASSWORD: assertEnv(process.env.ADMIN_PASSWORD, 'ADMIN_PASSWORD'),
@@ -58,7 +61,10 @@ const ENV: IENV = {
   PORT: Number(process.env.PORT) || 3000,
   REDIS_URL: assertEnv(process.env.REDIS_URL, 'REDIS_URL'),
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY ?? '7d',
-  REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
+  REFRESH_TOKEN_SECRET: assertEnv(
+    process.env.REFRESH_TOKEN_SECRET,
+    'REFRESH_TOKEN_SECRET',
+  ),
 };
 
 export default ENV;

@@ -1,7 +1,7 @@
 // src/routes/user.ts
 import { Router } from 'express';
 
-import { registerUser } from '#controllers/authentication/index.js';
+import { adminCreateUser } from '#controllers/authentication/index.js';
 import {
   changeUserRole,
   deleteAllUsers,
@@ -18,7 +18,7 @@ const userRoutes = Router();
 userRoutes.post(
   '/users',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT]),
-  ...registerUser,
+  ...adminCreateUser,
 );
 
 userRoutes.put(

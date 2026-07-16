@@ -28,8 +28,52 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  bookings Booking[]
-  payments Payment[]
+  /// Session epoch: every issued token embeds it, and a mismatch on
+  /// verification rejects the token. Bumping it invalidates every live
+  /// session at once (refresh-token theft response).
+  tokenVersion Int @default(0)
+
+  /// Consecutive wrong-password counter; at the threshold the account is
+  /// temporarily locked (lockedUntil), then the counter starts fresh.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  bookings       Booking[]
+  payments       Payment[]
+  securityTokens UserSecurityToken[]
+}
+
+enum TokenType {
+  /// The jti of an issued refresh JWT. Consumed when that token is exchanged
+  /// (rotation); presenting an already-consumed jti outside the concurrency
+  /// grace window is treated as theft and bumps the session epoch.
+  REFRESH
+  /// 6-digit email OTP for passwordless login (next phase).
+  OTP_LOGIN
+  /// Long random opaque token embedded in a password-reset link (next phase).
+  PASSWORD_RESET
+}
+
+model UserSecurityToken {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  /// sha256 hex of the plaintext token/jti — the plaintext is never persisted.
+  tokenHash String    @unique
+  type      TokenType
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  /// Rotation audit trail: when a refresh token is exchanged, the hash of the
+  /// successor's jti is recorded on the consumed row.
+  replacedByTokenHash String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
 }
 
 enum TourType {
