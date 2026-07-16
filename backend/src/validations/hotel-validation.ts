@@ -1,316 +1,135 @@
-import { ValidationChain } from 'express-validator';
-
-import prisma from '../config/prismaClient';
 // src/validations/hotel-validation.ts
-import { validator } from '../validations/validation-factory';
+//
+// Zod schemas for the hotel domain (replaces the express-validator chains).
+// Boundary rules only — shape, lengths, ranges and character patterns.
+// Invariants that need the database (destination existence, delete-with-rooms
+// guards) and the multer file checks (zod only sees req.body) live in
+// services/hotel.service.ts and the controller's photo-file middleware.
+import { z } from 'zod';
 
-// Validation for creating a new hotel
-export const createHotelValidation: ValidationChain[] = [
-  validator.string('name', {
-    customMessage: 'Hotel name must be between 2 and 100 characters',
-    maxLength: 100,
-    minLength: 2,
-    required: true,
-  }),
+import { HOTEL_SORT_FIELDS } from '../services/hotel.service';
+import { paginationQuery } from './common-validation';
 
-  validator.string('description', {
-    customMessage: 'Description must not exceed 2000 characters',
-    maxLength: 2000,
-    required: false,
-  }),
+/** Letters, spaces, hyphens and apostrophes — the legacy place-name pattern. */
+const PLACE_NAME_PATTERN = /^[a-zA-Z\s\-']+$/;
 
-  validator.string('address', {
-    customMessage: 'Address must be between 5 and 255 characters',
-    maxLength: 255,
-    minLength: 5,
-    required: true,
-  }),
+/** Optional +, then 10–15 digits — the legacy phone pattern. */
+const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
 
-  validator.phone('phone', {
-    required: false,
-  }),
-
-  validator.integer('starRating', {
-    max: 5,
-    min: 1,
-    required: false,
-  }),
-
-  validator.array('amenities', {
-    itemType: 'string',
-    maxLength: 20,
-    required: false,
-    unique: true,
-  }),
-
-  validator.custom(
-    'amenities',
-    (value: string[]) => {
-      if (!value || !Array.isArray(value)) return true;
-
-      return value.every((amenity) => {
-        return (
-          typeof amenity === 'string' &&
-          amenity.trim().length > 0 &&
-          amenity.length <= 50
-        );
-      });
-    },
+const amenityItem = z
+  .string('Each amenity must be a non-empty string with maximum 50 characters')
+  .trim()
+  .min(1, 'Each amenity must be a non-empty string with maximum 50 characters')
+  .max(
+    50,
     'Each amenity must be a non-empty string with maximum 50 characters',
-    { required: false },
-  ),
+  );
 
-  validator.integer('destinationId', {
-    min: 1,
-    required: true,
-  }),
+const amenitiesList = z
+  .array(amenityItem, 'amenities must be an array')
+  .max(20, 'amenities must contain at most 20 items')
+  .refine((items) => new Set(items).size === items.length, {
+    error: 'amenities must contain unique items',
+  });
 
-  validator.custom(
-    'destinationId',
-    async (value: number) => {
-      if (!value) return true;
+const hotelFields = z.object({
+  address: z
+    .string('Address must be between 5 and 255 characters')
+    .trim()
+    .min(5, 'Address must be between 5 and 255 characters')
+    .max(255, 'Address must be between 5 and 255 characters'),
+  amenities: amenitiesList.optional(),
+  description: z
+    .string()
+    .trim()
+    .max(2000, 'Description must not exceed 2000 characters')
+    .optional(),
+  // Multipart form fields arrive as strings, so numbers are coerced.
+  destinationId: z.coerce
+    .number('A valid destinationId is required')
+    .int('A valid destinationId is required')
+    .min(1, 'A valid destinationId is required'),
+  // Either a client-sent URL or, after the Cloudinary middleware runs, the
+  // uploaded image URL. A multipart file upload arrives as req.file instead
+  // and is guarded by the controller's photo-file middleware.
+  hotelPhoto: z.string().optional(),
+  name: z
+    .string('Hotel name must be between 2 and 100 characters')
+    .trim()
+    .min(2, 'Hotel name must be between 2 and 100 characters')
+    .max(100, 'Hotel name must be between 2 and 100 characters'),
+  phone: z
+    .string()
+    .trim()
+    .regex(PHONE_PATTERN, 'Must be a valid phone number (10–15 digits)')
+    .optional(),
+  starRating: z.coerce
+    .number('Star rating must be an integer between 1 and 5')
+    .int('Star rating must be an integer between 1 and 5')
+    .min(1, 'Star rating must be an integer between 1 and 5')
+    .max(5, 'Star rating must be an integer between 1 and 5')
+    .optional(),
+});
 
-      const destination = await prisma.destination.findUnique({
-        where: { id: Number(value) },
-      });
+export const createHotelSchema = hotelFields;
 
-      return !!destination;
-    },
-    'Destination does not exist',
-    { required: false },
-  ),
-];
+// Empty updates were accepted by the legacy handler (a no-op update returning
+// the hotel), so no "at least one field" refinement here.
+export const updateHotelSchema = hotelFields.partial();
 
-export const updateHotelValidation: ValidationChain[] = [
-  validator.string('name', {
-    customMessage: 'Hotel name must be between 2 and 100 characters',
-    maxLength: 100,
-    minLength: 2,
-    required: false,
-  }),
-
-  validator.string('description', {
-    customMessage: 'Description must not exceed 2000 characters',
-    maxLength: 2000,
-    required: false,
-  }),
-
-  validator.string('address', {
-    customMessage: 'Address must be between 5 and 255 characters',
-    maxLength: 255,
-    minLength: 5,
-    required: false,
-  }),
-
-  validator.phone('phone', {
-    required: false,
-  }),
-
-  validator.integer('starRating', {
-    max: 5,
-    min: 1,
-    required: false,
-  }),
-
-  validator.array('amenities', {
-    itemType: 'string',
-    maxLength: 20,
-    required: false,
-    unique: true,
-  }),
-
-  validator.custom(
-    'amenities',
-    (value: string[]) => {
-      if (!value || !Array.isArray(value)) return true;
-
-      return value.every((amenity) => {
-        return (
-          typeof amenity === 'string' &&
-          amenity.trim().length > 0 &&
-          amenity.length <= 50
-        );
-      });
-    },
-    'Each amenity must be a non-empty string with maximum 50 characters',
-    { required: false },
-  ),
-
-  validator.integer('destinationId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.custom(
-    'destinationId',
-    async (value: number) => {
-      if (!value) return true;
-
-      const destination = await prisma.destination.findUnique({
-        where: { id: Number(value) },
-      });
-
-      return !!destination;
-    },
-    'Destination does not exist',
-    { required: false },
-  ),
-];
-
-export const hotelIdParamValidation: ValidationChain[] = [
-  validator.integer('id', {
-    min: 1,
-    required: true,
-  }),
-];
-
-export const paginationQueryValidation: ValidationChain[] = [
-  validator.integer('page', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('limit', {
-    max: 1000,
-    min: 1,
-    required: false,
-  }),
-];
-
-export const hotelSearchValidation: ValidationChain[] = [
-  validator.string('search', {
-    customMessage: 'Search term must be between 1 and 100 characters',
-    maxLength: 100,
-    minLength: 1,
-    required: false,
-  }),
-
-  validator.integer('destinationId', {
-    min: 1,
-    required: false,
-  }),
-
-  validator.string('city', {
-    customMessage:
-      'City filter must contain only letters, spaces, hyphens, and apostrophes',
-    maxLength: 100,
-    minLength: 1,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    required: false,
-  }),
-
-  validator.string('country', {
-    customMessage:
-      'Country filter must contain only letters, spaces, hyphens, and apostrophes',
-    maxLength: 100,
-    minLength: 2,
-    pattern: /^[a-zA-Z\s\-']+$/,
-    required: false,
-  }),
-
-  validator.integer('starRating', {
-    max: 5,
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('minStarRating', {
-    max: 5,
-    min: 1,
-    required: false,
-  }),
-
-  validator.integer('maxStarRating', {
-    max: 5,
-    min: 1,
-    required: false,
-  }),
-
-  validator.custom(
-    'maxStarRating',
-    (value: number, req) => {
-      const minStarRating = req.query?.minStarRating;
-      if (!value || !minStarRating) return true;
-
-      return parseInt(value.toString()) >= parseInt(minStarRating.toString());
-    },
-    'Maximum star rating must be greater than or equal to minimum star rating',
-    { required: false },
-  ),
-
-  validator.array('amenities', {
-    itemType: 'string',
-    maxLength: 10,
-    required: false,
-  }),
-
-  validator.enum(
-    'sortBy',
-    ['name', 'city', 'country', 'starRating', 'createdAt', 'updatedAt'],
+export const hotelListQuery = paginationQuery
+  .extend({
+    // A single ?amenities=x arrives as a string, repeated params as an array.
+    amenities: z
+      .union([z.string(), z.array(z.string())], 'amenities must be a list')
+      .transform((value) => (Array.isArray(value) ? value : [value]))
+      .pipe(amenityItem.array().max(10, 'amenities must contain at most 10 items'))
+      .optional(),
+    city: z
+      .string()
+      .trim()
+      .min(1, 'City filter must contain only letters, spaces, hyphens, and apostrophes')
+      .max(100, 'City filter must contain only letters, spaces, hyphens, and apostrophes')
+      .regex(
+        PLACE_NAME_PATTERN,
+        'City filter must contain only letters, spaces, hyphens, and apostrophes',
+      )
+      .optional(),
+    country: z
+      .string()
+      .trim()
+      .min(2, 'Country filter must contain only letters, spaces, hyphens, and apostrophes')
+      .max(100, 'Country filter must contain only letters, spaces, hyphens, and apostrophes')
+      .regex(
+        PLACE_NAME_PATTERN,
+        'Country filter must contain only letters, spaces, hyphens, and apostrophes',
+      )
+      .optional(),
+    destinationId: z.coerce.number().int().min(1).optional(),
+    maxStarRating: z.coerce.number().int().min(1).max(5).optional(),
+    minStarRating: z.coerce.number().int().min(1).max(5).optional(),
+    search: z
+      .string()
+      .trim()
+      .min(1, 'Search term must be between 1 and 100 characters')
+      .max(100, 'Search term must be between 1 and 100 characters')
+      .optional(),
+    sortBy: z.enum(HOTEL_SORT_FIELDS).default('createdAt'),
+    sortOrder: z.enum(['asc', 'desc']).default('desc'),
+    starRating: z.coerce.number().int().min(1).max(5).optional(),
+  })
+  .refine(
+    (q) =>
+      q.minStarRating === undefined ||
+      q.maxStarRating === undefined ||
+      q.maxStarRating >= q.minStarRating,
     {
-      required: false,
+      error:
+        'Maximum star rating must be greater than or equal to minimum star rating',
+      path: ['maxStarRating'],
     },
-  ),
+  );
 
-  validator.enum('sortOrder', ['asc', 'desc'], {
-    required: false,
-  }),
-];
-
-export const getHotelsValidation: ValidationChain[] = [
-  ...paginationQueryValidation,
-  ...hotelSearchValidation,
-];
-
-export const bulkHotelValidation: ValidationChain[] = [
-  validator.array('hotelIds', {
-    itemType: 'number',
-    maxLength: 50,
-    minLength: 1,
-    required: true,
-    unique: true,
-  }),
-
-  validator.custom(
-    'hotelIds',
-    (value: number[]) => {
-      if (!Array.isArray(value)) return false;
-      return value.every((id) => Number.isInteger(id) && id > 0);
-    },
-    'All hotel IDs must be positive integers',
-    { required: false },
-  ),
-];
-
-export const hotelPhotoValidation: ValidationChain[] = [
-  validator.custom(
-    'hotelPhoto',
-    (value, req) => {
-      const file = req.file;
-      if (!file) return true;
-
-      const allowedMimeTypes = [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/webp',
-      ];
-      return allowedMimeTypes.includes(file.mimetype);
-    },
-    'Photo must be a valid image file (JPEG, PNG, or WebP)',
-    { required: false },
-  ),
-
-  validator.custom(
-    'hotelPhoto',
-    (value, req) => {
-      const file = req.file;
-      if (!file) return true;
-
-      const maxSize = 5 * 1024 * 1024;
-      return file.size <= maxSize;
-    },
-    'Photo size must not exceed 5MB',
-    { required: false },
-  ),
-];
+export type CreateHotelBody = z.infer<typeof createHotelSchema>;
+export type HotelListQuery = z.infer<typeof hotelListQuery>;
+export type UpdateHotelBody = z.infer<typeof updateHotelSchema>;
