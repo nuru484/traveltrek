@@ -42,7 +42,15 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+// Capture the raw request bytes so the Paystack webhook can verify its HMAC
+// signature over the exact wire body (re-serializing req.body is fragile).
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.set('trust proxy', true); // Enable trust proxy for proper IP handling behind proxies

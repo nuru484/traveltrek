@@ -25,6 +25,8 @@ export interface PaystackInitializeResult {
 export interface PaystackVerifyResult {
   amount: number;
   currency: string;
+  /** Echo of the metadata sent at initialization (e.g. `{ bookingId }`). */
+  metadata?: null | Record<string, unknown>;
   paid_at: null | string;
   reference: string;
   status: string;
@@ -39,6 +41,8 @@ interface PaystackEnvelope<T> {
 export const initializePaystackTransaction = async (params: {
   amount: number;
   callbackUrl?: string;
+  channels?: string[];
+  currency?: string;
   email: string;
   metadata?: Record<string, unknown>;
   reference?: string;
@@ -48,6 +52,8 @@ export const initializePaystackTransaction = async (params: {
     {
       amount: params.amount,
       callback_url: params.callbackUrl ?? ENV.PAYSTACK_CALLBACK_URL,
+      channels: params.channels,
+      currency: params.currency,
       email: params.email,
       metadata: params.metadata,
       reference: params.reference,
