@@ -5,10 +5,17 @@
 // "transport" just logs the message so auth flows remain fully exercisable
 // without an SMTP account. Never throws — callers fire-and-forget, and a
 // delivery failure must never fail (or time) the request that triggered it.
+import { setDefaultResultOrder } from 'node:dns';
 import nodemailer, { type Transporter } from 'nodemailer';
 
 import ENV from '#config/env.js';
 import logger from '#utils/logger.js';
+
+// Prefer IPv4 when DNS returns both families. Node otherwise dials the IPv6
+// address first, which dead-ends (connect ENETUNREACH) on hosts without an
+// IPv6 route — WSL2 dev boxes most notably — before IPv4 is ever tried.
+// Process-wide by nature, and harmless where IPv6 genuinely works.
+setDefaultResultOrder('ipv4first');
 
 export interface SendMailParams {
   html?: string;
