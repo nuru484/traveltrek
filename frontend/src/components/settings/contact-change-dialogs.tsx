@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import { Loader2, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Dialog,
   DialogContent,
@@ -269,22 +270,23 @@ export function ChangeEmailDialog({
                         )}
                       </div>
                       <FormControl>
-                        <Input
-                          type={method === "password" ? "password" : "text"}
-                          inputMode={method === "code" ? "numeric" : undefined}
-                          placeholder={
-                            method === "password"
-                              ? "Enter your current password"
-                              : "Enter the code we sent you"
-                          }
-                          autoComplete={
-                            method === "password"
-                              ? "current-password"
-                              : "one-time-code"
-                          }
-                          disabled={isLoading}
-                          {...field}
-                        />
+                        {method === "password" ? (
+                          <PasswordInput
+                            placeholder="Enter your current password"
+                            autoComplete="current-password"
+                            disabled={isLoading}
+                            {...field}
+                          />
+                        ) : (
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Enter the code we sent you"
+                            autoComplete="one-time-code"
+                            disabled={isLoading}
+                            {...field}
+                          />
+                        )}
                       </FormControl>
                       <FormMessage className="text-xs" />
                     </FormItem>
@@ -531,22 +533,23 @@ export function ChangePhoneDialog({
                         )}
                       </div>
                       <FormControl>
-                        <Input
-                          type={method === "password" ? "password" : "text"}
-                          inputMode={method === "code" ? "numeric" : undefined}
-                          placeholder={
-                            method === "password"
-                              ? "Enter your current password"
-                              : "Enter the code we sent you"
-                          }
-                          autoComplete={
-                            method === "password"
-                              ? "current-password"
-                              : "one-time-code"
-                          }
-                          disabled={isRequesting}
-                          {...field}
-                        />
+                        {method === "password" ? (
+                          <PasswordInput
+                            placeholder="Enter your current password"
+                            autoComplete="current-password"
+                            disabled={isRequesting}
+                            {...field}
+                          />
+                        ) : (
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Enter the code we sent you"
+                            autoComplete="one-time-code"
+                            disabled={isRequesting}
+                            {...field}
+                          />
+                        )}
                       </FormControl>
                       <FormMessage className="text-xs" />
                     </FormItem>
