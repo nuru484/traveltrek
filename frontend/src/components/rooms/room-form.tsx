@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,17 +23,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCreateRoomMutation, useUpdateRoomMutation } from "@/redux/roomApi";
 import { useGetAllHotelsQuery } from "@/redux/hotelApi";
 import toast from "react-hot-toast";
 import { IRoom } from "@/types/room.types";
 import { IHotel } from "@/types/hotel.types";
-import Image from "next/image";
+import {
+  PhotoUploadField,
+  appendPhotoToFormData,
+  usePhotoUpload,
+} from "@/components/forms/photo-upload-field";
 import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { shouldRemovePhoto } from "@/utils/photo-removal";
 
 const roomFormSchema = z.object({
   hotelId: z.number().min(1, "Hotel is required"),
@@ -65,10 +68,6 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       limit: 100,
     }
   );
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    room?.photo || null
-  );
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hotels: IHotel[] = React.useMemo(() => {
     return hotelsData?.data || [];
@@ -99,6 +98,12 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
     },
   });
 
+  const photo = usePhotoUpload({
+    form,
+    name: "roomPhoto",
+    existingPhoto: room?.photo,
+  });
+
   useEffect(() => {
     if (hotelId && hotels.length > 0) {
       const targetHotelId = hotelId;
@@ -108,58 +113,6 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       }
     }
   }, [hotelId, hotels, form]);
-
-  const handleImageChange = (file: File | undefined) => {
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        form.setError("roomPhoto", {
-          type: "manual",
-          message: "Please select a valid image file",
-        });
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        form.setError("roomPhoto", {
-          type: "manual",
-          message: "Image size should be less than 5MB",
-        });
-        return;
-      }
-
-      // Clean up old preview URL
-      if (previewUrl && previewUrl !== room?.photo) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      form.setValue("roomPhoto", file);
-      form.clearErrors("roomPhoto");
-    }
-  };
-
-  const removeImage = () => {
-    if (previewUrl && previewUrl !== room?.photo) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    setPreviewUrl(null);
-    form.setValue("roomPhoto", undefined);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl && previewUrl !== room?.photo) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl, room?.photo]);
 
   const onSubmit = async (values: RoomFormValues) => {
     try {
@@ -180,19 +133,12 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
           formData.append(`amenities[${index}]`, amenity);
         });
       }
-      if (values.roomPhoto) {
-        formData.append("roomPhoto", values.roomPhoto);
-      } else if (
-        shouldRemovePhoto({
-          existingPhoto: room?.photo,
-          isEdit: mode === "edit",
-          newFile: values.roomPhoto,
-          previewUrl,
-        })
-      ) {
-        // Empty string = the API's remove-photo signal.
-        formData.append("roomPhoto", "");
-      }
+      appendPhotoToFormData(formData, "roomPhoto", {
+        value: values.roomPhoto,
+        existingPhoto: room?.photo,
+        isEdit: mode === "edit",
+        previewUrl: photo.previewUrl,
+      });
 
       if (mode === "create") {
         const response = await createRoom(formData).unwrap();
@@ -453,68 +399,14 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                 )}
               />
 
-              <FormField
+              <PhotoUploadField
                 control={form.control}
                 name="roomPhoto"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Room Photo (Optional)</FormLabel>
-                    <FormControl>
-                      <div className="space-y-3">
-                        {/* Preview */}
-                        {previewUrl && (
-                          <div className="relative w-24 h-24 mx-auto">
-                            <div className="relative w-full h-full rounded-md overflow-hidden border border-muted-foreground/20">
-                              <Image
-                                src={previewUrl}
-                                alt="Room photo preview"
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={removeImage}
-                              className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
-                              aria-label="Remove image"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* File Input */}
-                        <div className="relative">
-                          <Input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleImageChange(e.target.files?.[0])
-                            }
-                            disabled={isLoading}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full bg-muted border-dashed border hover:bg-muted/80"
-                            disabled={isLoading}
-                          >
-                            <Upload className="mr-2 h-4 w-4" />
-                            {previewUrl ? "Change Photo" : "Upload Room Photo"}
-                          </Button>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground text-center">
-                          Supported formats: JPG, PNG, GIF (Max 5MB)
-                        </p>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                label="Room Photo (Optional)"
+                uploadLabel="Upload Room Photo"
+                previewAlt="Room photo preview"
+                upload={photo}
+                disabled={isLoading}
               />
 
               {/* Server errors that belong to no single field stay visible

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,32 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Loader2, Upload, X, Check, ChevronsUpDown } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   useCreateHotelMutation,
   useUpdateHotelMutation,
 } from "@/redux/hotelApi";
-import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import toast from "react-hot-toast";
 import { IHotel } from "@/types/hotel.types";
-import Image from "next/image";
+import { DestinationCombobox } from "@/components/forms/destination-combobox";
+import {
+  PhotoUploadField,
+  appendPhotoToFormData,
+  usePhotoUpload,
+} from "@/components/forms/photo-upload-field";
 import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
-import { shouldRemovePhoto } from "@/utils/photo-removal";
-import { cn } from "@/lib/utils";
 
 const hotelFormSchema = z.object({
   name: z.string().min(1, "Hotel name is required"),
@@ -72,18 +62,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
   const router = useRouter();
   const [createHotel, { isLoading: isCreating }] = useCreateHotelMutation();
   const [updateHotel, { isLoading: isUpdating }] = useUpdateHotelMutation();
-  const [destinationSearch, setDestinationSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    hotel?.photo || null
-  );
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { data: destinationsData, isLoading: isLoadingDestinations } =
-    useGetAllDestinationsQuery({
-      limit: 10,
-      search: destinationSearch,
-    });
 
   const form = useForm<HotelFormValues>({
     resolver: zodResolver(hotelFormSchema),
@@ -99,58 +77,11 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
     },
   });
 
-  const handleImageChange = (file: File | undefined) => {
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        form.setError("hotelPhoto", {
-          type: "manual",
-          message: "Please select a valid image file",
-        });
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        form.setError("hotelPhoto", {
-          type: "manual",
-          message: "Image size should be less than 5MB",
-        });
-        return;
-      }
-
-      // Clean up old preview URL
-      if (previewUrl && previewUrl !== hotel?.photo) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      form.setValue("hotelPhoto", file);
-      form.clearErrors("hotelPhoto");
-    }
-  };
-
-  const removeImage = () => {
-    if (previewUrl && previewUrl !== hotel?.photo) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    setPreviewUrl(null);
-    form.setValue("hotelPhoto", undefined);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl && previewUrl !== hotel?.photo) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl, hotel?.photo]);
+  const photo = usePhotoUpload({
+    form,
+    name: "hotelPhoto",
+    existingPhoto: hotel?.photo,
+  });
 
   const onSubmit = async (values: HotelFormValues) => {
     try {
@@ -168,19 +99,12 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
         });
       }
       formData.append("destinationId", values.destinationId.toString());
-      if (values.hotelPhoto) {
-        formData.append("hotelPhoto", values.hotelPhoto);
-      } else if (
-        shouldRemovePhoto({
-          existingPhoto: hotel?.photo,
-          isEdit: mode === "edit",
-          newFile: values.hotelPhoto,
-          previewUrl,
-        })
-      ) {
-        // Empty string = the API's remove-photo signal.
-        formData.append("hotelPhoto", "");
-      }
+      appendPhotoToFormData(formData, "hotelPhoto", {
+        value: values.hotelPhoto,
+        existingPhoto: hotel?.photo,
+        isEdit: mode === "edit",
+        previewUrl: photo.previewUrl,
+      });
 
       if (mode === "create") {
         await createHotel(formData).unwrap();
@@ -222,7 +146,6 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
   };
 
   const isLoading = isCreating || isUpdating;
-  const destinations = destinationsData?.data || [];
 
   return (
     <div className="space-y-6">
@@ -262,82 +185,10 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
                 )}
               />
 
-              <FormField
+              <DestinationCombobox
                 control={form.control}
                 name="destinationId"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Destination</FormLabel>
-                    <Popover open={open} onOpenChange={setOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={open}
-                            className={cn(
-                              "h-10 w-full min-w-0 justify-between text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            <span className="min-w-0 flex-1 line-clamp-1 whitespace-normal [overflow-wrap:anywhere]">
-                              {field.value
-                                ? destinations.find(
-                                    (destination) =>
-                                      destination.id === field.value
-                                  )?.name ||
-                                  hotel?.destination?.name ||
-                                  "Select destination"
-                                : "Select destination"}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                        <Command>
-                          <CommandInput
-                            placeholder="Search destination..."
-                            value={destinationSearch}
-                            onValueChange={setDestinationSearch}
-                          />
-                          <CommandEmpty>
-                            {isLoadingDestinations
-                              ? "Loading destinations..."
-                              : "No destination found."}
-                          </CommandEmpty>
-                          <CommandGroup>
-                            {destinations.map((destination) => (
-                              <CommandItem
-                                key={destination.id}
-                                value={destination.name}
-                                onSelect={() => {
-                                  field.onChange(destination.id);
-                                  setOpen(false);
-                                  setDestinationSearch("");
-                                }}
-                                className="items-start"
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4 shrink-0 mt-0.5",
-                                    destination.id === field.value
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">
-                                  {destination.name}
-                                </span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                fallbackName={hotel?.destination?.name}
               />
 
               <FormField
@@ -428,68 +279,14 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
                 )}
               />
 
-              <FormField
+              <PhotoUploadField
                 control={form.control}
                 name="hotelPhoto"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Hotel Photo (Optional)</FormLabel>
-                    <FormControl>
-                      <div className="space-y-3">
-                        {/* Preview */}
-                        {previewUrl && (
-                          <div className="relative w-24 h-24 mx-auto">
-                            <div className="relative w-full h-full rounded-md overflow-hidden border border-muted-foreground/20">
-                              <Image
-                                src={previewUrl}
-                                alt="Hotel photo preview"
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={removeImage}
-                              className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
-                              aria-label="Remove image"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* File Input */}
-                        <div className="relative">
-                          <Input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleImageChange(e.target.files?.[0])
-                            }
-                            disabled={isLoading}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full bg-muted border-dashed border hover:bg-muted/80"
-                            disabled={isLoading}
-                          >
-                            <Upload className="mr-2 h-4 w-4" />
-                            {previewUrl ? "Change Photo" : "Upload Hotel Photo"}
-                          </Button>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground text-center">
-                          Supported formats: JPG, PNG, GIF (Max 5MB)
-                        </p>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                label="Hotel Photo (Optional)"
+                uploadLabel="Upload Hotel Photo"
+                previewAlt="Hotel photo preview"
+                upload={photo}
+                disabled={isLoading}
               />
 
               {/* Server errors that belong to no single field stay visible
