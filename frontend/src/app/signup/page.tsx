@@ -62,6 +62,12 @@ export default function SignupPage() {
             message: errorMessage,
           });
         });
+      } else {
+        // No field to attach it to (e.g. contact already taken): keep the
+        // error visible in the form after the toast fades.
+        form.setError("root", {
+          message: message || "Signup failed. Please try again.",
+        });
       }
 
       // Always show toast for main message

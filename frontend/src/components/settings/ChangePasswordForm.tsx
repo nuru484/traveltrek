@@ -28,7 +28,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { useChangePasswordMutation } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import {
   changePasswordFormSchema,
@@ -96,11 +98,14 @@ export default function ChangePasswordForm() {
           : undefined;
 
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          if (field === "currentPassword" || field === "newPassword") {
-            form.setError(field, { message: errorMessage });
-          }
-        });
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
       } else if (status === 401) {
         // Uniform "Invalid credentials" — the current password didn't verify.
         form.setError("currentPassword", {
@@ -110,6 +115,12 @@ export default function ChangePasswordForm() {
         // "no password yet — omit currentPassword" / "current password is
         // required" — both belong on the current-password field.
         form.setError("currentPassword", { message });
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", {
+          message: message || "Could not change your password.",
+        });
       }
 
       toast.error(message || "Could not change your password.");
@@ -134,6 +145,7 @@ export default function ChangePasswordForm() {
 
         <Form {...form}>
           <form
+            noValidate
             onSubmit={form.handleSubmit(onSubmit)}
             className="mt-6 space-y-6"
           >
@@ -198,6 +210,10 @@ export default function ChangePasswordForm() {
                 </FormItem>
               )}
             />
+
+            {/* Server errors that belong to no single field stay visible
+                here after the toast fades. */}
+            <FormRootError />
 
             <Button
               type="submit"

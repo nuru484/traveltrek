@@ -22,7 +22,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { useResetPasswordMutation } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import {
   IResetPasswordFormSchema,
@@ -54,10 +56,28 @@ function ResetPasswordForm() {
       toast.success(result.message);
       router.push("/login");
     } catch (err) {
-      toast.error(
-        extractApiErrorMessage(err).message ||
-          "Could not reset the password. The link may have expired."
-      );
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
+      const fallback =
+        "Could not reset the password. The link may have expired.";
+
+      if (hasFieldErrors && fieldErrors) {
+        // "token" (sent alongside the password) isn't a rendered field —
+        // its message falls through to the root error.
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "password",
+          "confirmPassword",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   }
 
@@ -89,6 +109,7 @@ function ResetPasswordForm() {
 
       <Form {...form}>
         <form
+          noValidate
           onSubmit={form.handleSubmit(onSubmit)}
           className="mt-6 space-y-6"
         >
@@ -151,6 +172,10 @@ function ResetPasswordForm() {
               </FormItem>
             )}
           />
+
+          {/* Server errors that belong to no single field stay visible
+              here after the toast fades. */}
+          <FormRootError />
 
           <Button
             type="submit"

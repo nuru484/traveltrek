@@ -42,7 +42,7 @@ describe("OtpLoginForm", () => {
       screen.getByLabelText("Email or phone"),
       "amina@example.com"
     );
-    await user.click(screen.getByRole("button", { name: "Email me a code" }));
+    await user.click(screen.getByRole("button", { name: "Send me a code" }));
 
     expect(requestOtp).toHaveBeenCalledWith({ email: "amina@example.com" });
 
@@ -67,7 +67,7 @@ describe("OtpLoginForm", () => {
     render(<OtpLoginForm />);
 
     await user.type(screen.getByLabelText("Email or phone"), "+233540000000");
-    await user.click(screen.getByRole("button", { name: "Email me a code" }));
+    await user.click(screen.getByRole("button", { name: "Send me a code" }));
 
     expect(requestOtp).toHaveBeenCalledWith({ phone: "+233540000000" });
   });
@@ -77,7 +77,7 @@ describe("OtpLoginForm", () => {
     render(<OtpLoginForm />);
 
     await user.type(screen.getByLabelText("Email or phone"), "not-a-contact");
-    await user.click(screen.getByRole("button", { name: "Email me a code" }));
+    await user.click(screen.getByRole("button", { name: "Send me a code" }));
 
     expect(
       await screen.findByText("Enter a valid email address or phone number")

@@ -62,6 +62,12 @@ export default function LoginPage() {
             message: errorMessage,
           });
         });
+      } else {
+        // No field to attach it to (e.g. invalid credentials): keep the
+        // error visible in the form after the toast fades.
+        form.setError("root", {
+          message: message || "Login failed. Please try again.",
+        });
       }
 
       toast.error(message || "Login failed. Please try again.");
@@ -194,7 +200,7 @@ export default function LoginPage() {
                         Password
                       </TabsTrigger>
                       <TabsTrigger value="otp" className="cursor-pointer">
-                        Email me a code
+                        One-time code
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="password">

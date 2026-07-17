@@ -14,6 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Upload } from "lucide-react";
 import Image from "next/image";
@@ -22,6 +23,7 @@ import {
   useCreateDestinationMutation,
   useUpdateDestinationMutation,
 } from "@/redux/destinationApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { IDestination } from "@/types/destination.types";
@@ -164,16 +166,26 @@ export default function DestinationForm({
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
+      const fallback = "Operation failed";
+
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof DestinationFormValues, {
-            message: errorMessage,
-          });
-        });
-        toast.error(message);
+        // Only field names the form actually renders are attached; unknown
+        // ones fall through to the root error below.
+        const unmatched = applyServerFieldErrors(
+          form.setError,
+          fieldErrors,
+          Object.keys(destinationFormSchema.shape)
+        );
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
       } else {
-        toast.error(message || "Operation failed");
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
       }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -184,7 +196,7 @@ export default function DestinationForm({
       <Card className="max-w-2xl mx-auto">
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* Name */}
               <FormField
                 control={form.control}
@@ -320,6 +332,10 @@ export default function DestinationForm({
                   </FormItem>
                 )}
               />
+
+              {/* Server errors that belong to no single field stay visible
+                  here after the toast fades. */}
+              <FormRootError />
 
               {/* Actions */}
               <div className="flex gap-3 pt-4">

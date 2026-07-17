@@ -13,6 +13,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -30,6 +31,7 @@ import toast from "react-hot-toast";
 import { IRoom } from "@/types/room.types";
 import { IHotel } from "@/types/hotel.types";
 import Image from "next/image";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 
@@ -212,16 +214,26 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
+      const fallback = `Failed to ${mode} room`;
+
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof RoomFormValues, {
-            message: errorMessage,
-          });
-        });
-        toast.error(message);
+        // Only field names the form actually renders are attached; unknown
+        // ones fall through to the root error below.
+        const unmatched = applyServerFieldErrors(
+          form.setError,
+          fieldErrors,
+          Object.keys(roomFormSchema.shape)
+        );
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
       } else {
-        toast.error(message || `Failed to ${mode} room`);
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
       }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -249,7 +261,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
       <Card className="max-w-2xl mx-auto">
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="hotelId"
@@ -504,6 +516,10 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
                   </FormItem>
                 )}
               />
+
+              {/* Server errors that belong to no single field stay visible
+                  here after the toast fades. */}
+              <FormRootError />
 
               <div className="flex gap-3 pt-4">
                 <Button

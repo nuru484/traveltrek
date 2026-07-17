@@ -12,6 +12,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { ILoginFormSchema } from "@/validation/auth-validation";
 import { UseFormReturn } from "react-hook-form";
@@ -41,6 +42,7 @@ export default function LoginForm({
     <div className="w-full">
       <Form {...form}>
         <form
+          noValidate
           onSubmit={form.handleSubmit(handleSubmit)}
           className="w-full space-y-6"
         >
@@ -120,6 +122,10 @@ export default function LoginForm({
               </FormItem>
             )}
           />
+
+          {/* Server errors that belong to no single field (e.g. invalid
+              credentials) stay visible here after the toast fades. */}
+          <FormRootError />
 
           {/* Submit Button */}
           <Button

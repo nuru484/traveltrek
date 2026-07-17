@@ -12,6 +12,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -29,6 +30,7 @@ import {
 import { useGetAllDestinationsQuery } from "@/redux/destinationApi";
 import toast from "react-hot-toast";
 import { IFlight } from "@/types/flight.types";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { IDestination } from "@/types/destination.types";
@@ -167,16 +169,26 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
+      const fallback = `Failed to ${mode} flight`;
+
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof IFlightFormValues, {
-            message: errorMessage,
-          });
-        });
-        toast.error(message);
+        // Only field names the form actually renders are attached; unknown
+        // ones fall through to the root error below.
+        const unmatched = applyServerFieldErrors(
+          form.setError,
+          fieldErrors,
+          Object.keys(flightFormSchema.shape)
+        );
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
       } else {
-        toast.error(message || `Failed to ${mode} flight`);
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
       }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -187,7 +199,7 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
       <Card className="max-w-2xl mx-auto">
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="flightNumber"
@@ -425,6 +437,10 @@ export function FlightForm({ flight, mode }: IFlightFormProps) {
                   </FormItem>
                 )}
               />
+
+              {/* Server errors that belong to no single field stay visible
+                  here after the toast fades. */}
+              <FormRootError />
 
               <div className="flex gap-3 pt-4">
                 <Button

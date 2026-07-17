@@ -36,6 +36,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { useRefreshTokenMutation } from "@/redux/apiSlice";
 import {
   useChangeEmailMutation,
@@ -43,6 +44,7 @@ import {
   useConfirmPhoneChangeMutation,
   useReauthChallengeMutation,
 } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import {
   changeEmailFormSchema,
@@ -163,10 +165,26 @@ export function ChangeEmailDialog({
       ).unwrap();
       setSentMessage(result.message);
     } catch (error) {
-      const { message } = extractApiErrorMessage(error);
-      form.setError("secret", {
-        message: message || "Could not start the email change",
-      });
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(error);
+      const fallback = "Could not start the email change";
+
+      if (hasFieldErrors && fieldErrors) {
+        // Real field errors land on their fields; anything else (e.g. a
+        // wrong password / bad code) shows as the form-level error below.
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "newEmail",
+          "method",
+          "secret",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -206,6 +224,7 @@ export function ChangeEmailDialog({
 
             <Form {...form}>
               <form
+                noValidate
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
               >
@@ -293,6 +312,10 @@ export function ChangeEmailDialog({
                   )}
                 />
 
+                {/* Server errors that belong to no single field stay
+                    visible here after the toast fades. */}
+                <FormRootError />
+
                 <DialogFooter className="gap-2">
                   <Button
                     type="button"
@@ -369,10 +392,26 @@ export function ChangePhoneDialog({
       ).unwrap();
       setOtpStepMessage(result.message);
     } catch (error) {
-      const { message } = extractApiErrorMessage(error);
-      form.setError("secret", {
-        message: message || "Could not start the phone change",
-      });
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(error);
+      const fallback = "Could not start the phone change";
+
+      if (hasFieldErrors && fieldErrors) {
+        // Real field errors land on their fields; anything else (e.g. a
+        // wrong password / bad code) shows as the form-level error below.
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "newPhone",
+          "method",
+          "secret",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -408,7 +447,7 @@ export function ChangePhoneDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={onConfirm} className="space-y-4">
+            <form noValidate onSubmit={onConfirm} className="space-y-4">
               <div className="space-y-2">
                 <label
                   htmlFor="phone-otp"
@@ -469,6 +508,7 @@ export function ChangePhoneDialog({
 
             <Form {...form}>
               <form
+                noValidate
                 onSubmit={form.handleSubmit(onRequest)}
                 className="space-y-4"
               >
@@ -555,6 +595,10 @@ export function ChangePhoneDialog({
                     </FormItem>
                   )}
                 />
+
+                {/* Server errors that belong to no single field stay
+                    visible here after the toast fades. */}
+                <FormRootError />
 
                 <DialogFooter className="gap-2">
                   <Button

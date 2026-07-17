@@ -27,6 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RatingStarsInput } from "@/components/ui/rating";
@@ -35,6 +36,7 @@ import {
   useUpdateReviewMutation,
 } from "@/redux/reviewApi";
 import type { IReview } from "@/types/review.types";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { reviewFormSchema, ReviewFormValues } from "./review-logic";
 
@@ -97,10 +99,26 @@ export function ReviewDialog({
       }
       onOpenChange(false);
     } catch (error) {
-      const { message } = extractApiErrorMessage(error);
-      toast.error(
-        message || `Failed to ${isEdit ? "update" : "submit"} review`
-      );
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(error);
+      const fallback = `Failed to ${isEdit ? "update" : "submit"} review`;
+
+      if (hasFieldErrors && fieldErrors) {
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "rating",
+          "title",
+          "comment",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to (e.g. "already reviewed"): keep the
+        // error visible in the dialog after the toast fades.
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -119,7 +137,7 @@ export function ReviewDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             <FormField
               control={form.control}
               name="rating"
@@ -178,6 +196,10 @@ export function ReviewDialog({
                 </FormItem>
               )}
             />
+
+            {/* Server errors that belong to no single field stay visible
+                here after the toast fades. */}
+            <FormRootError />
 
             <DialogFooter className="gap-2">
               <Button

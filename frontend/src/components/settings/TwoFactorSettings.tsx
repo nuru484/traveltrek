@@ -24,6 +24,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import {
   useTwoFactorChallengeMutation,
@@ -31,6 +32,7 @@ import {
   useTwoFactorEnableMutation,
   useTwoFactorStatusQuery,
 } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import {
   ITwoFactorCodeFormSchema,
@@ -86,10 +88,26 @@ export default function TwoFactorSettings() {
             : "Two-factor authentication is now off.")
       );
     } catch (err) {
-      const { message } = extractApiErrorMessage(err);
-      codeForm.setError("code", {
-        message: message || "Invalid or expired code. Please try again.",
-      });
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
+      const fallback = "Invalid or expired code. Please try again.";
+
+      if (hasFieldErrors && fieldErrors) {
+        const unmatched = applyServerFieldErrors(
+          codeForm.setError,
+          fieldErrors,
+          ["code"]
+        );
+        if (unmatched.length > 0) {
+          codeForm.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        codeForm.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -189,6 +207,7 @@ export default function TwoFactorSettings() {
 
             <Form {...codeForm}>
               <form
+                noValidate
                 onSubmit={codeForm.handleSubmit(onVerifyCode)}
                 className="mt-4 space-y-4"
               >
@@ -213,6 +232,10 @@ export default function TwoFactorSettings() {
                     </FormItem>
                   )}
                 />
+
+                {/* Server errors that belong to no single field stay
+                    visible here after the toast fades. */}
+                <FormRootError />
 
                 <div className="flex flex-wrap items-center gap-3">
                   <Button

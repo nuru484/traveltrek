@@ -1,6 +1,6 @@
 // src/components/authentication/OtpLoginForm.tsx
 //
-// Passwordless "email me a code" login: request a 6-digit code for an email
+// Passwordless "send me a code" login: request a 6-digit code for an email
 // or phone, then verify it. The request step always succeeds on the wire (no
 // account enumeration), so the UI moves to the code step unconditionally.
 "use client";
@@ -20,10 +20,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import {
   useOtpRequestMutation,
   useOtpVerifyMutation,
 } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import {
@@ -63,10 +65,34 @@ export default function OtpLoginForm() {
       setStep("verify");
       toast.success(result.message);
     } catch (err) {
-      toast.error(
-        extractApiErrorMessage(err).message ||
-          "Could not send the code. Please try again."
-      );
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
+      const fallback = "Could not send the code. Please try again.";
+
+      if (hasFieldErrors && fieldErrors) {
+        // The wire payload is { email } or { phone }; both map back onto the
+        // single "contact" field this form renders.
+        const remapped = Object.fromEntries(
+          Object.entries(fieldErrors).map(([field, errorMessage]) => [
+            field === "email" || field === "phone" ? "contact" : field,
+            errorMessage,
+          ])
+        );
+        const unmatched = applyServerFieldErrors(
+          requestForm.setError,
+          remapped,
+          ["contact"]
+        );
+        if (unmatched.length > 0) {
+          requestForm.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        requestForm.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -79,10 +105,24 @@ export default function OtpLoginForm() {
       toast.success("Login successful! Redirecting...");
       router.push(loginRedirectPath(window.location.search));
     } catch (err) {
-      toast.error(
-        extractApiErrorMessage(err).message ||
-          "Invalid or expired code. Please try again."
-      );
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
+      const fallback = "Invalid or expired code. Please try again.";
+
+      if (hasFieldErrors && fieldErrors) {
+        const unmatched = applyServerFieldErrors(
+          verifyForm.setError,
+          fieldErrors,
+          ["code"]
+        );
+        if (unmatched.length > 0) {
+          verifyForm.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        verifyForm.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -91,6 +131,7 @@ export default function OtpLoginForm() {
       <div className="w-full">
         <Form {...verifyForm}>
           <form
+            noValidate
             onSubmit={verifyForm.handleSubmit(onVerify)}
             className="w-full space-y-6"
           >
@@ -121,6 +162,10 @@ export default function OtpLoginForm() {
                 </FormItem>
               )}
             />
+
+            {/* Server errors that belong to no single field stay visible
+                here after the toast fades. */}
+            <FormRootError />
 
             <Button
               type="submit"
@@ -165,6 +210,7 @@ export default function OtpLoginForm() {
     <div className="w-full">
       <Form {...requestForm}>
         <form
+          noValidate
           onSubmit={requestForm.handleSubmit(onRequest)}
           className="w-full space-y-6"
         >
@@ -193,6 +239,10 @@ export default function OtpLoginForm() {
             password needed.
           </p>
 
+          {/* Server errors that belong to no single field stay visible
+              here after the toast fades. */}
+          <FormRootError />
+
           <Button
             type="submit"
             className="h-11 w-full cursor-pointer rounded-full bg-foreground font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -204,7 +254,7 @@ export default function OtpLoginForm() {
                 Sending code...
               </>
             ) : (
-              "Email me a code"
+              "Send me a code"
             )}
           </Button>
         </form>

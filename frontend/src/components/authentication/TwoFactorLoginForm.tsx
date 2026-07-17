@@ -22,10 +22,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import {
   useTwoFactorResendMutation,
   useTwoFactorVerifyMutation,
 } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import {
@@ -59,7 +61,8 @@ export default function TwoFactorLoginForm({
       toast.success("Login successful! Redirecting...");
       router.push(loginRedirectPath(window.location.search));
     } catch (err) {
-      const { message } = extractApiErrorMessage(err);
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
       const status =
         typeof err === "object" && err !== null && "status" in err
           ? (err as { status?: unknown }).status
@@ -72,9 +75,22 @@ export default function TwoFactorLoginForm({
         return;
       }
 
-      form.setError("code", {
-        message: message || "Invalid or expired code. Please try again.",
-      });
+      const fallback = "Invalid or expired code. Please try again.";
+
+      if (hasFieldErrors && fieldErrors) {
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "code",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   };
 
@@ -94,6 +110,7 @@ export default function TwoFactorLoginForm({
     <div className="w-full">
       <Form {...form}>
         <form
+          noValidate
           onSubmit={form.handleSubmit(onVerify)}
           className="w-full space-y-6"
         >
@@ -129,6 +146,10 @@ export default function TwoFactorLoginForm({
               </FormItem>
             )}
           />
+
+          {/* Server errors that belong to no single field stay visible
+              here after the toast fades. */}
+          <FormRootError />
 
           <Button
             type="submit"

@@ -15,6 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Upload } from "lucide-react";
 import Image from "next/image";
@@ -24,6 +25,7 @@ import {
   useUpdateCustomerMutation,
 } from "@/redux/customerApi";
 import { ICustomer } from "@/types/customer.types";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 import {
@@ -175,15 +177,28 @@ export default function CustomerForm({
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
+      const fallback = "Operation failed";
+
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof ICustomerCreateFormSchema, {
-            message: errorMessage,
-          });
-        });
+        // Only field names the form actually renders are attached (e.g. the
+        // multipart "profilePicture" isn't one); unknown ones fall through
+        // to the root error below.
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "name",
+          "email",
+          "phone",
+          "address",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
       }
 
-      toast.error(message || "Operation failed");
+      toast.error(message || fallback);
     }
   };
 
@@ -194,7 +209,7 @@ export default function CustomerForm({
       <Card className="max-w-2xl mx-auto">
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="name"
@@ -351,6 +366,10 @@ export default function CustomerForm({
                   </FormControl>
                 </FormItem>
               )}
+
+              {/* Server errors that belong to no single field stay visible
+                  here after the toast fades. */}
+              <FormRootError />
 
               <div className="flex gap-3 pt-4">
                 <Button

@@ -17,7 +17,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { useForgotPasswordMutation } from "@/redux/auth/authApi";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import {
   forgotPasswordFormSchema,
@@ -42,10 +44,24 @@ export default function ForgotPasswordPage() {
       // Always 200 on the wire (no account enumeration).
       setSentTo(data.email);
     } catch (err) {
-      toast.error(
-        extractApiErrorMessage(err).message ||
-          "Could not send the reset link. Please try again."
-      );
+      const { message, fieldErrors, hasFieldErrors } =
+        extractApiErrorMessage(err);
+      const fallback = "Could not send the reset link. Please try again.";
+
+      if (hasFieldErrors && fieldErrors) {
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "email",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
+      }
+
+      toast.error(message || fallback);
     }
   }
 
@@ -99,6 +115,7 @@ export default function ForgotPasswordPage() {
 
                   <Form {...form}>
                     <form
+                      noValidate
                       onSubmit={form.handleSubmit(onSubmit)}
                       className="mt-6 space-y-6"
                     >
@@ -122,6 +139,10 @@ export default function ForgotPasswordPage() {
                           </FormItem>
                         )}
                       />
+
+                      {/* Server errors that belong to no single field stay
+                          visible here after the toast fades. */}
+                      <FormRootError />
 
                       <Button
                         type="submit"

@@ -24,6 +24,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -40,6 +41,7 @@ import {
   useCreateUserMutation,
 } from "@/redux/userApi";
 import { IUserResponse } from "@/types/user.types";
+import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 import {
@@ -172,15 +174,29 @@ export default function UserForm({ mode, user }: IUserFormProps) {
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(error);
 
+      const fallback = "Operation failed";
+
       if (hasFieldErrors && fieldErrors) {
-        Object.entries(fieldErrors).forEach(([field, errorMessage]) => {
-          form.setError(field as keyof IStaffCreateFormSchema, {
-            message: errorMessage,
-          });
-        });
+        // Only field names the form actually renders are attached (e.g. the
+        // multipart "profilePicture" isn't one); unknown ones fall through
+        // to the root error below.
+        const unmatched = applyServerFieldErrors(form.setError, fieldErrors, [
+          "name",
+          "email",
+          "phone",
+          "address",
+          "role",
+        ]);
+        if (unmatched.length > 0) {
+          form.setError("root", { message: unmatched.join(" ") });
+        }
+      } else {
+        // No field to attach it to: keep the error visible in the form
+        // after the toast fades.
+        form.setError("root", { message: message || fallback });
       }
 
-      toast.error(message || "Operation failed");
+      toast.error(message || fallback);
     }
   };
 
@@ -191,7 +207,7 @@ export default function UserForm({ mode, user }: IUserFormProps) {
       <Card className="max-w-2xl mx-auto">
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="name"
@@ -208,15 +224,16 @@ export default function UserForm({ mode, user }: IUserFormProps) {
 
               {isSelf && (
                 <p className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                  Your email and phone number are how you sign in, so they
-                  can&apos;t be edited here. Change them securely under{" "}
+                  Your email is how you sign in, and your phone can receive
+                  your verification codes — so both change through the
+                  verified flow under{" "}
                   <Link
                     href="/dashboard/settings/contact"
                     className="font-medium text-foreground underline-offset-4 hover:underline"
                   >
                     Settings &rarr; Contact
                   </Link>
-                  .
+                  , which confirms the new contact before it applies.
                 </p>
               )}
 
@@ -369,6 +386,10 @@ export default function UserForm({ mode, user }: IUserFormProps) {
                   </div>
                 </FormControl>
               </FormItem>
+
+              {/* Server errors that belong to no single field stay visible
+                  here after the toast fades. */}
+              <FormRootError />
 
               <div className="flex gap-3 pt-4">
                 <Button

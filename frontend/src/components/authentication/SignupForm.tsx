@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { UseFormReturn } from "react-hook-form";
+import { FormRootError } from "@/components/ui/form-root-error";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ export default function SignupForm({
     <div className="w-full">
       <Form {...form}>
         <form
+          noValidate
           onSubmit={form.handleSubmit(onSubmit)}
           className="w-full space-y-6"
         >
@@ -185,6 +187,10 @@ export default function SignupForm({
             One contact is enough — skip the password and we&apos;ll sign you
             in with a one-time code sent to it.
           </p>
+
+          {/* Server errors that belong to no single field stay visible here
+              after the toast fades. */}
+          <FormRootError />
 
           <Button
             type="submit"
