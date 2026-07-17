@@ -62,10 +62,12 @@ export function ReportFilterBar({
   const isBelowLg = useIsBelowLg();
 
   // Few controls: render them straight into the toolbar, no button/panel.
+  // lg+ caps each control at a quarter of the row (4-col grid) so one or
+  // two selects don't stretch to half the page.
   if (isInlineFilterBar(controlCount)) {
     return (
       <div className="flex flex-wrap items-end gap-3">
-        <div className="grid min-w-0 flex-1 basis-64 grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 flex-1 basis-64 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {filterFields}
         </div>
         <div className="flex flex-none items-center gap-2">
