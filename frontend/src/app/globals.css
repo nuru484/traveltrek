@@ -197,6 +197,58 @@ html {
   display: none;
 }
 
+/* ---- Branded dashboard loader ----
+   The "now boarding" loader (components/ui/DashboardLoader): a plane orbits a
+   dashed route ring around the logo while a runway bar taxis underneath. Its
+   own signature, not the plain spinner rings elsewhere. */
+@keyframes tt-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tt-route {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes tt-runway {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+@keyframes tt-lift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.tt-orbit {
+  animation: tt-orbit 2.6s linear infinite;
+}
+.tt-route {
+  animation: tt-route 9s linear infinite;
+}
+.tt-runway {
+  animation: tt-runway 1.4s ease-in-out infinite;
+}
+.tt-lift {
+  animation: tt-lift 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-orbit,
+  .tt-route,
+  .tt-runway,
+  .tt-lift {
+    animation: none;
+  }
+}
+
 /* ---- Report printing ----
    Print only the marked report data. `printReport()` toggles the
    `report-printing` class on <body>; the rules below hide the app chrome,

@@ -204,14 +204,19 @@ export default function DashboardSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="flex items-center py-5 border-b border-sidebar-border">
-        <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground hover:bg-transparent">
-          <Image
-            src="/logo.png"
-            alt="Travel Trek Logo"
-            width={40}
-            height={40}
-          />
-          <span className="font-display text-xl font-semibold tracking-tight">
+        <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground hover:bg-transparent group-data-[collapsible=icon]:!p-0">
+          {/* The logo art is dark, so it rides on a white chip to read on the
+              dark sidebar. flex-none keeps it square when the label truncates. */}
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-white p-1 shadow-sm">
+            <Image
+              src="/logo.png"
+              alt="Travel Trek Logo"
+              width={32}
+              height={32}
+              className="h-full w-full object-contain"
+            />
+          </span>
+          <span className="font-display text-xl font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
             Travel Trek
           </span>
         </SidebarMenuButton>
@@ -256,7 +261,9 @@ export default function DashboardSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="mt-auto border-t border-sidebar-border">
-        <div className="px-4 py-3 font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/50">
+        {/* Hidden when collapsed: at icon width the label wrapped and its
+            vertical stack pushed up over the nav icons. */}
+        <div className="whitespace-nowrap px-4 py-3 font-mono text-[9px] uppercase tracking-[0.18em] text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
           TT-2026 · Tour system
         </div>
       </SidebarFooter>

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Compass, Cog, Layers, Mail, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -38,8 +39,16 @@ const Header = () => {
           <div className="flex h-14 md:h-16 items-center justify-between gap-3">
             <Link
               href="/"
-              className="flex min-w-0 items-baseline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              className="flex min-w-0 items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
             >
+              <Image
+                src="/logo.png"
+                alt=""
+                width={32}
+                height={32}
+                priority
+                className="h-7 w-7 flex-none object-contain md:h-8 md:w-8"
+              />
               <span className="font-display text-xl md:text-2xl font-semibold tracking-tight whitespace-nowrap">
                 Travel Trek
               </span>
