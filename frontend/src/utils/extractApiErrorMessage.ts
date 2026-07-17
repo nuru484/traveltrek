@@ -7,46 +7,58 @@ interface ApiErrorResult {
   code?: string;
 }
 
+/** The one message every "can't talk to the server" failure collapses to. */
+const NETWORK_MESSAGE =
+  "Can't reach the server right now. Check your internet connection and try again.";
+
+const FALLBACK_MESSAGE = "Something went wrong. Please try again.";
+
+/** Browser/engine network error strings that mean nothing to a person. */
+const isBrowserNetworkMessage = (message: string): boolean =>
+  /failed to fetch|networkerror|network error|load failed|fetch failed|ERR_NETWORK|ERR_CONNECTION/i.test(
+    message,
+  );
+
 export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
   if (!error) {
-    return { message: "An unknown error occurred", hasFieldErrors: false };
+    return { message: FALLBACK_MESSAGE, hasFieldErrors: false };
   }
 
   // Handle string errors
   if (typeof error === "string") {
-    return { message: error, hasFieldErrors: false };
+    return {
+      message: isBrowserNetworkMessage(error) ? NETWORK_MESSAGE : error,
+      hasFieldErrors: false,
+    };
   }
 
   // Handle RTK Query or API errors
   if (typeof error === "object" && error !== null) {
-    // Handle RTK Query FETCH_ERROR (network errors, server down, etc.)
-    if (
-      "status" in error &&
-      error.status === "FETCH_ERROR" &&
-      "error" in error
-    ) {
-      const errorMessage =
-        typeof error.error === "string"
-          ? error.error
-          : "Network error - unable to connect to server";
-      return { message: errorMessage, hasFieldErrors: false };
+    // RTK Query FETCH_ERROR (server down, no network, DNS…). The raw cause
+    // is developer-speak ("TypeError: Failed to fetch") — never show it.
+    if ("status" in error && error.status === "FETCH_ERROR") {
+      return {
+        message: NETWORK_MESSAGE,
+        hasFieldErrors: false,
+      };
     }
 
     // Handle RTK Query PARSING_ERROR
-    if (
-      "status" in error &&
-      error.status === "PARSING_ERROR" &&
-      "error" in error
-    ) {
+    if ("status" in error && error.status === "PARSING_ERROR") {
       return {
-        message: "Failed to parse server response",
+        message:
+          "The server sent an unexpected response. Please try again in a moment.",
         hasFieldErrors: false,
       };
     }
 
     // Handle RTK Query TIMEOUT_ERROR
     if ("status" in error && error.status === "TIMEOUT_ERROR") {
-      return { message: "Request timed out", hasFieldErrors: false };
+      return {
+        message:
+          "The request took too long. Please check your connection and try again.",
+        hasFieldErrors: false,
+      };
     }
 
     // RTK Query error with status and data (API responses from your backend)
@@ -199,44 +211,63 @@ export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
         }
       }
 
-      // Handle HTTP status codes with no specific data
+      // HTTP status codes with no usable response body — say what the person
+      // can do about it, not what the protocol called it.
       if (typeof error.status === "number") {
         const statusMessages: Record<number, string> = {
-          400: "Bad request",
-          401: "Unauthorized - please log in",
-          403: "Access forbidden",
-          404: "Resource not found",
-          500: "Internal server error",
-          502: "Bad gateway",
-          503: "Service unavailable",
+          400: "That request couldn't be processed. Please review and try again.",
+          401: "Your session has expired. Please sign in again.",
+          403: "You don't have permission to do that.",
+          404: "We couldn't find what you were looking for.",
+          429: "Too many attempts. Please wait a moment and try again.",
+          500: "Something went wrong on our side. Please try again.",
+          502: "The server is temporarily unavailable. Please try again in a moment.",
+          503: "The server is temporarily unavailable. Please try again in a moment.",
+          504: "The server is temporarily unavailable. Please try again in a moment.",
         };
 
         const message =
-          statusMessages[error.status] || `HTTP ${error.status} error`;
+          statusMessages[error.status] ||
+          "Something went wrong. Please try again.";
         return { message, hasFieldErrors: false };
       }
     }
 
-    // JavaScript Error or objects with message
+    // JavaScript Error or objects with message — translate browser network
+    // errors ("Failed to fetch", "NetworkError", "Load failed") to the
+    // friendly copy; pass anything else through.
     if ("message" in error && typeof error.message === "string") {
-      return { message: error.message, hasFieldErrors: false };
+      return {
+        message: isBrowserNetworkMessage(error.message)
+          ? NETWORK_MESSAGE
+          : error.message,
+        hasFieldErrors: false,
+      };
     }
 
     // Handle cases where error is an object but doesn't match expected patterns
     if ("error" in error && typeof error.error === "string") {
-      return { message: error.error, hasFieldErrors: false };
+      return {
+        message: isBrowserNetworkMessage(error.error)
+          ? NETWORK_MESSAGE
+          : error.error,
+        hasFieldErrors: false,
+      };
     }
   }
 
   // Fallback - try to convert to string
   try {
+    // A raw JSON blob is developer output, not a message — log it for
+    // debugging and show the person something they can act on.
     const stringified = JSON.stringify(error);
     if (stringified && stringified !== "{}") {
-      return { message: `Error: ${stringified}`, hasFieldErrors: false };
+      console.error("Unrecognized API error shape:", stringified);
+      return { message: FALLBACK_MESSAGE, hasFieldErrors: false };
     }
   } catch {
     // JSON.stringify failed, fall through to final fallback
   }
 
-  return { message: "An unknown error occurred", hasFieldErrors: false };
+  return { message: FALLBACK_MESSAGE, hasFieldErrors: false };
 };
