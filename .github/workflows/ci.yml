@@ -35,10 +35,6 @@ jobs:
       REDIS_URL: redis://localhost:6379
       ACCESS_TOKEN_SECRET: ci_access_secret
       REFRESH_TOKEN_SECRET: ci_refresh_secret
-      ADMIN_EMAIL: admin@example.com
-      ADMIN_NAME: CI Admin
-      ADMIN_PASSWORD: ci_admin_password
-      ADMIN_PHONE: "233240000000"
       CLOUDINARY_CLOUD_NAME: test
       CLOUDINARY_API_KEY: test
       CLOUDINARY_API_SECRET: test

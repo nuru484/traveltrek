@@ -1,10 +1,18 @@
 interface IENV {
   ACCESS_TOKEN_EXPIRY: string;
   ACCESS_TOKEN_SECRET: string;
-  ADMIN_EMAIL: string;
-  ADMIN_NAME: string;
-  ADMIN_PASSWORD: string;
-  ADMIN_PHONE: string;
+  /** ADMIN_*: read ONLY by `npm run seed` (which asserts them itself), so
+   * they are optional here — the API/worker boot without them and
+   * production never needs the admin credentials in its env store. */
+  ADMIN_EMAIL?: string;
+  ADMIN_NAME?: string;
+  ADMIN_PASSWORD?: string;
+  ADMIN_PHONE?: string;
+  /** Gate for `npm run seed`: false (default) makes the seed a no-op. */
+  ADMIN_SEED_ENABLED: boolean;
+  /** false (default) = create-only seed; true also overwrites an existing
+   * admin with the current ADMIN_* values (credential rotation). */
+  ADMIN_SEED_FORCE_UPDATE: boolean;
   CLOUDINARY_API_KEY: string;
   CLOUDINARY_API_SECRET: string;
   CLOUDINARY_CLOUD_NAME: string;
@@ -67,10 +75,12 @@ const ENV: IENV = {
     process.env.ACCESS_TOKEN_SECRET,
     'ACCESS_TOKEN_SECRET',
   ),
-  ADMIN_EMAIL: assertEnv(process.env.ADMIN_EMAIL, 'ADMIN_EMAIL'),
-  ADMIN_NAME: assertEnv(process.env.ADMIN_NAME, 'ADMIN_NAME'),
-  ADMIN_PASSWORD: assertEnv(process.env.ADMIN_PASSWORD, 'ADMIN_PASSWORD'),
-  ADMIN_PHONE: assertEnv(process.env.ADMIN_PHONE, 'ADMIN_PHONE'),
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+  ADMIN_NAME: process.env.ADMIN_NAME,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  ADMIN_PHONE: process.env.ADMIN_PHONE,
+  ADMIN_SEED_ENABLED: process.env.ADMIN_SEED_ENABLED === 'true',
+  ADMIN_SEED_FORCE_UPDATE: process.env.ADMIN_SEED_FORCE_UPDATE === 'true',
   CLOUDINARY_API_KEY: assertEnv(
     process.env.CLOUDINARY_API_KEY,
     'CLOUDINARY_API_KEY',
