@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { NotFoundActions } from "@/components/ui/not-found-actions";
 
 /** Branded 404 in the landing page's boarding-pass voice. */
 export default function NotFound() {
@@ -22,12 +21,7 @@ export default function NotFound() {
             landing page to find your way.
           </p>
           <div className="mt-7">
-            <Button
-              asChild
-              className="rounded-full bg-foreground px-6 text-background hover:bg-foreground/90"
-            >
-              <Link href="/">Back to home</Link>
-            </Button>
+            <NotFoundActions />
           </div>
         </div>
       </div>

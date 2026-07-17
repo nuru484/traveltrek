@@ -1,7 +1,7 @@
 // src/components/hotels/hotel-detail.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import { RootState } from "@/redux/store";
@@ -49,7 +49,6 @@ interface IHotelDetailProps {
 
 export function HotelDetail({ hotel }: IHotelDetailProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const user = useSelector((state: RootState) => state.auth.user);
   const isAdmin = isAdminUser(user);
   // Staff (admin or agent) book on behalf of a customer; only customers self-book.
@@ -74,7 +73,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
   }, [isBookingsError, bookingsError]);
 
   const handleEdit = () => {
-    router.push(`/admin-dashboard/hotels/${hotel.id}/edit`);
+    router.push(`/dashboard/hotels/${hotel.id}/edit`);
   };
 
   const handleDelete = async () => {
@@ -82,11 +81,7 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
       await deleteHotel(hotel.id).unwrap();
       toast.success("Hotel deleted successfully");
       setShowDeleteDialog(false);
-      router.push(
-        pathname.startsWith("/admin-dashboard")
-          ? "/admin-dashboard/hotels"
-          : "/dashboard/hotels"
-      );
+      router.push("/dashboard/hotels");
     } catch (error) {
       const { message } = extractApiErrorMessage(error);
       toast.error(message || "Failed to delete hotel");
