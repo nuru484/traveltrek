@@ -6,11 +6,17 @@
 // tours). Every widget owns its own query and renders its own
 // skeleton/error/retry — no page-level all-or-nothing. Customers keep the
 // platform stats, quick actions and their travel-summary block.
+//
+// Role note: the revenue/avg-booking cards, charts and ranked lists read the
+// ADMIN-only report endpoints, so they render (and query) for admins ONLY —
+// an agent's dashboard never fires a request it is forbidden to make.
+// Agents keep the staff blocks their role can read (bookings/customers
+// stats, needs-attention) plus a pointer to their own activity report.
 "use client";
 import { useSelector } from "react-redux";
 import Link from "next/link";
 import { RootState } from "@/redux/store";
-import { isStaff } from "@/utils/roles";
+import { isAdmin, isStaff } from "@/utils/roles";
 import {
   useGetDashboardStatsQuery,
   useGetNeedsAttentionQuery,
@@ -62,14 +68,17 @@ export function DashboardOverview() {
   const user = useSelector((state: RootState) => state.auth.user);
   // Backend sends the bookings/users blocks to ADMIN and AGENT alike.
   const staff = isStaff(user);
+  // The report summaries below are ADMIN-only endpoints — never fire them
+  // for agents (they would just 403 into error cards).
+  const admin = isAdmin(user);
 
   const statsQuery = useGetDashboardStatsQuery();
   const attentionQuery = useGetNeedsAttentionQuery(undefined, { skip: !staff });
   // Business widgets read the reports endpoints with their default window
   // (the current year), so trends compare against the previous year.
-  const bookingsQuery = useGetMonthlyBookingsSummaryQuery({}, { skip: !staff });
-  const paymentsQuery = useGetPaymentsSummaryQuery({}, { skip: !staff });
-  const toursQuery = useGetTopToursByBookingsQuery({}, { skip: !staff });
+  const bookingsQuery = useGetMonthlyBookingsSummaryQuery({}, { skip: !admin });
+  const paymentsQuery = useGetPaymentsSummaryQuery({}, { skip: !admin });
+  const toursQuery = useGetTopToursByBookingsQuery({}, { skip: !admin });
 
   const stats = statsQuery.data?.data;
   const attention = attentionQuery.data?.data;
@@ -185,8 +194,8 @@ export function DashboardOverview() {
                 </>
               )}
 
-              {/* Revenue ← payments summary (this year) */}
-              {paymentsQuery.isLoading ? (
+              {/* Revenue ← payments summary (this year, ADMIN only) */}
+              {!admin ? null : paymentsQuery.isLoading ? (
                 <StatsCardSkeleton pills={2} />
               ) : paymentsQuery.isError || !paymentsReport ? (
                 <CardError
@@ -211,8 +220,8 @@ export function DashboardOverview() {
                 />
               )}
 
-              {/* Avg booking value ← bookings summary (this year) */}
-              {bookingsQuery.isLoading ? (
+              {/* Avg booking value ← bookings summary (this year, ADMIN only) */}
+              {!admin ? null : bookingsQuery.isLoading ? (
                 <StatsCardSkeleton pills={1} />
               ) : bookingsQuery.isError || !bookingsReport ? (
                 <CardError
@@ -248,8 +257,8 @@ export function DashboardOverview() {
           <NeedsAttention data={attention} />
         ))}
 
-      {/* Bookings over time | status donut (staff) */}
-      {staff && (
+      {/* Bookings over time | status donut (ADMIN — reads admin-only reports) */}
+      {admin && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {bookingsQuery.isLoading ? (
             <ChartCardSkeleton title="Bookings over time" height={280} />
@@ -284,8 +293,8 @@ export function DashboardOverview() {
         </div>
       )}
 
-      {/* Recent bookings | top tours (staff) */}
-      {staff && (
+      {/* Recent bookings | top tours (ADMIN — reads admin-only reports) */}
+      {admin && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {bookingsQuery.isLoading ? (
             <ListCardSkeleton title="Recent bookings" />
@@ -310,6 +319,26 @@ export function DashboardOverview() {
           ) : (
             <TopToursRankedCard topTours={toursReport.topTours} />
           )}
+        </div>
+      )}
+
+      {/* Agents: the analytics above are admin-only; point at the report
+          their role owns instead of rendering forbidden widgets. */}
+      {staff && !admin && (
+        <div className="space-y-4">
+          <SectionLabel>My activity</SectionLabel>
+          <div className="flex flex-col gap-4 rounded-xl border border-foreground/15 bg-card px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-medium">Your bookings and payments, period by period</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The activity report covers everything you have processed —
+                bookings handled, payments taken, and how this period compares.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="flex-none cursor-pointer">
+              <Link href="/dashboard/reports">View my activity</Link>
+            </Button>
+          </div>
         </div>
       )}
 
