@@ -12,6 +12,7 @@ import { IDestination } from "@/types/destination.types";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import type { SerializedError } from "@reduxjs/toolkit";
 import EmptyState from "@/components/ui/EmptyState";
+import { hasActiveFilterValues } from "@/utils/active-filters";
 
 interface FlightListProps {
   toolbarActions?: React.ReactNode;
@@ -98,6 +99,23 @@ export function FlightList({
   }
 
   const flightCount = data?.length || 0;
+  const hasActiveFilters = hasActiveFilterValues(filters);
+
+  // No flights exist at all (not a filtered miss): a lone EmptyState replaces
+  // the filter bar and results header — filters over nothing are pointless.
+  if (meta.total === 0 && !hasActiveFilters) {
+    return (
+      <EmptyState
+        title="No flights yet."
+        description={
+          toolbarActions
+            ? "Add your first flight to start taking seat bookings."
+            : "Flights will show up here once they are added."
+        }
+        action={toolbarActions}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -13,6 +13,7 @@ import { DestinationFilters } from "./DestinationFilters";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import type { SerializedError } from "@reduxjs/toolkit";
 import EmptyState from "@/components/ui/EmptyState";
+import { hasActiveFilterValues } from "@/utils/active-filters";
 
 interface DestinationListProps {
   toolbarActions?: React.ReactNode;
@@ -89,6 +90,30 @@ export default function DestinationList({
   }
 
   const destinationCount = data?.length || 0;
+  // sortBy/sortOrder are view defaults, not filters — strip them before the
+  // "any filter set?" check.
+  const hasActiveFilters = hasActiveFilterValues({
+    ...filters,
+    sortBy: undefined,
+    sortOrder: undefined,
+  });
+
+  // No destinations exist at all (not a filtered miss): a lone EmptyState
+  // replaces the filter bar and results header — filters over nothing are
+  // pointless.
+  if (meta.total === 0 && !hasActiveFilters) {
+    return (
+      <EmptyState
+        title="No destinations yet."
+        description={
+          toolbarActions
+            ? "Add your first destination to anchor hotels, flights and tours."
+            : "Destinations will show up here once they are added."
+        }
+        action={toolbarActions}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

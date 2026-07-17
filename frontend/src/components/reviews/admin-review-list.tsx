@@ -31,6 +31,7 @@ import {
 } from "@/redux/reviewApi";
 import type { IReview, ReviewStatus } from "@/types/review.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { hasActiveFilterValues } from "@/utils/active-filters";
 import { useTableQueryState } from "@/hooks/use-table-query-state";
 import type { TableFiltersSpec } from "@/hooks/table-query-state-logic";
 import { ReviewFilters } from "./ReviewFilters";
@@ -128,6 +129,20 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
 
   const reviews = data?.data ?? [];
   const meta = data?.meta ?? { total: 0, page: 1, limit: 10, totalPages: 0 };
+  const hasActiveFilters = hasActiveFilterValues(filters);
+
+  // No reviews exist at all (not a filtered miss): a lone EmptyState replaces
+  // the filter bar and results count — filters over nothing are pointless.
+  // No create action here: reviews arrive from customers rating completed
+  // bookings, staff never create them.
+  if (meta.total === 0 && !hasActiveFilters) {
+    return (
+      <EmptyState
+        title="No reviews yet."
+        description="Reviews appear here once customers rate their completed bookings."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
