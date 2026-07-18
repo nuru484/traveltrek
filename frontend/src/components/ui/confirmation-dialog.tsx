@@ -1,6 +1,6 @@
 // src/components/ui/confirmation-dialog.tsx
-"use client";
-import { useState, useEffect } from "react";
+'use client';
+import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,10 +10,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import clsx from "clsx";
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import clsx from 'clsx';
 
 interface ConfirmationDialogProps {
   open: boolean;
@@ -33,17 +33,17 @@ export function ConfirmationDialog({
   title,
   description,
   onConfirm,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   isDestructive = false,
   requireExactMatch,
 }: ConfirmationDialogProps) {
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState('');
 
   // Reset the confirmation input on every open/close transition instead of
   // watching `open` in an effect (avoids a redundant re-render cascade).
   const handleOpenChange = (nextOpen: boolean) => {
-    setInputValue("");
+    setInputValue('');
     onOpenChange(nextOpen);
   };
 
@@ -73,10 +73,10 @@ export function ConfirmationDialog({
               htmlFor="confirm-input"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
-              Type{" "}
+              Type{' '}
               <span className="font-mono font-semibold text-foreground break-all inline-block">
                 {requireExactMatch}
-              </span>{" "}
+              </span>{' '}
               to confirm:
             </Label>
             <Input
@@ -101,12 +101,12 @@ export function ConfirmationDialog({
             onClick={handleConfirm}
             disabled={isConfirmDisabled}
             className={clsx(
-              "cursor-pointer transition-colors",
+              'cursor-pointer transition-colors',
               isDestructive && [
-                "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-                "focus-visible:ring-destructive",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-              ]
+                'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+                'focus-visible:ring-destructive',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+              ],
             )}
           >
             {confirmText}
