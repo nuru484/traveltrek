@@ -5,7 +5,6 @@ import {
   UploadApiResponse,
 } from 'cloudinary';
 
-import { assertEnv } from '#config/env.js';
 import ENV from '#config/env.js';
 import {
   CustomError,
@@ -26,10 +25,11 @@ import { isValidBase64Image } from '#utils/validate-base64-image.js';
 const MAX_UPLOAD_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
+// CLOUDINARY_* are envRequired in ENV, so they are guaranteed present here.
 export const defaultCloudinaryConfig: ICloudinaryConfig = {
-  api_key: assertEnv(ENV.CLOUDINARY_API_KEY, 'CLOUDINARY_API_KEY'),
-  api_secret: assertEnv(ENV.CLOUDINARY_API_SECRET, 'CLOUDINARY_API_SECRET'),
-  cloud_name: assertEnv(ENV.CLOUDINARY_CLOUD_NAME, 'CLOUDINARY_CLOUD_NAME'),
+  api_key: ENV.CLOUDINARY_API_KEY,
+  api_secret: ENV.CLOUDINARY_API_SECRET,
+  cloud_name: ENV.CLOUDINARY_CLOUD_NAME,
 };
 
 export const extractPublicIdFromUrl = (url: string): string => {

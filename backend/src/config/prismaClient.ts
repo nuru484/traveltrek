@@ -8,8 +8,14 @@ const connectionString = process.env.DATABASE_URL ?? '';
 
 // Explicit pool cap (pg defaults to 10). process.env (not the app ENV
 // module) on purpose: this module is imported by seeds/scripts that don't
-// carry the full fail-fast app env.
+// carry the full fail-fast app env. A malformed value still fails loudly
+// instead of handing pg `max: NaN`.
 const poolMax = Number(process.env.DB_POOL_MAX ?? 20);
+if (Number.isNaN(poolMax)) {
+  throw new Error(
+    `Invalid number for env variable DB_POOL_MAX: "${process.env.DB_POOL_MAX ?? ''}"`,
+  );
+}
 
 const adapter = new PrismaPg({ connectionString, max: poolMax });
 

@@ -1,132 +1,140 @@
-interface IENV {
-  ACCESS_TOKEN_EXPIRY: string;
-  ACCESS_TOKEN_SECRET: string;
+// src/config/env.ts
+//
+// Typed, fail-fast environment access. Every variable is read exactly once,
+// through a reader that validates its SHAPE, not just its presence - a
+// mistyped PORT or SMTP_PORT dies at boot with the variable named instead of
+// silently falling back to a default mid-request. The ENV object's type is
+// inferred from the readers (required -> string, optional -> string |
+// undefined), so there is no separate interface to keep in sync. App code
+// imports ENV and never touches process.env (the one documented exception is
+// prismaClient.ts, which seeds/scripts import without the full app env).
+
+/**
+ * Reads a boolean environment variable. Absent or empty applies the default;
+ * anything other than exactly "true"/"false" throws so a typo ("1", "TRUE")
+ * fails at startup instead of silently meaning false.
+ */
+function envBool(name: string, defaultValue = false): boolean {
+  const v = process.env[name];
+  if (!v?.length) return defaultValue;
+  if (v !== 'true' && v !== 'false') {
+    throw new Error(
+      `Invalid boolean for env variable ${name}: "${v}". Use "true" or "false".`,
+    );
+  }
+  return v === 'true';
+}
+
+/**
+ * Reads a numeric environment variable.
+ * - If a defaultValue is provided, it acts as an optional numeric var.
+ * - If no defaultValue is provided, the variable is treated as required.
+ * Throws on NaN so bad values (e.g. "abc") don't silently produce a fallback.
+ */
+function envNumber(name: string, defaultValue?: number): number {
+  const v = process.env[name];
+  if (!v?.length) {
+    if (defaultValue !== undefined) return defaultValue;
+    throw new Error(`Missing required env variable: ${name}`);
+  }
+  const parsed = Number(v);
+  if (Number.isNaN(parsed)) {
+    throw new Error(`Invalid number for env variable: ${name}`);
+  }
+  return parsed;
+}
+
+/**
+ * Reads an optional environment variable. Returns undefined (rather than an
+ * empty string) when the variable is absent or set to "", keeping downstream
+ * consumers clean.
+ */
+function envOptional(name: string): string | undefined {
+  const v = process.env[name];
+  return v?.length ? v : undefined;
+}
+
+/**
+ * Reads a required environment variable. Throws at startup if the variable is
+ * missing or empty, so misconfigured deployments fail fast rather than at
+ * runtime.
+ */
+function envRequired(name: string): string {
+  const v = process.env[name];
+  if (!v?.length) throw new Error(`Missing required env variable: ${name}`);
+  return v;
+}
+
+const NODE_ENV = envOptional('NODE_ENV') ?? 'development';
+
+const ENV = {
+  ACCESS_TOKEN_EXPIRY: envOptional('ACCESS_TOKEN_EXPIRY') ?? '30m',
+  ACCESS_TOKEN_SECRET: envRequired('ACCESS_TOKEN_SECRET'),
   /** ADMIN_*: read ONLY by `npm run seed` (which asserts them itself), so
-   * they are optional here — the API/worker boot without them and
+   * they are optional here - the API/worker boot without them and
    * production never needs the admin credentials in its env store. */
-  ADMIN_EMAIL?: string;
-  ADMIN_NAME?: string;
-  ADMIN_PASSWORD?: string;
-  ADMIN_PHONE?: string;
+  ADMIN_EMAIL: envOptional('ADMIN_EMAIL'),
+  ADMIN_NAME: envOptional('ADMIN_NAME'),
+  ADMIN_PASSWORD: envOptional('ADMIN_PASSWORD'),
+  ADMIN_PHONE: envOptional('ADMIN_PHONE'),
   /** Gate for `npm run seed`: false (default) makes the seed a no-op. */
-  ADMIN_SEED_ENABLED: boolean;
+  ADMIN_SEED_ENABLED: envBool('ADMIN_SEED_ENABLED'),
   /** false (default) = create-only seed; true also overwrites an existing
    * admin with the current ADMIN_* values (credential rotation). */
-  ADMIN_SEED_FORCE_UPDATE: boolean;
-  CLOUDINARY_API_KEY: string;
-  CLOUDINARY_API_SECRET: string;
-  CLOUDINARY_CLOUD_NAME: string;
-  COOKIE_DOMAIN?: string;
-  CORS_ACCESS?: string;
-  DATABASE_URL: string;
-  /** Frog (Wigal) SMS credentials — all three unset means log-only SMS. */
-  FROG_API_KEY?: string;
-  FROG_SENDER_ID?: string;
-  FROG_USERNAME?: string;
+  ADMIN_SEED_FORCE_UPDATE: envBool('ADMIN_SEED_FORCE_UPDATE'),
+  CLOUDINARY_API_KEY: envRequired('CLOUDINARY_API_KEY'),
+  CLOUDINARY_API_SECRET: envRequired('CLOUDINARY_API_SECRET'),
+  CLOUDINARY_CLOUD_NAME: envRequired('CLOUDINARY_CLOUD_NAME'),
+  COOKIE_DOMAIN: envOptional('COOKIE_DOMAIN'),
+  CORS_ACCESS: envOptional('CORS_ACCESS'),
+  DATABASE_URL: envRequired('DATABASE_URL'),
+  /** Frog (Wigal) SMS credentials - all three unset means log-only SMS. */
+  FROG_API_KEY: envOptional('FROG_API_KEY'),
+  FROG_SENDER_ID: envOptional('FROG_SENDER_ID'),
+  FROG_USERNAME: envOptional('FROG_USERNAME'),
   /** Base URL embedded in emailed links (password reset). */
-  FRONTEND_URL: string;
+  FRONTEND_URL: envOptional('FRONTEND_URL') ?? 'http://localhost:3000',
   /** OAuth client id for Google sign-in; unset disables the endpoint (503). */
-  GOOGLE_CLIENT_ID?: string;
-  MAIL_FROM_EMAIL: string;
-  MAIL_FROM_NAME: string;
-  NODE_ENV: string;
+  GOOGLE_CLIENT_ID: envOptional('GOOGLE_CLIENT_ID'),
+  MAIL_FROM_EMAIL: envOptional('MAIL_FROM_EMAIL') ?? 'no-reply@traveltrek.local',
+  MAIL_FROM_NAME: envOptional('MAIL_FROM_NAME') ?? 'TravelTrek',
+  NODE_ENV,
   /**
    * true sends email/SMS directly (fire-and-forget, no retries) instead of
    * through the durable BullMQ notification queue. For tests and Redis-less
-   * local runs only — production should keep the queued default.
+   * local runs only - production should keep the queued default.
    */
-  NOTIFICATIONS_INLINE: boolean;
-  PAYSTACK_CALLBACK_URL?: string;
-  PAYSTACK_SECRET_KEY: string;
-  PORT: number;
-  REDIS_URL: string;
-  REFRESH_TOKEN_EXPIRY: string;
-  REFRESH_TOKEN_SECRET: string;
+  NOTIFICATIONS_INLINE: envBool('NOTIFICATIONS_INLINE'),
+  /** Override for Paystack's API host (tests/sandboxes). */
+  PAYSTACK_API_BASE_URL:
+    envOptional('PAYSTACK_API_BASE_URL') ?? 'https://api.paystack.co',
+  PAYSTACK_CALLBACK_URL: envOptional('PAYSTACK_CALLBACK_URL'),
+  PAYSTACK_SECRET_KEY: envRequired('PAYSTACK_SECRET_KEY'),
+  PORT: envNumber('PORT', 3000),
+  /** Internal bypass for the rate limiter (header X-Rate-Limit-Bypass).
+   * Unset means no bypass exists - fail closed. */
+  RATE_LIMIT_BYPASS_SECRET: envOptional('RATE_LIMIT_BYPASS_SECRET'),
+  REDIS_URL: envRequired('REDIS_URL'),
+  REFRESH_TOKEN_EXPIRY: envOptional('REFRESH_TOKEN_EXPIRY') ?? '7d',
+  REFRESH_TOKEN_SECRET: envRequired('REFRESH_TOKEN_SECRET'),
   /** Error tracking (Sentry). Optional: unset disables reporting entirely. */
-  SENTRY_DSN?: string;
+  SENTRY_DSN: envOptional('SENTRY_DSN'),
   /** Environment tag on Sentry events; defaults to NODE_ENV. */
-  SENTRY_ENVIRONMENT: string;
-  /** Performance-tracing sample rate 0–1; default 0 (errors only). */
-  SENTRY_TRACES_SAMPLE_RATE: number;
+  SENTRY_ENVIRONMENT: envOptional('SENTRY_ENVIRONMENT') ?? NODE_ENV,
+  /** Performance-tracing sample rate 0-1; default 0 (errors only). */
+  SENTRY_TRACES_SAMPLE_RATE: envNumber('SENTRY_TRACES_SAMPLE_RATE', 0),
   /** SMTP_HOST unset means the mailer logs instead of sending (dev-friendly). */
-  SMTP_HOST?: string;
-  SMTP_PASSWORD?: string;
-  SMTP_PORT: number;
-  SMTP_SECURE: boolean;
-  SMTP_USER?: string;
+  SMTP_HOST: envOptional('SMTP_HOST'),
+  SMTP_PASSWORD: envOptional('SMTP_PASSWORD'),
+  SMTP_PORT: envNumber('SMTP_PORT', 587),
+  SMTP_SECURE: envBool('SMTP_SECURE'),
+  SMTP_USER: envOptional('SMTP_USER'),
   /**
    * Workers run in-process with the web server by default (saves a dyno).
    * Set to true on the WEB process only when a dedicated worker process runs
    * `build/worker.js`, so jobs are never processed twice.
    */
-  WEB_DISABLE_WORKERS: boolean;
-}
-
-export function assertEnv<T>(value: T | undefined, name: string): T {
-  if (value === undefined) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
-
-const ENV: IENV = {
-  ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY ?? '30m',
-  ACCESS_TOKEN_SECRET: assertEnv(
-    process.env.ACCESS_TOKEN_SECRET,
-    'ACCESS_TOKEN_SECRET',
-  ),
-  ADMIN_EMAIL: process.env.ADMIN_EMAIL,
-  ADMIN_NAME: process.env.ADMIN_NAME,
-  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-  ADMIN_PHONE: process.env.ADMIN_PHONE,
-  ADMIN_SEED_ENABLED: process.env.ADMIN_SEED_ENABLED === 'true',
-  ADMIN_SEED_FORCE_UPDATE: process.env.ADMIN_SEED_FORCE_UPDATE === 'true',
-  CLOUDINARY_API_KEY: assertEnv(
-    process.env.CLOUDINARY_API_KEY,
-    'CLOUDINARY_API_KEY',
-  ),
-  CLOUDINARY_API_SECRET: assertEnv(
-    process.env.CLOUDINARY_API_SECRET,
-    'CLOUDINARY_API_SECRET',
-  ),
-  CLOUDINARY_CLOUD_NAME: assertEnv(
-    process.env.CLOUDINARY_CLOUD_NAME,
-    'CLOUDINARY_CLOUD_NAME',
-  ),
-  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
-  CORS_ACCESS: process.env.CORS_ACCESS,
-  DATABASE_URL: assertEnv(process.env.DATABASE_URL, 'DATABASE_URL'),
-  FROG_API_KEY: process.env.FROG_API_KEY,
-  FROG_SENDER_ID: process.env.FROG_SENDER_ID,
-  FROG_USERNAME: process.env.FROG_USERNAME,
-  FRONTEND_URL: process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-  MAIL_FROM_EMAIL: process.env.MAIL_FROM_EMAIL ?? 'no-reply@traveltrek.local',
-  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME ?? 'TravelTrek',
-  NODE_ENV: process.env.NODE_ENV ?? 'development',
-  NOTIFICATIONS_INLINE: process.env.NOTIFICATIONS_INLINE === 'true',
-  PAYSTACK_CALLBACK_URL: process.env.PAYSTACK_CALLBACK_URL,
-  PAYSTACK_SECRET_KEY: assertEnv(
-    process.env.PAYSTACK_SECRET_KEY,
-    'PAYSTACK_SECRET_KEY',
-  ),
-  PORT: Number(process.env.PORT) || 3000,
-  REDIS_URL: assertEnv(process.env.REDIS_URL, 'REDIS_URL'),
-  REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY ?? '7d',
-  REFRESH_TOKEN_SECRET: assertEnv(
-    process.env.REFRESH_TOKEN_SECRET,
-    'REFRESH_TOKEN_SECRET',
-  ),
-  SENTRY_DSN: process.env.SENTRY_DSN,
-  SENTRY_ENVIRONMENT:
-    process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
-  SENTRY_TRACES_SAMPLE_RATE: Number(process.env.SENTRY_TRACES_SAMPLE_RATE) || 0,
-  SMTP_HOST: process.env.SMTP_HOST,
-  SMTP_PASSWORD: process.env.SMTP_PASSWORD,
-  SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
-  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
-  SMTP_USER: process.env.SMTP_USER,
-  WEB_DISABLE_WORKERS: process.env.WEB_DISABLE_WORKERS === 'true',
-};
+  WEB_DISABLE_WORKERS: envBool('WEB_DISABLE_WORKERS'),
+} as const;
 
 export default ENV;

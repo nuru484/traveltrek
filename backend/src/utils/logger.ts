@@ -1,6 +1,8 @@
 import { pino } from 'pino';
 
-const isProduction = process.env.NODE_ENV === 'production';
+import ENV from '#config/env.js';
+
+const isProduction = ENV.NODE_ENV === 'production';
 
 // JSON logs in production (for log aggregators); pretty-printed in dev only.
 const logger = pino({
