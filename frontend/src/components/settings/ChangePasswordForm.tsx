@@ -1,6 +1,6 @@
 // src/components/settings/ChangePasswordForm.tsx
 //
-// POST /auth/change-password — the ONLY password-writing surface for an
+// POST /auth/change-password - the ONLY password-writing surface for an
 // existing account (staff/customer forms carry no password fields). Works
 // for both principals and both modes:
 // - account HAS a password: current password required (a wrong one answers
@@ -9,8 +9,11 @@
 //   current password stays blank and this SETS the first password.
 // The stored user can't tell the two apart, so the field is always shown
 // with "leave blank" guidance and the backend's 400s are mapped onto it.
-// Success re-issues THIS session's cookies — every other session dies, the
+// Success re-issues THIS session's cookies - every other session dies, the
 // user stays signed in here.
+//
+// The tab opens READ-ONLY (a masked password row); the form only mounts
+// after Edit, and Cancel/success return to the read-only view.
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -67,6 +70,7 @@ function PasswordInput({
 
 export default function ChangePasswordForm() {
   const [changePassword, { isLoading }] = useChangePasswordMutation();
+  const [editing, setEditing] = React.useState(false);
 
   const form = useForm<IChangePasswordFormSchema>({
     resolver: zodResolver(changePasswordFormSchema),
@@ -81,7 +85,7 @@ export default function ChangePasswordForm() {
     try {
       const res = await changePassword({
         newPassword: values.newPassword,
-        // Blank means "this account has no password yet" — the key must be
+        // Blank means "this account has no password yet" - the key must be
         // ABSENT for the passwordless first-set.
         ...(values.currentPassword
           ? { currentPassword: values.currentPassword }
@@ -89,6 +93,7 @@ export default function ChangePasswordForm() {
       }).unwrap();
       toast.success(res.message || "Password changed successfully.");
       form.reset({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setEditing(false);
     } catch (err) {
       const { message, fieldErrors, hasFieldErrors } =
         extractApiErrorMessage(err);
@@ -107,13 +112,13 @@ export default function ChangePasswordForm() {
           form.setError("root", { message: unmatched.join(" ") });
         }
       } else if (status === 401) {
-        // Uniform "Invalid credentials" — the current password didn't verify.
+        // Uniform "Invalid credentials" - the current password didn't verify.
         form.setError("currentPassword", {
           message: "Incorrect current password.",
         });
       } else if (status === 400 && /current ?password/i.test(message)) {
-        // "no password yet — omit currentPassword" / "current password is
-        // required" — both belong on the current-password field.
+        // "no password yet - omit currentPassword" / "current password is
+        // required" - both belong on the current-password field.
         form.setError("currentPassword", { message });
       } else {
         // No field to attach it to: keep the error visible in the form
@@ -135,15 +140,36 @@ export default function ChangePasswordForm() {
       </div>
 
       <div className="px-4 py-6 sm:px-6">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Change password
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-          Changing your password signs you out everywhere else — this session
-          stays signed in.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold tracking-tight">Password</h2>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {editing
+                ? "Changing your password signs you out everywhere else - this session stays signed in."
+                : "The password you sign in with."}
+            </p>
+          </div>
+          {!editing && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </Button>
+          )}
+        </div>
 
-        <Form {...form}>
+        {!editing ? (
+          <div className="mt-6 rounded-lg border border-foreground/15 px-4 py-3">
+            <p className="text-sm font-medium">Password</p>
+            <p className="mt-1 font-mono text-sm tracking-[0.3em] text-muted-foreground">
+              ••••••••
+            </p>
+          </div>
+        ) : (
+          <Form {...form}>
           <form
             noValidate
             onSubmit={form.handleSubmit(onSubmit)}
@@ -165,8 +191,8 @@ export default function ChangePasswordForm() {
                     />
                   </FormControl>
                   <FormDescription className="text-xs leading-relaxed">
-                    Leave blank if you haven&apos;t set a password yet (Google
-                    or code-only sign-in) — this will set your first one.
+                    No password yet (Google or code sign-in)? Leave blank to
+                    set your first one.
                   </FormDescription>
                   <FormMessage className="text-xs" />
                 </FormItem>
@@ -215,16 +241,35 @@ export default function ChangePasswordForm() {
                 here after the toast fades. */}
             <FormRootError />
 
-            <Button
-              type="submit"
-              className="w-full cursor-pointer sm:w-auto"
-              disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? "Saving..." : "Change password"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                className="cursor-pointer"
+                disabled={isLoading}
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading ? "Saving..." : "Change password"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="cursor-pointer"
+                disabled={isLoading}
+                onClick={() => {
+                  form.reset({
+                    currentPassword: "",
+                    newPassword: "",
+                    confirmPassword: "",
+                  });
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
         </Form>
+        )}
       </div>
     </div>
   );

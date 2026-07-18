@@ -1,9 +1,9 @@
 // src/components/settings/contact-change/ReauthFields.tsx
 //
-// The shared "confirm it's you" block used by both contact-change dialogs: the
+// The shared "confirm it's you" block used by both contact-change forms: the
 // password/code method toggle plus the secret field (a password input, or a
 // 6-digit code input with a Send code button). Generic over any form whose
-// values carry `method` and `secret`, so the email and phone dialogs reuse it
+// values carry `method` and `secret`, so the email and phone forms reuse it
 // without duplicating ~55 lines of field wiring each.
 "use client";
 import * as React from "react";
@@ -47,8 +47,7 @@ export function ReauthFields<
               />
             </FormControl>
             <FormDescription className="text-xs">
-              No password on your account? Choose &quot;Send me a code&quot; — it
-              goes to your current email or phone.
+              No password? Choose &quot;Send me a code&quot; instead.
             </FormDescription>
           </FormItem>
         )}

@@ -54,6 +54,7 @@ export default function TwoFactorSettings() {
     "enable" | "disable" | null
   >(null);
   const [confirmDisableOpen, setConfirmDisableOpen] = React.useState(false);
+  const [confirmResendOpen, setConfirmResendOpen] = React.useState(false);
 
   const codeForm = useForm<ITwoFactorCodeFormSchema>({
     resolver: zodResolver(twoFactorCodeFormSchema),
@@ -160,8 +161,8 @@ export default function TwoFactorSettings() {
 
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {enabled
-            ? "Password sign-ins ask for a 6-digit code sent to you before completing. Codes go to the channel shown above."
-            : "Add a second step to password sign-ins: after your password, we send a 6-digit code you enter to finish signing in."}
+            ? "Password sign-ins ask for a 6-digit code we send you."
+            : "Adds a second step: after your password, enter a 6-digit code we send you."}
         </p>
 
         {pendingAction === null ? (
@@ -169,7 +170,7 @@ export default function TwoFactorSettings() {
             {enabled ? (
               <Button
                 variant="outline"
-                className="w-full cursor-pointer sm:w-auto"
+                className="cursor-pointer"
                 disabled={isBusy}
                 onClick={() => setConfirmDisableOpen(true)}
               >
@@ -182,7 +183,7 @@ export default function TwoFactorSettings() {
               </Button>
             ) : (
               <Button
-                className="w-full cursor-pointer sm:w-auto"
+                className="cursor-pointer"
                 disabled={isBusy}
                 onClick={() => sendChallenge("enable")}
               >
@@ -240,7 +241,7 @@ export default function TwoFactorSettings() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="submit"
-                    className="w-full cursor-pointer sm:w-auto"
+                    className="cursor-pointer"
                     disabled={isBusy}
                   >
                     {(isEnabling || isDisabling) && (
@@ -254,7 +255,7 @@ export default function TwoFactorSettings() {
                   </Button>
                   <button
                     type="button"
-                    onClick={() => sendChallenge(pendingAction)}
+                    onClick={() => setConfirmResendOpen(true)}
                     className="cursor-pointer text-sm text-muted-foreground underline-offset-4 hover:underline disabled:opacity-60"
                     disabled={isBusy}
                   >
@@ -274,6 +275,18 @@ export default function TwoFactorSettings() {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={confirmResendOpen}
+        onOpenChange={setConfirmResendOpen}
+        title="Resend verification code"
+        description="We'll send you a fresh 6-digit code; the one you already received stops working."
+        onConfirm={() => {
+          setConfirmResendOpen(false);
+          if (pendingAction) void sendChallenge(pendingAction);
+        }}
+        confirmText="Resend code"
+      />
 
       <ConfirmationDialog
         open={confirmDisableOpen}

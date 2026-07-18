@@ -25,6 +25,7 @@ describe("ChangePasswordForm", () => {
   it("omits currentPassword entirely when left blank (first-set)", async () => {
     const user = userEvent.setup();
     render(<ChangePasswordForm />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
 
     await user.type(screen.getByLabelText("New password"), "new-secret");
     await user.type(
@@ -39,6 +40,7 @@ describe("ChangePasswordForm", () => {
   it("sends currentPassword when filled (rotation)", async () => {
     const user = userEvent.setup();
     render(<ChangePasswordForm />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
 
     await user.type(screen.getByLabelText("Current password"), "old-secret");
     await user.type(screen.getByLabelText("New password"), "new-secret");
@@ -57,6 +59,7 @@ describe("ChangePasswordForm", () => {
   it("blocks a mismatched confirmation before hitting the API", async () => {
     const user = userEvent.setup();
     render(<ChangePasswordForm />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
 
     await user.type(screen.getByLabelText("New password"), "new-secret");
     await user.type(screen.getByLabelText("Confirm new password"), "other");
@@ -79,6 +82,7 @@ describe("ChangePasswordForm", () => {
 
     const user = userEvent.setup();
     render(<ChangePasswordForm />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
 
     await user.type(screen.getByLabelText("Current password"), "wrong-pass");
     await user.type(screen.getByLabelText("New password"), "new-secret");
@@ -101,13 +105,14 @@ describe("ChangePasswordForm", () => {
           data: {
             status: "error",
             message:
-              "This account has no password yet — omit currentPassword to set one.",
+              "This account has no password yet - omit currentPassword to set one.",
           },
         }),
     });
 
     const user = userEvent.setup();
     render(<ChangePasswordForm />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
 
     await user.type(screen.getByLabelText("Current password"), "whatever");
     await user.type(screen.getByLabelText("New password"), "new-secret");
@@ -119,7 +124,7 @@ describe("ChangePasswordForm", () => {
 
     expect(
       await screen.findByText(
-        "This account has no password yet — omit currentPassword to set one."
+        "This account has no password yet - omit currentPassword to set one."
       )
     ).toBeInTheDocument();
   });
