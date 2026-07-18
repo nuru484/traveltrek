@@ -48,7 +48,9 @@ function ListCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="gap-0 p-5">
+    // p-4 below sm: the rows inside carry their own border + padding, and the
+    // two paddings stacked leave the content too little width on phones.
+    <Card className="gap-0 p-4 sm:p-5">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
@@ -84,7 +86,7 @@ export function RecentBookingsCard({
           {bookings.map((booking) => (
             <div
               key={booking.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
+              className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5 sm:p-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
@@ -103,7 +105,7 @@ export function RecentBookingsCard({
                   {booking.tour ? ` · ${booking.tour.name}` : ""}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="flex-none text-right">
                 <p className="text-sm font-medium">
                   <Money amount={booking.totalPrice} />
                 </p>
@@ -145,7 +147,7 @@ export function RecentPaymentsCard({
           {payments.map((payment) => (
             <div
               key={payment.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
+              className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5 sm:p-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
@@ -163,7 +165,7 @@ export function RecentPaymentsCard({
                   {payment.customer.name} · {label(payment.paymentMethod)}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="flex-none text-right">
                 <p className="text-sm font-medium">
                   <Money amount={payment.amount} />
                 </p>

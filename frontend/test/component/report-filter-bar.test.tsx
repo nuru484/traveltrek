@@ -9,10 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 
 describe("ReportFilterBar", () => {
-  it("renders controls inline (no Filters button) at <=2 controls", () => {
+  it("renders controls inline (no Filters button) at the period-only count", () => {
     render(
       <ReportFilterBar
-        controlCount={2}
+        controlCount={1}
         filterCount={0}
         hasFiltersApplied={false}
         onClearAll={() => {}}

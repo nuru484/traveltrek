@@ -3,7 +3,7 @@
 // Pure logic for the report filter bar: preset → API date-range mapping and
 // the active-filter count. Kept free of React so it's unit-testable.
 //
-// The backend has no preset support — the UI maps each preset onto the
+// The backend has no preset support - the UI maps each preset onto the
 // reports API's startDate/endDate. Dates are built in local time (matching
 // what the user's calendar shows); endDate carries an explicit end-of-day
 // time so the whole final day is included (the API parses date-only strings
@@ -121,9 +121,10 @@ export function periodToParams(
 /**
  * Filter bars with few controls skip the collapsed Filters button/panel and
  * render their controls inline in the toolbar. With more than this many
- * controls (period included) the collapsed panel earns its place.
+ * controls (period included) the collapsed panel earns its place - on phones
+ * inline controls stack full width, so only the period-only tabs stay inline.
  */
-export const INLINE_FILTER_THRESHOLD = 2;
+export const INLINE_FILTER_THRESHOLD = 1;
 
 /** True when `controlCount` filter controls should render inline. */
 export function isInlineFilterBar(controlCount: number): boolean {

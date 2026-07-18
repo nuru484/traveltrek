@@ -3,29 +3,23 @@
 // The reports filter bar. Two renderings, decided by how many controls a tab
 // has (isInlineFilterBar threshold):
 //
-// - ≤2 controls: the controls render INLINE in the toolbar — no Filters
-//   button, no collapsed panel, no sheet (period-only tabs shouldn't hide
-//   their one select behind a click).
-// - >2 controls (dms pattern): a Filters button with an active-count badge;
-//   on lg+ it rolls out an inline panel, below lg a bottom sheet.
+// - At or under the threshold (period-only tabs): the controls render INLINE
+//   in the toolbar - no Filters button, no collapsed panel (period-only tabs
+//   shouldn't hide their one select behind a click).
+// - Above it (dms pattern): a Filters button with an active-count badge that
+//   rolls out an inline panel below the toolbar on every screen size - the
+//   same drop-down behaviour as the list-page filter bars.
 "use client";
 
 import * as React from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { useIsBelowLg } from "@/hooks/use-below-lg";
 import { cn } from "@/lib/utils";
 import { isInlineFilterBar } from "./report-filters-logic";
 
 interface ReportFilterBarProps {
-  /** The filter controls, rendered inline, in the desktop panel or the sheet. */
+  /** The filter controls, rendered inline or in the drop-down panel. */
   filterFields: React.ReactNode;
   /**
    * How many filter controls `filterFields` contains (period included).
@@ -59,7 +53,6 @@ export function ReportFilterBar({
   actions,
 }: ReportFilterBarProps) {
   const [showFilters, setShowFilters] = React.useState(false);
-  const isBelowLg = useIsBelowLg();
 
   // Few controls: render them straight into the toolbar, no button/panel.
   // lg+ caps each control at a quarter of the row (4-col grid) so one or
@@ -110,12 +103,12 @@ export function ReportFilterBar({
         {actions}
       </div>
 
-      {/* Desktop inline panel (lg+) */}
-      {showFilters && !isBelowLg && (
+      {/* Drop-down panel, every screen size. */}
+      {showFilters && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
           <div
             className={cn(
-              "grid grid-cols-1 gap-3",
+              "grid grid-cols-1 gap-3 sm:grid-cols-2",
               LG_COLS[filterColumns] ?? LG_COLS[4],
             )}
           >
@@ -135,29 +128,6 @@ export function ReportFilterBar({
           )}
         </div>
       )}
-
-      {/* Tablet / phone bottom sheet (< lg) */}
-      <Sheet open={showFilters && isBelowLg} onOpenChange={setShowFilters}>
-        <SheetContent side="bottom" className="max-h-[85vh] gap-0">
-          <SheetHeader className="border-b px-4 py-3">
-            <SheetTitle className="text-lg">Filters</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-3 overflow-y-auto p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filterFields}
-            </div>
-            {hasFiltersApplied && (
-              <Button
-                variant="outline"
-                onClick={onClearAll}
-                className="h-10 w-full cursor-pointer text-destructive hover:bg-destructive/10"
-              >
-                Clear all filters
-              </Button>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
