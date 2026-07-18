@@ -5,10 +5,11 @@
 // keeps its own connections (config/redisConnection.ts) - this client is for
 // plain commands only.
 //
-// Failure posture: fail fast, degrade gracefully. enableOfflineQueue:false
-// makes every command reject immediately while Redis is unreachable, so
-// callers fall back (rate limiter to its memory store at boot, authz cache to
-// its in-process map) instead of stalling requests behind a retry queue.
+// Failure posture: commands queue briefly while the lazy connection comes up
+// (the rate-limit store loads its script at construction, which would
+// otherwise race the connect), but maxRetriesPerRequest:1 keeps rejection
+// bounded when Redis is truly down so callers fall back (rate limiter to its
+// memory store, authz cache to its in-process map) instead of stalling.
 // Tests never open a connection: getRedisClient() returns null under
 // NODE_ENV=test and callers treat that as "no Redis".
 import { Redis } from 'ioredis';
@@ -42,7 +43,6 @@ export function getRedisClient(): null | Redis {
 
   // rediss:// URLs enable TLS automatically in ioredis.
   client = new Redis(ENV.REDIS_URL, {
-    enableOfflineQueue: false,
     lazyConnect: true,
     maxRetriesPerRequest: 1,
   });
