@@ -37,7 +37,7 @@ const resolveLiveTokenVersion = async (
   kind: PrincipalKind,
   id: number,
 ): Promise<null | number> => {
-  const cached = getCachedTokenVersion(kind, id);
+  const cached = await getCachedTokenVersion(kind, id);
   if (cached !== undefined) return cached;
 
   // findFirst so the soft-delete extension scopes the read: a soft-deleted
@@ -53,7 +53,7 @@ const resolveLiveTokenVersion = async (
           where: { id },
         });
   const version = principal?.tokenVersion ?? null;
-  setCachedTokenVersion(kind, id, version);
+  await setCachedTokenVersion(kind, id, version);
   return version;
 };
 

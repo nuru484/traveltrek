@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import ENV from '#config/env.js';
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
+import { closeRedisClient } from '#lib/redis.js';
 import { flushSentry, initSentry } from '#lib/sentry.js';
 import logger from '#utils/logger.js';
 
@@ -62,8 +63,10 @@ const shutdown = async (signal: string): Promise<void> => {
       });
     });
     // Closes every BullMQ worker and queue, which also closes their Redis
-    // connections (the web process holds no other Redis clients).
+    // connections; the shared command client (rate limits, authz cache)
+    // closes separately.
     await stopWorkers();
+    await closeRedisClient();
     // Flush buffered error reports before the process dies.
     await flushSentry();
     await prisma.$disconnect();

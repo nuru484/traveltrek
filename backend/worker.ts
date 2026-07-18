@@ -7,6 +7,7 @@
 // never processed twice.
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
+import { closeRedisClient } from '#lib/redis.js';
 import { flushSentry, initSentry } from '#lib/sentry.js';
 import logger from '#utils/logger.js';
 
@@ -28,6 +29,8 @@ const shutdown = async (signal: string): Promise<void> => {
 
   try {
     await stopWorkers();
+    // Jobs invalidate the shared authz cache through this client.
+    await closeRedisClient();
     await flushSentry();
     await prisma.$disconnect();
     process.exit(0);
