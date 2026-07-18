@@ -2,7 +2,6 @@
 import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -37,21 +36,9 @@ import {
 } from "@/components/forms/photo-upload-field";
 import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { roomFormSchema, type IRoomFormValues } from "@/validation/room-validation";
 
-const roomFormSchema = z.object({
-  hotelId: z.number().min(1, "Hotel is required"),
-  roomType: z.string().min(1, "Room type is required"),
-  // GHS decimal in the form; converted to integer pesewas (×100) on submit
-  // and back (÷100) when hydrating edit defaults.
-  pricePerNight: z.number().min(0, "Price must be a positive number"),
-  capacity: z.number().min(1, "Capacity must be at least 1"),
-  totalRooms: z.number().min(1, "Total rooms must be at least 1"),
-  description: z.string().optional().nullable(),
-  amenities: z.array(z.string()).optional(),
-  roomPhoto: z.any().optional(),
-});
 
-type RoomFormValues = z.infer<typeof roomFormSchema>;
 
 interface IRoomFormProps {
   room?: IRoom;
@@ -83,7 +70,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
     return 0;
   };
 
-  const form = useForm<RoomFormValues>({
+  const form = useForm<IRoomFormValues>({
     resolver: zodResolver(roomFormSchema),
     defaultValues: {
       hotelId: getDefaultHotelId(),
@@ -114,7 +101,7 @@ export function RoomForm({ room, mode, hotelId }: IRoomFormProps) {
     }
   }, [hotelId, hotels, form]);
 
-  const onSubmit = async (values: RoomFormValues) => {
+  const onSubmit = async (values: IRoomFormValues) => {
     try {
       const formData = new FormData();
       formData.append("hotelId", values.hotelId.toString());

@@ -2,7 +2,6 @@
 import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -39,19 +38,9 @@ import {
 } from "@/components/forms/photo-upload-field";
 import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { hotelFormSchema, type IHotelFormValues } from "@/validation/hotel-validation";
 
-const hotelFormSchema = z.object({
-  name: z.string().min(1, "Hotel name is required"),
-  description: z.string().optional().nullable(),
-  address: z.string().min(1, "Address is required"),
-  phone: z.string().optional().nullable(),
-  starRating: z.number().min(1).max(5).optional(),
-  amenities: z.array(z.string()).optional(),
-  destinationId: z.number().min(1, "Destination is required"),
-  hotelPhoto: z.any().optional(),
-});
 
-type HotelFormValues = z.infer<typeof hotelFormSchema>;
 
 interface IHotelFormProps {
   hotel?: IHotel;
@@ -63,7 +52,7 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
   const [createHotel, { isLoading: isCreating }] = useCreateHotelMutation();
   const [updateHotel, { isLoading: isUpdating }] = useUpdateHotelMutation();
 
-  const form = useForm<HotelFormValues>({
+  const form = useForm<IHotelFormValues>({
     resolver: zodResolver(hotelFormSchema),
     defaultValues: {
       name: hotel?.name || "",
@@ -83,7 +72,7 @@ export function HotelForm({ hotel, mode }: IHotelFormProps) {
     existingPhoto: hotel?.photo,
   });
 
-  const onSubmit = async (values: HotelFormValues) => {
+  const onSubmit = async (values: IHotelFormValues) => {
     try {
       const formData = new FormData();
       formData.append("name", values.name);

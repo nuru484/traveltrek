@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
@@ -27,16 +26,9 @@ import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { shouldRemovePhoto } from "@/utils/photo-removal";
 import { IDestination } from "@/types/destination.types";
+import { destinationFormSchema, type IDestinationFormValues } from "@/validation/destination-validation";
 
-const destinationFormSchema = z.object({
-  name: z.string().min(1, "Destination name is required"),
-  description: z.string().optional().nullable(),
-  country: z.string().min(1, "Country is required"),
-  city: z.string().optional().nullable(),
-  destinationPhoto: z.any().optional(),
-});
 
-type DestinationFormValues = z.infer<typeof destinationFormSchema>;
 
 interface IDestinationFormProps {
   destination?: IDestination;
@@ -59,7 +51,7 @@ export default function DestinationForm({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const defaultValues: Partial<DestinationFormValues> = useMemo(
+  const defaultValues: Partial<IDestinationFormValues> = useMemo(
     () => ({
       name: destination?.name || "",
       description: destination?.description || "",
@@ -70,7 +62,7 @@ export default function DestinationForm({
     [destination]
   );
 
-  const form = useForm<DestinationFormValues>({
+  const form = useForm<IDestinationFormValues>({
     resolver: zodResolver(destinationFormSchema),
     defaultValues,
   });
@@ -128,7 +120,7 @@ export default function DestinationForm({
     };
   }, [previewUrl, destination?.photo]);
 
-  const onSubmit = async (values: DestinationFormValues) => {
+  const onSubmit = async (values: IDestinationFormValues) => {
     try {
       const formData = new FormData();
       formData.append("name", values.name);

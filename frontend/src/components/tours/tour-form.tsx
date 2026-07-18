@@ -3,7 +3,6 @@
 import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -36,27 +35,9 @@ import {
 } from "@/components/forms/photo-upload-field";
 import { applyServerFieldErrors } from "@/utils/apply-server-field-errors";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { tourFormSchema, type ITourFormValues } from "@/validation/tour-validation";
 
-const tourFormSchema = z.object({
-  name: z.string().min(1, "Tour name is required"),
-  description: z.string().optional().nullable(),
-  type: z.enum(
-    ["ADVENTURE", "CULTURAL", "BEACH", "CITY", "WILDLIFE", "CRUISE"],
-    {
-      message: "Tour type is required",
-    }
-  ),
-  // GHS decimal in the form; converted to integer pesewas (×100) on submit
-  // and back (÷100) when hydrating edit defaults.
-  price: z.number().min(0, "Price must be a non-negative number"),
-  maxGuests: z.number().min(1, "Max guests must be a positive number"),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
-  destinationId: z.number().min(1, "Destination is required"),
-  tourPhoto: z.any().optional(),
-});
 
-type TourFormValues = z.infer<typeof tourFormSchema>;
 
 interface ITourFormProps {
   tour?: ITour;
@@ -77,7 +58,7 @@ export function TourForm({ tour, mode }: ITourFormProps) {
   const [createTour, { isLoading: isCreating }] = useCreateTourMutation();
   const [updateTour, { isLoading: isUpdating }] = useUpdateTourMutation();
 
-  const form = useForm<TourFormValues>({
+  const form = useForm<ITourFormValues>({
     resolver: zodResolver(tourFormSchema),
     defaultValues: {
       name: tour?.name || "",
@@ -107,7 +88,7 @@ export function TourForm({ tour, mode }: ITourFormProps) {
     existingPhoto: tour?.photo,
   });
 
-  const onSubmit = async (values: TourFormValues) => {
+  const onSubmit = async (values: ITourFormValues) => {
     try {
       // Multipart body — the 'tourPhoto' file field rides along with the
       // scalar fields (the backend zod schema coerces the stringified ones).
