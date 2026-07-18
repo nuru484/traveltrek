@@ -54,6 +54,7 @@ export function CustomersDataTable({
   onPageChange,
   onPageSizeChange,
   onFiltersChange,
+  toolbarActions,
 }: ICustomersDataTableProps) {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -119,11 +120,12 @@ export function CustomersDataTable({
         filters={filters}
         onFiltersChange={onFiltersChange}
         totalCount={totalCount}
+        actions={toolbarActions}
       />
 
       {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        {/* Phones: dense tappable row cards — no side-scroll. */}
+        {/* Phones: dense tappable row cards - no side-scroll. */}
         <RowCardList>
           {loading ? (
             <SkeletonRowCards rows={Math.min(pageSize, 8)} />
@@ -150,7 +152,7 @@ export function CustomersDataTable({
                     <span className="flex-none text-xs text-muted-foreground">
                       {customer.createdAt
                         ? format(new Date(customer.createdAt), "MMM d, yyyy")
-                        : "—"}
+                        : "-"}
                     </span>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">

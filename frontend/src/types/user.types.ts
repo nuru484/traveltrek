@@ -2,6 +2,7 @@
 //
 // /users is STAFF-ONLY (backend Phase 5b): every User row is an ADMIN or
 // AGENT account. Customers are a separate principal under /customers.
+import type { ReactNode } from "react";
 export type UserRole = "ADMIN" | "CUSTOMER" | "AGENT";
 
 /** The only roles a User row may carry (customers are not users anymore). */
@@ -37,7 +38,7 @@ export interface IUsersPaginatedResponse {
   };
 }
 
-/** PUT /users/:userId — no password field (a `password` key is stripped);
+/** PUT /users/:userId - no password field (a `password` key is stripped);
  * passwords rotate only through POST /auth/change-password. */
 export interface IUserUpdateInput {
   name?: string;
@@ -47,7 +48,7 @@ export interface IUserUpdateInput {
   profilePicture?: string;
 }
 
-/** PATCH /users/:userId/role — staff-only enum on the backend. */
+/** PATCH /users/:userId/role - staff-only enum on the backend. */
 export interface IChangeRoleInput {
   role: StaffRole;
 }
@@ -72,4 +73,6 @@ export interface IUsersDataTableProps {
     filters: Partial<Omit<IUsersQueryParams, "page" | "limit">>
   ) => void;
   onRefresh?: () => void;
+  /** Page actions (e.g. Add Staff) rendered inside the toolbar. */
+  toolbarActions?: ReactNode;
 }

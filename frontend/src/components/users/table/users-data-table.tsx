@@ -59,6 +59,7 @@ export function UsersDataTable({
   onPageSizeChange,
   onFiltersChange,
   onRefresh,
+  toolbarActions,
 }: IUsersDataTableProps) {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -166,11 +167,12 @@ export function UsersDataTable({
         onFiltersChange={onFiltersChange}
         totalCount={totalCount}
         onDeleteSelected={handleDeleteSelected}
+        actions={toolbarActions}
       />
 
       {/* Dual render: row cards below md, the real table from md up. */}
       <div className="rounded-md border overflow-hidden">
-        {/* Phones: dense tappable row cards — no side-scroll. */}
+        {/* Phones: dense tappable row cards - no side-scroll. */}
         <RowCardList>
           {loading ? (
             <SkeletonRowCards rows={Math.min(pageSize, 8)} />
@@ -212,7 +214,7 @@ export function UsersDataTable({
                     <span className="flex-none text-xs text-muted-foreground">
                       {staff.createdAt
                         ? format(new Date(staff.createdAt), "MMM d, yyyy")
-                        : "—"}
+                        : "-"}
                     </span>
                   </div>
                 </RowCard>

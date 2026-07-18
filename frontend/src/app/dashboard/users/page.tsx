@@ -2,6 +2,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { UsersDataTable } from "@/components/users/table/users-data-table";
 import { DataTableSkeleton } from "@/components/ui/DataTableSkeleton";
 import { useGetAllUsersQuery } from "@/redux/userApi";
@@ -68,26 +69,26 @@ const UsersManagePage = () => {
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-7xl py-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold truncate">
-              Staff Management
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Manage staff accounts (admins and agents) and their roles
-            </p>
-          </div>
-
-          <Link
-            href="/dashboard/users/create-user"
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-foreground text-background rounded-md cursor-pointer transition-colors duration-200 hover:bg-foreground/90 text-sm sm:text-base font-medium text-center whitespace-nowrap flex-shrink-0"
-          >
-            Add Staff
-          </Link>
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">
+            Staff Management
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Manage staff accounts (admins and agents) and their roles
+          </p>
         </div>
 
         {/* Users Data Table */}
         <UsersDataTable
+          toolbarActions={
+            <Button
+              asChild
+              size="sm"
+              className="cursor-pointer whitespace-nowrap"
+            >
+              <Link href="/dashboard/users/create-user">Add Staff</Link>
+            </Button>
+          }
           data={users || []}
           loading={isLoading}
           totalCount={usersData?.meta.total || 0}

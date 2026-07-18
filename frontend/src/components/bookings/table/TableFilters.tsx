@@ -2,15 +2,8 @@
 "use client";
 import * as React from "react";
 import { Table } from "@tanstack/react-table";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -19,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FilterBar } from "@/components/ui/FilterBar";
+import { ColumnToggleMenu } from "@/components/ui/ColumnToggleMenu";
 import { IBooking, IBookingsQueryParams } from "@/types/booking.types";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -94,8 +89,7 @@ export function TableFilters({
     onFiltersChange({ status });
   };
 
-  const hasFiltersApplied =
-    filters.status !== undefined || filters.search !== undefined;
+  const activeCount = filters.status !== undefined ? 1 : 0;
 
   const clearFilters = () => {
     setSearchInput("");
@@ -107,146 +101,55 @@ export function TableFilters({
 
   return (
     <div className="space-y-4">
-      {/* Action Bar */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        {/* Selection Info & Delete Action */}
-        <div className="flex items-center gap-3 order-2 lg:order-1">
-          {selectedCount > 0 ? (
-            <div className="flex items-center gap-3 bg-muted/50 px-3 py-2 rounded-lg border">
-              <Badge variant="secondary" className="font-medium">
-                {selectedCount} selected {isAllSelected && "(All)"}
-              </Badge>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={onDeleteSelected}
-                className="h-8 hover:cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected
-              </Button>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {totalCount} total bookings
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Filters Row */}
-      <div className="flex flex-col xl:flex-row gap-4">
-        {/* Search Input */}
-        <div className="w-full min-w-0 md:max-w-sm">
-          <Input
-            placeholder="Search bookings by customer name, email, or service..."
-            value={searchInput}
-            onChange={(event) => {
-              typedRef.current = true;
-              setSearchInput(event.target.value);
-            }}
-            className="w-full"
-          />
-        </div>
-
-        {/* Filter Controls */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-          {/* Status Filter */}
-          <Select
-            value={getStatusFilterValue()}
-            onValueChange={handleStatusFilterChange}
+      {/* Selection Info & Delete Action */}
+      {selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 bg-muted/50 px-3 py-2 rounded-lg border w-fit">
+          <Badge variant="secondary" className="font-medium">
+            {selectedCount} selected {isAllSelected && "(All)"}
+          </Badge>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onDeleteSelected}
+            className="h-8 hover:cursor-pointer"
           >
-            <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Clear Filters */}
-          {hasFiltersApplied && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="whitespace-nowrap"
-            >
-              Clear filters
-            </Button>
-          )}
-
-          {/* Column Visibility */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="default"
-                className="whitespace-nowrap"
-              >
-                <ChevronDown className="w-4 h-4 mr-2" />
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[200px]">
-              <div className="p-2">
-                <div className="text-sm font-medium mb-2">Toggle columns</div>
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id.replace(/([A-Z])/g, " $1").trim()}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Selected
+          </Button>
         </div>
-      </div>
-
-      {/* Active Filters Display */}
-      {hasFiltersApplied && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-          {filters.search && (
-            <Badge variant="secondary" className="gap-2">
-              Search: {filters.search}
-              <button
-                onClick={() => {
-                  setSearchInput("");
-                  onFiltersChange({ search: undefined });
-                }}
-                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
-          {filters.status !== undefined && (
-            <Badge variant="secondary" className="gap-2">
-              Status: {filters.status}
-              <button
-                onClick={() => onFiltersChange({ status: undefined })}
-                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
+      ) : (
+        <div className="text-sm text-muted-foreground">
+          {totalCount} total bookings
         </div>
       )}
+
+      <FilterBar
+        search={searchInput}
+        onSearch={(value) => {
+          typedRef.current = true;
+          setSearchInput(value);
+        }}
+        searchPlaceholder="Search by customer name, email or service…"
+        activeCount={activeCount}
+        onClear={clearFilters}
+        actions={<ColumnToggleMenu table={table} />}
+      >
+        <Select
+          value={getStatusFilterValue()}
+          onValueChange={handleStatusFilterChange}
+        >
+          <SelectTrigger className="w-full lg:w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="confirmed">Confirmed</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
     </div>
   );
 }

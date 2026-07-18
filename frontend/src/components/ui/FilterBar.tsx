@@ -21,21 +21,31 @@ export function FilterBar({
   activeCount = 0,
   onClear,
   actions,
+  actionsAlign = "right",
   children,
 }: {
   search: string;
   onSearch: (value: string) => void;
   searchPlaceholder?: string;
-  /** Number of active filters — shown as a badge on the Filters pill. */
+  /** Number of active filters - shown as a badge on the Filters pill. */
   activeCount?: number;
   /** Resets every filter; renders a "Clear filters" link when any is active. */
   onClear?: () => void;
-  /** Page actions (e.g. Create) — right-aligned on every size. */
+  /** Page actions (e.g. Create) - right-aligned on every size by default. */
   actions?: ReactNode;
+  /**
+   * "left" keeps the actions on the left of the narrow (phone) toolbar row
+   * instead of pushing them to the right edge; wide layouts always keep
+   * actions right-aligned.
+   */
+  actionsAlign?: "left" | "right";
   /** The filter controls (selects). */
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+
+  // No filter controls: the Filters pill would only open an empty panel.
+  const hasFilterControls = children != null;
 
   const clearLink =
     onClear && activeCount > 0 ? (
@@ -50,7 +60,7 @@ export function FilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      {/* Search — full width until the container can fit the inline row */}
+      {/* Search - full width until the container can fit the inline row */}
       <div className="relative w-full @4xl/main:min-w-[200px] @4xl/main:max-w-xs">
         <Search
           className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -77,27 +87,33 @@ export function FilterBar({
 
       {/* Narrow row 2 (phones + tablets with the sidebar open): Filters pill left, actions right */}
       <div className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-2 @4xl/main:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-controls="filter-bar-panel"
-          className="inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-foreground/20 px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 active:bg-muted"
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-          Filters
-          {activeCount > 0 && (
-            <span className="grid h-4.5 min-w-[18px] place-items-center rounded-full bg-foreground px-1 font-mono text-[10px] font-medium text-background">
-              {activeCount}
-            </span>
-          )}
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
+        {hasFilterControls ? (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="filter-bar-panel"
+            className="inline-flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-foreground/20 px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 active:bg-muted"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            Filters
+            {activeCount > 0 && (
+              <span className="grid h-4.5 min-w-[18px] place-items-center rounded-full bg-foreground px-1 font-mono text-[10px] font-medium text-background">
+                {activeCount}
+              </span>
+            )}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+        ) : null}
         {!open ? clearLink : null}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <div
+          className={`flex flex-wrap items-center gap-2 ${
+            actionsAlign === "left" ? "" : "ml-auto justify-end"
+          }`}
+        >
           {actions}
         </div>
       </div>

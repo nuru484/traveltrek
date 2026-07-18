@@ -2,6 +2,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { CustomersDataTable } from "@/components/customers/table/customers-data-table";
 import { DataTableSkeleton } from "@/components/ui/DataTableSkeleton";
 import { useGetAllCustomersQuery } from "@/redux/customerApi";
@@ -59,25 +60,23 @@ const CustomersManagePage = () => {
     <div className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-7xl py-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold truncate">
-              Customers
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Manage the customer base — profiles, bookings and payments
-            </p>
-          </div>
-
-          <Link
-            href="/dashboard/customers/create"
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-foreground text-background rounded-md cursor-pointer transition-colors duration-200 hover:bg-foreground/90 text-sm sm:text-base font-medium text-center whitespace-nowrap flex-shrink-0"
-          >
-            Add Customer
-          </Link>
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">Customers</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Manage the customer base - profiles, bookings and payments
+          </p>
         </div>
 
         <CustomersDataTable
+          toolbarActions={
+            <Button
+              asChild
+              size="sm"
+              className="cursor-pointer whitespace-nowrap"
+            >
+              <Link href="/dashboard/customers/create">Add Customer</Link>
+            </Button>
+          }
           data={customers || []}
           loading={isLoading}
           totalCount={customersData?.meta.total || 0}

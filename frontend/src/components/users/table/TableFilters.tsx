@@ -2,15 +2,8 @@
 "use client";
 import * as React from "react";
 import { Table } from "@tanstack/react-table";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -19,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FilterBar } from "@/components/ui/FilterBar";
+import { ColumnToggleMenu } from "@/components/ui/ColumnToggleMenu";
 import { IUser, IUsersQueryParams, StaffRole } from "@/types/user.types";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -30,6 +25,8 @@ interface ITableFiltersProps {
   ) => void;
   totalCount: number;
   onDeleteSelected: () => void;
+  /** Page actions (e.g. Add Staff) rendered inside the toolbar. */
+  actions?: React.ReactNode;
 }
 
 export function TableFilters({
@@ -38,6 +35,7 @@ export function TableFilters({
   onFiltersChange,
   totalCount,
   onDeleteSelected,
+  actions,
 }: ITableFiltersProps) {
   const selectedCount = table.getSelectedRowModel().rows.length;
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
@@ -90,8 +88,7 @@ export function TableFilters({
     onFiltersChange({ role });
   };
 
-  const hasFiltersApplied =
-    filters.role !== undefined || filters.search !== undefined;
+  const activeCount = filters.role !== undefined ? 1 : 0;
 
   const clearFilters = () => {
     setSearchInput("");
@@ -103,144 +100,58 @@ export function TableFilters({
 
   return (
     <div className="space-y-4">
-      {/* Action Bar */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        {/* Selection Info & Delete Action */}
-        <div className="flex items-center gap-3 order-2 lg:order-1">
-          {selectedCount > 0 ? (
-            <div className="flex items-center gap-3 bg-muted/50 px-3 py-2 rounded-lg border">
-              <Badge variant="secondary" className="font-medium">
-                {selectedCount} selected {isAllSelected && "(All)"}
-              </Badge>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={onDeleteSelected}
-                className="h-8 hover:cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected
-              </Button>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {totalCount} total staff
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Filters Row */}
-      <div className="flex flex-col xl:flex-row gap-4">
-        {/* Search Input */}
-        <div className="w-full min-w-0 md:max-w-sm">
-          <Input
-            placeholder="Search staff by name or email..."
-            value={searchInput}
-            onChange={(event) => {
-              typedRef.current = true;
-              setSearchInput(event.target.value);
-            }}
-            className="w-full"
-          />
-        </div>
-
-        {/* Filter Controls */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-          {/* Role Filter */}
-          <Select
-            value={getRoleFilterValue()}
-            onValueChange={handleRoleFilterChange}
+      {/* Selection Info & Delete Action */}
+      {selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 bg-muted/50 px-3 py-2 rounded-lg border w-fit">
+          <Badge variant="secondary" className="font-medium">
+            {selectedCount} selected {isAllSelected && "(All)"}
+          </Badge>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onDeleteSelected}
+            className="h-8 hover:cursor-pointer"
           >
-            <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="agent">Agent</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Clear Filters */}
-          {hasFiltersApplied && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="whitespace-nowrap"
-            >
-              Clear filters
-            </Button>
-          )}
-
-          {/* Column Visibility */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="default"
-                className="whitespace-nowrap"
-              >
-                <ChevronDown className="w-4 h-4 mr-2" />
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[200px]">
-              <div className="p-2">
-                <div className="text-sm font-medium mb-2">Toggle columns</div>
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id.replace(/([A-Z])/g, " $1").trim()}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Selected
+          </Button>
         </div>
-      </div>
-
-      {/* Active Filters Display */}
-      {hasFiltersApplied && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-          {filters.search && (
-            <Badge variant="secondary" className="gap-2">
-              Search: {filters.search}
-              <button
-                onClick={() => {
-                  setSearchInput("");
-                  onFiltersChange({ search: undefined });
-                }}
-                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
-          {filters.role !== undefined && (
-            <Badge variant="secondary" className="gap-2">
-              Role: {filters.role}
-              <button
-                onClick={() => onFiltersChange({ role: undefined })}
-                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
+      ) : (
+        <div className="text-sm text-muted-foreground">
+          {totalCount} total staff
         </div>
       )}
+
+      <FilterBar
+        search={searchInput}
+        onSearch={(value) => {
+          typedRef.current = true;
+          setSearchInput(value);
+        }}
+        searchPlaceholder="Search staff by name or email…"
+        activeCount={activeCount}
+        onClear={clearFilters}
+        actions={
+          <>
+            {actions}
+            <ColumnToggleMenu table={table} />
+          </>
+        }
+      >
+        <Select
+          value={getRoleFilterValue()}
+          onValueChange={handleRoleFilterChange}
+        >
+          <SelectTrigger className="w-full lg:w-[140px]">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="agent">Agent</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
     </div>
   );
 }

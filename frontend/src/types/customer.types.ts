@@ -3,6 +3,7 @@
 // Customers are their own principal (backend Phase 5b): bookings/payments
 // hang off a Customer record, and customers have NO role field. The DTO
 // shapes mirror backend src/utils/mappers/customer.mapper.ts.
+import type { ReactNode } from "react";
 import type { BookingStatus } from "./booking.types";
 
 export interface ICustomer {
@@ -82,7 +83,7 @@ export interface ICustomerHistoryQueryParams {
 }
 
 /** POST /customers is JSON (no upload middleware on the create route). No
- * password — staff never set one; owners use POST /auth/change-password. */
+ * password - staff never set one; owners use POST /auth/change-password. */
 export interface ICustomerCreateInput {
   name: string;
   email?: string;
@@ -107,4 +108,6 @@ export interface ICustomersDataTableProps {
     filters: Partial<Omit<ICustomersQueryParams, "page" | "limit">>
   ) => void;
   onRefresh?: () => void;
+  /** Page actions (e.g. Add Customer) rendered inside the toolbar. */
+  toolbarActions?: ReactNode;
 }
