@@ -34,7 +34,7 @@ export default function DetailedViewSkeleton() {
         <CardContent className="space-y-8">
           {/* Destination Info grid */}
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="border-l-4 border-l-primary">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   <Skeleton className="h-5 w-5 rounded-full" />
@@ -45,7 +45,7 @@ export default function DetailedViewSkeleton() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-secondary">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   <Skeleton className="h-5 w-5 rounded-full" />

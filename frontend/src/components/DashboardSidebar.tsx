@@ -222,7 +222,8 @@ export default function DashboardSidebar() {
         </SidebarMenuButton>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      {/* pt-3 keeps the first item's active background off the header border. */}
+      <SidebarContent className="px-2 pt-3">
         <SidebarMenu className="space-y-1.5">
           {navigationItems.map((item) => {
             const isActive =

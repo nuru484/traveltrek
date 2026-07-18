@@ -271,7 +271,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Hero — clean image, content below */}
+        {/* Hero - clean image, content below */}
         <FlightDetailHero
           flight={flight}
           isAdmin={isAdmin}
@@ -289,7 +289,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
 
         <div className="grid grid-cols-1 items-start gap-4 @2xl/main:grid-cols-2 sm:gap-6">
           {/* Origin */}
-          <Card className="py-0 border-l-4 border-l-primary">
+          <Card className="py-0">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
@@ -304,7 +304,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           </Card>
 
           {/* Destination */}
-          <Card className="py-0 border-l-4 border-l-secondary">
+          <Card className="py-0">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-secondary-foreground mt-1 flex-shrink-0" />
@@ -321,7 +321,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           </Card>
 
           {/* Departure & Price */}
-          <Card className="py-0 border-l-4 border-l-accent">
+          <Card className="py-0">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start gap-3">
                 <CreditCard className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
@@ -364,7 +364,7 @@ export function FlightDetail({ flight }: IFlightDetailProps) {
           />
         </div>
 
-        {/* Detailed schedule — full width */}
+        {/* Detailed schedule - full width */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6">
           <FlightScheduleCard
             flight={flight}

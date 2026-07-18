@@ -2,13 +2,11 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useGetUserQuery } from "@/redux/userApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import UserForm from "@/components/users/UserForm";
-import FormSkeleton from "@/components/ui/FormSkeleton";
+import UserFormSkeleton from "@/components/users/UserFormSkeleton";
 import DetailPageHeader from "@/components/ui/DetailPageHeader";
 
 export default function EditUserPage() {
@@ -39,18 +37,7 @@ export default function EditUserPage() {
     : "Update staff details below";
 
   if (isLoading) {
-    return (
-      <div className="mx-auto w-full max-w-7xl py-6">
-        <Card className="">
-          <CardHeader>
-            <Skeleton className="h-8 w-48" />
-          </CardHeader>
-          <CardContent>
-            <FormSkeleton />
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <UserFormSkeleton />;
   }
 
   if (isError) return <ErrorMessage error={errorMessage} onRetry={refetch} />;

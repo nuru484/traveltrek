@@ -112,7 +112,13 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
               key={i}
               className="space-y-2.5 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
             >
-              <Skeleton className="h-4 w-32" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-3 w-40" />
             </div>
@@ -164,40 +170,15 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
               key={review.id}
               className="rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <RatingValue value={review.rating} />
-                    <Badge variant={STATUS_VARIANT[review.status]}>
-                      {review.status}
-                    </Badge>
-                  </div>
-                  {review.title && (
-                    <p className="font-semibold break-words [overflow-wrap:anywhere]">
-                      {review.title}
-                    </p>
-                  )}
-                  {review.comment && (
-                    <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
-                      {review.comment}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    <span className="break-words [overflow-wrap:anywhere]">
-                      By {review.customer.name}
-                    </span>
-                    <span aria-hidden>·</span>
-                    <Link
-                      href={reviewTargetHref(review.target)}
-                      className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
-                    >
-                      {reviewTargetLabel(review.target)}
-                    </Link>
-                    <span aria-hidden>·</span>
-                    <span>
-                      {format(new Date(review.createdAt), "MMM d, yyyy")}
-                    </span>
-                  </div>
+              {/* Row 1: rating + status left, admin actions right. The body
+                  below spans the full card width so the actions button never
+                  reserves a column of its own. */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <RatingValue value={review.rating} />
+                  <Badge variant={STATUS_VARIANT[review.status]}>
+                    {review.status}
+                  </Badge>
                 </div>
 
                 {isAdmin && (
@@ -243,6 +224,35 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
+              </div>
+
+              <div className="mt-2 space-y-2">
+                {review.title && (
+                    <p className="font-semibold break-words [overflow-wrap:anywhere]">
+                      {review.title}
+                    </p>
+                  )}
+                  {review.comment && (
+                    <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
+                      {review.comment}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    <span className="break-words [overflow-wrap:anywhere]">
+                      By {review.customer.name}
+                    </span>
+                    <span aria-hidden>·</span>
+                    <Link
+                      href={reviewTargetHref(review.target)}
+                      className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    >
+                      {reviewTargetLabel(review.target)}
+                    </Link>
+                    <span aria-hidden>·</span>
+                    <span>
+                      {format(new Date(review.createdAt), "MMM d, yyyy")}
+                    </span>
+                  </div>
               </div>
             </li>
           ))}

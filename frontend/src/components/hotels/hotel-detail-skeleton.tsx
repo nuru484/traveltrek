@@ -32,7 +32,7 @@ export function HotelDetailSkeleton() {
       {/* Hotel Details Skeleton - Horizontal Layout */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* Location Card Skeleton */}
-        <Card className="border-l-4 border-l-primary">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
@@ -47,7 +47,7 @@ export function HotelDetailSkeleton() {
         </Card>
 
         {/* Destination Card Skeleton */}
-        <Card className="border-l-4 border-l-secondary">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
@@ -61,7 +61,7 @@ export function HotelDetailSkeleton() {
         </Card>
 
         {/* Star Rating & Contact Card Skeleton */}
-        <Card className="border-l-4 border-l-accent">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
@@ -84,7 +84,7 @@ export function HotelDetailSkeleton() {
         </Card>
 
         {/* Description & Amenities Card Skeleton */}
-        <Card className="border-l-4 border-l-muted sm:col-span-2 lg:col-span-1">
+        <Card className="sm:col-span-2 lg:col-span-1">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />

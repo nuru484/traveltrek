@@ -33,7 +33,7 @@ export function FlightDetailSkeleton() {
       {/* Flight Details Skeleton - Horizontal Layout */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* Origin Card Skeleton */}
-        <Card className="border-l-4 border-l-primary">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
@@ -47,7 +47,7 @@ export function FlightDetailSkeleton() {
         </Card>
 
         {/* Destination Card Skeleton */}
-        <Card className="border-l-4 border-l-secondary">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
@@ -61,7 +61,7 @@ export function FlightDetailSkeleton() {
         </Card>
 
         {/* Schedule Card Skeleton */}
-        <Card className="border-l-4 border-l-accent">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
@@ -81,7 +81,7 @@ export function FlightDetailSkeleton() {
         </Card>
 
         {/* Pricing & Details Card Skeleton */}
-        <Card className="border-l-4 border-l-muted">
+        <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
               <Skeleton className="h-5 w-5 mt-1 flex-shrink-0" />
