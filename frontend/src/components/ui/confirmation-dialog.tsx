@@ -71,13 +71,13 @@ export function ConfirmationDialog({
           <div className="space-y-3">
             <Label
               htmlFor="confirm-input"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="flex-wrap gap-x-1.5 gap-y-1 items-baseline font-sans normal-case tracking-normal text-sm font-medium leading-relaxed text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
-              Type{' '}
-              <span className="font-mono font-semibold text-foreground break-all inline-block">
+              <span>Type</span>
+              <span className="min-w-0 break-all font-mono font-semibold text-foreground">
                 {requireExactMatch}
-              </span>{' '}
-              to confirm:
+              </span>
+              <span>to confirm:</span>
             </Label>
             <Input
               id="confirm-input"
