@@ -56,6 +56,16 @@ export const loginSchema = z.object({
   password: z.string('Password is required').min(1, 'Password is required'),
 });
 
+/** POST /auth/demo-login — the role to sign in as. ADMIN/AGENT resolve a
+ * staff User; CUSTOMER resolves a Customer. Server-gated by DEMO_LOGIN_ENABLED;
+ * the demo accounts themselves live in the DB (no credentials cross the wire). */
+export const demoLoginSchema = z.object({
+  role: z.enum(
+    ['ADMIN', 'AGENT', 'CUSTOMER'],
+    'role must be one of: ADMIN, AGENT, CUSTOMER',
+  ),
+});
+
 /** Public minimal signup: name + (email OR phone); everything else optional.
  * Creates a CUSTOMER — there is no role concept on the public surface (a
  * `role` key in the body is simply stripped). */
@@ -210,6 +220,7 @@ export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
 export type ChangePhoneBody = z.infer<typeof changePhoneSchema>;
 export type ConfirmEmailChangeBody = z.infer<typeof confirmEmailChangeSchema>;
 export type ConfirmPhoneChangeBody = z.infer<typeof confirmPhoneChangeSchema>;
+export type DemoLoginBody = z.infer<typeof demoLoginSchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
 export type GoogleSignInBody = z.infer<typeof googleSignInSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;

@@ -88,6 +88,21 @@ const ENV = {
   COOKIE_DOMAIN: envOptional('COOKIE_DOMAIN'),
   CORS_ACCESS: envOptional('CORS_ACCESS'),
   DATABASE_URL: envRequired('DATABASE_URL'),
+  /** DEMO_*: server-side demo login. DEMO_LOGIN_ENABLED (default false) gates
+   * POST /auth/demo-login entirely (403 when off). When on, each role resolves
+   * a real account by these emails — ADMIN/AGENT are staff Users,
+   * DEMO_CUSTOMER_EMAIL is a Customer. AGENT/CUSTOMER default to fixed
+   * seed-owned addresses so `npm run seed` (with the seed flag on) wires them
+   * up with zero config; the same defaults are what demo-login looks up here.
+   * DEMO_ADMIN_EMAIL has no default: the demo admin IS the seeded admin, so
+   * point it at ADMIN_EMAIL (an unset/unseeded email just 404s that role).
+   * Never NEXT_PUBLIC_* — no credentials ever reach the client. */
+  DEMO_ADMIN_EMAIL: envOptional('DEMO_ADMIN_EMAIL'),
+  DEMO_AGENT_EMAIL:
+    envOptional('DEMO_AGENT_EMAIL') ?? 'demo.agent@traveltrek.app',
+  DEMO_CUSTOMER_EMAIL:
+    envOptional('DEMO_CUSTOMER_EMAIL') ?? 'demo.customer@traveltrek.app',
+  DEMO_LOGIN_ENABLED: envBool('DEMO_LOGIN_ENABLED'),
   /** Frog (Wigal) SMS credentials - all three unset means log-only SMS. */
   FROG_API_KEY: envOptional('FROG_API_KEY'),
   FROG_SENDER_ID: envOptional('FROG_SENDER_ID'),

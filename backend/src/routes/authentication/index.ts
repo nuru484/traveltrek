@@ -3,6 +3,7 @@ import { Router } from 'express';
 
 import changePasswordRoutes from '#routes/authentication/change-password.js';
 import contactChangeRoutes from '#routes/authentication/contact-change.js';
+import demoLoginRoutes from '#routes/authentication/demo-login.js';
 import googleRoutes from '#routes/authentication/google.js';
 import loginRoutes from '#routes/authentication/login.js';
 import logoutRoutes from '#routes/authentication/logout.js';
@@ -16,6 +17,7 @@ const authenticationRouter = Router();
 
 authenticationRouter.use('/auth', registerRoutes);
 authenticationRouter.use('/auth', loginRoutes);
+authenticationRouter.use('/auth', demoLoginRoutes);
 authenticationRouter.use('/auth', twoFactorRoutes);
 authenticationRouter.use('/auth', otpRoutes);
 authenticationRouter.use('/auth', passwordResetRoutes);

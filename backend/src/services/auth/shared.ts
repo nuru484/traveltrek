@@ -96,6 +96,10 @@ export interface ChangePhoneInput {
   newPhone: string;
 }
 
+/** The role a demo login asks for. ADMIN/AGENT resolve a staff User;
+ * CUSTOMER resolves a Customer — the split-principal mirror of a real login. */
+export type DemoRole = 'ADMIN' | 'AGENT' | 'CUSTOMER';
+
 export interface LoginInput {
   email: string;
   password: string;

@@ -398,6 +398,7 @@ describe('2FA bypasses (documented): OTP login and Google sign-in', () => {
       config: {
         ACCESS_TOKEN_EXPIRY: ENV.ACCESS_TOKEN_EXPIRY,
         ACCESS_TOKEN_SECRET: ENV.ACCESS_TOKEN_SECRET,
+        DEMO_LOGIN_ENABLED: false,
         FRONTEND_URL: ENV.FRONTEND_URL,
         GOOGLE_CLIENT_ID: 'test-google-client-id',
         REFRESH_TOKEN_EXPIRY: ENV.REFRESH_TOKEN_EXPIRY,

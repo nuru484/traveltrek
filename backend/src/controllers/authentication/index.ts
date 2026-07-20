@@ -5,6 +5,7 @@ import {
   confirmEmailChange,
   confirmPhoneChange,
 } from '#controllers/authentication/contact-change.js';
+import { demoLogin } from '#controllers/authentication/demo-login.js';
 import { googleSignIn } from '#controllers/authentication/google.js';
 import { login } from '#controllers/authentication/login.js';
 import logout from '#controllers/authentication/logout.js';
@@ -38,6 +39,7 @@ export {
   changePhone,
   confirmEmailChange,
   confirmPhoneChange,
+  demoLogin,
   disableTwoFactor,
   enableTwoFactor,
   forgotPassword,

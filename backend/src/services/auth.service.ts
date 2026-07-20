@@ -1,6 +1,7 @@
 import { makeChangePasswordService } from '#services/auth/change-password.service.js';
 import { makeContactChangeService } from '#services/auth/contact-change.service.js';
 import { makeAuthCore } from '#services/auth/core.js';
+import { makeDemoLoginService } from '#services/auth/demo-login.service.js';
 import { makeGoogleService } from '#services/auth/google.service.js';
 import { makeLoginService } from '#services/auth/login.service.js';
 import { makeOtpLoginService } from '#services/auth/otp-login.service.js';
@@ -25,6 +26,7 @@ import {
   type ChangePasswordInput,
   type ChangePhoneInput,
   customerPrincipal,
+  type DemoRole,
   type LoginInput,
   type LoginResult,
   type OtpContact,
@@ -50,6 +52,7 @@ export {
   type ChangePasswordInput,
   type ChangePhoneInput,
   customerPrincipal,
+  type DemoRole,
   type LoginInput,
   type LoginResult,
   type OtpContact,
@@ -68,6 +71,7 @@ export const makeAuthService = (d: AuthDeps) => {
   return {
     ...makeRegistrationService(d),
     ...makeLoginService(d, core),
+    ...makeDemoLoginService(d),
     ...makeOtpLoginService(d, core),
     ...makePasswordResetService(d, core),
     ...makeGoogleService(d),
@@ -86,6 +90,7 @@ export const {
   changePassword,
   confirmEmailChange,
   confirmPhoneChange,
+  demoLogin,
   disableTwoFactor,
   enableTwoFactor,
   getTwoFactorStatus,

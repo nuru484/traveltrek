@@ -31,6 +31,13 @@ import loggerInstance from '#utils/logger.js';
 export interface AppConfig {
   ACCESS_TOKEN_EXPIRY: string;
   ACCESS_TOKEN_SECRET: string;
+  /** Server-side demo login: which real account each demo role resolves to,
+   * and whether the endpoint is enabled at all. An unset email for an enabled
+   * role makes that role's demo login 404 (the account isn't seeded). */
+  DEMO_ADMIN_EMAIL?: string;
+  DEMO_AGENT_EMAIL?: string;
+  DEMO_CUSTOMER_EMAIL?: string;
+  DEMO_LOGIN_ENABLED: boolean;
   FRONTEND_URL: string;
   /** Unset means Google sign-in is not configured (the endpoint 503s). */
   GOOGLE_CLIENT_ID?: string;
@@ -94,6 +101,10 @@ export const defaultDeps: AppDeps = {
   config: {
     ACCESS_TOKEN_EXPIRY: ENV.ACCESS_TOKEN_EXPIRY,
     ACCESS_TOKEN_SECRET: ENV.ACCESS_TOKEN_SECRET,
+    DEMO_ADMIN_EMAIL: ENV.DEMO_ADMIN_EMAIL,
+    DEMO_AGENT_EMAIL: ENV.DEMO_AGENT_EMAIL,
+    DEMO_CUSTOMER_EMAIL: ENV.DEMO_CUSTOMER_EMAIL,
+    DEMO_LOGIN_ENABLED: ENV.DEMO_LOGIN_ENABLED,
     FRONTEND_URL: ENV.FRONTEND_URL,
     GOOGLE_CLIENT_ID: ENV.GOOGLE_CLIENT_ID,
     PAYSTACK_CALLBACK_URL: ENV.PAYSTACK_CALLBACK_URL,
