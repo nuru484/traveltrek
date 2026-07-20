@@ -16,9 +16,16 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
+  // Disable powerful browser features this app never uses.
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
 ];
 
 const nextConfig: NextConfig = {
+  // Don't advertise the framework in an x-powered-by header.
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {
