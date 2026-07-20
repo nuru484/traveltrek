@@ -49,6 +49,15 @@ export interface IGoogleSignInInput {
   idToken: string;
 }
 
+/** The role a demo login asks the server for. The credentials live entirely
+ * server-side (POST /auth/demo-login) — the client only names a role. */
+export type DemoLoginRole = "ADMIN" | "AGENT" | "CUSTOMER";
+
+/** POST /auth/demo-login — the role to sign in as. */
+export interface IDemoLoginInput {
+  role: DemoLoginRole;
+}
+
 /**
  * Password login on a 2FA-enabled account answers 200 with this payload
  * instead of a user DTO: no session cookies were issued — only the signed

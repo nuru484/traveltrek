@@ -14,8 +14,8 @@ import GoogleSignInButton from "@/components/authentication/GoogleSignInButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { useLoginMutation } from "@/redux/auth/authApi";
-import { isTwoFactorRequired } from "@/types/auth";
+import { useLoginMutation, useDemoLoginMutation } from "@/redux/auth/authApi";
+import { DemoLoginRole, isTwoFactorRequired } from "@/types/auth";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ import Header from "@/components/index/Header";
 export default function LoginPage() {
   const router = useRouter();
   const [loginUser, { isLoading }] = useLoginMutation();
+  const [demoLoginUser, { isLoading: isDemoLoading }] = useDemoLoginMutation();
 
   // A 2FA account's password step answers { twoFactorRequired: true } with
   // no session — the card swaps to the code step until verify completes.
@@ -74,54 +75,38 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async (role: "customer" | "agent" | "admin") => {
-    const credentials = {
-      customer: {
-        email: process.env.NEXT_PUBLIC_DEMO_CUSTOMER_EMAIL || "",
-        password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || "",
-      },
-      agent: {
-        email: process.env.NEXT_PUBLIC_DEMO_AGENT_EMAIL || "",
-        password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || "",
-      },
-      admin: {
-        email: process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL || "",
-        password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || "",
-      },
-    };
-
-    const selectedCredentials = credentials[role];
-
-    if (!selectedCredentials.email || !selectedCredentials.password) {
-      toast.error(`Demo ${role} credentials not configured`);
-      return;
+  // Demo login is entirely server-side: the client only names a role and the
+  // backend mints a session for the canned account (no credentials ship in the
+  // bundle). A 403 (demo disabled) or 404 (account not seeded) surfaces as the
+  // server's message.
+  const handleDemoLogin = async (role: DemoLoginRole) => {
+    try {
+      await demoLoginUser({ role }).unwrap();
+      toast.success("Login successful! Redirecting...");
+      router.push(loginRedirectPath(window.location.search));
+    } catch (err) {
+      const { message } = extractApiErrorMessage(err);
+      toast.error(message || "Demo login is unavailable right now.");
     }
-
-    // Populate form fields for visual feedback
-    form.setValue("email", selectedCredentials.email);
-    form.setValue("password", selectedCredentials.password);
-
-    // Submit the form
-    await onSubmit(selectedCredentials);
   };
 
   // Boarding-style role codes instead of icons — matches the landing's
   // document vocabulary.
   const demoAccounts = [
     {
-      role: "customer" as const,
+      role: "CUSTOMER" as const,
       code: "PAX",
       label: "Customer demo",
       description: "Browse and book travel",
     },
     {
-      role: "agent" as const,
+      role: "AGENT" as const,
       code: "AGT",
       label: "Agent demo",
       description: "Manage bookings",
     },
     {
-      role: "admin" as const,
+      role: "ADMIN" as const,
       code: "ADM",
       label: "Admin demo",
       description: "Full system access",
@@ -160,7 +145,7 @@ export default function LoginPage() {
                     key={role}
                     type="button"
                     onClick={() => handleDemoLogin(role)}
-                    disabled={isLoading}
+                    disabled={isLoading || isDemoLoading}
                     className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 active:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 lg:flex-col lg:items-start lg:justify-start lg:gap-1"
                   >
                     <span className="min-w-0">

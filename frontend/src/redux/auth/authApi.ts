@@ -7,6 +7,7 @@ import {
   IChangePhoneInput,
   IConfirmEmailChangeInput,
   IConfirmPhoneChangeInput,
+  IDemoLoginInput,
   IForgotPasswordInput,
   IGoogleSignInInput,
   ILoginResponseData,
@@ -70,6 +71,30 @@ export const authApi = apiSlice.injectEndpoints({
           }
         } catch {
           // errors are surfaced by the calling form
+        }
+      },
+    }),
+
+    // Server-side demo login: the client only names a role — the credentials
+    // live entirely on the server. Success is the exact login envelope
+    // (cookies + DTO), so the session hydrates identically to a real login.
+    // No 2FA path (demo accounts are fixtures). A 403 means demo login is
+    // disabled; a 404 means the role's account isn't seeded.
+    demoLogin: builder.mutation<
+      IApiResponse<IUserRegistrationResponseData>,
+      IDemoLoginInput
+    >({
+      query: (data) => ({
+        url: "auth/demo-login",
+        method: "POST",
+        body: data,
+      }),
+      async onQueryStarted(arg, { queryFulfilled, dispatch }) {
+        try {
+          const result = await queryFulfilled;
+          dispatch(userLoggedIn({ user: result.data.data }));
+        } catch {
+          // errors are surfaced by the calling page
         }
       },
     }),
@@ -302,6 +327,7 @@ export const authApi = apiSlice.injectEndpoints({
 export const {
   useRegisterUserMutation,
   useLoginMutation,
+  useDemoLoginMutation,
   useTwoFactorVerifyMutation,
   useTwoFactorResendMutation,
   useChangePasswordMutation,

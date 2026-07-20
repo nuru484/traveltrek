@@ -18,6 +18,7 @@ const verify = vi.fn();
 const resend = vi.fn();
 vi.mock("@/redux/auth/authApi", () => ({
   useLoginMutation: () => [login, { isLoading: false }],
+  useDemoLoginMutation: () => [vi.fn(), { isLoading: false }],
   useTwoFactorVerifyMutation: () => [verify, { isLoading: false }],
   useTwoFactorResendMutation: () => [resend, { isLoading: false }],
   useOtpRequestMutation: () => [vi.fn(), { isLoading: false }],
