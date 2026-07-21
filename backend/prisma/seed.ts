@@ -206,11 +206,45 @@ async function seedCatalogAndBookings(): Promise<void> {
   };
   const demoPassword = await randomDemoPassword();
 
+  // Free, hot-linkable stock images (Unsplash CDN) so the catalog looks real.
+  const IMG = {
+    adventure: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80',
+    beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+    city: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=800&q=80',
+    cruise: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=800&q=80',
+    cultural: 'https://images.unsplash.com/photo-1539768942893-daf53e448371?auto=format&fit=crop&w=800&q=80',
+    flight: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
+    hotel: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+    room: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80',
+    safari: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=800&q=80',
+  };
+  const TOUR_TYPE_PHOTO: Record<TourType, string> = {
+    [TourType.ADVENTURE]: IMG.adventure,
+    [TourType.BEACH]: IMG.beach,
+    [TourType.CITY]: IMG.city,
+    [TourType.CRUISE]: IMG.cruise,
+    [TourType.CULTURAL]: IMG.cultural,
+    [TourType.WILDLIFE]: IMG.safari,
+  };
+  const DEST_PHOTO: Record<string, string> = {
+    Accra: IMG.city,
+    Cairo: IMG.cultural,
+    'Cape Coast': IMG.beach,
+    'Cape Town': IMG.adventure,
+    Marrakech: IMG.city,
+    Santorini: IMG.cruise,
+    Serengeti: IMG.safari,
+    Zanzibar: IMG.beach,
+  };
+
   // --- customers (upsert by email; no phone, so re-runs never clash) ---
   const CUSTOMER_NAMES = [
     'Ama Mensah', 'Kofi Boateng', 'Yaa Asante', 'Kwame Owusu', 'Abena Sarpong',
     'Kojo Danso', 'Esi Bediako', 'Yaw Ofori', 'Adwoa Frimpong', 'Fiifi Quaye',
     'Akosua Addai', 'Kwesi Appiah', 'Efua Nyarko', 'Nana Acheampong', 'Maya Osei',
+    'Sena Agyeman', 'Elorm Kudjo', 'Dela Ansah', 'Selorm Tetteh', 'Mawuli Doe',
+    'Afia Owusu', 'Nii Lartey', 'Adjoa Boakye', 'Kojo Amankwah', 'Ama Serwaa',
+    'Kwabena Osei', 'Akua Darko', 'Yaw Antwi', 'Efua Baah', 'Kofi Asante',
   ];
   const customerIds: number[] = [];
   for (let i = 0; i < CUSTOMER_NAMES.length; i += 1) {
@@ -243,13 +277,14 @@ async function seedCatalogAndBookings(): Promise<void> {
   ];
   const destId = new Map<string, number>();
   for (const d of DESTINATIONS) {
+    const data = { ...d, photo: DEST_PHOTO[d.name] };
     const existing = await prisma.destination.findFirst({
       select: { id: true },
       where: { name: d.name },
     });
     const row = existing
-      ? await prisma.destination.update({ data: d, select: { id: true }, where: { id: existing.id } })
-      : await prisma.destination.create({ data: d, select: { id: true } });
+      ? await prisma.destination.update({ data, select: { id: true }, where: { id: existing.id } })
+      : await prisma.destination.create({ data, select: { id: true } });
     destId.set(d.name, row.id);
   }
 
@@ -279,6 +314,7 @@ async function seedCatalogAndBookings(): Promise<void> {
       destinationId,
       name: h.name,
       phone: '+233555000000',
+      photo: IMG.hotel,
       starRating: h.starRating,
     };
     const existingHotel = await prisma.hotel.findFirst({ select: { id: true }, where: { name: h.name } });
@@ -293,6 +329,7 @@ async function seedCatalogAndBookings(): Promise<void> {
         capacity: rt.capacity,
         description: `${rt.roomType} room at ${h.name}.`,
         hotelId: hotel.id,
+        photo: IMG.room,
         pricePerNight: price,
         roomType: rt.roomType,
         totalRooms: rt.totalRooms,
@@ -352,6 +389,7 @@ async function seedCatalogAndBookings(): Promise<void> {
       endDate,
       maxGuests: t.maxGuests,
       name: t.name,
+      photo: TOUR_TYPE_PHOTO[t.type],
       price: t.price,
       startDate,
       status,
@@ -409,6 +447,7 @@ async function seedCatalogAndBookings(): Promise<void> {
       duration: f.duration,
       flightClass: f.flightClass,
       originId: must(destId.get(f.origin)),
+      photo: IMG.flight,
       price: f.price,
       seatsAvailable: f.capacity,
       status,
@@ -503,104 +542,174 @@ async function seedCatalogAndBookings(): Promise<void> {
     reviewCount += 1;
   };
 
-  for (const customerId of customerIds) {
-    // 1-2 distinct tours per customer (respects @@unique([customerId, tourId])).
-    for (const t of shuffle(tours).slice(0, randInt(1, 2))) {
-      const guests = randInt(1, 4);
-      const status =
-        t.status === TourStatus.CANCELLED
-          ? BookingStatus.CANCELLED
-          : t.status === TourStatus.COMPLETED
-            ? chance(0.85) ? BookingStatus.COMPLETED : BookingStatus.CANCELLED
-            : t.status === TourStatus.ONGOING
-              ? BookingStatus.CONFIRMED
-              : chance(0.6) ? BookingStatus.CONFIRMED : chance(0.6) ? BookingStatus.PENDING : BookingStatus.CANCELLED;
-      const totalPrice = t.price * guests;
-      const when = t.status === TourStatus.UPCOMING
-        ? daysFromNow(-randInt(1, 20))
-        : new Date(t.startDate.getTime() - randInt(5, 40) * DAY);
-      const booking = await prisma.booking.create({
-        data: {
-          bookingDate: when,
-          createdAt: when,
-          createdByUserId: chance(0.3) ? agentId : null,
-          customerId,
-          numberOfGuests: guests,
-          status,
-          totalPrice,
-          tourId: t.id,
-        },
-        select: { id: true },
-      });
-      bookingCount += 1;
-      if (status !== BookingStatus.CANCELLED) {
-        tourGuests.set(t.id, (tourGuests.get(t.id) ?? 0) + guests);
-      }
-      await createPayment(booking.id, customerId, totalPrice, status, when);
-      if (status === BookingStatus.COMPLETED) await maybeReview(booking.id, customerId);
-    }
+  // Per-customer uniqueness guards for the booking constraints.
+  const usedTour = new Set<string>();
+  const usedFlight = new Set<string>();
 
-    // A room stay (at most one per customer).
-    if (chance(0.55) && rooms.length > 0) {
-      const room = pick(rooms);
-      const nights = randInt(2, 7);
-      const numberOfRooms = randInt(1, 2);
-      const startDate = daysFromNow(randInt(-25, 40));
-      const endDate = new Date(startDate.getTime() + nights * DAY);
-      const status = endDate < now
-        ? BookingStatus.COMPLETED
-        : startDate > now
-          ? chance(0.6) ? BookingStatus.CONFIRMED : BookingStatus.PENDING
-          : BookingStatus.CONFIRMED;
-      const totalPrice = room.price * nights * numberOfRooms;
-      const when = new Date(startDate.getTime() - randInt(5, 30) * DAY);
-      const booking = await prisma.booking.create({
-        data: {
-          bookingDate: when,
-          createdAt: when,
-          createdByUserId: chance(0.3) ? agentId : null,
-          customerId,
-          endDate,
-          numberOfGuests: randInt(1, room.capacity),
-          numberOfNights: nights,
-          numberOfRooms,
-          roomId: room.id,
-          startDate,
-          status,
-          totalPrice,
-        },
-        select: { id: true },
-      });
-      bookingCount += 1;
-      await createPayment(booking.id, customerId, totalPrice, status, when);
-      if (status === BookingStatus.COMPLETED) await maybeReview(booking.id, customerId);
+  // Booking status follows how long ago it was made: older bookings have run
+  // their course, recent ones are still confirmed/pending. This spreads
+  // COMPLETED-payment revenue across every month while keeping "this week"
+  // full of live, in-flight bookings.
+  const statusForAge = (when: Date): BookingStatus => {
+    const ageDays = (now.getTime() - when.getTime()) / DAY;
+    if (ageDays > 45) {
+      return chance(0.82) ? BookingStatus.COMPLETED : BookingStatus.CANCELLED;
     }
+    if (ageDays > 7) {
+      const roll = Math.random();
+      return roll < 0.55
+        ? BookingStatus.CONFIRMED
+        : roll < 0.8
+          ? BookingStatus.COMPLETED
+          : BookingStatus.CANCELLED;
+    }
+    return chance(0.5)
+      ? BookingStatus.CONFIRMED
+      : chance(0.75)
+        ? BookingStatus.PENDING
+        : BookingStatus.CANCELLED;
+  };
 
-    // A flight (at most one per customer, so @@unique([customerId, flightId]) holds).
-    if (chance(0.55) && flights.length > 0) {
-      const flight = pick(flights);
-      const guests = randInt(1, 3);
-      const status = chance(0.7) ? BookingStatus.CONFIRMED : BookingStatus.PENDING;
-      const totalPrice = flight.price * guests;
-      const when = daysFromNow(-randInt(1, 25));
-      const booking = await prisma.booking.create({
-        data: {
-          bookingDate: when,
-          createdAt: when,
-          createdByUserId: chance(0.3) ? agentId : null,
-          customerId,
-          flightId: flight.id,
-          numberOfGuests: guests,
-          status,
-          totalPrice,
-        },
-        select: { id: true },
-      });
-      bookingCount += 1;
-      if (status === BookingStatus.CONFIRMED) {
-        flightSeats.set(flight.id, (flightSeats.get(flight.id) ?? 0) + guests);
-      }
-      await createPayment(booking.id, customerId, totalPrice, status, when);
+  const finish = async (
+    bookingId: number,
+    customerId: number,
+    totalPrice: number,
+    status: BookingStatus,
+    when: Date,
+  ): Promise<void> => {
+    bookingCount += 1;
+    await createPayment(bookingId, customerId, totalPrice, status, when);
+    if (status === BookingStatus.COMPLETED) await maybeReview(bookingId, customerId);
+  };
+
+  const bookTour = async (customerId: number, when: Date): Promise<boolean> => {
+    const key = (id: number): string => `${customerId.toString()}:${id.toString()}`;
+    const t = shuffle(tours).find((tour) => !usedTour.has(key(tour.id)));
+    if (!t) return false;
+    usedTour.add(key(t.id));
+    const guests = randInt(1, 4);
+    const status =
+      t.status === TourStatus.CANCELLED ? BookingStatus.CANCELLED : statusForAge(when);
+    const totalPrice = t.price * guests;
+    const booking = await prisma.booking.create({
+      data: {
+        bookingDate: when,
+        createdAt: when,
+        createdByUserId: chance(0.3) ? agentId : null,
+        customerId,
+        numberOfGuests: guests,
+        status,
+        totalPrice,
+        tourId: t.id,
+      },
+      select: { id: true },
+    });
+    if (status !== BookingStatus.CANCELLED) {
+      tourGuests.set(t.id, (tourGuests.get(t.id) ?? 0) + guests);
+    }
+    await finish(booking.id, customerId, totalPrice, status, when);
+    return true;
+  };
+
+  const bookRoom = async (customerId: number, when: Date): Promise<void> => {
+    const room = pick(rooms);
+    const nights = randInt(2, 7);
+    const numberOfRooms = randInt(1, 2);
+    const startDate = new Date(when.getTime() + randInt(3, 45) * DAY);
+    const endDate = new Date(startDate.getTime() + nights * DAY);
+    const status = statusForAge(when);
+    const totalPrice = room.price * nights * numberOfRooms;
+    const booking = await prisma.booking.create({
+      data: {
+        bookingDate: when,
+        createdAt: when,
+        createdByUserId: chance(0.3) ? agentId : null,
+        customerId,
+        endDate,
+        numberOfGuests: randInt(1, room.capacity),
+        numberOfNights: nights,
+        numberOfRooms,
+        roomId: room.id,
+        startDate,
+        status,
+        totalPrice,
+      },
+      select: { id: true },
+    });
+    await finish(booking.id, customerId, totalPrice, status, when);
+  };
+
+  const bookFlight = async (customerId: number, when: Date): Promise<boolean> => {
+    const key = (id: number): string => `${customerId.toString()}:${id.toString()}`;
+    const f = shuffle(flights).find((flight) => !usedFlight.has(key(flight.id)));
+    if (!f) return false;
+    usedFlight.add(key(f.id));
+    const guests = randInt(1, 3);
+    const status = statusForAge(when);
+    const totalPrice = f.price * guests;
+    const booking = await prisma.booking.create({
+      data: {
+        bookingDate: when,
+        createdAt: when,
+        createdByUserId: chance(0.3) ? agentId : null,
+        customerId,
+        flightId: f.id,
+        numberOfGuests: guests,
+        status,
+        totalPrice,
+      },
+      select: { id: true },
+    });
+    if (status === BookingStatus.CONFIRMED || status === BookingStatus.COMPLETED) {
+      flightSeats.set(f.id, (flightSeats.get(f.id) ?? 0) + guests);
+    }
+    await finish(booking.id, customerId, totalPrice, status, when);
+    return true;
+  };
+
+  // Booking dates across the current year (plus December of last year for the
+  // previous-window trend), weighted toward the current month and the last 7
+  // days - so this-week / this-month / last-month / this-year charts all carry
+  // data and the year view runs across every month.
+  const bookingDates: Date[] = [];
+  const addDate = (d: Date): void => {
+    if (d <= now) bookingDates.push(d);
+  };
+  let month = new Date(now.getFullYear() - 1, 11, 1);
+  while (month <= now) {
+    const isCurrent =
+      month.getFullYear() === now.getFullYear() &&
+      month.getMonth() === now.getMonth();
+    const perMonth = isCurrent ? 20 : 11;
+    const lastDay = isCurrent
+      ? Math.max(1, now.getDate())
+      : new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    for (let i = 0; i < perMonth; i += 1) {
+      addDate(
+        new Date(
+          month.getFullYear(),
+          month.getMonth(),
+          randInt(1, lastDay),
+          randInt(8, 20),
+          randInt(0, 59),
+        ),
+      );
+    }
+    month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+  }
+  for (let i = 0; i < 14; i += 1) {
+    addDate(new Date(now.getTime() - Math.floor(rand(0, 7 * DAY))));
+  }
+
+  for (const when of bookingDates) {
+    const customerId = pick(customerIds);
+    const roll = Math.random();
+    if (roll < 0.6) {
+      if (!(await bookTour(customerId, when))) await bookRoom(customerId, when);
+    } else if (roll < 0.82) {
+      await bookRoom(customerId, when);
+    } else if (!(await bookFlight(customerId, when))) {
+      await bookRoom(customerId, when);
     }
   }
 
