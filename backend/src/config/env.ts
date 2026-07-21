@@ -97,7 +97,8 @@ const ENV = {
    * DEMO_ADMIN_EMAIL has no default: the demo admin IS the seeded admin, so
    * point it at ADMIN_EMAIL (an unset/unseeded email just 404s that role).
    * Never NEXT_PUBLIC_* — no credentials ever reach the client. */
-  DEMO_ADMIN_EMAIL: envOptional('DEMO_ADMIN_EMAIL'),
+  DEMO_ADMIN_EMAIL:
+    envOptional('DEMO_ADMIN_EMAIL') ?? 'abdulmajeednurudeen47@gmail.com',
   DEMO_AGENT_EMAIL:
     envOptional('DEMO_AGENT_EMAIL') ?? 'demo.agent@traveltrek.app',
   DEMO_CUSTOMER_EMAIL:
@@ -111,7 +112,8 @@ const ENV = {
   FRONTEND_URL: envOptional('FRONTEND_URL') ?? 'http://localhost:3000',
   /** OAuth client id for Google sign-in; unset disables the endpoint (503). */
   GOOGLE_CLIENT_ID: envOptional('GOOGLE_CLIENT_ID'),
-  MAIL_FROM_EMAIL: envOptional('MAIL_FROM_EMAIL') ?? 'no-reply@traveltrek.local',
+  MAIL_FROM_EMAIL:
+    envOptional('MAIL_FROM_EMAIL') ?? 'no-reply@traveltrek.local',
   MAIL_FROM_NAME: envOptional('MAIL_FROM_NAME') ?? 'TravelTrek',
   NODE_ENV,
   /**
