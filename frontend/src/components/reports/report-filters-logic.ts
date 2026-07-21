@@ -24,7 +24,7 @@ export type ReportPreset = (typeof REPORT_PRESETS)[number];
 /** The period control's value: a preset or an explicit custom range. */
 export type PeriodSelection = ReportPreset | "CUSTOM";
 
-export const DEFAULT_PRESET: PeriodSelection = "THIS_MONTH";
+export const DEFAULT_PRESET: PeriodSelection = "THIS_YEAR";
 
 export const PRESET_LABELS: Record<PeriodSelection, string> = {
   TODAY: "Today",
