@@ -4,6 +4,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import SignupForm from "@/components/authentication/SignupForm";
@@ -110,7 +111,20 @@ export default function SignupPage() {
               )}
 
               <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                By signing up, you agree to the terms of service
+                By signing up, you agree to the{" "}
+                <Link
+                  href="/terms-of-service"
+                  className="underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  terms of service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy-policy"
+                  className="underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  privacy policy
+                </Link>
               </p>
             </div>
           </div>

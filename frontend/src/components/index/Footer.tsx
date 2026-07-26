@@ -103,9 +103,23 @@ const Footer = ({ numbered = true }: { numbered?: boolean }) => (
 
       <div className="flex flex-col gap-2 border-t border-white/10 py-6 text-night-foreground/55 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
         <p className="text-xs">© 2026 Nurudeen Abdul-Majeed</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em]">
-          TT-2026 · Built to show full-stack range
-        </p>
+        <div className="flex items-center gap-5">
+          <Link
+            href="/privacy-policy"
+            className="text-xs transition-colors hover:text-night-foreground"
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms-of-service"
+            className="text-xs transition-colors hover:text-night-foreground"
+          >
+            Terms
+          </Link>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em]">
+            TT-2026 · Built to show full-stack range
+          </p>
+        </div>
       </div>
     </div>
   </footer>
