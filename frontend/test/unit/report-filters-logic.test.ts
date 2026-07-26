@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countActiveFilters,
+  DEFAULT_PRESET,
   INLINE_FILTER_THRESHOLD,
   isInlineFilterBar,
   periodToParams,
@@ -105,15 +106,17 @@ describe("periodToParams", () => {
 
 describe("countActiveFilters", () => {
   it("counts set entity filters", () => {
-    expect(countActiveFilters("THIS_MONTH", [undefined, undefined])).toBe(0);
-    expect(countActiveFilters("THIS_MONTH", ["CONFIRMED", undefined])).toBe(1);
-    expect(countActiveFilters("THIS_MONTH", ["CONFIRMED", "ADVENTURE"])).toBe(2);
+    expect(countActiveFilters(DEFAULT_PRESET, [undefined, undefined])).toBe(0);
+    expect(countActiveFilters(DEFAULT_PRESET, ["CONFIRMED", undefined])).toBe(1);
+    expect(countActiveFilters(DEFAULT_PRESET, ["CONFIRMED", "ADVENTURE"])).toBe(
+      2,
+    );
   });
 
   it("counts a non-default period as one filter", () => {
     expect(countActiveFilters("LAST_MONTH", [])).toBe(1);
     expect(countActiveFilters("CUSTOM", ["CONFIRMED"])).toBe(2);
-    expect(countActiveFilters("THIS_MONTH", [])).toBe(0);
+    expect(countActiveFilters(DEFAULT_PRESET, [])).toBe(0);
   });
 });
 
