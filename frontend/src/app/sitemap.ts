@@ -3,7 +3,7 @@ import { siteUrl } from "@/lib/site";
 
 /**
  * The landing page, the live demo, and the legal documents are the only
- * public, indexable surfaces — everything else sits behind authentication.
+ * public, indexable surfaces - everything else sits behind authentication.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

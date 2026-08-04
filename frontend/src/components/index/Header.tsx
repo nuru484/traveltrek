@@ -54,7 +54,7 @@ const Header = () => {
               </span>
             </Link>
 
-            {/* Anchor nav — desktop only; phones get the bottom bar */}
+            {/* Anchor nav - desktop only; phones get the bottom bar */}
             <nav className="hidden md:flex items-center gap-6">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -78,7 +78,7 @@ const Header = () => {
         </div>
       </header>
 
-      {/* Phone bottom bar — icon tabs, safe-area aware. Pages that render
+      {/* Phone bottom bar - icon tabs, safe-area aware. Pages that render
           this header add pb so the last content isn't covered. */}
       <nav
         aria-label="Sections"

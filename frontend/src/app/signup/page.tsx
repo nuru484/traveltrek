@@ -34,7 +34,7 @@ export default function SignupPage() {
   });
 
   // Minimal registration mirroring backend registerUserSchema: name + ONE
-  // contact (email or phone), password optional — passwordless accounts sign
+  // contact (email or phone), password optional - passwordless accounts sign
   // in with a one-time code.
   async function onSubmit(data: z.infer<typeof signupFormSchema>) {
     try {

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 /**
  * Last-resort boundary for errors thrown in the root layout itself. It
  * replaces the whole document, so it renders its own <html>/<body> and can't
- * rely on the global stylesheet — everything is inline-styled and
+ * rely on the global stylesheet - everything is inline-styled and
  * self-contained, in the landing page's paper-and-ink palette.
  */
 export default function GlobalError({
@@ -88,7 +88,7 @@ export default function GlobalError({
                 color: "#5b6b82",
               }}
             >
-              An unexpected error kept the app from loading. Try again — if it
+              An unexpected error kept the app from loading. Try again. If it
               keeps happening, come back in a moment.
             </p>
             <div style={{ marginTop: 28 }}>

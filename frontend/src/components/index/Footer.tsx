@@ -22,7 +22,7 @@ const Footer = ({ numbered = true }: { numbered?: boolean }) => (
             Nurudeen Abdul-Majeed
           </h2>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-night-foreground/65">
-            Full-stack developer in Tamale, Ghana — available for remote work.
+            Full-stack developer in Tamale, Ghana, available for remote work.
             Travel Trek is one project; the approach travels.
           </p>
           <div className="mt-7">
@@ -49,7 +49,7 @@ const Footer = ({ numbered = true }: { numbered?: boolean }) => (
             <ul className="mt-3 space-y-2 text-sm text-night-foreground/80">
               <li>
                 {/* The address itself lives behind the link (and the "Get in
-                    touch" button) — no 34-char string to wrap on phones. */}
+                    touch" button) - no 34-char string to wrap on phones. */}
                 <a
                   href={`mailto:${CONTACT_EMAIL}`}
                   className="inline-flex items-center gap-1 hover:text-night-foreground transition-colors"

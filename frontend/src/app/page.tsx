@@ -7,7 +7,7 @@ import GateCallSection from "@/components/index/GateCallSection";
 import Footer from "@/components/index/Footer";
 
 // Fully static: the landing is the portfolio pitch, and the live showcase
-// (real rows from the public API) lives on its own page at /demo — the gate
+// (real rows from the public API) lives on its own page at /demo - the gate
 // call below hands off to it, so this page renders with zero backend calls.
 const page = () => (
   // pb clears the phone bottom nav bar rendered by Header.

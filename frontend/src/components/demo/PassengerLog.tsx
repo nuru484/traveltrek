@@ -19,7 +19,7 @@ const PassengerLog = ({ reviews }: { reviews: IPublicReview[] }) => {
           What travellers <span className="italic">wrote back.</span>
         </h2>
         <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Verified reviews from completed bookings in the demo — customers can
+          Verified reviews from completed bookings in the demo. Customers can
           only review trips they actually took.
         </p>
 
@@ -46,7 +46,7 @@ const PassengerLog = ({ reviews }: { reviews: IPublicReview[] }) => {
                 </p>
               )}
               <p className="mt-auto border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                — {review.reviewer}
+                - {review.reviewer}
               </p>
             </li>
           ))}

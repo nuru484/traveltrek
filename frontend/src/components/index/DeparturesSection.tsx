@@ -1,4 +1,4 @@
-// The four booking modules, laid out as a departures board — the product's
+// The four booking modules, laid out as a departures board - the product's
 // own vernacular. Codes, details, and statuses are real, not decorative.
 
 const MODULES = [
@@ -50,7 +50,7 @@ const DeparturesSection = () => (
       </h2>
 
       <div className="mt-10 sm:mt-14">
-        {/* Board header — only where the columns actually exist */}
+        {/* Board header - only where the columns actually exist */}
         <div className="hidden md:grid grid-cols-[100px_1.1fr_1.6fr_auto] gap-6 border-b border-foreground/15 pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           <span>Flt no.</span>
           <span>Module</span>

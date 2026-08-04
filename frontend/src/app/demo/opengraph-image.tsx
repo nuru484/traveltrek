@@ -1,18 +1,18 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Travel Trek live demo — real tours, hotels, flights and reviews from the running system. Now boarding.";
+  "Travel Trek live demo: real tours, hotels, flights and reviews from the running system. Now boarding.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Landing palette (globals.css) as hex — Satori doesn't parse oklch.
+// Landing palette (globals.css) as hex - Satori doesn't parse oklch.
 const NIGHT = "#16233a";
 const NIGHT_TEXT = "#eef2f8";
 const NIGHT_MUTED = "#8fa0b8";
 const BOARD_LINE = "#2b3a55";
 const ACCENT = "#2aa8a0";
 
-/** The demo board's rows — statuses only; live counts belong to the page. */
+/** The demo board's rows - statuses only; live counts belong to the page. */
 const BOARD_ROWS: [row: string, status: string][] = [
   ["TOURS", "BOARDING"],
   ["DESTINATIONS", "ROUTE MAP"],
@@ -90,8 +90,8 @@ export default function OpengraphImage() {
             color: NIGHT_MUTED,
           }}
         >
-          Real rows from the running system, served by its public API — sign
-          in and book any of it.
+          Real rows from the running system, served by its public API. Sign in
+          and book any of it.
         </div>
 
         {/* The board */}

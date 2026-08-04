@@ -1,5 +1,5 @@
 // The demo page's hero: a flight-information board on the night band. The
-// board rows are real — each one is a live count from the public API, so the
+// board rows are real - each one is a live count from the public API, so the
 // board reads differently every time the inventory changes (and says so,
 // honestly, when the backend is idle).
 import Link from "next/link";
@@ -14,7 +14,7 @@ interface BoardRow {
   status: string;
 }
 
-/** Two-digit board count — "06", not "6"; boards pad. */
+/** Two-digit board count - "06", not "6"; boards pad. */
 const boardCount = (n: number) => String(n).padStart(2, "0");
 
 const boardRows = (data: IShowcaseData): BoardRow[] => [
@@ -41,7 +41,7 @@ const DemoBoard = ({ data }: { data: IShowcaseData }) => {
               }`}
               aria-hidden
             />
-            {live ? "Live — revalidates every 5 min" : "Demo idle"}
+            {live ? "Live · revalidates every 5 min" : "Demo idle"}
           </span>
         </p>
 
@@ -52,7 +52,7 @@ const DemoBoard = ({ data }: { data: IShowcaseData }) => {
         <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <p className="max-w-xl text-[15px] leading-relaxed text-night-foreground/75 sm:text-base">
             Everything on this page is a real row from the running system,
-            served by its public API — not a mockup. Sign in with a demo
+            served by its public API, not a mockup. Sign in with a demo
             account and book any of it; the dashboard takes over from there.
           </p>
 
@@ -78,7 +78,7 @@ const DemoBoard = ({ data }: { data: IShowcaseData }) => {
           </div>
         </div>
 
-        {/* The board itself — live counts, padded like a real terminal display */}
+        {/* The board itself - live counts, padded like a real terminal display */}
         <div className="mt-10 overflow-hidden rounded-xl border border-night-foreground/15 sm:mt-12">
           <div className="grid grid-cols-[1fr_auto_auto] gap-x-6 border-b border-night-foreground/15 bg-night-foreground/5 px-4 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-night-foreground/50 sm:px-5">
             <span>Row</span>
@@ -98,7 +98,7 @@ const DemoBoard = ({ data }: { data: IShowcaseData }) => {
                   {boardCount(row.count)}
                 </span>
                 <span className="w-20 text-right font-mono text-[9px] uppercase tracking-[0.15em] text-night-foreground/50 sm:w-24 sm:text-[10px]">
-                  {row.count > 0 ? row.status : "—"}
+                  {row.count > 0 ? row.status : "-"}
                 </span>
               </li>
             ))}

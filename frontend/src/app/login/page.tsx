@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [demoLoginUser, { isLoading: isDemoLoading }] = useDemoLoginMutation();
 
   // A 2FA account's password step answers { twoFactorRequired: true } with
-  // no session — the card swaps to the code step until verify completes.
+  // no session - the card swaps to the code step until verify completes.
   const [twoFactorPending, setTwoFactorPending] = React.useState(false);
 
   const form = useForm<ILoginFormSchema>({
@@ -90,7 +90,7 @@ export default function LoginPage() {
     }
   };
 
-  // Boarding-style role codes instead of icons — matches the landing's
+  // Boarding-style role codes instead of icons - matches the landing's
   // document vocabulary.
   const demoAccounts = [
     {

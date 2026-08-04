@@ -1,6 +1,6 @@
 // The gate call: the landing page's hand-off to the live demo, which lives
 // on its own page (/demo) so this one can stay a portfolio piece. One night
-// card in the boarding-pass vernacular — a gate monitor announcing that the
+// card in the boarding-pass vernacular - a gate monitor announcing that the
 // system it just described is running right now.
 import Link from "next/link";
 import { ArrowRight, Plane } from "lucide-react";
@@ -16,7 +16,7 @@ const GateCallSection = () => (
         The demo is <span className="italic">live.</span>
       </h2>
 
-      {/* Gate monitor — same night surface as the boarding pass header */}
+      {/* Gate monitor - same night surface as the boarding pass header */}
       <div className="mt-10 overflow-hidden rounded-xl border border-foreground/20 bg-night text-night-foreground sm:mt-14">
         <div className="flex items-center justify-between gap-3 border-b border-night-foreground/15 px-5 py-2.5 sm:px-7">
           <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-night-foreground/70">
@@ -36,8 +36,8 @@ const GateCallSection = () => (
         <div className="flex flex-col gap-6 px-5 py-7 sm:px-7 sm:py-8 lg:flex-row lg:items-center lg:justify-between">
           <p className="max-w-xl text-[15px] leading-relaxed text-night-foreground/75 sm:text-base">
             Real tours, hotels, flights and reviews from the running system,
-            served by its public API — browse the inventory, then sign in with
-            a demo account and book any of it.
+            served by its public API. Browse the inventory, then sign in with a
+            demo account and book any of it.
           </p>
 
           <div className="flex flex-col gap-3 min-[420px]:flex-row lg:flex-none">

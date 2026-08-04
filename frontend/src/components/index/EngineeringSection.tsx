@@ -13,13 +13,13 @@ const DECISIONS = [
     tag: "Money",
     title: "Integer pesewas only",
     detail:
-      "Every amount is an integer in minor units from database to API — no floats near money. One formatter renders GH₵ at the edge; Paystack collects, webhook-verified.",
+      "Every amount is an integer in minor units from database to API. No floats near money. One formatter renders GH₵ at the edge; Paystack collects, webhook-verified.",
   },
   {
     tag: "Data",
     title: "PostgreSQL + Prisma",
     detail:
-      "A relational schema built for booking integrity — flights, hotels, rooms, tours, and payments in one typed model, with soft deletes auto-scoped out of every read.",
+      "A relational schema built for booking integrity: flights, hotels, rooms, tours, and payments in one typed model, with soft deletes auto-scoped out of every read.",
   },
   {
     tag: "Queues",
@@ -37,7 +37,7 @@ const DECISIONS = [
     tag: "Testing",
     title: "450+ tests in CI",
     detail:
-      "Over 340 integration tests exercise every endpoint against a real Postgres, plus a frontend suite — lint, types, tests, and build gate every merge.",
+      "Over 340 integration tests exercise every endpoint against a real Postgres, plus a frontend suite. Lint, types, tests, and build gate every merge.",
   },
 ];
 
@@ -57,8 +57,8 @@ const EngineeringSection = () => (
           </h2>
         </div>
         <p className="max-w-xs text-sm leading-relaxed text-night-foreground/60">
-          Not a demo. Every layer — validation, queues, payments, access
-          control — is built the way a production team would ship it.
+          Not a demo. Validation, queues, payments, access control: every layer
+          is built the way a production team would ship it.
         </p>
       </div>
 

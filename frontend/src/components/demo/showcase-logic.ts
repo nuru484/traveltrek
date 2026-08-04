@@ -1,13 +1,13 @@
 // src/components/demo/showcase-logic.ts
 //
-// Pure decisions for the live-demo showcase — extracted so the
+// Pure decisions for the live-demo showcase - extracted so the
 // degrade-when-the-backend-is-down behaviour is unit-testable without
 // rendering server components.
 import type { IShowcaseData } from "@/lib/public-api";
 
 /**
  * Booking CTAs on showcase cards land on the sign-in page and bounce into
- * the dashboard after auth — loginRedirectPath() only honors /dashboard
+ * the dashboard after auth - loginRedirectPath() only honors /dashboard
  * paths, so the target must live under /dashboard.
  */
 export function demoHref(dashboardPath: string): string {
@@ -29,7 +29,7 @@ export function hasTestimonials(data: IShowcaseData): boolean {
   return data.reviews.length > 0;
 }
 
-/** "City, Country" — city omitted when the seed left it null. */
+/** "City, Country" - city omitted when the seed left it null. */
 export function destinationLine(destination: {
   city: string | null;
   country: string;

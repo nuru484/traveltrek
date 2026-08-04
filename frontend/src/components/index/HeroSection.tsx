@@ -6,7 +6,7 @@ import { ArrowRight, Github, Plane } from "lucide-react";
 
 /**
  * Dashed flight path drawn under the hero's italic line, ending in a small
- * plane — the page's one accent-colored flourish.
+ * plane - the page's one accent-colored flourish.
  */
 const FlightPath = ({ reduced }: { reduced: boolean }) => (
   <svg
@@ -52,7 +52,7 @@ const PassField = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-/** CSS barcode — irregular vertical bars, no image needed. */
+/** CSS barcode - irregular vertical bars, no image needed. */
 const Barcode = () => (
   <div
     aria-hidden
@@ -66,7 +66,7 @@ const Barcode = () => (
 
 /**
  * The page's signature: the project's spec sheet rendered as a boarding
- * pass — perforated stub, punched notches, barcode. Every field is real
+ * pass - perforated stub, punched notches, barcode. Every field is real
  * project metadata, not decoration.
  */
 const BoardingPass = ({ reduced }: { reduced: boolean }) => (
@@ -91,7 +91,7 @@ const BoardingPass = ({ reduced }: { reduced: boolean }) => (
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4 p-4 min-[480px]:grid-cols-3 sm:p-5">
           <PassField label="Passenger" value="Nurudeen Abdul-Majeed" />
-          <PassField label="Role" value="Solo — design & engineering" />
+          <PassField label="Role" value="Solo - design & engineering" />
           <PassField label="Route" value="Schema → Screen" />
           <PassField label="Type" value="Production booking system" />
           <PassField label="Stack" value="Next.js · Express · PostgreSQL" />
@@ -110,7 +110,7 @@ const BoardingPass = ({ reduced }: { reduced: boolean }) => (
         </dl>
       </div>
 
-      {/* Perforation — punched notches show the band behind the pass */}
+      {/* Perforation - punched notches show the band behind the pass */}
       <div className="relative border-t border-dashed border-foreground/25 sm:border-t-0 sm:border-l">
         <span
           aria-hidden
@@ -181,8 +181,8 @@ const HeroSection = () => {
             {...fadeUp(0.16)}
             className="max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base"
           >
-            Travel Trek is a production-ready booking system — flights, hotels,
-            tours and payments — with secure authentication, real-time
+            Travel Trek is a production-ready booking system for flights,
+            hotels, tours and payments, with secure authentication, real-time
             availability, and a full admin layer. Designed and engineered solo,
             from schema to screen.
           </motion.p>

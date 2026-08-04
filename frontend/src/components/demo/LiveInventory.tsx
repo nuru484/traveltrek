@@ -26,7 +26,7 @@ const LiveInventory = ({ data }: { data: IShowcaseData }) => {
             </p>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
               The demo backend isn&apos;t reachable right now, so there&apos;s
-              nothing at the gate. Check back shortly — the board refreshes
+              nothing at the gate. Check back shortly; the board refreshes
               itself every five minutes.
             </p>
           </div>

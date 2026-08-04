@@ -1,5 +1,5 @@
 // Slim header for the demo page: a way back to the portfolio on the left,
-// the way into the system on the right. No section tabs — this page is the
+// the way into the system on the right. No section tabs - this page is the
 // destination, not the pitch.
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";

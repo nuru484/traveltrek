@@ -39,7 +39,7 @@ export default function Error({
             Something went wrong.
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            We hit an unexpected error loading this page. Try again — if it
+            We hit an unexpected error loading this page. Try again. If it
             keeps happening, head back to the start.
           </p>
           <div className="mt-7 flex flex-col justify-center gap-3 min-[380px]:flex-row">

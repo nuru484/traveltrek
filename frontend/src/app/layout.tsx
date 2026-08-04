@@ -26,7 +26,7 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
-// Utility face for the landing page's "travel document" details — boarding
+// Utility face for the landing page's "travel document" details - boarding
 // pass fields, departure codes, manifest rows.
 const plexMono = IBM_Plex_Mono({
   variable: "--font-mono-plex",
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   alternates: { canonical: "/" },
   // og:image and twitter:image come from app/opengraph-image.tsx (the
-  // boarding-pass card) — listing images here would override it.
+  // boarding-pass card) - listing images here would override it.
   openGraph: {
     title: siteConfig.title,
     description: siteConfig.description,

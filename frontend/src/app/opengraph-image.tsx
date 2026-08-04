@@ -1,11 +1,11 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Travel Trek — a travel and tour booking platform: flights, hotels, tours, and payments.";
+  "Travel Trek, a travel and tour booking platform: flights, hotels, tours, and payments.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Landing palette (globals.css) as hex — Satori doesn't parse oklch.
+// Landing palette (globals.css) as hex - Satori doesn't parse oklch.
 const PAPER = "#e8edf5";
 const CARD = "#ffffff";
 const INK = "#1f2937";
@@ -14,7 +14,7 @@ const NIGHT_TEXT = "#eef2f8";
 const MUTED = "#5b6b82";
 const ACCENT = "#2aa8a0";
 
-/** Barcode as a flex row of bars — Satori has no repeating gradients. */
+/** Barcode as a flex row of bars - Satori has no repeating gradients. */
 const BAR_WIDTHS = [
   3, 2, 5, 2, 3, 6, 2, 4, 2, 6, 3, 2, 5, 3, 2, 4, 6, 2, 3, 5, 2, 4, 2, 6, 3,
   2, 5, 2, 4, 3,
@@ -97,7 +97,7 @@ export default function OpengraphImage() {
                 </div>
               </div>
 
-              {/* Conversion line — the card should invite a click */}
+              {/* Conversion line - the card should invite a click */}
               <div style={{ display: "flex" }}>
                 <div
                   style={{
