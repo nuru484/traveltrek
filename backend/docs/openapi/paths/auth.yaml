@@ -1,0 +1,361 @@
+# Session lifecycle. The account-management half of /auth (password, email and
+# phone changes) lives in paths/account.yaml.
+
+/api/v1/auth/register-user:
+  post:
+    tags: [Auth]
+    operationId: registerCustomer
+    summary: Create a customer account
+    description: |
+      Public signup. Always creates a **customer**: there is no role concept on
+      this surface, and a `role` key in the body is stripped rather than
+      honored, so this endpoint cannot be used to mint staff.
+
+      Supply an email or a phone number, or both. A password is optional;
+      leaving it out creates a passwordless account that signs in with a
+      one-time code, which is what makes the phone-only path work.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `profilePicture`
+      is a file part that is uploaded to Cloudinary and replaced by its URL
+      before the account is written, so a failed upload cannot leave a row
+      pointing at nothing.
+
+      On success the session cookies are set, so a new account is signed in
+      immediately without a second round trip.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RegisterRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/RegisterRequest' }
+    responses:
+      '201':
+        description: Account created and signed in.
+        headers:
+          Set-Cookie:
+            description: '`accessToken` and `refreshToken`.'
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '409': { $ref: '#/components/responses/Conflict' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/login:
+  post:
+    tags: [Auth]
+    operationId: login
+    summary: Sign in with email and password
+    description: |
+      Resolves the email against staff and customers alike, so both principal
+      types use this one endpoint.
+
+      There are two possible 200 responses. Normally the session cookies are
+      set and the account is returned. If the account has two-factor enabled,
+      no session is created; a ten-minute pending cookie is set instead and the
+      response carries `twoFactorRequired: true`, and the client continues at
+      `POST /api/v1/auth/2fa/verify`.
+
+      Rate limited to 10 **failed** attempts per 15 minutes. Successful logins
+      are not counted, so a legitimate user is never locked out by their own
+      activity.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/LoginRequest' }
+    responses:
+      '200':
+        description: Signed in, or a second factor is required.
+        headers:
+          Set-Cookie:
+            description: |
+              `accessToken` and `refreshToken` on a completed sign-in, or
+              `twoFactorPending` when a second factor is needed.
+            schema: { type: string }
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/SessionResponse'
+                - $ref: '#/components/schemas/TwoFactorRequiredResponse'
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: Wrong email or password. Deliberately identical for both.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/demo-login:
+  post:
+    tags: [Auth]
+    operationId: demoLogin
+    summary: Sign in as a seeded demo account
+    description: |
+      One-click sign-in for evaluating the system. The server holds the demo
+      credentials and picks the account, so no password is sent and none needs
+      publishing.
+
+      **This is the endpoint to call first when trying the API from this page.**
+      It sets the session cookie, after which every authenticated endpoint here
+      works without further setup.
+
+      Gated by a server-side flag that is off by default, so a deployment that
+      has not enabled it answers 403. That gate is the reason a demo account
+      cannot be reached on an installation carrying real customer data.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/DemoLoginRequest' }
+    responses:
+      '200':
+        description: Signed in as the demo principal for the requested role.
+        headers:
+          Set-Cookie:
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '403':
+        description: Demo login is disabled on this deployment.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404':
+        description: Demo login is enabled but no demo account is seeded for that role.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/2fa/verify:
+  post:
+    tags: [Auth]
+    operationId: verifyLoginTwoFactor
+    summary: Complete a two-factor sign-in
+    description: |
+      Second step of a password login for an account with two-factor enabled.
+      Authorized by the `twoFactorPending` cookie set by the first step, not by
+      a session. If that cookie is missing or expired the client must start the
+      login again.
+    security:
+      - twoFactorPendingCookie: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TwoFactorCodeRequest' }
+    responses:
+      '200':
+        description: Signed in. Session cookies set, pending cookie cleared.
+        headers:
+          Set-Cookie:
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: The pending login expired, or the code was wrong or already used.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/2fa/resend:
+  post:
+    tags: [Auth]
+    operationId: resendLoginTwoFactor
+    summary: Resend the two-factor code
+    description: |
+      Issues a fresh code for a login already waiting on its second factor.
+      Authorized by the same pending cookie, so it cannot be used to send codes
+      to an account the caller has not already proved the password for.
+    security:
+      - twoFactorPendingCookie: []
+    responses:
+      '200':
+        description: A new code was dispatched.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '401':
+        description: The pending login expired. Start the login again.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/otp/request:
+  post:
+    tags: [Auth]
+    operationId: requestLoginOtp
+    summary: Request a one-time login code
+    description: |
+      Passwordless sign-in, step one, for accounts created without a password.
+
+      Exactly one of `email` or `phone` must be supplied. Sending both is a
+      validation error rather than a silent preference, so the delivery channel
+      is never ambiguous.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OtpRequestBody' }
+    responses:
+      '200':
+        description: |
+          Accepted. A code was sent if the account exists.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/otp/verify:
+  post:
+    tags: [Auth]
+    operationId: verifyLoginOtp
+    summary: Sign in with a one-time code
+    description: |
+      Passwordless sign-in, step two. On success the session cookies are set
+      exactly as they are for a password login. This path bypasses two-factor,
+      because possession of the code already proves control of the contact a
+      second factor would be sent to.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OtpVerifyRequest' }
+    responses:
+      '200':
+        description: Signed in.
+        headers:
+          Set-Cookie:
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: The code was wrong, expired, or already used.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/google:
+  post:
+    tags: [Auth]
+    operationId: googleSignIn
+    summary: Sign in with Google
+    description: |
+      Exchanges a Google ID token for a session. The token is verified
+      server-side against Google's published keys, so the client never asserts
+      who the user is; it only relays what Google signed.
+
+      Creates a customer account on first use. Like the one-time code path,
+      this bypasses two-factor, because Google has already authenticated the
+      person.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GoogleSignInRequest' }
+    responses:
+      '200':
+        description: Signed in.
+        headers:
+          Set-Cookie:
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: The Google token was invalid, expired, or issued to another client.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/refresh-token:
+  post:
+    tags: [Auth]
+    operationId: refreshSession
+    summary: Rotate the session
+    description: |
+      Exchanges the refresh cookie for a fresh access and refresh pair.
+
+      Rotation is one-time-use: each refresh consumes its token id. Presenting
+      a consumed token is treated as theft rather than a retry, and invalidates
+      every outstanding token for that account, which forces a re-login on all
+      devices.
+    security:
+      - refreshCookie: []
+    responses:
+      '200':
+        description: New cookie pair set.
+        headers:
+          Set-Cookie:
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionResponse' }
+      '401':
+        description: |
+          The refresh cookie was missing, expired, or already consumed. A
+          consumed token also revokes the whole family.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/logout:
+  post:
+    tags: [Auth]
+    operationId: logout
+    summary: Sign out
+    description: |
+      Revokes the refresh token server-side and clears every auth cookie.
+      Always answers 200, including when there was no session to begin with, so
+      a client can log out without first checking whether it is signed in.
+    security: []
+    responses:
+      '200':
+        description: Signed out. Cookies cleared.
+        headers:
+          Set-Cookie:
+            description: Expired `accessToken`, `refreshToken`, and `twoFactorPending`.
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+
+/api/v1/auth/2fa/status:
+  get:
+    tags: [Auth]
+    operationId: getTwoFactorStatus
+    summary: Whether two-factor is on, and where codes go
+    description: |
+      Reports the signed-in account's own two-factor state. The channel is
+      derived from the contact on file, which is why an account with no phone
+      can only ever receive codes by email.
+    responses:
+      '200':
+        description: The current two-factor state.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoFactorStatusResponse' }
+      '401': { $ref: '#/components/responses/Unauthorized' }

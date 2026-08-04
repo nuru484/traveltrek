@@ -1,0 +1,736 @@
+# Two staff-facing domains in one file: flight inventory and the staff roster.
+#
+# They share a shape. Both are managed surfaces behind a session, both are
+# gated by role at the route and then narrowed again by rules that need the
+# stored row, and in both the interesting behaviour is what the server refuses
+# rather than what it accepts. Those refusals are documented per operation,
+# because a 400 here usually means "the state does not allow that", not "your
+# JSON was malformed".
+
+/api/v1/flights:
+  post:
+    tags: [Flights]
+    operationId: createFlight
+    summary: Create a flight
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403.
+
+      Accepts `application/json` or `multipart/form-data`. Under multipart the
+      `flightPhoto` file part is uploaded to Cloudinary and replaced by its URL
+      before the row is written, and if the insert is then refused the upload
+      is reclaimed, so a rejected request never leaves an orphaned image or a
+      row pointing at nothing.
+
+      Boundary checks come first: the flight number must match the airline
+      format, departure must be in the future, arrival must follow it by at
+      least 30 minutes, and origin and destination must differ. Both endpoints
+      are then looked up in the database, and a soft-deleted destination counts
+      as missing, which is a 404 rather than a validation error because
+      nothing about the payload was wrong.
+
+      The new flight is always `SCHEDULED`; the lifecycle endpoint owns every
+      later value. `seatsAvailable` is seeded to `capacity` and is not a field
+      a client sets: from here on it moves only through the booking path, which
+      claims seats inside a transaction with a guarded atomic decrement.
+
+      Flight numbers are unique at the database level and the constraint spans
+      soft-deleted rows, so a retired flight keeps holding its number and
+      reusing it answers 409.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FlightCreateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/FlightCreateRequest' }
+    responses:
+      '201':
+        description: Flight created, `SCHEDULED`, with every seat available.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: The origin or the destination does not exist, or has been soft-deleted.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: That flight number is already held by another flight, soft-deleted ones included.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Flights]
+    operationId: listFlights
+    summary: List flights
+    description: |
+      **Any signed-in principal**: `ADMIN`, `AGENT`, and `CUSTOMER` all pass,
+      so there is no 403 on this endpoint. It is the internal browse surface;
+      the unauthenticated one lives under `/api/v1/public`.
+
+      `search` matches the flight number or the airline, case-insensitively,
+      as a substring. `airline` filters on the airline alone, which is what
+      makes it useful alongside a search term rather than a duplicate of it.
+
+      Price bounds are integer pesewas, like the column, and `maxPrice` must be
+      at or above `minPrice`. The departure window is inclusive at both ends
+      and `departureTo` must be on or after `departureFrom`. `maxDuration`
+      caps the stored duration in minutes, `maxStops` the stop count, and
+      `minSeats` filters to flights still holding at least that many seats,
+      which is the one filter that tracks live inventory.
+
+      Sorting defaults to `departure` **ascending** on this endpoint, unlike
+      the newest-first default elsewhere: a flight list is read forwards in
+      time. `sortBy` is limited to the whitelisted columns below, so no client
+      string ever reaches an order-by clause.
+
+      The `meta` block carries the usual pagination counts plus a `filters`
+      object echoing exactly what was applied, defaults included.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/SortOrder'
+      - name: sortBy
+        in: query
+        required: false
+        description: Column to order by. Defaults to `departure`, ascending.
+        schema:
+          type: string
+          enum: [airline, arrival, createdAt, departure, duration, flightNumber, price]
+          default: departure
+      - name: airline
+        in: query
+        required: false
+        description: Case-insensitive substring match on the airline, 2 to 60 characters.
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 60
+      - name: originId
+        in: query
+        required: false
+        description: Exact match on the origin destination id.
+        schema: { type: integer, minimum: 1 }
+      - name: destinationId
+        in: query
+        required: false
+        description: Exact match on the arrival destination id.
+        schema: { type: integer, minimum: 1 }
+      - name: flightClass
+        in: query
+        required: false
+        description: Exact match on the cabin class.
+        schema: { $ref: '#/components/schemas/FlightClass' }
+      - name: departureFrom
+        in: query
+        required: false
+        description: |
+          Lower bound of the departure window, inclusive. Any string a date
+          parser accepts; it is echoed back in `meta.filters` unchanged.
+        schema: { type: string, format: date-time }
+      - name: departureTo
+        in: query
+        required: false
+        description: Upper bound of the departure window, inclusive. Must be on or after `departureFrom`.
+        schema: { type: string, format: date-time }
+      - name: minPrice
+        in: query
+        required: false
+        description: Lowest acceptable fare, in integer pesewas.
+        schema: { $ref: '#/components/schemas/Money' }
+      - name: maxPrice
+        in: query
+        required: false
+        description: Highest acceptable fare, in integer pesewas. Must be at or above `minPrice`.
+        schema: { $ref: '#/components/schemas/Money' }
+      - name: maxDuration
+        in: query
+        required: false
+        description: Longest acceptable flight, in minutes, from 30 to 1440.
+        schema: { type: integer, minimum: 30, maximum: 1440 }
+      - name: maxStops
+        in: query
+        required: false
+        description: Most stops tolerated.
+        schema: { type: integer, minimum: 0, maximum: 5 }
+      - name: minSeats
+        in: query
+        required: false
+        description: Only flights with at least this many seats still available.
+        schema: { type: integer, minimum: 1, maximum: 850 }
+    responses:
+      '200':
+        description: A page of flights, with pagination counts and the applied filters.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/flights/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Flight id. Must be a positive integer; anything else is a 400 before the handler runs.
+      schema: { type: integer, minimum: 1 }
+
+  get:
+    tags: [Flights]
+    operationId: getFlight
+    summary: Get one flight
+    description: |
+      **Any signed-in principal**: `ADMIN`, `AGENT`, and `CUSTOMER` all pass.
+
+      Returns the route summaries plus the raw ids, `capacity` alongside
+      `seatsAvailable` so the load is readable, and a `rating` block
+      aggregating the flight's published reviews. An unreviewed flight still
+      carries the block, as `{ "average": null, "count": 0 }`.
+
+      Soft-deleted flights are scoped out of the read, so a deleted flight is
+      indistinguishable from one that never existed.
+    responses:
+      '200':
+        description: The flight.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightDetailResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Flights]
+    operationId: updateFlight
+    summary: Update a flight
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403.
+
+      Accepts `application/json` or `multipart/form-data`, with the same
+      `flightPhoto` handling as create. Sending `flightPhoto` as an empty
+      string removes the current photo and deletes the stored image; omitting
+      it leaves the photo alone. A refused update reclaims any image the
+      middleware had already uploaded.
+
+      Every field is optional, but the request must carry at least one, an
+      uploaded photo counting as one. That rule lives past the file middleware
+      because a multipart file is invisible to schema validation.
+
+      Most of what this endpoint does is refuse things, and each refusal is a
+      400:
+
+      - the flight is `DEPARTED` or `LANDED`, so it is history and not editable
+      - the flight is `DELAYED`, where only times, status, and the photo may
+        move; anything else is named in the message
+      - the route would change while bookings exist, which would move people
+        who bought a different journey
+      - `capacity` would drop below the seats already booked
+      - origin and destination would end up equal, after the omitted side
+        falls back to the stored value
+      - arrival would sit less than 30 minutes after the effective departure,
+        or before it
+      - departure would move into the past on a still-`SCHEDULED` flight
+      - `status` would be set to `CANCELLED` while active bookings exist
+
+      A capacity change re-derives `seatsAvailable` as `capacity - bookedSeats`
+      rather than overwriting it, so seats already sold stay sold. Changing
+      either time recomputes the stored `duration`.
+
+      `status` accepts only `DELAYED` or `CANCELLED` here. Everything else is
+      the state machine's business, at
+      `PATCH /api/v1/flights/{id}/status`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FlightUpdateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/FlightUpdateRequest' }
+    responses:
+      '200':
+        description: The updated flight, with the full origin and destination rows.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightResponse' }
+      '400':
+        description: |
+          Either the payload failed validation, in which case `details.errors`
+          names the fields, or the stored flight does not allow the change, in
+          which case the message says which rule stopped it.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: No such flight, or the new origin or destination does not exist.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: The new flight number is already held by another flight.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Flights]
+    operationId: deleteFlight
+    summary: Delete a flight
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403.
+
+      A soft delete: the row survives with a tombstone and every scoped read
+      stops returning it, so the flight 404s afterwards while its history stays
+      intact for reporting. Its flight number stays claimed, because the unique
+      constraint spans deleted rows.
+
+      Three guards run in order, each a 400:
+
+      1. the status is `DEPARTED`, `LANDED`, or `DELAYED`; only `SCHEDULED` or
+         `CANCELLED` flights may be removed
+      2. the flight has `PENDING` or `CONFIRMED` bookings, which must be
+         cancelled first
+      3. the flight has bookings carrying completed or pending payment records,
+         in which case the message reports the counts and the total so refunds
+         can be processed before anything disappears
+
+      Bookings that are already finished or cancelled, with no live payment,
+      do not block the delete. They are logged and survive as orphans, which
+      is the deliberate trade: a completed journey should not be erasable by
+      deleting the flight it happened on.
+
+      The stored photo is removed from Cloudinary best-effort afterwards; a
+      cleanup failure is logged and does not fail the request.
+    responses:
+      '200':
+        description: Deleted. The body reports which flight went, and in which state.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightDeleteResponse' }
+      '400':
+        description: |
+          The flight's status forbids deletion, or it still carries bookings or
+          payment records. The message names which.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/flights/{id}/status:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Flight id.
+      schema: { type: integer, minimum: 1 }
+
+  patch:
+    tags: [Flights]
+    operationId: updateFlightStatus
+    summary: Move a flight through its lifecycle
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403.
+
+      This endpoint exists separately from `PUT /api/v1/flights/{id}` because
+      status is not a field, it is a state machine. A transition has
+      preconditions the value alone cannot express, it can rewrite the flight's
+      times as a side effect, and cancelling cascades to bookings. Folding that
+      into the general update would mean a request that renames an airline and
+      one that grounds an aircraft take the same path and the same guards, and
+      it would leave the illegal transitions reachable by anyone who could edit
+      a field. The general update is therefore restricted to `DELAYED` and
+      `CANCELLED`, and every other move happens here.
+
+      Permitted transitions:
+
+      - `SCHEDULED` to `DEPARTED`, `DELAYED`, or `CANCELLED`
+      - `DELAYED` to `DEPARTED`, `CANCELLED`, or back to `SCHEDULED`
+      - `DEPARTED` to `LANDED`
+      - `CANCELLED` to `SCHEDULED`, while the original departure is still ahead
+      - `LANDED` to nothing
+
+      Marking a flight `DEPARTED` or `LANDED` is refused while the scheduled
+      time is still in the future, and on success the corresponding timestamp
+      is stamped to now and `duration` is recomputed, so the record reflects
+      what happened rather than what was planned.
+
+      `DELAYED` is the only status that accepts times, and it requires both.
+      The new departure must be in the future and later than the one on file,
+      arrival must follow it, and the resulting duration must fall between 10
+      minutes and 24 hours. Sending times with any other status is a 400.
+
+      Cancelling is heavily guarded: a flight with completed payments, with
+      confirmed bookings, or with any bookings at all is refused, with a
+      message saying which. Those guards mean a flight only ever reaches
+      `CANCELLED` with nothing attached, and the cascade that cancels remaining
+      active bookings afterwards is a safety net rather than the normal path.
+
+      Setting the status it already holds is a 400, not a quiet success.
+
+      Seat inventory is untouched here. Seats move only through the booking
+      path, inside a transaction, with a guarded atomic decrement.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FlightStatusUpdateRequest' }
+    responses:
+      '200':
+        description: The flight at its new status, with any times the transition rewrote.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlightResponse' }
+      '400':
+        description: |
+          The status value is not a known one, or the transition is not allowed
+          from the current status, or its preconditions are unmet: a future
+          departure for `DEPARTED`, a future arrival for `LANDED`, missing or
+          invalid times for `DELAYED`, times sent for a status that does not
+          take them, bookings blocking a cancel, or a status that is already
+          set.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/users:
+  post:
+    tags: [Users]
+    operationId: createStaffUser
+    summary: Create a staff account
+    description: |
+      **The route admits `ADMIN` and `AGENT`, and the handler then narrows it
+      to `ADMIN` alone.** That gap is visible in the status codes and is worth
+      knowing before you debug one: a `CUSTOMER` is stopped by the route gate
+      and gets a **403**, while an `AGENT` passes the gate, reaches the
+      handler, and is refused there with a **401** carrying
+      `Unauthorized. Only admins can add users.` The narrower check is the
+      real rule; the route gate is simply looser than it needs to be.
+
+      This creates **staff only**. `role` is required and may be `ADMIN` or
+      `AGENT`; `CUSTOMER` is a 400, because customers are a different table
+      reached through public signup or `POST /api/v1/customers`.
+
+      Admins never set passwords. A `password` in the body is stripped rather
+      than honoured, and the account is created passwordless: its owner
+      establishes a credential through the forgot-password flow, so nobody but
+      that person ever knew it. No session cookie is issued, since this creates
+      somebody else's account.
+
+      Accepts `application/json` or `multipart/form-data`; a `profilePicture`
+      file part is uploaded to Cloudinary and replaced by its URL before the
+      row is written, and reclaimed if creation then fails.
+
+      Email and phone must be free across **both** principal tables, so a new
+      staff account cannot claim a contact a customer already logs in with.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/UserCreateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/UserCreateRequest' }
+    responses:
+      '201':
+        description: |
+          Staff account created, passwordless. No cookies are set: the caller's
+          own session is unaffected.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or an `AGENT` who passed the route gate. Staff creation
+          is admins only, and the handler reports that as 401 rather than 403.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '409': { $ref: '#/components/responses/Conflict' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Users]
+    operationId: listStaffUsers
+    summary: List staff accounts
+    description: |
+      **ADMIN and AGENT.** Customers are refused with a 403: they have no
+      business enumerating the staff roster, and their own surface is
+      `/api/v1/customers`.
+
+      Every row is staff, so a `role` filter here means `ADMIN` or `AGENT`.
+      An unrecognised value, `CUSTOMER` included, is **ignored** rather than
+      rejected, and the unfiltered page comes back; that is deliberate
+      compatibility with the older handler, so do not read an empty result as
+      confirmation that a filter was understood.
+
+      `search` matches the name, email, or phone, case-insensitively, as a
+      substring.
+
+      Ordering is fixed at newest first; this endpoint takes no sort
+      parameters. Soft-deleted accounts are scoped out.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - name: role
+        in: query
+        required: false
+        description: |
+          Restrict to one staff role. An unknown value is silently dropped
+          rather than rejected.
+        schema: { $ref: '#/components/schemas/UserStaffRole' }
+    responses:
+      '200':
+        description: A page of staff accounts, newest first.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/users/{userId}:
+  parameters:
+    - name: userId
+      in: path
+      required: true
+      description: |
+        Staff account id. Positive integer. Staff and customers have
+        independent id sequences, so this id is meaningful only against the
+        staff table.
+      schema: { type: integer, minimum: 1 }
+
+  get:
+    tags: [Users]
+    operationId: getStaffUser
+    summary: Get one staff account
+    description: |
+      **ADMIN and AGENT.** Customers are refused at the route with a 403.
+
+      Any staff member may read any staff profile, and their own. The password
+      is excluded at the database select rather than stripped from the result,
+      so it cannot leak through this endpoint even if the shape changes.
+      Columns with no value are omitted from the object rather than returned
+      as null.
+
+      Soft-deleted accounts are scoped out and 404 like accounts that never
+      existed.
+    responses:
+      '200':
+        description: The staff account.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Users]
+    operationId: updateStaffUser
+    summary: Update a staff profile
+    description: |
+      **ADMIN and AGENT**, on their own profile or anyone else's. Customers are
+      refused at the route with a 403.
+
+      Accepts `application/json` or `multipart/form-data`. A `profilePicture`
+      file part is uploaded to Cloudinary and its URL written onto the profile;
+      the empty string removes the current picture and deletes the stored
+      image; omitting the field leaves it alone. A replaced picture has its
+      predecessor deleted best-effort afterwards, and an update that fails
+      reclaims the image the middleware had already uploaded.
+
+      This endpoint never touches credentials. A `password` key in the body is
+      stripped, not applied, so a staff session cannot overwrite anyone's
+      password; rotation happens only at
+      `POST /api/v1/auth/change-password`. A `role` key is validated and then
+      ignored: use `PATCH /api/v1/users/{userId}/role`.
+
+      Email and phone are login identifiers, so the rule depends on who is
+      editing. Editing **another** account changes them directly, as an
+      administrative override. Editing **your own** is refused with a 400 that
+      points at `POST /api/v1/auth/change-email` and
+      `POST /api/v1/auth/change-phone`, the flows that confirm the new contact
+      before it can be logged in with. Submitting your current value is a
+      no-op, so a form that posts the whole profile still succeeds.
+
+      Uniqueness is checked against both principal tables and against
+      soft-deleted rows, because the database constraints span tombstones: an
+      address held by a deleted account is still taken.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/UserUpdateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/UserUpdateRequest' }
+    responses:
+      '200':
+        description: The updated profile.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserResponse' }
+      '400':
+        description: |
+          The payload failed validation, or you tried to change your own email
+          or phone here instead of through the verified contact-change flows.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409': { $ref: '#/components/responses/Conflict' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Users]
+    operationId: deleteStaffUser
+    summary: Delete a staff account
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403.
+
+      An admin may not delete themselves, which is also a 403: the point is to
+      stop the last administrator from removing the only account that could
+      undo it.
+
+      A soft delete. The row survives with a tombstone, scoped reads stop
+      returning it, and the account's cached session epoch is invalidated
+      immediately, so access ends on the next request rather than whenever a
+      cache entry would have expired. Its email and phone stay claimed,
+      because the unique constraints span deleted rows.
+
+      There is no payment or booking guard here. Staff carry neither: bookings
+      and payments hang off customers, so a staff delete has nothing financial
+      to protect.
+
+      The profile picture is removed from Cloudinary best-effort afterwards; a
+      cleanup failure is logged and does not fail the request.
+
+      The response is a message only, naming the account that went.
+    responses:
+      '200':
+        description: Deleted. The message names the account and its email.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: |
+          Not an admin, or an admin attempting to delete their own account.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/users/{userId}/role:
+  parameters:
+    - name: userId
+      in: path
+      required: true
+      description: Staff account id whose role is being changed.
+      schema: { type: integer, minimum: 1 }
+
+  patch:
+    tags: [Users]
+    operationId: changeStaffUserRole
+    summary: Change a staff member's role
+    description: |
+      **ADMIN only.** Agents and customers are refused at the route with a 403,
+      which is the point of splitting this off: the general profile update
+      admits agents, and promoting people is not something an agent should be
+      able to do while renaming them. Keeping the role on its own endpoint also
+      keeps the audit story simple, since a request here means exactly one
+      thing.
+
+      It can set `ADMIN` or `AGENT`, and nothing else. There is no `CUSTOMER`
+      option: customers are a separate table with their own id sequence, so
+      there is no row to move and demoting staff into a customer is not a
+      transition this system has. `CUSTOMER`, or any unknown value, is a 400.
+
+      Two guards, both intentional. An admin may not change their **own** role,
+      which is a 403 and stops the last administrator demoting the system out
+      of having one. And setting the role the account already holds is a 400
+      rather than a quiet success, so a client is told when nothing happened.
+
+      On success the account's cached session epoch is invalidated, so the next
+      request re-reads the live row. The **already-issued** access token still
+      carries the old role until it is refreshed or the user signs in again,
+      which is why a freshly promoted admin may need a new session before the
+      admin-only routes open up.
+
+      A `role` field sent to `PUT /api/v1/users/{userId}` is validated and then
+      ignored; this endpoint is the only one that moves a role.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/UserRoleChangeRequest' }
+    responses:
+      '200':
+        description: The account at its new role.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserResponse' }
+      '400':
+        description: |
+          The role is missing, not a staff role (`CUSTOMER` included), or the
+          same one the account already holds.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: Not an admin, or an admin attempting to change their own role.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }

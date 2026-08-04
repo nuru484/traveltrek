@@ -59,6 +59,13 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      # API reference gate: validates the OpenAPI document and diffs it against
+      # the routes the app actually mounts. A new endpoint shipped without docs,
+      # or a documented path that no longer exists, fails here rather than
+      # leaving the public reference quietly wrong.
+      - name: Check API reference matches the routes
+        run: npm run docs:check
+
       - name: Build
         run: npm run build
 

@@ -1,0 +1,765 @@
+# Components for the unauthenticated browse surface (/api/v1/public) and for
+# the authenticated dashboard.
+#
+# The two live together because they are the two "read-only summary" surfaces
+# of the API: one shows an anonymous visitor what can be booked, the other
+# shows a signed-in principal what already exists. Everything here is a read
+# shape; nothing in this file is ever accepted as input.
+
+schemas:
+  PublicRating:
+    type: object
+    description: |
+      Aggregate of **PUBLISHED** reviews for one tour, hotel, or flight.
+      Hidden reviews feed neither the average nor the count, so moderating a
+      review removes it from the score as well as from the list.
+
+      An item with no published reviews still carries this block, as
+      `{ "average": null, "count": 0 }`, so a client never has to test for a
+      missing key before rendering stars.
+    required: [average, count]
+    properties:
+      average:
+        type: [number, 'null']
+        minimum: 1
+        maximum: 5
+        description: |
+          Mean rating rounded to one decimal place, or null when nothing has
+          been published yet. Null rather than 0, because 0 would sort and
+          display as a genuinely bad score.
+        examples: [4.6]
+      count:
+        type: integer
+        minimum: 0
+        description: How many published reviews the average was computed from.
+        examples: [12]
+
+  PublicDestinationSummary:
+    type: object
+    description: |
+      The destination block embedded in a tour or a flight. Four fields only:
+      enough to label a card, and nothing a landing page does not render.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        description: Null for a destination recorded at country granularity.
+        examples: [Cape Coast]
+
+  PublicHotelDestinationSummary:
+    type: object
+    description: |
+      The destination block embedded in a hotel. Same as the tour and flight
+      summary plus `description`, because a hotel page has room for a line of
+      context about where it is and a tour card does not.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        examples: [Cape Coast]
+      description:
+        type: [string, 'null']
+
+  PublicDestination:
+    type: object
+    description: |
+      A destination as the browse surface sees it. Deliberately smaller than
+      the authenticated destination shape: the timestamps are dropped, because
+      a visitor has no use for when a row was written and every field that
+      leaves the building is a field that has to stay safe to publish.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+      description:
+        type: [string, 'null']
+        examples: [Historic forts and a working fishing harbour.]
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        examples: [Cape Coast]
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when no image has been uploaded.
+
+  PublicTourType:
+    type: string
+    description: The tour's category, used by the landing page filter chips.
+    enum: [ADVENTURE, CULTURAL, BEACH, CITY, WILDLIFE, CRUISE]
+    examples: [ADVENTURE]
+
+  PublicTourStatus:
+    type: string
+    description: |
+      Lifecycle state. The browse **listing** only ever returns `UPCOMING` or
+      `ONGOING`, since those are the only tours a visitor could act on. The
+      detail endpoint is not filtered that way, so a bookmarked link can still
+      resolve to a `COMPLETED` or `CANCELLED` tour, and this field is how a
+      client tells that apart from something bookable.
+    enum: [UPCOMING, ONGOING, COMPLETED, CANCELLED]
+    examples: [UPCOMING]
+
+  PublicFlightStatus:
+    type: string
+    description: |
+      Live flight state. As with tours, the browse listing only returns
+      `SCHEDULED` departures still in the future, while the detail endpoint
+      will serve whatever the id points at.
+    enum: [SCHEDULED, DEPARTED, LANDED, CANCELLED, DELAYED]
+    examples: [SCHEDULED]
+
+  PublicTour:
+    type: object
+    description: |
+      A tour on the browse surface. Identical to the authenticated tour read
+      shape: a tour carries no principal data of its own, so there was nothing
+      to strip, and keeping one shape means the landing page and the admin
+      console cannot drift apart.
+    required:
+      [
+        id,
+        name,
+        type,
+        status,
+        duration,
+        price,
+        maxGuests,
+        guestsBooked,
+        startDate,
+        endDate,
+        destination,
+        rating,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [11] }
+      name: { type: string, examples: [Savannah Safari] }
+      description:
+        type: [string, 'null']
+      photo:
+        type: [string, 'null']
+        format: uri
+      type: { $ref: '#/components/schemas/PublicTourType' }
+      status: { $ref: '#/components/schemas/PublicTourStatus' }
+      duration:
+        type: integer
+        minimum: 1
+        description: Length of the tour in days.
+        examples: [5]
+      price:
+        $ref: '#/components/schemas/Money'
+      maxGuests:
+        type: integer
+        description: Capacity. Compare against `guestsBooked` to show what is left.
+        examples: [20]
+      guestsBooked:
+        type: integer
+        description: |
+          Seats already taken. Published so a card can show scarcity without a
+          second request; it is a count, not a list, so no booking or customer
+          detail is implied.
+        examples: [14]
+      startDate: { type: string, format: date-time }
+      endDate: { type: string, format: date-time }
+      destination: { $ref: '#/components/schemas/PublicDestinationSummary' }
+      rating: { $ref: '#/components/schemas/PublicRating' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  PublicTourDetail:
+    description: |
+      One tour plus its first page of published reviews, so a detail page
+      renders from a single request rather than a list call followed by a
+      reviews call.
+    allOf:
+      - $ref: '#/components/schemas/PublicTour'
+      - type: object
+        required: [reviews, reviewsTotal]
+        properties:
+          reviews:
+            type: array
+            maxItems: 5
+            description: |
+              The five most recent published reviews, newest first. There is no
+              paging parameter here on purpose: the browse surface stays small,
+              and anything beyond the first page belongs to the reviews API.
+            items: { $ref: '#/components/schemas/PublicReview' }
+          reviewsTotal:
+            type: integer
+            minimum: 0
+            description: |
+              Total published reviews for this tour, so the page can say "5 of
+              41" without a second call.
+            examples: [41]
+
+  PublicHotelRoomSummary:
+    type: object
+    description: |
+      A room type offered by the hotel. Enough to price the stay, not enough to
+      book it: availability, capacity, and stock counts stay on the
+      authenticated room endpoints.
+    required: [id, roomType, pricePerNight]
+    properties:
+      id: { type: integer, examples: [8] }
+      roomType: { type: string, examples: [Deluxe Double] }
+      pricePerNight:
+        $ref: '#/components/schemas/Money'
+      photo:
+        type: [string, 'null']
+        format: uri
+      description:
+        type: [string, 'null']
+
+  PublicHotel:
+    type: object
+    description: |
+      A hotel on the browse surface, with its destination and its room types
+      already embedded. The rooms come along on the listing as well as the
+      detail because a hotel with no visible price is not a card anyone can
+      act on.
+    required:
+      [
+        id,
+        name,
+        address,
+        starRating,
+        amenities,
+        destination,
+        rooms,
+        rating,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [4] }
+      name: { type: string, examples: [Harbourlight] }
+      description:
+        type: [string, 'null']
+      address: { type: string, examples: [12 Beach Road] }
+      phone:
+        type: [string, 'null']
+        examples: ['+233302000111']
+      photo:
+        type: [string, 'null']
+        format: uri
+      starRating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        description: |
+          The hotel's own star classification. Unrelated to `rating`, which is
+          what guests said.
+        examples: [4]
+      amenities:
+        type: array
+        items: { type: string }
+        examples: [[Wi-Fi, Pool, Airport shuttle]]
+      destination: { $ref: '#/components/schemas/PublicHotelDestinationSummary' }
+      rooms:
+        type: array
+        description: Every room type this hotel offers, cheapest first as stored.
+        items: { $ref: '#/components/schemas/PublicHotelRoomSummary' }
+      rating:
+        allOf:
+          - $ref: '#/components/schemas/PublicRating'
+        description: |
+          Aggregated over reviews of **any** of this hotel's rooms, because a
+          review is written against a booking and a hotel booking is always a
+          booking of one room.
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  PublicHotelDetail:
+    description: One hotel plus its first page of published reviews.
+    allOf:
+      - $ref: '#/components/schemas/PublicHotel'
+      - type: object
+        required: [reviews, reviewsTotal]
+        properties:
+          reviews:
+            type: array
+            maxItems: 5
+            description: The five most recent published reviews, newest first.
+            items: { $ref: '#/components/schemas/PublicReview' }
+          reviewsTotal:
+            type: integer
+            minimum: 0
+            examples: [7]
+
+  PublicFlight:
+    type: object
+    description: |
+      A flight as the browse listing returns it. `capacity` is absent here and
+      present on the detail: a listing only needs seats still for sale, and the
+      total size of the aircraft is operations data.
+    required:
+      [
+        id,
+        flightNumber,
+        airline,
+        departure,
+        arrival,
+        origin,
+        originId,
+        destination,
+        destinationId,
+        price,
+        flightClass,
+        status,
+        duration,
+        stops,
+        seatsAvailable,
+        rating,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [21] }
+      flightNumber: { type: string, examples: [AW114] }
+      airline: { type: string, examples: [Africa World Airlines] }
+      departure: { type: string, format: date-time }
+      arrival: { type: string, format: date-time }
+      origin: { $ref: '#/components/schemas/PublicDestinationSummary' }
+      originId:
+        type: integer
+        description: |
+          Repeated alongside the embedded `origin` so a client can filter or
+          group without reaching into the nested object.
+        examples: [1]
+      destination: { $ref: '#/components/schemas/PublicDestinationSummary' }
+      destinationId: { type: integer, examples: [3] }
+      price:
+        $ref: '#/components/schemas/Money'
+      photo:
+        type: [string, 'null']
+        format: uri
+      flightClass: { type: string, examples: [Economy] }
+      status: { $ref: '#/components/schemas/PublicFlightStatus' }
+      duration:
+        type: integer
+        description: Scheduled flight time in minutes.
+        examples: [95]
+      stops:
+        type: integer
+        minimum: 0
+        examples: [0]
+      seatsAvailable:
+        type: integer
+        minimum: 0
+        examples: [58]
+      rating: { $ref: '#/components/schemas/PublicRating' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  PublicFlightDetail:
+    description: |
+      One flight plus the aircraft `capacity` and the first page of published
+      reviews. Capacity appears only here because it is what makes
+      `seatsAvailable` interpretable as a percentage, which a detail page shows
+      and a list card does not.
+    allOf:
+      - $ref: '#/components/schemas/PublicFlight'
+      - type: object
+        required: [capacity, reviews, reviewsTotal]
+        properties:
+          capacity:
+            type: integer
+            minimum: 0
+            examples: [180]
+          reviews:
+            type: array
+            maxItems: 5
+            description: The five most recent published reviews, newest first.
+            items: { $ref: '#/components/schemas/PublicReview' }
+          reviewsTotal:
+            type: integer
+            minimum: 0
+            examples: [3]
+
+  PublicReviewTarget:
+    description: |
+      What the review was written about. A review has no target columns of its
+      own: it is attached to a booking, and the booking's tour, room, or flight
+      is the target. Discriminate on `type`.
+    oneOf:
+      - type: object
+        title: Tour
+        required: [type, id, name]
+        properties:
+          type: { type: string, const: TOUR }
+          id: { type: integer, examples: [11] }
+          name: { type: string, examples: [Savannah Safari] }
+      - type: object
+        title: Room
+        required: [type, id, roomType, hotel]
+        properties:
+          type: { type: string, const: ROOM }
+          id:
+            type: integer
+            description: The room id, not the hotel id.
+            examples: [8]
+          roomType: { type: string, examples: [Deluxe Double] }
+          hotel:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer, examples: [4] }
+              name: { type: string, examples: [Harbourlight] }
+      - type: object
+        title: Flight
+        required: [type, id, airline, flightNumber]
+        properties:
+          type: { type: string, const: FLIGHT }
+          id: { type: integer, examples: [21] }
+          airline: { type: string, examples: [Africa World Airlines] }
+          flightNumber: { type: string, examples: [AW114] }
+
+  PublicReview:
+    type: object
+    description: |
+      A published review as an anonymous visitor sees it. This shape is the
+      privacy boundary of the whole browse surface: it carries the reviewer's
+      **display name only**. No customer id, no email, no booking id, and no
+      moderation status, because every one of those would tie a public opinion
+      back to an identifiable person or expose an internal decision.
+
+      Only reviews in the `PUBLISHED` state are ever serialized here, so
+      hiding a review removes it from these lists immediately.
+    required: [id, rating, reviewer, target, createdAt]
+    properties:
+      id: { type: integer, examples: [57] }
+      rating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        examples: [5]
+      title:
+        type: [string, 'null']
+        examples: [Great time]
+      comment:
+        type: [string, 'null']
+        examples: [Lovely trip end to end.]
+      reviewer:
+        type: string
+        description: |
+          The reviewer's display name, and nothing else about them. Not unique
+          and not an identifier; two different customers named Kofi Mensah
+          produce the same string here, which is the point.
+        examples: [Kofi Mensah]
+      target: { $ref: '#/components/schemas/PublicReviewTarget' }
+      createdAt: { type: string, format: date-time }
+
+  PublicDestinationListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Destinations retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/PublicDestination' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  PublicTourListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Tours retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/PublicTour' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  PublicTourDetailResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Tour retrieved successfully] }
+      data: { $ref: '#/components/schemas/PublicTourDetail' }
+
+  PublicHotelListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Hotels retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/PublicHotel' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  PublicHotelDetailResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Hotel retrieved successfully] }
+      data: { $ref: '#/components/schemas/PublicHotelDetail' }
+
+  PublicFlightListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Flights retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/PublicFlight' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  PublicFlightDetailResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Flight retrieved successfully] }
+      data: { $ref: '#/components/schemas/PublicFlightDetail' }
+
+  PublicRecentReviewsResponse:
+    type: object
+    description: |
+      A plain array with no `meta` block, because this is a fixed-size strip
+      rather than a paginated list: there is no page after the one you asked
+      for.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Reviews retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/PublicReview' }
+
+  DashboardOverview:
+    type: object
+    description: |
+      Aggregate counts for the signed-in principal.
+
+      The payload **widens with the role**. Everyone gets the four inventory
+      blocks. `bookings` and `users` are added for `ADMIN` and `AGENT` only,
+      and for a customer those keys are **absent rather than empty**, so a
+      client cannot mistake "you may not see this" for "the number is zero".
+
+      Every figure is a live count. Nothing here is cached, and nothing is
+      scoped to the caller: these are system-wide totals, which is why the two
+      blocks that describe people and money are staff-only.
+    required: [tours, hotels, flights, destinations]
+    properties:
+      tours:
+        type: object
+        required: [total, upcoming, ongoing]
+        properties:
+          total: { type: integer, examples: [42] }
+          upcoming: { type: integer, examples: [18] }
+          ongoing: { type: integer, examples: [3] }
+      hotels:
+        type: object
+        required: [total, availableRooms]
+        properties:
+          total: { type: integer, examples: [12] }
+          availableRooms:
+            type: integer
+            description: |
+              Room **types** on file, not nights free tonight and not the sum
+              of stock counts. It answers "how much room inventory exists",
+              which is what the tile is for.
+            examples: [37]
+      flights:
+        type: object
+        required: [total, availableSeats]
+        properties:
+          total: { type: integer, examples: [26] }
+          availableSeats:
+            type: integer
+            description: Sum of `seatsAvailable` across every flight on file.
+            examples: [1840]
+      destinations:
+        type: object
+        required: [total]
+        properties:
+          total: { type: integer, examples: [9] }
+      bookings:
+        type: object
+        description: '**Staff only.** Absent from a customer''s response.'
+        required: [total, pending, confirmed, completed]
+        properties:
+          total: { type: integer, examples: [310] }
+          pending: { type: integer, examples: [12] }
+          confirmed: { type: integer, examples: [190] }
+          completed: { type: integer, examples: [104] }
+      users:
+        type: object
+        description: |
+          **Staff only.** Absent from a customer's response.
+
+          Staff and customers live in separate tables, so `total` is the sum of
+          the three counts below rather than the size of any one table.
+        required: [total, admins, agents, customers]
+        properties:
+          total: { type: integer, examples: [214] }
+          admins: { type: integer, examples: [2] }
+          agents: { type: integer, examples: [6] }
+          customers: { type: integer, examples: [206] }
+
+  DashboardOverviewResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message:
+        type: string
+        examples: [Dashboard statistics retrieved successfully]
+      data: { $ref: '#/components/schemas/DashboardOverview' }
+
+  DashboardNeedsAttention:
+    type: object
+    description: |
+      The staff dashboard's operational strip: five counts of things that need
+      a human, computed live at request time.
+
+      Two of them are ratio judgements rather than plain filters. A tour
+      starting within 14 days with under 30% of its capacity booked, and a
+      flight departing within 7 days with more than 70% of its seats unsold,
+      both count as needing attention. Those compare two columns against each
+      other, which a plain database filter cannot express, so the small
+      time-windowed candidate sets are counted in the service.
+    required:
+      [
+        pendingBookings,
+        pendingPayments,
+        failedPayments,
+        upcomingToursLowOccupancy,
+        flightsDepartingSoonLowSeats,
+      ]
+    properties:
+      pendingBookings:
+        type: integer
+        minimum: 0
+        description: Bookings sitting in `PENDING`, awaiting confirmation.
+        examples: [12]
+      pendingPayments:
+        type: integer
+        minimum: 0
+        description: |
+          Payments still `PENDING`. A charge that never reached a terminal
+          state is money in limbo, so this is the first number to look at.
+        examples: [4]
+      failedPayments:
+        type: integer
+        minimum: 0
+        description: Payments in `FAILED`, usually worth a follow-up with the customer.
+        examples: [2]
+      upcomingToursLowOccupancy:
+        type: integer
+        minimum: 0
+        description: |
+          Tours starting within 14 days with less than 30% of `maxGuests`
+          booked. Early warning that a departure will not fill.
+        examples: [3]
+      flightsDepartingSoonLowSeats:
+        type: integer
+        minimum: 0
+        description: |
+          Flights departing within 7 days with more than 70% of their seats
+          still unsold. The mirror image of the tour check, phrased in seats
+          because a flight tracks what is left rather than what is taken.
+        examples: [1]
+
+  DashboardNeedsAttentionResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message:
+        type: string
+        examples: [Needs-attention summary retrieved successfully]
+      data: { $ref: '#/components/schemas/DashboardNeedsAttention' }
+
+parameters:
+  PublicSearch:
+    name: search
+    in: query
+    required: false
+    description: |
+      Free-text filter, case-insensitive substring match. Which columns it
+      spans depends on the endpoint; each operation says.
+
+      Between 1 and 100 characters. An empty or over-long term is a 400 rather
+      than a silently ignored filter, so a client never believes it narrowed a
+      list that it did not.
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 100
+
+  PublicDestinationId:
+    name: destinationId
+    in: query
+    required: false
+    description: |
+      Restrict to one destination, by id. An id that matches nothing yields an
+      empty page rather than a 404, because a filter that selects nothing is a
+      valid answer.
+    schema:
+      type: integer
+      minimum: 1
+
+  PublicOriginId:
+    name: originId
+    in: query
+    required: false
+    description: |
+      Restrict to flights departing from this destination. Combine with
+      `destinationId` to ask for one route.
+    schema:
+      type: integer
+      minimum: 1
+
+  PublicTourTypeFilter:
+    name: type
+    in: query
+    required: false
+    description: Restrict to one tour category.
+    schema:
+      $ref: '#/components/schemas/PublicTourType'
+
+  PublicRecentReviewsLimit:
+    name: limit
+    in: query
+    required: false
+    description: |
+      How many reviews to return. Defaults to 6, which is what the testimonial
+      strip renders, and is capped at 50: this endpoint has no paging, so the
+      cap is the only thing standing between an anonymous caller and the whole
+      review table. Asking for more is a 400.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 50
+      default: 6
+
+  PublicTourId:
+    name: id
+    in: path
+    required: true
+    description: The tour's id. Must be a positive integer.
+    schema:
+      type: integer
+      minimum: 1
+
+  PublicHotelId:
+    name: id
+    in: path
+    required: true
+    description: The hotel's id. Must be a positive integer.
+    schema:
+      type: integer
+      minimum: 1
+
+  PublicFlightId:
+    name: id
+    in: path
+    required: true
+    description: The flight's id. Must be a positive integer.
+    schema:
+      type: integer
+      minimum: 1

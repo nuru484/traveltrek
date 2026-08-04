@@ -1,0 +1,648 @@
+# Tour inventory and the destinations it hangs off.
+#
+# Both domains follow the same shape: administrators own every write, while
+# any signed-in principal (ADMIN, AGENT or CUSTOMER) can read. The role gate
+# is the route's only authorization step, so these listings are the full
+# catalogue rather than a per-principal slice. The unauthenticated browse
+# surface for the same inventory lives under /api/v1/public.
+#
+# Deletes are soft everywhere here. The row keeps a `deletedAt` tombstone and
+# every read is scoped past it, so a deleted tour or destination is
+# indistinguishable from one that never existed, and the name it used becomes
+# available again.
+
+/api/v1/tours:
+  post:
+    tags: [Tours]
+    operationId: createTour
+    summary: Create a tour
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Opens a dated, priced trip for sale against an existing destination.
+      That destination is looked up first, and a missing or soft-deleted one
+      answers 404 rather than surfacing a foreign key error, since a
+      soft-deleted hub must not be able to host new inventory.
+
+      Three fields are the server's and are not accepted here. `duration` is
+      computed from the date range, with partial days rounded up. `status`
+      always starts at `UPCOMING`. `guestsBooked` starts at zero and moves
+      only when a booking is made. Capacity is set through `maxGuests` alone.
+
+      The dates are checked at the boundary: the start must be in the future
+      and the end must be strictly after it.
+
+      Accepts JSON or `multipart/form-data`. Under multipart the cover image
+      is the `tourPhoto` file part, capped at 5MB and limited to JPEG, PNG or
+      WebP; it is uploaded to Cloudinary and the resulting URL replaces the
+      `tourPhoto` field before the row is written. That is why the schema
+      types `tourPhoto` as a plain optional string: validation runs before the
+      upload and only ever sees text, so the file is guarded separately and
+      the URL is what finally reaches the column. A create that is refused
+      after the upload deletes the image again rather than orphaning it.
+
+      A brand-new tour has no reviews, so its `rating` comes back as
+      `{ average: null, count: 0 }` without an aggregate query being run.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TourCreateRequest' }
+        multipart/form-data:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/TourCreateRequest'
+            properties:
+              tourPhoto:
+                type: string
+                format: binary
+                description: |
+                  The cover image as a file part. Overrides the string form of
+                  the same field: whatever text was sent alongside it is
+                  replaced by the Cloudinary URL.
+    responses:
+      '201':
+        description: Tour created.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TourResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: |
+          No such destination, or it has been soft-deleted. The already
+          uploaded photo, if any, is reclaimed before this is returned.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Tours]
+    operationId: listTours
+    summary: List tours
+    description: |
+      **ADMIN, AGENT and CUSTOMER.** Every signed-in principal sees the same
+      catalogue: tours are inventory, not per-customer records, so there is no
+      ownership scoping here.
+
+      Every tour in every status is returned unless `status` narrows it, which
+      is what makes this the staff view. Customers looking for bookable trips
+      want `status=UPCOMING` or `availableOnly=true`.
+
+      The filters combine with AND, except `search`, which is an OR across the
+      tour name, its description, and its destination's name. Soft-deleted
+      tours are excluded from both the rows and the count.
+
+      Three pairs are checked against each other at the boundary rather than
+      silently returning nothing: `maxPrice` must be at least `minPrice`,
+      `maxDuration` at least `minDuration`, and `maxGuests` at least
+      `minGuests`. Each failure names the offending field.
+
+      Ratings for the whole page are fetched in a single aggregate query, so
+      the row count does not drive the query count.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/SortOrder'
+      - name: sortBy
+        in: query
+        required: false
+        description: |
+          Restricted to a whitelist of scalar columns, so the sort can never
+          be pointed at an arbitrary field or a relation.
+        schema:
+          type: string
+          enum:
+            [
+              createdAt,
+              duration,
+              endDate,
+              guestsBooked,
+              maxGuests,
+              name,
+              price,
+              startDate,
+              updatedAt,
+            ]
+          default: createdAt
+      - name: type
+        in: query
+        required: false
+        description: Exact match on the trip category.
+        schema: { $ref: '#/components/schemas/TourType' }
+      - name: status
+        in: query
+        required: false
+        description: |
+          Exact match on the lifecycle state. Omitting it returns every
+          status, including cancelled and completed tours.
+        schema: { $ref: '#/components/schemas/TourStatus' }
+      - name: destinationId
+        in: query
+        required: false
+        description: Exact destination match. Combine with nothing else to get one hub's catalogue.
+        schema: { type: integer, minimum: 1 }
+      - name: country
+        in: query
+        required: false
+        description: |
+          Case-insensitive substring match against the destination's country,
+          so `gha` finds Ghana.
+        schema: { type: string, minLength: 1, maxLength: 255 }
+      - name: city
+        in: query
+        required: false
+        description: Case-insensitive substring match against the destination's city.
+        schema: { type: string, minLength: 1, maxLength: 255 }
+      - name: minPrice
+        in: query
+        required: false
+        description: |
+          Lower bound on price per guest, inclusive, in integer pesewas like
+          the column itself. GH₵ 950.00 is `95000`.
+        schema: { $ref: '#/components/schemas/Money' }
+      - name: maxPrice
+        in: query
+        required: false
+        description: Upper bound on price per guest, inclusive, in integer pesewas.
+        schema: { $ref: '#/components/schemas/Money' }
+      - name: minDuration
+        in: query
+        required: false
+        description: Lower bound on the derived duration, in whole days, inclusive.
+        schema: { type: integer, minimum: 1 }
+      - name: maxDuration
+        in: query
+        required: false
+        description: Upper bound on the derived duration, in whole days, inclusive.
+        schema: { type: integer, minimum: 1 }
+      - name: minGuests
+        in: query
+        required: false
+        description: |
+          Lower bound on the tour's **capacity**, not on how full it is. This
+          filters `maxGuests`, so it finds tours big enough for a group rather
+          than tours with that many seats left. For seats left, use
+          `availableOnly`.
+        schema: { type: integer, minimum: 1 }
+      - name: maxGuests
+        in: query
+        required: false
+        description: Upper bound on the tour's capacity, inclusive.
+        schema: { type: integer, minimum: 1, maximum: 1000 }
+      - name: startDate
+        in: query
+        required: false
+        description: Tours starting on or after this instant.
+        schema: { type: string, format: date-time }
+      - name: endDate
+        in: query
+        required: false
+        description: Tours ending on or before this instant.
+        schema: { type: string, format: date-time }
+      - name: availableOnly
+        in: query
+        required: false
+        description: |
+          When `true`, only tours with at least one seat left, compared
+          column to column as `guestsBooked < maxGuests` so the answer is
+          computed by the database rather than assembled from a second query.
+
+          Sent as the literal string `true` or `false`; any other value is a
+          validation error rather than a falsy default.
+        schema:
+          type: string
+          enum: ['true', 'false']
+    responses:
+      '200':
+        description: One page of tours, newest first unless sorted otherwise.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TourListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/tours/{id}:
+  parameters:
+    - $ref: '#/components/parameters/TourIdPath'
+
+  get:
+    tags: [Tours]
+    operationId: getTour
+    summary: Get a tour
+    description: |
+      **ADMIN, AGENT and CUSTOMER.**
+
+      Returns the tour with its destination summary and its published-review
+      rating. A soft-deleted tour answers 404 exactly as a never-existing id
+      does, so a client cannot use this endpoint to discover that a tour was
+      withdrawn.
+    responses:
+      '200':
+        description: The tour.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TourResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Tours]
+    operationId: updateTour
+    summary: Update a tour
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Every field is optional and omitted fields are left as they are, so this
+      is a merge despite the verb. It is a `PUT` because the target is
+      addressed directly and repeating the call changes nothing further.
+
+      Editing is only possible while the whole trip is still ahead: a tour
+      whose start date or end date has passed is frozen, because its dates and
+      price are what its existing bookings were sold against. Within that
+      window the guards are:
+
+      - new dates must themselves be in the future, and the end must remain
+        after the start once the stored values fill in whatever was not sent;
+      - `duration` is recomputed whenever either date moves and is never taken
+        from the body;
+      - `maxGuests` may not drop below the tour's current `guestsBooked`, and
+        the refusal names that figure;
+      - the destination may not change once bookings exist, and a destination
+        that does not exist or has been soft-deleted answers 404.
+
+      `status` is deliberately not accepted here. Lifecycle moves have their
+      own endpoint because they are transitions with their own preconditions,
+      not field assignments.
+
+      Accepts JSON or `multipart/form-data`. Under multipart the cover image
+      is the `tourPhoto` file part, capped at 5MB and limited to JPEG, PNG or
+      WebP; Cloudinary returns a URL and that URL replaces the `tourPhoto`
+      field before the write, which is why the schema types the field as a
+      plain optional string rather than a file. Sending `tourPhoto: ""`
+      removes the photo and reclaims the stored image. A refused update
+      reclaims the image it had just uploaded, so a 404 on a multipart call
+      leaves nothing behind on Cloudinary.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TourUpdateRequest' }
+        multipart/form-data:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/TourUpdateRequest'
+            properties:
+              tourPhoto:
+                type: string
+                format: binary
+                description: |
+                  The replacement cover image as a file part. The previous
+                  image is deleted from Cloudinary once the row no longer
+                  points at it.
+    responses:
+      '200':
+        description: The updated tour.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TourResponse' }
+      '400': { $ref: '#/components/responses/TourWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: |
+          No such tour, or the tour is being moved to a destination that does
+          not exist. Both are soft-delete aware.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Tours]
+    operationId: deleteTour
+    summary: Delete a tour
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      A soft delete: the row survives with a `deletedAt` tombstone and every
+      read is scoped past it, so the tour disappears from lists and answers
+      404 on a direct read while the bookings and reviews that reference it
+      keep their foreign keys intact. A freed-up name can be reused
+      immediately by a new tour.
+
+      Refused with 400 when the tour has already started, has already ended,
+      is `ONGOING` or `COMPLETED`, still has bookings attached, or still
+      counts booked guests. Those are five separate checks rather than one,
+      so the message says which condition blocked it.
+
+      The cover image is deleted from Cloudinary afterwards. That cleanup is
+      best-effort: a Cloudinary failure is logged and does not fail the
+      request, because the row is already tombstoned and retrying the delete
+      would not fix the remote file.
+    responses:
+      '200':
+        description: Tour deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/TourWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/tours/{id}/status:
+  parameters:
+    - $ref: '#/components/parameters/TourIdPath'
+
+  patch:
+    tags: [Tours]
+    operationId: updateTourStatus
+    summary: Move a tour through its lifecycle
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Status lives on its own endpoint because it is a state machine, not a
+      field. Each move has preconditions that involve the tour's dates, its
+      bookings and their payments, and folding that into the general update
+      would mean a single request could both edit a tour and transition it,
+      with no clear order between the two.
+
+      The permitted moves, and what each one checks:
+
+      - `UPCOMING` to `ONGOING`: the start date must have been reached, and no
+        booking may still have a pending payment. Starting a trip that
+        somebody has not finished paying for would strand the money mid-flow.
+      - `UPCOMING` to `CANCELLED`: refused if any booking has a completed
+        payment, because that money would have to be refunded first. Cancelling
+        also cancels the tour's pending and confirmed bookings in the same
+        step.
+      - `ONGOING` to `COMPLETED`: the end date must have passed, and the tour's
+        `endDate` is snapped to the moment of completion.
+      - `CANCELLED` back to `UPCOMING`: only while the start date is still in
+        the future.
+
+      Everything else is refused with 400, including cancelling an ongoing or
+      completed tour and setting the status the tour already has.
+
+      Capacity is not settable from here or anywhere else. `guestsBooked` is
+      owned by the booking transaction, which increments it with a conditional
+      write that only lands while the total stays within `maxGuests`, so two
+      concurrent bookings can never both pass an earlier read-then-check and
+      oversell the trip. Exposing that counter to clients would put a value
+      that is only correct inside a transaction into a request body.
+
+      The response is the slim status shape rather than the full tour, since
+      the status and the end date are the only things this call can change.
+      The transition is written to the application log with the acting
+      administrator's id.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TourStatusUpdateRequest' }
+    responses:
+      '200':
+        description: The tour's new status.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TourStatusUpdateResponse' }
+      '400': { $ref: '#/components/responses/TourWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/destinations:
+  post:
+    tags: [Destinations]
+    operationId: createDestination
+    summary: Create a destination
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Creates the country and city hub that tours, hotels and flights are
+      attached to. Only the country is required, so a destination can be a
+      whole country rather than a city.
+
+      Uniqueness is on the place as a whole, compared case-insensitively:
+      name plus country, plus city when one is supplied. A duplicate answers
+      **400, not 409**, because the check is a query rather than a database
+      unique index and the value is reported as rejected rather than as a
+      resource conflict.
+
+      Country and city accept letters, spaces, hyphens and apostrophes only,
+      which keeps digits and punctuation out of fields whose whole purpose is
+      to be matched against other place names. The destination's own name is
+      not restricted that way.
+
+      Accepts JSON or `multipart/form-data`. Under multipart the picture is
+      the `destinationPhoto` file part, capped at 5MB and limited to JPEG, PNG
+      or WebP; it is uploaded to Cloudinary and the resulting URL replaces the
+      `destinationPhoto` field before the row is written. The schema types
+      that field as a plain optional string for exactly that reason: the body
+      is validated before the upload happens, so at validation time the field
+      is either absent or a URL the client sent itself. A create refused after
+      the upload reclaims the image.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/DestinationCreateRequest' }
+        multipart/form-data:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/DestinationCreateRequest'
+            properties:
+              destinationPhoto:
+                type: string
+                format: binary
+                description: The destination image as a file part.
+    responses:
+      '201':
+        description: Destination created.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DestinationResponse' }
+      '400': { $ref: '#/components/responses/DestinationWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Destinations]
+    operationId: listDestinations
+    summary: List destinations
+    description: |
+      **ADMIN, AGENT and CUSTOMER.** Destinations are shared reference data,
+      so every signed-in principal sees the same rows.
+
+      `search` is an OR across the name, description, country and city;
+      `country` and `city` are separate case-insensitive substring filters
+      that AND with it. Soft-deleted destinations are excluded from the rows
+      and from the count.
+
+      The `meta` block carries the usual pagination counts plus an echo of the
+      filters that produced this page, so a client rendering from a shared
+      link can show what is applied without re-parsing the query string.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/SortOrder'
+      - name: sortBy
+        in: query
+        required: false
+        description: Restricted to a whitelist of scalar columns.
+        schema:
+          type: string
+          enum: [city, country, createdAt, name, updatedAt]
+          default: createdAt
+      - name: country
+        in: query
+        required: false
+        description: |
+          Case-insensitive substring match. Letters, spaces, hyphens and
+          apostrophes only, matching the column's own rule.
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-']+$"
+      - name: city
+        in: query
+        required: false
+        description: Case-insensitive substring match, same character rule as `country`.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-']+$"
+    responses:
+      '200':
+        description: One page of destinations, with the applied filters echoed in `meta`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DestinationListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/destinations/{id}:
+  parameters:
+    - $ref: '#/components/parameters/DestinationIdPath'
+
+  get:
+    tags: [Destinations]
+    operationId: getDestination
+    summary: Get a destination
+    description: |
+      **ADMIN, AGENT and CUSTOMER.**
+
+      Returns the full destination record. Tour responses already embed a
+      four-field summary of their destination, so this is for the detail view
+      rather than for hydrating a list. A soft-deleted destination answers 404
+      like a never-existing id.
+    responses:
+      '200':
+        description: The destination.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DestinationResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Destinations]
+    operationId: updateDestination
+    summary: Update a destination
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Every field is optional and omitted fields are left as they are, so this
+      is a merge rather than a replacement, but **at least one field must be
+      present**. An empty body is a 400 rather than a silent no-op, so a
+      client that lost its form state is told rather than left believing it
+      saved something. A photo uploaded as a file part counts as that one
+      field, since the file never passes through the validated body.
+
+      A rename re-runs the uniqueness check, filling in the stored country and
+      city when the request does not send them, so an edit cannot land on a
+      place that already exists. As with create, a collision is a 400.
+
+      Accepts JSON or `multipart/form-data`. The `destinationPhoto` file part
+      is uploaded to Cloudinary and its URL replaces the field before the
+      write, which is why the schema types the field as a plain optional
+      string. Sending `destinationPhoto: ""` removes the photo. Replacing or
+      removing an image deletes the previous one from Cloudinary once the row
+      no longer points at it, and a refused update reclaims whatever it had
+      just uploaded.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/DestinationUpdateRequest' }
+        multipart/form-data:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/DestinationUpdateRequest'
+            properties:
+              destinationPhoto:
+                type: string
+                format: binary
+                description: The replacement image as a file part.
+    responses:
+      '200':
+        description: The updated destination.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DestinationResponse' }
+      '400': { $ref: '#/components/responses/DestinationWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Destinations]
+    operationId: deleteDestination
+    summary: Delete a destination
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Refused with 400 while any hotel, tour or flight still points at this
+      destination, and the message names which of those groups blocked it. A
+      destination is a shared root rather than a private child record, so
+      removing one out from under live inventory is never the intended
+      outcome. Dependents that have themselves been soft-deleted do not count
+      as blockers.
+
+      Once nothing depends on it the delete is soft: the row keeps a
+      `deletedAt` tombstone, reads are scoped past it, and the place name
+      becomes available again. The photo is then removed from Cloudinary on a
+      best-effort basis, so a failure there is logged rather than failing a
+      delete that has already happened.
+    responses:
+      '200':
+        description: Destination deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/DestinationWriteRefused' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }

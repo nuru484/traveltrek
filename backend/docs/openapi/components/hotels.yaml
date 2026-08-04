@@ -1,0 +1,628 @@
+# Hotel and room inventory.
+#
+# Two models that only make sense together: a hotel is a place, a room is a
+# sellable unit inside it, and a booking is always placed against a room rather
+# than a hotel. That is why the money lives on the room and the address lives on
+# the hotel, and why the two halves of this domain share one file.
+#
+# Rooms carry an availability pair (`roomsAvailable` / `roomsBooked`) that is
+# not stored anywhere. It is computed per request from the bookings that overlap
+# a date window, so the same room row answers differently depending on the dates
+# asked about. Every schema below that carries those counts says which window
+# they were computed for.
+
+schemas:
+  HotelRatingSummary:
+    type: object
+    description: |
+      Aggregate of the **published** reviews left against this hotel's rooms.
+      Reviews hang off bookings, not off hotels, so this is rolled up from the
+      rooms rather than read from a column, and a review still awaiting
+      moderation contributes nothing.
+    required: [average, count]
+    properties:
+      average:
+        type: [number, 'null']
+        minimum: 1
+        maximum: 5
+        description: |
+          Mean rating to one decimal place, or null when nothing published
+          exists yet. Null rather than 0, because an unreviewed hotel is not a
+          badly reviewed one and clients should be able to tell the two apart.
+        examples: [4.5]
+      count:
+        type: integer
+        minimum: 0
+        description: How many published reviews the average was computed from.
+        examples: [12]
+
+  HotelDestinationSummary:
+    type: object
+    description: |
+      The destination hub this hotel belongs to, embedded so a list of hotels
+      can be rendered with its city and country without a second request. A
+      hotel always has exactly one, and a soft-deleted destination cannot host
+      new ones.
+    required: [id, name, city, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+      city: { type: string, examples: [Cape Coast] }
+      country: { type: string, examples: [Ghana] }
+      description:
+        type: [string, 'null']
+
+  HotelRoomSummary:
+    type: object
+    description: |
+      One of the hotel's rooms, trimmed to what a hotel page needs: what it is,
+      what it costs, and a picture. Deliberately without the availability
+      counts, because those depend on a date window and a hotel read carries no
+      dates. Fetch the room itself, or `GET /api/v1/rooms`, to get them.
+    required: [id, roomType, pricePerNight]
+    properties:
+      id: { type: integer, examples: [88] }
+      roomType: { type: string, examples: [Deluxe Double] }
+      pricePerNight:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Nightly rate in integer pesewas. GH₵ 450.00 is `45000`.
+      description:
+        type: [string, 'null']
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when no photo has been uploaded.
+
+  Hotel:
+    type: object
+    description: |
+      A hotel with its destination, its rooms, and its published-review
+      aggregate already resolved. Soft-deleted hotels are scoped out of every
+      read, so a hotel that appears here exists as far as the API is concerned.
+    required:
+      [
+        id,
+        name,
+        address,
+        starRating,
+        amenities,
+        destination,
+        rooms,
+        rating,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [17] }
+      name: { type: string, examples: [Seaside Retreat] }
+      description:
+        type: [string, 'null']
+        examples: [A breezy seaside hotel a short walk from the castle.]
+      address:
+        type: string
+        description: Street address. Free text, and searchable.
+        examples: [12 Beachside Avenue, Accra]
+      phone:
+        type: [string, 'null']
+        examples: ['+233550001000']
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when none has been uploaded.
+      starRating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        description: |
+          The operator's own star classification, not a guest score. Defaults to
+          3 when a hotel is created without one. Guest sentiment lives in
+          `rating`, and the two are unrelated numbers on purpose.
+        examples: [4]
+      amenities:
+        type: array
+        description: |
+          Facility tags. Always an array, empty when none were supplied, so a
+          client never has to null-check before iterating.
+        items: { type: string, maxLength: 50 }
+        maxItems: 20
+        examples: [[wifi, pool, parking]]
+      destination: { $ref: '#/components/schemas/HotelDestinationSummary' }
+      rooms:
+        type: array
+        description: |
+          Every active room of this hotel. Empty on a freshly created hotel,
+          and a hotel with rooms cannot be deleted until they are removed.
+        items: { $ref: '#/components/schemas/HotelRoomSummary' }
+      rating: { $ref: '#/components/schemas/HotelRatingSummary' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  HotelResponse:
+    type: object
+    description: The single-hotel envelope, returned by create, read, and update.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Hotel retrieved successfully] }
+      data: { $ref: '#/components/schemas/Hotel' }
+
+  HotelListResponse:
+    type: object
+    description: |
+      A page of hotels. The review aggregates for the whole page are fetched in
+      one query rather than per row, so page size does not multiply the database
+      work.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Hotels retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Hotel' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  HotelWritableFields:
+    type: object
+    description: |
+      The hotel fields a client may set. Shared by create and update so the two
+      cannot drift; which of them are required is decided by the schema that
+      composes this one.
+
+      Numbers are coerced from strings, because a `multipart/form-data` part is
+      always text and `destinationId=3` has to mean the same thing whether it
+      arrived as JSON or as a form field.
+    properties:
+      name:
+        type: string
+        minLength: 2
+        maxLength: 100
+        description: Trimmed before validation, so trailing spaces cannot pad it to length.
+        examples: [Seaside Retreat]
+      description:
+        type: string
+        maxLength: 2000
+      address:
+        type: string
+        minLength: 5
+        maxLength: 255
+        examples: [12 Beachside Avenue, Accra]
+      phone:
+        type: string
+        pattern: '^\+?[0-9]{10,15}$'
+        description: Optional leading `+`, then 10 to 15 digits.
+        examples: ['+233550001000']
+      destinationId:
+        type: integer
+        minimum: 1
+        description: |
+          The destination hub the hotel sits in. Checked against the live table,
+          and a soft-deleted destination reads as missing, so a hotel can never
+          be attached to a hub that has been retired.
+        examples: [3]
+      starRating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        description: Defaults to 3 on create when omitted.
+        examples: [4]
+      amenities:
+        type: array
+        description: |
+          Facility tags, each 1 to 50 characters after trimming. Duplicates are
+          rejected rather than silently collapsed, so a client that meant to
+          send two different tags finds out it sent one twice.
+
+          On update this replaces the whole array; there is no per-item patch.
+          Under `multipart/form-data`, repeat the `amenities` field once per
+          tag.
+        items: { type: string, minLength: 1, maxLength: 50 }
+        maxItems: 20
+        examples: [[wifi, pool]]
+
+  HotelCreateRequest:
+    description: |
+      JSON form of a hotel create. `name`, `address`, and `destinationId` are
+      the only required fields; everything else has a sensible default or stays
+      null.
+    allOf:
+      - $ref: '#/components/schemas/HotelWritableFields'
+      - type: object
+        required: [name, address, destinationId]
+        properties:
+          hotelPhoto:
+            type: string
+            format: uri
+            description: |
+              An image URL to store as-is. Use the `multipart/form-data` variant
+              of this request to upload a file instead; the two are the same
+              field seen from either side of the upload.
+
+  HotelCreateFormRequest:
+    description: |
+      Multipart form of a hotel create, for uploading the photo rather than
+      pointing at one. Every other field carries the same meaning as the JSON
+      variant, sent as text parts.
+    allOf:
+      - $ref: '#/components/schemas/HotelWritableFields'
+      - type: object
+        required: [name, address, destinationId]
+        properties:
+          hotelPhoto:
+            type: string
+            format: binary
+            description: |
+              JPEG, PNG, or WebP, up to 5MB. The file is uploaded to Cloudinary
+              and replaced by its URL before the row is written, so the database
+              only ever holds a URL.
+
+              The upload runs **after** the rest of the body has validated, and
+              a create that is refused afterwards deletes the image it just
+              uploaded, so a rejected request cannot leave an orphan in
+              Cloudinary or a row pointing at nothing.
+
+  HotelUpdateRequest:
+    description: |
+      JSON form of a hotel update. Every field is optional and omitted fields
+      are left untouched, so this is a partial update despite being a PUT. An
+      empty body is accepted and returns the hotel unchanged.
+    allOf:
+      - $ref: '#/components/schemas/HotelWritableFields'
+      - type: object
+        properties:
+          hotelPhoto:
+            type: string
+            format: uri
+            description: |
+              A new image URL. Sending `""` removes the photo: the column is
+              nulled and the old Cloudinary image is deleted. Omitting the field
+              entirely leaves the existing photo alone, which is what makes
+              "remove" and "do not touch" distinguishable.
+
+  HotelUpdateFormRequest:
+    description: |
+      Multipart form of a hotel update, for replacing the photo with an upload.
+      Field meanings match the JSON variant.
+    allOf:
+      - $ref: '#/components/schemas/HotelWritableFields'
+      - type: object
+        properties:
+          hotelPhoto:
+            type: string
+            format: binary
+            description: |
+              JPEG, PNG, or WebP, up to 5MB. Uploaded to Cloudinary and replaced
+              by its URL before the row is written. Once the row points at the
+              new image the previous one is deleted, best-effort, so replacing a
+              photo does not accumulate dead assets.
+
+              To remove the photo instead, send `hotelPhoto` as an empty **text**
+              part rather than a file.
+
+  RoomHotelSummary:
+    type: object
+    description: |
+      The hotel a room belongs to, embedded so a room can be shown with its
+      hotel's name without a second request. Trimmed to identity: the address,
+      the star rating, and the sibling rooms are on the hotel resource.
+    required: [id, name]
+    properties:
+      id: { type: integer, examples: [17] }
+      name: { type: string, examples: [Seaside Retreat] }
+      description:
+        type: [string, 'null']
+
+  Room:
+    type: object
+    description: |
+      A room type within a hotel, together with the availability counts for the
+      date window the request asked about.
+
+      A room is a **type with an inventory count**, not a single physical key:
+      `totalRooms` is how many of it exist, and a booking reserves some number
+      of them. That is why a room can be partly booked, and why `roomsAvailable`
+      changes with the dates in the query while nothing about the row itself
+      changes.
+    required:
+      [
+        id,
+        hotel,
+        roomType,
+        pricePerNight,
+        capacity,
+        totalRooms,
+        amenities,
+        roomsAvailable,
+        roomsBooked,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [88] }
+      hotel: { $ref: '#/components/schemas/RoomHotelSummary' }
+      roomType:
+        type: string
+        description: |
+          The room's name within its hotel, and its identity: a hotel cannot
+          hold two active rooms of the same type. Matched case-sensitively for
+          that uniqueness check, filtered case-insensitively on the list.
+        examples: [Deluxe Double]
+      pricePerNight:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          The rate for **one room for one night**, in integer pesewas. A stay's
+          total is this multiplied by nights and by rooms, computed when the
+          booking is placed, so a later price change never rewrites an existing
+          booking.
+      capacity:
+        type: integer
+        minimum: 1
+        description: Guests one room of this type sleeps.
+        examples: [2]
+      totalRooms:
+        type: integer
+        minimum: 1
+        description: |
+          How many rooms of this type the hotel has. This is the ceiling every
+          availability count is measured against.
+        examples: [5]
+      description:
+        type: [string, 'null']
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when none has been uploaded.
+      amenities:
+        type: array
+        items: { type: string, maxLength: 50 }
+        maxItems: 20
+        examples: [[wifi, tv]]
+      roomsBooked:
+        type: integer
+        minimum: 0
+        description: |
+          Rooms of this type already committed across every `PENDING` or
+          `CONFIRMED` booking that overlaps the requested window. Cancelled and
+          completed bookings free their rooms; a pending one does not, because a
+          reservation waiting on payment is still holding inventory.
+        examples: [2]
+      roomsAvailable:
+        type: integer
+        description: |
+          `totalRooms` minus `roomsBooked` for the requested window. Not stored,
+          and not stable: the same room reports differently for different dates,
+          which is the whole point of the window.
+        examples: [3]
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  RoomResponse:
+    type: object
+    description: The single-room envelope, returned by create, read, and update.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Room retrieved successfully] }
+      data: { $ref: '#/components/schemas/Room' }
+
+  RoomListResponse:
+    type: object
+    description: |
+      A page of rooms. Every row's availability is computed for the **same**
+      window, the one derived from the request's `startDate` and `endDate`, so
+      the counts on the page are comparable with each other.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Rooms retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Room' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  RoomDeleteSummary:
+    type: object
+    description: |
+      What the delete actually did. It names the hotel and the room type because
+      the row is now hidden and a client that only kept an id has no other way
+      to describe what it removed, and it counts the historical bookings that
+      were deliberately left behind.
+    required: [id, roomType, hotelName, historicalBookingsCount, deletedAt]
+    properties:
+      id: { type: integer, examples: [88] }
+      roomType: { type: string, examples: [Deluxe Double] }
+      hotelName: { type: string, examples: [Seaside Retreat] }
+      historicalBookingsCount:
+        type: integer
+        minimum: 0
+        description: |
+          Completed and cancelled bookings that survive the delete. They never
+          block it, because refusing to retire a room that once sold anything
+          would mean no room could ever be retired, but they are kept for
+          record-keeping and reporting.
+        examples: [4]
+      deletedAt:
+        type: string
+        format: date-time
+        description: When the row was soft-deleted. The row itself is not destroyed.
+
+  RoomDeleteResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Room deleted successfully] }
+      data: { $ref: '#/components/schemas/RoomDeleteSummary' }
+
+  RoomWritableFields:
+    type: object
+    description: |
+      The room fields a client may set. Shared by create and update so the two
+      cannot drift; which of them are required is decided by the schema that
+      composes this one.
+
+      Numbers are coerced from strings, so a `multipart/form-data` part reading
+      `capacity=2` means the same as the JSON `2`.
+    properties:
+      hotelId:
+        type: integer
+        minimum: 1
+        description: |
+          The hotel this room belongs to. Checked against the live table, and a
+          soft-deleted hotel reads as missing.
+
+          On update, moving a room to another hotel is refused while the room
+          has active bookings, because the guests booked a place, not a row.
+        examples: [17]
+      roomType:
+        type: string
+        minLength: 1
+        maxLength: 100
+        description: |
+          Trimmed, then required to be unique among the hotel's active rooms. A
+          soft-deleted room does not reserve its type, so a retired name can be
+          reused.
+        examples: [Deluxe Double]
+      pricePerNight:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Nightly rate per room, in integer pesewas, and strictly positive. GH₵
+          450.00 is `45000`. Sending `450.50` is a validation error rather than
+          a rounded value, because a fractional pesewa has no meaning in the
+          payment path.
+      capacity:
+        type: integer
+        minimum: 1
+        description: |
+          Guests one room sleeps. On update it may be raised freely but cannot
+          be **lowered** while active bookings exist, since those guests chose
+          the room on the strength of the capacity advertised at the time.
+        examples: [2]
+      totalRooms:
+        type: integer
+        minimum: 1
+        description: |
+          How many rooms of this type exist. On update it cannot be reduced
+          below the number already committed to active bookings, which would
+          otherwise oversell rooms that are already sold.
+        examples: [5]
+      description:
+        type: string
+        maxLength: 2000
+      amenities:
+        type: array
+        description: |
+          Facility tags, each 1 to 50 characters after trimming, duplicates
+          rejected. Replaces the whole array on update. Under
+          `multipart/form-data`, repeat the `amenities` field once per tag.
+        items: { type: string, minLength: 1, maxLength: 50 }
+        maxItems: 20
+        examples: [[wifi, tv]]
+
+  RoomCreateRequest:
+    description: |
+      JSON form of a room create. `hotelId`, `roomType`, `pricePerNight`,
+      `capacity`, and `totalRooms` are all required: a room with no price or no
+      inventory count could not be booked, so there is no useful partial room to
+      create.
+    allOf:
+      - $ref: '#/components/schemas/RoomWritableFields'
+      - type: object
+        required: [hotelId, roomType, pricePerNight, capacity, totalRooms]
+        properties:
+          roomPhoto:
+            type: string
+            format: uri
+            description: |
+              An image URL to store as-is. Use the `multipart/form-data` variant
+              to upload a file instead.
+
+  RoomCreateFormRequest:
+    description: |
+      Multipart form of a room create, for uploading the photo rather than
+      pointing at one. Every other field carries the same meaning as the JSON
+      variant, sent as text parts.
+    allOf:
+      - $ref: '#/components/schemas/RoomWritableFields'
+      - type: object
+        required: [hotelId, roomType, pricePerNight, capacity, totalRooms]
+        properties:
+          roomPhoto:
+            type: string
+            format: binary
+            description: |
+              JPEG, PNG, or WebP, up to 5MB. Uploaded to Cloudinary and replaced
+              by its URL before the row is written.
+
+              The upload runs **after** the rest of the body has validated, and
+              a create refused afterwards, by a missing hotel or a duplicate
+              room type, deletes the image it just uploaded rather than
+              stranding it.
+
+  RoomUpdateRequest:
+    description: |
+      JSON form of a room update. Every field is optional and omitted fields are
+      left untouched, so this is a partial update despite being a PUT. An empty
+      body is accepted and returns the room unchanged.
+    allOf:
+      - $ref: '#/components/schemas/RoomWritableFields'
+      - type: object
+        properties:
+          roomPhoto:
+            type: string
+            format: uri
+            description: |
+              A new image URL. Sending `""` removes the photo: the column is
+              nulled and the old Cloudinary image is deleted. Omitting the field
+              leaves the existing photo alone.
+
+  RoomUpdateFormRequest:
+    description: |
+      Multipart form of a room update, for replacing the photo with an upload.
+      Field meanings match the JSON variant.
+    allOf:
+      - $ref: '#/components/schemas/RoomWritableFields'
+      - type: object
+        properties:
+          roomPhoto:
+            type: string
+            format: binary
+            description: |
+              JPEG, PNG, or WebP, up to 5MB. Uploaded to Cloudinary and replaced
+              by its URL before the row is written; the previous image is then
+              deleted, best-effort.
+
+              To remove the photo instead, send `roomPhoto` as an empty **text**
+              part rather than a file.
+
+parameters:
+  RoomStartDate:
+    name: startDate
+    in: query
+    required: false
+    description: |
+      Start of the availability window, inclusive. Any string `Date` can parse,
+      normally an ISO date or date-time.
+
+      Only honoured together with `endDate`. Sending one alone, or either as an
+      empty string, falls back to the default window rather than half-applying
+      the filter, so a partially built query never silently answers about a
+      period nobody asked for.
+    schema:
+      type: string
+      examples: ['2026-09-01']
+
+  RoomEndDate:
+    name: endDate
+    in: query
+    required: false
+    description: |
+      End of the availability window. Must be strictly after `startDate`.
+
+      Overlap is computed on open bounds: a booking that starts exactly at
+      `endDate`, or ends exactly at `startDate`, does not count against the
+      window. Back-to-back stays therefore do not collide, and a checkout frees
+      the room for a same-day checkin.
+
+      Only honoured together with `startDate`. Both default to a window of now
+      through this time tomorrow.
+    schema:
+      type: string
+      examples: ['2026-09-08']

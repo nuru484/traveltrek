@@ -1,0 +1,320 @@
+# Shared building blocks: security schemes, the error and pagination
+# envelopes, reusable query parameters, and the canned error responses that
+# every operation references instead of restating.
+
+securitySchemes:
+  sessionCookie:
+    type: apiKey
+    in: cookie
+    name: accessToken
+    description: |
+      The session cookie set by any successful login. It is httpOnly, so
+      JavaScript cannot read or set it and there is nothing to paste into the
+      Authorize dialog. Call `POST /api/v1/auth/demo-login` from this page and
+      the browser will hold the cookie for every subsequent request.
+
+      Cross-origin callers must send `credentials: 'include'`. An
+      `Authorization` header is never read by any endpoint.
+
+  refreshCookie:
+    type: apiKey
+    in: cookie
+    name: refreshToken
+    description: |
+      The rotating refresh cookie, seven days, sent only to
+      `POST /api/v1/auth/refresh-token`. Each refresh consumes its token id and
+      issues a new pair; replaying a consumed token is treated as theft rather
+      than a retry.
+
+  twoFactorPendingCookie:
+    type: apiKey
+    in: cookie
+    name: twoFactorPending
+    description: |
+      A ten-minute signed cookie issued when a password login needs a second
+      factor. It carries no session authority: it authorizes the two-factor
+      verify and resend steps and nothing else.
+
+  paystackSignature:
+    type: apiKey
+    in: header
+    name: x-paystack-signature
+    description: |
+      HMAC of the raw request body, computed by Paystack with the shared secret
+      key. The webhook verifies it against the unparsed bytes rather than the
+      re-serialized JSON, because re-serializing would change the byte sequence
+      the signature was computed over and every event would be rejected.
+
+schemas:
+  Error:
+    type: object
+    description: |
+      The single error shape returned by every failing endpoint.
+
+      Note which fields are guaranteed. `status`, `message`, and `requestId`
+      are always present. `code` and `errorId` appear **outside production
+      only**, so a client must not branch on them; branch on the HTTP status
+      instead. `details` is returned in every environment for validation
+      failures.
+    required: [status, message, requestId]
+    properties:
+      status:
+        type: string
+        const: error
+      message:
+        type: string
+        description: |
+          Human-readable summary. In production a 500 is always reported as
+          `Internal Server Error` so internal detail never reaches a client.
+        examples: [Validation Error]
+      requestId:
+        type: string
+        description: |
+          Correlates this response with the access log and error log entries
+          for the same request. Also returned in the `X-Request-Id` header.
+      details:
+        type: object
+        description: |
+          Present in all environments when the failure was validation, in which
+          case it holds the per-field failures. Outside production it is also
+          populated for any other error carrying context.
+        properties:
+          errors:
+            type: array
+            items: { $ref: '#/components/schemas/FieldError' }
+      code:
+        type: string
+        description: |
+          **Non-production only.** A classifier such as `VALIDATION_ERROR`,
+          `EXPIRED_TOKEN`, `INVALID_TOKEN`, `USER_NOT_FOUND`,
+          `STALE_TOKEN_VERSION`, or `RATE_LIMIT_EXCEEDED`. Useful when
+          debugging locally; absent in production, so production clients cannot
+          depend on it.
+        examples: [VALIDATION_ERROR]
+      errorId:
+        type: string
+        description: Non-production only. Ties the response to a single log record.
+    examples:
+      - status: error
+        message: Validation Error
+        requestId: 3f1c9d2e-5b7a-4c11-9f60-2a8e4d0b7c31
+        details:
+          errors:
+            - field: email
+              message: Invalid email address
+
+  FieldError:
+    type: object
+    required: [field, message]
+    properties:
+      field:
+        type: string
+        description: Dotted path to the offending field, as Zod reported it.
+        examples: [email]
+      message:
+        type: string
+        examples: [Invalid email address]
+
+  PaginationMeta:
+    type: object
+    description: The list-response meta block, identical across every paginated endpoint.
+    required: [page, limit, total, totalPages]
+    properties:
+      page:
+        type: integer
+        minimum: 1
+        examples: [1]
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        examples: [10]
+      total:
+        type: integer
+        minimum: 0
+        description: Rows matching the filter, ignoring pagination.
+        examples: [42]
+      totalPages:
+        type: integer
+        minimum: 1
+        description: |
+          Never below 1, so an empty result still describes a coherent single
+          page rather than a zero-page range a client has to special-case.
+        examples: [5]
+
+  MessageResponse:
+    type: object
+    description: |
+      The reply from action endpoints that have nothing to return. Deletes and
+      confirmations answer with this.
+    required: [message]
+    properties:
+      message:
+        type: string
+        examples: [Tour deleted successfully]
+
+  Role:
+    type: string
+    description: |
+      Authorization role. `ADMIN` and `AGENT` are staff; `CUSTOMER` is a public
+      account. Route middleware enforces the role, while per-record ownership
+      rules live in the service layer, so an endpoint that admits `CUSTOMER`
+      still returns only that customer's own rows.
+    enum: [ADMIN, AGENT, CUSTOMER]
+
+  PrincipalKind:
+    type: string
+    description: |
+      Which table the principal lives in. Staff and customers are separate
+      tables with independent id sequences, so an id alone is ambiguous.
+    enum: [staff, customer]
+
+  Money:
+    type: integer
+    minimum: 0
+    description: |
+      An amount in **minor units (pesewas)**, never a float and never a decimal
+      string. GH₵ 1,250.00 is `125000`. This holds from the database column
+      through to the Paystack charge, so amounts compare exactly and no
+      rounding error can accumulate in the payment path.
+    examples: [125000]
+
+  Currency:
+    type: string
+    description: ISO 4217 code. Ghana cedis throughout.
+    default: GHS
+    examples: [GHS]
+
+parameters:
+  Page:
+    name: page
+    in: query
+    required: false
+    description: 1-based page number.
+    schema:
+      type: integer
+      minimum: 1
+      default: 1
+
+  Limit:
+    name: limit
+    in: query
+    required: false
+    description: Rows per page, capped at 100 so one request can never pull a whole table.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 10
+
+  Search:
+    name: search
+    in: query
+    required: false
+    description: Free-text filter. Case-insensitive substring match.
+    schema:
+      type: string
+
+  SortOrder:
+    name: sortOrder
+    in: query
+    required: false
+    schema:
+      type: string
+      enum: [asc, desc]
+      default: desc
+
+headers:
+  XRequestId:
+    description: |
+      The correlation id for this request, present on every response. Quote it
+      in a bug report and the exact log lines can be retrieved.
+    schema:
+      type: string
+
+responses:
+  ValidationError:
+    description: |
+      The request failed schema validation. `details.errors` names every field
+      that failed and why. Validation covers the body, the path parameters, and
+      the query string, so this can be raised before any handler runs.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+        example:
+          status: error
+          message: Validation Error
+          requestId: 3f1c9d2e-5b7a-4c11-9f60-2a8e4d0b7c31
+          details:
+            errors:
+              - field: startDate
+                message: Start date must be in the future
+
+  BadRequest:
+    description: The request was well-formed but cannot be satisfied in the current state.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+
+  Unauthorized:
+    description: |
+      No session, or a session that is no longer valid. Outside production the
+      `code` distinguishes the causes: `EXPIRED_TOKEN` (refresh and retry),
+      `INVALID_TOKEN` (log out), `USER_NOT_FOUND`, or `STALE_TOKEN_VERSION`
+      (the session was revoked server-side).
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+
+  Forbidden:
+    description: |
+      Authenticated, but not permitted. Returned for a role the endpoint does
+      not accept and for acting on another principal's record. Never used for
+      an expired session, so a client can treat 403 as final rather than
+      retrying it after a refresh.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+
+  NotFound:
+    description: |
+      No such record, or it has been soft-deleted. Soft-deleted rows are scoped
+      out of every read, so they are indistinguishable from never having
+      existed.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+
+  Conflict:
+    description: |
+      The write collides with an existing row, typically a unique contact
+      already registered. Contact uniqueness spans both the staff and customer
+      tables, so a customer cannot claim an email a staff account already uses.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+
+  RateLimited:
+    description: |
+      Too many requests. A global limiter applies to the whole API, with
+      tighter budgets on the credential endpoints.
+    headers:
+      Retry-After:
+        description: Seconds to wait before retrying.
+        schema: { type: integer }
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }

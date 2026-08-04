@@ -1,0 +1,785 @@
+# Hotel and room inventory.
+#
+# Both halves of the same domain: a hotel is a place with an address, a room is
+# a sellable unit inside it with a nightly price and a count of how many exist.
+# Bookings are always placed against a room, never a hotel, which is why the
+# money and the availability live down here and not on the hotel.
+#
+# Reads are open to every signed-in principal, because customers have to be able
+# to browse what they are booking. Writes are ADMIN only. The role gate is on
+# the route, so a rejected write never reaches the service and never touches
+# Cloudinary.
+
+/api/v1/hotels:
+  post:
+    tags: [Hotels]
+    operationId: createHotel
+    summary: Create a hotel
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      Adds a hotel to a destination hub. `destinationId` is verified against the
+      live table first, and a soft-deleted destination reads as missing, so a
+      hotel can never be attached to a hub that has been retired.
+
+      `starRating` is the operator's own classification and defaults to 3 when
+      omitted. It is not a guest score: the `rating` block on the response is
+      the published-review aggregate, and on a brand-new hotel it is
+      `{ average: null, count: 0 }` without a query being run for it.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `hotelPhoto` is a
+      file part, up to 5MB and JPEG, PNG, or WebP, that is uploaded to
+      Cloudinary and replaced by its URL before the row is written. The upload
+      happens after the rest of the body validates, and if the create is then
+      refused, by a missing destination for instance, the freshly uploaded image
+      is deleted, so a failed request leaves neither an orphaned asset nor a row
+      pointing at nothing.
+
+      A new hotel has no rooms yet, so `rooms` comes back empty. Add them
+      through `POST /api/v1/rooms`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/HotelCreateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/HotelCreateFormRequest' }
+    responses:
+      '201':
+        description: Hotel created.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HotelResponse' }
+            example:
+              message: Hotel created successfully
+              data:
+                id: 17
+                name: Seaside Retreat
+                description: A breezy seaside hotel a short walk from the castle.
+                address: 12 Beachside Avenue, Accra
+                phone: '+233550001000'
+                photo: null
+                starRating: 4
+                amenities: [wifi, pool]
+                destination:
+                  id: 3
+                  name: Cape Coast
+                  city: Cape Coast
+                  country: Ghana
+                  description: Fort town on the central coast.
+                rooms: []
+                rating: { average: null, count: 0 }
+                createdAt: '2026-08-04T09:12:44.010Z'
+                updatedAt: '2026-08-04T09:12:44.010Z'
+      '400':
+        description: |
+          The body failed validation, or the uploaded photo was not a JPEG, PNG,
+          or WebP, or exceeded 5MB. `details.errors` names each offending field;
+          photo failures are reported under `hotelPhoto`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: No such destination, or it has been soft-deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Hotels]
+    operationId: listHotels
+    summary: List hotels
+    description: |
+      **ADMIN, AGENT, and CUSTOMER.** Every signed-in principal sees the same
+      rows: hotels are inventory, not private data, so there is no per-principal
+      scoping here.
+
+      Filters combine with AND. `search` is the loose one and matches, case
+      insensitively, against the hotel name, description, and address as well as
+      its destination's city and country, which is what lets a single search box
+      answer both "Seaside" and "Cape Coast".
+
+      Star rating can be filtered exactly or as a range. Sending `starRating`
+      alongside `minStarRating` or `maxStarRating` is not an error, but the
+      range wins: the bound replaces the exact match rather than intersecting
+      with it.
+
+      `sortBy` accepts `city` and `country` even though neither is a column on
+      the hotel. Both sort through the related destination. Anything outside the
+      whitelist is rejected at the boundary rather than quietly falling back to
+      a default order, so a client never gets a page sorted by something other
+      than what it asked for.
+
+      Soft-deleted hotels are scoped out, so `meta.total` counts only live rows.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/SortOrder'
+      - name: sortBy
+        in: query
+        required: false
+        description: |
+          Order key. `city` and `country` sort through the related destination;
+          the rest are columns on the hotel itself.
+        schema:
+          type: string
+          enum: [city, country, createdAt, name, starRating, updatedAt]
+          default: createdAt
+      - name: destinationId
+        in: query
+        required: false
+        description: Exact destination hub. Use this rather than `city` when the id is known.
+        schema:
+          type: integer
+          minimum: 1
+      - name: city
+        in: query
+        required: false
+        description: |
+          Case-insensitive substring match on the destination's city. Letters,
+          spaces, hyphens, and apostrophes only, which is what a place name is
+          made of and keeps this from being used as a general text probe.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-']+$"
+          examples: [Cape Coast]
+      - name: country
+        in: query
+        required: false
+        description: Case-insensitive substring match on the destination's country, same character rules as `city`.
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-zA-Z\\s\\-']+$"
+          examples: [Ghana]
+      - name: starRating
+        in: query
+        required: false
+        description: Exact star rating. Superseded by `minStarRating` or `maxStarRating` when either is also sent.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5
+      - name: minStarRating
+        in: query
+        required: false
+        description: Lower bound, inclusive.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5
+      - name: maxStarRating
+        in: query
+        required: false
+        description: |
+          Upper bound, inclusive. Must be greater than or equal to
+          `minStarRating` when both are sent; an inverted range is a 400 on
+          `maxStarRating` rather than an empty page, so a client can tell a
+          typo from a genuinely empty result.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5
+      - name: amenities
+        in: query
+        required: false
+        description: |
+          Hotels offering **every** one of these, not any of them. Repeat the
+          parameter once per amenity: `?amenities=wifi&amenities=pool`. A single
+          occurrence is accepted too and is treated as a one-item list.
+
+          At most 10 per request, each 1 to 50 characters.
+        style: form
+        explode: true
+        schema:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 50 }
+          maxItems: 10
+    responses:
+      '200':
+        description: A page of hotels.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HotelListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/hotels/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Hotel id. Coerced from the URL segment and required to be a positive integer.
+      schema:
+        type: integer
+        minimum: 1
+
+  get:
+    tags: [Hotels]
+    operationId: getHotel
+    summary: Get one hotel
+    description: |
+      **ADMIN, AGENT, and CUSTOMER.**
+
+      Returns the hotel with its destination, its active rooms, and the
+      published-review aggregate for those rooms rolled up into `rating`.
+
+      The embedded rooms deliberately carry no availability counts. Availability
+      only means something over a date window, and a hotel read carries no
+      dates, so asking here would have to invent one. Use
+      `GET /api/v1/rooms/{id}` or `GET /api/v1/rooms` with `startDate` and
+      `endDate` when the answer needs to be "free when?" rather than "what
+      exists?".
+    responses:
+      '200':
+        description: The hotel.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HotelResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Hotels]
+    operationId: updateHotel
+    summary: Update a hotel
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      A partial update despite being a PUT: every field is optional and omitted
+      fields keep their current values. An empty body is accepted and returns
+      the hotel unchanged, which keeps a form that submits nothing from being an
+      error case.
+
+      Moving the hotel by sending a new `destinationId` re-checks that the
+      destination exists.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `hotelPhoto` is a
+      file part, up to 5MB and JPEG, PNG, or WebP, uploaded to Cloudinary and
+      replaced by its URL before the row is written; the previous image is then
+      deleted best-effort, so replacing a photo does not accumulate dead assets.
+      Sending `hotelPhoto` as an empty value removes the photo instead. Omitting
+      it entirely leaves the current one alone, which is what makes "remove" and
+      "do not touch" two different requests.
+
+      As on create, a refused update deletes the image it just uploaded rather
+      than stranding it in Cloudinary.
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/HotelUpdateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/HotelUpdateFormRequest' }
+    responses:
+      '200':
+        description: The updated hotel, with its review aggregate re-read.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HotelResponse' }
+      '400':
+        description: |
+          The body or the id failed validation, or the uploaded photo was not a
+          JPEG, PNG, or WebP, or exceeded 5MB.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: No such hotel, or the `destinationId` being moved to does not exist.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Hotels]
+    operationId: deleteHotel
+    summary: Delete a hotel
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      Soft delete: the row survives with `deletedAt` set and every read scopes
+      it out, so afterwards the hotel is indistinguishable from one that never
+      existed while its rows stay intact for historical bookings and reporting.
+
+      Refused with 400 while the hotel still has active rooms. Rooms are what
+      bookings point at, so removing the hotel out from under them would leave
+      sold inventory hanging off nothing. Delete the rooms first, through
+      `DELETE /api/v1/rooms/{id}`, which enforces its own booking guards.
+
+      The hotel's Cloudinary photo is deleted afterwards, best-effort: a cleanup
+      failure is logged and does not fail the request, because the row is
+      already gone and reporting an error would suggest otherwise.
+    responses:
+      '200':
+        description: Hotel soft-deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+            example:
+              message: Hotel deleted successfully
+      '400':
+        description: |
+          The id failed validation, or the hotel still has rooms
+          (`Cannot delete hotel with existing rooms. Please remove rooms
+          first.`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/rooms:
+  post:
+    tags: [Rooms]
+    operationId: createRoom
+    summary: Create a room
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      Adds a room type to a hotel. A room is a **type with an inventory count**,
+      not a single physical key: `totalRooms` says how many of it exist and a
+      booking reserves some number of them, which is what allows a room to be
+      partly booked.
+
+      `roomType` must be unique among the hotel's active rooms; a duplicate is a
+      409. A soft-deleted room does not reserve its name, so a retired type can
+      be reused.
+
+      `pricePerNight` is integer pesewas for one room for one night. A stay's
+      total is derived from it at booking time, so changing the price later
+      never rewrites an existing booking.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `roomPhoto` is a
+      file part, up to 5MB and JPEG, PNG, or WebP, uploaded to Cloudinary and
+      replaced by its URL before the row is written. A create refused after the
+      upload, by a missing hotel or a duplicate room type, deletes the image it
+      just uploaded.
+
+      The response carries availability for the default window, now through this
+      time tomorrow. A brand-new room has no bookings, so `roomsAvailable`
+      equals `totalRooms`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RoomCreateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/RoomCreateFormRequest' }
+    responses:
+      '201':
+        description: Room created.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomResponse' }
+            example:
+              message: Room created successfully
+              data:
+                id: 88
+                hotel:
+                  id: 17
+                  name: Seaside Retreat
+                  description: A breezy seaside hotel a short walk from the castle.
+                roomType: Deluxe Double
+                pricePerNight: 45000
+                capacity: 2
+                totalRooms: 5
+                description: A cosy seaside room.
+                photo: null
+                amenities: [wifi, tv]
+                roomsBooked: 0
+                roomsAvailable: 5
+                createdAt: '2026-08-04T09:20:11.442Z'
+                updatedAt: '2026-08-04T09:20:11.442Z'
+      '400':
+        description: |
+          The body failed validation, or the uploaded photo was not a JPEG, PNG,
+          or WebP, or exceeded 5MB. Photo failures are reported under
+          `roomPhoto`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: No such hotel, or it has been soft-deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          The hotel already has an active room of that type. Room types are the
+          room's identity within its hotel, so two of them would make a booking
+          ambiguous about what was actually reserved.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Rooms]
+    operationId: listRooms
+    summary: List rooms
+    description: |
+      **ADMIN, AGENT, and CUSTOMER.**
+
+      A page of rooms with the availability counts for one shared date window,
+      so the numbers on a page are comparable with each other. The window comes
+      from `startDate` and `endDate`, and both have to be present for either to
+      apply; otherwise it defaults to now through this time tomorrow.
+
+      This is the endpoint behind a search-results grid: filter by hotel, price,
+      capacity, and amenities, then read `roomsAvailable` per row to see which
+      of the matches can actually be booked for the dates in question. Filtering
+      does not remove full rooms from the page, it just reports them as having
+      none available, which keeps "sold out" visible instead of silently absent.
+
+      Price bounds are integer pesewas, like `pricePerNight` itself. Filters
+      combine with AND, and `roomType` matches case insensitively as a
+      substring.
+
+      Note there is no free-text `search` here: rooms are described by their
+      hotel, their type, and their numbers, all of which have their own
+      parameter.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/SortOrder'
+      - $ref: '#/components/parameters/RoomStartDate'
+      - $ref: '#/components/parameters/RoomEndDate'
+      - name: sortBy
+        in: query
+        required: false
+        description: |
+          Order key. Only these three are accepted; anything else is rejected at
+          the boundary rather than falling back to a default order.
+        schema:
+          type: string
+          enum: [capacity, createdAt, pricePerNight]
+          default: createdAt
+      - name: hotelId
+        in: query
+        required: false
+        description: Only this hotel's rooms.
+        schema:
+          type: integer
+          minimum: 1
+      - name: roomType
+        in: query
+        required: false
+        description: Case-insensitive substring match on the room type.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+          examples: [Deluxe]
+      - name: minPrice
+        in: query
+        required: false
+        description: |
+          Lower bound on the nightly rate, inclusive, in integer pesewas. GH₵
+          200.00 is `20000`.
+        schema:
+          $ref: '#/components/schemas/Money'
+      - name: maxPrice
+        in: query
+        required: false
+        description: |
+          Upper bound on the nightly rate, inclusive, in integer pesewas. Must
+          be greater than or equal to `minPrice` when both are sent; an inverted
+          range is a 400 on `maxPrice` rather than an empty page.
+        schema:
+          $ref: '#/components/schemas/Money'
+      - name: minCapacity
+        in: query
+        required: false
+        description: Rooms sleeping at least this many guests. The usual "we are a party of four" filter.
+        schema:
+          type: integer
+          minimum: 1
+      - name: maxCapacity
+        in: query
+        required: false
+        description: |
+          Rooms sleeping at most this many guests. Must be greater than or equal
+          to `minCapacity` when both are sent; an inverted range is a 400 on
+          `maxCapacity`.
+        schema:
+          type: integer
+          minimum: 1
+      - name: amenities
+        in: query
+        required: false
+        description: |
+          Rooms offering **every** one of these, not any of them. Repeat the
+          parameter once per amenity: `?amenities=wifi&amenities=tv`. A single
+          occurrence is accepted too and is treated as a one-item list.
+
+          At most 10 per request, each 1 to 50 characters.
+        style: form
+        explode: true
+        schema:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 50 }
+          maxItems: 10
+    responses:
+      '200':
+        description: A page of rooms, each with availability for the requested window.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomListResponse' }
+      '400':
+        description: |
+          A query parameter failed validation, or the date window was
+          unusable: `Invalid date format` when either date cannot be parsed,
+          `End date must be after start date` when the window is inverted or
+          empty.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/rooms/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Room id. Coerced from the URL segment and required to be a positive integer.
+      schema:
+        type: integer
+        minimum: 1
+
+  get:
+    tags: [Rooms]
+    operationId: getRoom
+    summary: Get one room, with availability for a date window
+    description: |
+      **ADMIN, AGENT, and CUSTOMER.**
+
+      Returns the room and, alongside it, how much of its inventory is free.
+      That second half is the reason this endpoint takes a query at all.
+
+      **Availability is held per date window, not per room.** `totalRooms` is
+      fixed, but the rooms already committed to `PENDING` or `CONFIRMED`
+      bookings depend entirely on which dates are being asked about, so the same
+      room can be wide open one week and full the next. A bare read and a read
+      with dates therefore answer two different questions:
+
+      - Without `startDate` and `endDate`, the window defaults to now through
+        this time tomorrow. That answers "is this bookable right now?", which is
+        a reasonable default for an inventory screen and a poor one for a
+        customer picking dates in September.
+      - With both dates, the counts describe exactly that stay. This is the
+        question a booking flow actually needs answered before it lets someone
+        commit.
+
+      Both dates must be present for either to apply. Sending one alone, or
+      either as an empty string, silently falls back to the default window
+      rather than half-applying the filter, so a half-built query never quietly
+      reports on a period nobody asked about.
+
+      Overlap uses open bounds: a booking starting exactly at `endDate`, or
+      ending exactly at `startDate`, does not count against the window, so
+      back-to-back stays do not collide.
+
+      Order of failure is worth knowing: a missing room 404s **before** the
+      dates are examined, so a bad date range on a nonexistent room reports the
+      404, not the 400.
+    parameters:
+      - $ref: '#/components/parameters/RoomStartDate'
+      - $ref: '#/components/parameters/RoomEndDate'
+    responses:
+      '200':
+        description: The room, with `roomsBooked` and `roomsAvailable` for the resolved window.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomResponse' }
+            example:
+              message: Room retrieved successfully
+              data:
+                id: 88
+                hotel:
+                  id: 17
+                  name: Seaside Retreat
+                  description: A breezy seaside hotel a short walk from the castle.
+                roomType: Deluxe Double
+                pricePerNight: 45000
+                capacity: 2
+                totalRooms: 5
+                description: A cosy seaside room.
+                photo: https://res.cloudinary.com/demo/image/upload/v1/rooms/88.jpg
+                amenities: [wifi, tv]
+                roomsBooked: 2
+                roomsAvailable: 3
+                createdAt: '2026-08-04T09:20:11.442Z'
+                updatedAt: '2026-08-04T09:20:11.442Z'
+      '400':
+        description: |
+          The id failed validation, or the date window was unusable: `Invalid
+          date format` when either date cannot be parsed, `End date must be
+          after start date` when the window is inverted or empty. Both are only
+          reached once the room has been found.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Rooms]
+    operationId: updateRoom
+    summary: Update a room
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      A partial update despite being a PUT: every field is optional and omitted
+      fields keep their current values. An empty body is accepted and returns
+      the room unchanged.
+
+      Several changes are refused while the room has active (`PENDING` or
+      `CONFIRMED`) bookings, because those guests booked against the values as
+      they stood:
+
+      - Moving the room to another `hotelId`. Guests booked a place, not a row.
+      - Renaming `roomType`. It is the room's identity inside its hotel and
+        appears on the booking.
+      - **Lowering** `capacity`. Raising it is fine; reducing it would change
+        what an existing guest was sold.
+      - Reducing `totalRooms` below the number already committed across active
+        bookings, which would oversell rooms that are already sold. The error
+        names the floor.
+
+      `pricePerNight` may always be changed. A move of more than 50% on a room
+      with active bookings is logged for review but not blocked, since existing
+      bookings carry their own total and are unaffected.
+
+      A renamed `roomType` must still be unique among the hotel's active rooms;
+      a collision is a 409.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `roomPhoto` is a
+      file part, up to 5MB and JPEG, PNG, or WebP, uploaded to Cloudinary and
+      replaced by its URL before the row is written; the previous image is then
+      deleted best-effort. Sending `roomPhoto` as an empty value removes the
+      photo instead, and omitting it leaves the current one alone. A refused
+      update deletes the image it just uploaded.
+
+      The response's availability is recomputed for the default window, now
+      through this time tomorrow, not for any window the caller last queried.
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RoomUpdateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/RoomUpdateFormRequest' }
+    responses:
+      '200':
+        description: The updated room.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomResponse' }
+      '400':
+        description: |
+          The body or the id failed validation, the uploaded photo was not a
+          JPEG, PNG, or WebP or exceeded 5MB, or one of the booking-aware guards
+          refused the change: moving hotel, renaming the room type, lowering
+          capacity while active bookings exist, or reducing `totalRooms` below
+          what is already booked.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404':
+        description: No such room, or the `hotelId` being moved to does not exist.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: The hotel already has another active room of the requested type.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Rooms]
+    operationId: deleteRoom
+    summary: Delete a room
+    description: |
+      **ADMIN only.** `AGENT` and `CUSTOMER` are refused with 403.
+
+      Soft delete: the row survives with `deletedAt` set and every read scopes
+      it out. Bookings that pointed at it keep pointing at it, which is what
+      lets a retired room still appear correctly in a customer's history and in
+      reports.
+
+      The guards run in order, and each one answers 400 with a message naming
+      the count that blocked it:
+
+      1. Bookings with a **completed payment**. Money changed hands, so the room
+         is kept for financial and legal record-keeping and can never be
+         deleted.
+      2. **Active** bookings, `PENDING` or `CONFIRMED`. Cancel or complete them
+         first.
+      3. **Future** bookings, whatever their status.
+      4. **Ongoing** stays, where a confirmed booking has guests currently
+         checked in.
+      5. Bookings with a **pending payment**, which have to be resolved either
+         way first.
+      6. The hotel's **last** room. A hotel with no rooms is unbookable and
+         would show up as an empty listing rather than as anything a customer
+         could act on, so the last one is held back deliberately. Delete the
+         hotel instead.
+
+      Completed and cancelled bookings never block. Refusing to retire a room
+      that once sold anything would mean no room could ever be retired; instead
+      they are counted into `historicalBookingsCount` on the response.
+
+      The room's Cloudinary photo is deleted afterwards, best-effort: a cleanup
+      failure is logged and does not fail the request.
+    responses:
+      '200':
+        description: |
+          Room soft-deleted. The body names the hotel and room type, because the
+          row is now hidden and a caller holding only an id has no other way to
+          describe what it removed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomDeleteResponse' }
+            example:
+              message: Room deleted successfully
+              data:
+                id: 88
+                roomType: Deluxe Double
+                hotelName: Seaside Retreat
+                historicalBookingsCount: 4
+                deletedAt: '2026-08-04T11:02:59.318Z'
+      '400':
+        description: |
+          The id failed validation, or one of the delete guards refused: a
+          completed payment, an active, future, or ongoing booking, a pending
+          payment, or the room being the hotel's last.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }

@@ -1,0 +1,742 @@
+# Bookings and customers.
+#
+# A booking is a reservation against exactly one product: a tour, a hotel
+# room, or a flight. Creating one claims real inventory, so most of the
+# interesting behavior here is about when that inventory is held, released, or
+# refused.
+#
+# Both domains admit the CUSTOMER role on several endpoints. Route middleware
+# only checks the role; the ownership rule that keeps one customer out of
+# another's records is enforced in the service, which is why a customer
+# calling a list endpoint gets a page of their own rows rather than a 403.
+# Each operation below states both halves of that rule.
+
+/api/v1/bookings:
+  post:
+    tags: [Bookings]
+    operationId: createBooking
+    summary: Create a booking
+    description: |
+      Reserves a tour place, a hotel room for a stay, or seats on a flight.
+      The new booking is `PENDING` and holds inventory immediately, so the
+      product it was booked against is no longer available to anyone else even
+      though nothing has been paid.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may book on behalf of
+      any customer and are recorded on the booking as its creator. A
+      `CUSTOMER` may only pass their own id as `customerId`; booking for
+      somebody else answers 401 rather than silently retargeting the booking.
+
+      **Choosing the product.** Send exactly one of `tourId`, `roomId`, or
+      `flightId`. Sending none is a 400. Sending several is accepted by
+      validation but is not a supported combination, and nothing unwinds the
+      inventory it would claim against each one.
+
+      **Price.** `totalPrice` is required by the schema and then ignored. The
+      server prices the booking from the product itself (per guest for a tour,
+      per night per room for a stay, per seat for a flight) and returns what
+      it computed in both `totalPrice` and `bookingDetails.calculatedPrice`,
+      so the amount a client is about to charge always comes from the server.
+
+      **The hold is not indefinite.** Every booking gets a payment deadline
+      derived from how close the trip is: normally 24 hours before check-in,
+      but 2 hours from now when the trip starts within a day, and 30 minutes
+      from now when it starts within 2 hours. A background sweep cancels
+      expired `PENDING` bookings and returns their inventory, which is what
+      stops abandoned checkouts from taking a departure off sale.
+
+      **Overselling.** Availability is checked twice. A friendly check runs
+      first so the caller gets a message naming how many slots, seats, or
+      rooms actually remain. The claim itself then happens inside the booking
+      transaction under a guarded write, so two requests that both passed the
+      friendly check cannot both succeed; the loser gets a 400 asking it to
+      try again.
+
+      **One booking per customer per product.** A customer cannot hold two
+      bookings for the same tour, the same flight, or the same room over the
+      same dates. That constraint counts deleted bookings too, so a
+      soft-deleted booking still occupies the slot until it is purged.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/BookingCreateRequest' }
+    responses:
+      '201':
+        description: Booking created, inventory held, payment deadline set.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingCreateResponse' }
+      '400':
+        description: |
+          Either the body failed validation, or the booking cannot be made:
+          no product id was supplied, the tour is cancelled or completed, the
+          flight is cancelled, fewer slots, seats, or rooms remain than were
+          asked for, a room booking is missing its dates, check-in is in the
+          past, check-out is not after check-in, the guests do not fit in the
+          rooms requested, or a concurrent booking took the last of the
+          inventory between the check and the claim.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` tried to book for a different customer
+          (`Customers can only book for themselves`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404':
+        description: The customer, tour, room, or flight does not exist, or has been deleted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          This customer already holds a booking for that tour, that flight, or
+          that room over those dates.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Bookings]
+    operationId: listBookings
+    summary: List bookings
+    description: |
+      Paginated bookings, newest first, across every product type.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff see everything. A
+      `CUSTOMER` sees only their own bookings: the service pins the owner
+      filter to the caller's id before any query parameter is applied, so
+      there is no combination of filters that widens the result. The
+      `customerId` filter is therefore ignored for a customer rather than
+      honored, which is why this endpoint answers 200 with the caller's own
+      page instead of 403.
+
+      **Filters.** `status`, `type`, `tourId`, `roomId`, `flightId`, a
+      `fromDate`/`toDate` window over the date the booking was placed, and a
+      free-text `search` across tour, room, hotel, and flight names and
+      descriptions as well as the customer's name and email. Note that `type`
+      overrides a same-product id filter: asking for `type=TOUR&tourId=5`
+      matches every tour booking, not just tour 5.
+    parameters:
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+      - { $ref: '#/components/parameters/Search' }
+      - { $ref: '#/components/parameters/BookingStatusFilter' }
+      - { $ref: '#/components/parameters/BookingTypeFilter' }
+      - { $ref: '#/components/parameters/BookingCustomerIdFilter' }
+      - { $ref: '#/components/parameters/BookingTourIdFilter' }
+      - { $ref: '#/components/parameters/BookingRoomIdFilter' }
+      - { $ref: '#/components/parameters/BookingFlightIdFilter' }
+      - { $ref: '#/components/parameters/BookingFromDate' }
+      - { $ref: '#/components/parameters/BookingToDate' }
+    responses:
+      '200':
+        description: A page of bookings.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingListResponse' }
+      '400':
+        description: |
+          A filter failed validation, for example an unknown status or type,
+          an unparseable date, or a `fromDate` after its `toDate`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/bookings/{id}:
+  get:
+    tags: [Bookings]
+    operationId: getBooking
+    summary: Get one booking
+    description: |
+      The full booking with its customer, its product, and its payment.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may read any booking.
+      A `CUSTOMER` may read only their own; asking for somebody else's answers
+      401 rather than 404, so the id is not confirmed or denied.
+    parameters:
+      - { $ref: '#/components/parameters/BookingIdPath' }
+    responses:
+      '200':
+        description: The booking.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingResponse' }
+      '400':
+        description: |
+          The id was not a positive integer, or the booking row has no product
+          attached at all and therefore cannot be represented. The second case
+          only arises for rows written outside this API.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` asked for another customer's booking
+          (`You can only view your own bookings`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Bookings]
+    operationId: updateBooking
+    summary: Update a booking
+    description: |
+      Changes a booking's status, its product, its quantities, or its dates.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER` are admitted by the route,
+      and this operation carries **no ownership rule of its own**: unlike the
+      read, cancel, and create paths, the service does not scope the update to
+      the caller's own bookings. Treat it as a staff endpoint and do not
+      expose it to customers in a client.
+
+      **Status changes** walk the transition map (`PENDING` to `CONFIRMED` or
+      `CANCELLED`, `CONFIRMED` to `COMPLETED` or `CANCELLED`, nothing out of a
+      terminal state) and are checked against the payment. A booking cannot
+      become `CONFIRMED` or `COMPLETED` without a completed payment, cannot
+      fall back to `PENDING` once paid, and cannot be cancelled here while
+      paid. That last refusal is deliberate: cancelling a paid booking has to
+      move the money at the same time, which is what
+      `POST /api/v1/bookings/{id}/cancel` does.
+
+      **Product, quantity, and date changes** re-account inventory inside one
+      transaction: slots or seats held on the old product are released and the
+      new ones claimed together, and the booking is re-priced from whatever it
+      now points at, so `totalPrice` in the body is overridden whenever
+      anything price-bearing changes. Capacity is re-checked with this
+      booking's existing hold added back first, so raising a guest count by
+      one does not have to fit as though the booking held nothing. A booking
+      already `COMPLETED` or `CANCELLED` refuses these fields outright.
+
+      Confirming or cancelling through this endpoint notifies the customer.
+    parameters:
+      - { $ref: '#/components/parameters/BookingIdPath' }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/BookingUpdateRequest' }
+    responses:
+      '200':
+        description: The updated booking.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingResponse' }
+      '400':
+        description: |
+          The body failed validation, or the change is refused: an illegal
+          status transition, a status that contradicts the payment, an attempt
+          to modify a completed or cancelled booking, dates that do not make a
+          stay, guests that do not fit the rooms, or insufficient remaining
+          inventory on the product being moved to.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '404':
+        description: The booking, or the customer, tour, room, or flight it was moved to, does not exist.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          The change would leave the customer holding two bookings for the
+          same tour, flight, or room and dates.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Bookings]
+    operationId: deleteBooking
+    summary: Delete a booking
+    description: |
+      Removes a booking from the system. Compare with
+      `POST /api/v1/bookings/{id}/cancel`, which is the customer-facing path
+      and the one to reach for in almost every case.
+
+      **Roles.** `ADMIN` only. Agents and customers are refused by the route
+      with a 403, and the service repeats the staff check as a second line of
+      defence.
+
+      **What it does.** The booking is soft-deleted: the row survives with a
+      tombstone and disappears from every read. Tour slots and flight seats it
+      held are returned in the same transaction, and its payment, if any, is
+      tombstoned alongside it so no orphaned payment is left pointing at a
+      booking nobody can see. The response spells out what was returned to
+      sale, because a delete that quietly failed to release inventory is
+      otherwise invisible until the product looks fully booked with nothing on
+      it.
+
+      **What it does not do.** It does not refund anything, which is why a
+      booking with a completed payment is refused: settle the money first,
+      through the refund endpoint, or cancel instead. Because the
+      one-booking-per-product constraint spans deleted rows, the customer also
+      still cannot rebook that same tour or flight afterwards. Cancelling
+      leaves a visible, auditable `CANCELLED` booking and frees nothing at the
+      database level; deleting hides the row instead. For anything a customer
+      asked for, cancel.
+
+      Completed bookings cannot be deleted at all, and a confirmed booking
+      whose booking date has already passed is refused as history.
+    parameters:
+      - { $ref: '#/components/parameters/BookingIdPath' }
+    responses:
+      '200':
+        description: Deleted, with a summary of the inventory returned to sale.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingDeleteResponse' }
+      '400':
+        description: |
+          The booking is `COMPLETED`, its payment is `COMPLETED` or in a state
+          that is not safe to discard, or it is a confirmed booking already in
+          the past. Cancel it instead.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: The caller is not an `ADMIN`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/bookings/{id}/cancel:
+  post:
+    tags: [Bookings]
+    operationId: cancelBooking
+    summary: Cancel a booking
+    description: |
+      Self-service cancellation, and the correct way to stop any booking a
+      customer asked to stop.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. A `CUSTOMER` may cancel
+      only their own booking and gets a 401 otherwise; staff may cancel any.
+
+      **What it does.** The booking moves to `CANCELLED` and the inventory it
+      was holding is released in the same transaction: tour guest slots and
+      flight seats are decremented back, and a room stops counting against its
+      dates because room availability is recomputed per window rather than
+      kept in a counter. The customer is notified.
+
+      **If the booking was already paid**, the payment moves to
+      `REFUND_REQUESTED` and `refundRequested` comes back `true`. No money
+      moves here. A customer cancelling their own trip must never be able to
+      trigger a disbursement, so the payment is parked in a state an
+      administrator then actions through the refund endpoint, and the response
+      message says so in words that can be shown to the user.
+
+      **What it refuses.** A booking that is already `CANCELLED` or
+      `COMPLETED`, and any booking whose trip has already started, measured
+      from the tour's start date, the flight's departure, or the room's
+      check-in. Once travel has begun there is nothing left to release.
+
+      **Cancel versus delete.** Cancelling keeps the booking visible with a
+      `CANCELLED` status, which is what customer history and reporting need,
+      and it handles the paid case. `DELETE /api/v1/bookings/{id}` is an
+      administrative cleanup that hides the row entirely and refuses anything
+      paid.
+    parameters:
+      - { $ref: '#/components/parameters/BookingIdPath' }
+    responses:
+      '200':
+        description: |
+          Cancelled. `refundRequested` says whether a completed payment was
+          parked for an administrator to refund.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingCancelResponse' }
+      '400':
+        description: |
+          The booking is already cancelled, is completed, or its trip has
+          already started.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` tried to cancel a booking that is not
+          theirs (`You can only cancel your own bookings`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/bookings/customer/{customerId}:
+  get:
+    tags: [Bookings]
+    operationId: listBookingsForCustomer
+    summary: List one customer's bookings
+    description: |
+      The same filtered, paginated list as `GET /api/v1/bookings`, pinned to
+      one customer. Useful to staff looking at a single account, and to a
+      customer's own trips screen.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may list any
+      customer. A `CUSTOMER` may only pass their own id and gets a 401
+      otherwise, so this route cannot be used to enumerate other people's
+      travel by walking ids.
+
+      This endpoint does not check that the customer exists: an unknown id
+      returns an empty page rather than a 404. Use
+      `GET /api/v1/customers/{id}/bookings` when you want the history of a
+      customer you have already resolved and want a 404 if they are gone.
+
+      The free-text `search` is trimmed and truncated to 100 characters here,
+      unlike on the general list.
+    parameters:
+      - { $ref: '#/components/parameters/BookingCustomerIdPath' }
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+      - { $ref: '#/components/parameters/Search' }
+      - { $ref: '#/components/parameters/BookingStatusFilter' }
+      - { $ref: '#/components/parameters/BookingTypeFilter' }
+      - { $ref: '#/components/parameters/BookingTourIdFilter' }
+      - { $ref: '#/components/parameters/BookingRoomIdFilter' }
+      - { $ref: '#/components/parameters/BookingFlightIdFilter' }
+      - { $ref: '#/components/parameters/BookingFromDate' }
+      - { $ref: '#/components/parameters/BookingToDate' }
+    responses:
+      '200':
+        description: A page of that customer's bookings, empty if they have none.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingListResponse' }
+      '400':
+        description: The customer id or one of the filters failed validation.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` asked for another customer's bookings
+          (`You can only view your own bookings`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/customers:
+  post:
+    tags: [Customers]
+    operationId: createCustomer
+    summary: Create a customer
+    description: |
+      Staff-side creation, for the walk-in or telephone customer who has not
+      signed up themselves. The public signup path is
+      `POST /api/v1/auth/register-user`.
+
+      **Roles.** `ADMIN` and `AGENT`. Customers are refused with a 403; a
+      customer creating customers has no meaning on this surface.
+
+      Name is required plus at least one of email or phone, since an account
+      with neither could not be signed into or contacted. The account is
+      always created **passwordless**: a `password` in the body is dropped
+      rather than stored, so staff never hold a customer's credential. The
+      customer signs in with a one-time code and sets a password themselves
+      later if they want one.
+
+      Contact uniqueness is checked across both the customer and the staff
+      tables, and against soft-deleted rows, because a deleted customer still
+      owns its email at the database level.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CustomerCreateRequest' }
+    responses:
+      '201':
+        description: Customer created.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: The caller is not `ADMIN` or `AGENT`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409': { $ref: '#/components/responses/Conflict' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Customers]
+    operationId: listCustomers
+    summary: List customers
+    description: |
+      The customer base, newest first, with a free-text search across name,
+      email, and phone.
+
+      **Roles.** `ADMIN` and `AGENT` only. This is the one customer endpoint
+      the `CUSTOMER` role cannot reach at all: there is no per-record rule
+      that could scope a whole-table listing to one person usefully, so it is
+      a flat 403 rather than a one-row page.
+
+      Rows are the plain customer record without the activity stats. Those
+      cost several queries each, so they are computed only for the
+      single-customer read.
+    parameters:
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+      - { $ref: '#/components/parameters/Search' }
+    responses:
+      '200':
+        description: A page of customers.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: The caller is not `ADMIN` or `AGENT`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/customers/{id}:
+  get:
+    tags: [Customers]
+    operationId: getCustomer
+    summary: Get a customer profile
+    description: |
+      The full profile: identity plus a lifetime activity block covering
+      bookings, spend, upcoming travel, and the destination this customer
+      keeps returning to.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may read any profile.
+      A `CUSTOMER` may read exactly their own and gets a 401 for anyone
+      else's.
+
+      Self is decided on the principal **kind** as well as the id. Staff and
+      customers are separate tables with independent id sequences, so agent 42
+      and customer 42 are different people; an agent is admitted because they
+      are staff, never because the numbers happen to match.
+
+      The stats are computed on read from the live rows rather than kept in
+      maintained counters, so they cannot drift. Money figures count completed
+      payments only.
+    parameters:
+      - { $ref: '#/components/parameters/CustomerIdPath' }
+    responses:
+      '200':
+        description: The customer with their activity stats.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerProfileResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` asked for another customer's profile
+          (`You are not authorized to view this customer profile`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  put:
+    tags: [Customers]
+    operationId: updateCustomer
+    summary: Update a customer
+    description: |
+      Edits a customer's name, address, contact details, or profile picture.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may edit any
+      customer. A `CUSTOMER` may edit only their own record and gets a 401
+      otherwise.
+
+      **Email and phone are login identifiers, so who is asking matters.**
+      Staff may set them directly, as an administrative correction. A customer
+      editing their own profile may not, and gets a 400 pointing at
+      `POST /api/v1/auth/change-email` or `POST /api/v1/auth/change-phone`,
+      which confirm control of the new address or number before it becomes
+      something you can sign in with. Submitting the current value unchanged
+      is a no-op, so a form that posts the whole profile keeps working.
+
+      Credentials are never touched here: a `password` in the body is dropped,
+      because a password is only ever rotated by the account holder through
+      the authenticated change-password flow.
+
+      Accepts JSON or `multipart/form-data`. Under multipart the
+      `profilePicture` file is uploaded to Cloudinary before the row is
+      written, the previous image is deleted afterwards, and a refused update
+      reclaims the image it had just uploaded, so a rejected request cannot
+      leave an orphan behind.
+    parameters:
+      - { $ref: '#/components/parameters/CustomerIdPath' }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CustomerUpdateRequest' }
+        multipart/form-data:
+          schema: { $ref: '#/components/schemas/CustomerUpdateRequest' }
+    responses:
+      '200':
+        description: The updated customer.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerResponse' }
+      '400':
+        description: |
+          The body failed validation, or a customer tried to change their own
+          email or phone here instead of through the verified flow.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` tried to edit another customer
+          (`You are not authorized to update this customer.`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409': { $ref: '#/components/responses/Conflict' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Customers]
+    operationId: deleteCustomer
+    summary: Delete a customer
+    description: |
+      Soft-deletes a customer. The row survives with a tombstone and vanishes
+      from every read, so it is indistinguishable from never having existed
+      while remaining available for audit.
+
+      **Roles.** `ADMIN` only. Agents and customers are refused with a 403,
+      including a customer trying to delete their own account.
+
+      A customer holding any **active** booking, meaning `PENDING` or
+      `CONFIRMED`, is protected with a 409. Deleting them would leave live
+      reservations owned by an account nobody can see, and inventory held on
+      behalf of a person who no longer exists. Cancel or complete those
+      bookings first.
+
+      The session is cut immediately rather than at token expiry: the cached
+      session epoch is dropped, so the next request from that account re-reads
+      the database, finds nothing, and is rejected. The profile picture is
+      cleaned up afterwards on a best-effort basis, since failing to delete an
+      image is not a reason to keep the account.
+
+      The response carries only a message; there is no deleted record to
+      return.
+    parameters:
+      - { $ref: '#/components/parameters/CustomerIdPath' }
+    responses:
+      '200':
+        description: Deleted. The message names the account that was removed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: The caller is not an `ADMIN`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: The customer still has pending or confirmed bookings.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/customers/{id}/bookings:
+  get:
+    tags: [Customers]
+    operationId: listCustomerBookingHistory
+    summary: A customer's complete booking history
+    description: |
+      Every booking this customer has ever made, in any status, paginated
+      newest first. Unfiltered on purpose: this is the history view behind a
+      profile page, where the cancelled and completed trips are the point.
+      For a filtered or searchable list, use
+      `GET /api/v1/bookings/customer/{customerId}`.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may read anyone's
+      history. A `CUSTOMER` may read exactly their own and gets a 401
+      otherwise, decided on the principal kind as well as the id.
+
+      Unlike the filtered list, this one resolves the customer first and
+      answers 404 when they do not exist or have been deleted.
+    parameters:
+      - { $ref: '#/components/parameters/CustomerIdPath' }
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+    responses:
+      '200':
+        description: A page of that customer's bookings.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` asked for another customer's history
+          (`You can only view your own bookings`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/customers/{id}/payments:
+  get:
+    tags: [Customers]
+    operationId: listCustomerPaymentHistory
+    summary: A customer's complete payment history
+    description: |
+      Every payment on the account, in any status, paginated newest first.
+      Failed and pending attempts are included, which is what makes this
+      useful to a support agent asked why a booking never confirmed.
+
+      **Roles.** `ADMIN`, `AGENT`, and `CUSTOMER`. Staff may read anyone's
+      payments. A `CUSTOMER` may read exactly their own and gets a 401
+      otherwise.
+
+      Each row carries a `bookedItem` block naming what the money was for,
+      flattened from the booking behind it so a receipts list needs no
+      per-row lookups. Amounts are integer pesewas, like every amount in this
+      API.
+
+      The customer is resolved first, so an unknown or deleted id answers 404
+      rather than an empty page.
+    parameters:
+      - { $ref: '#/components/parameters/CustomerIdPath' }
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+    responses:
+      '200':
+        description: A page of that customer's payments.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerPaymentListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or a `CUSTOMER` asked for another customer's payments
+          (`You can only view your own payments`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }

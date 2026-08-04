@@ -1,0 +1,85 @@
+/health:
+  get:
+    tags: [Health]
+    operationId: healthLiveness
+    summary: Liveness probe
+    description: |
+      Answers as soon as the process can serve a request. It deliberately
+      touches no dependency, so a database or Redis outage never causes the
+      platform to kill and restart an otherwise healthy process.
+
+      Mounted ahead of the API router and the rate limiter, so probe traffic
+      never runs business middleware and can never exhaust a request budget.
+    security: []
+    responses:
+      '200':
+        description: The process is up.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: ok }
+
+/health/ready:
+  get:
+    tags: [Health]
+    operationId: healthReadiness
+    summary: Readiness probe
+    description: |
+      What a load balancer should gate on. Verifies the database connection
+      established at boot rather than re-querying on every call, which keeps a
+      frequent poller from holding an auto-suspending database awake purely to
+      answer health checks.
+    security: []
+    responses:
+      '200':
+        description: Ready to serve traffic.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: ready }
+      '503':
+        description: Not ready. Do not route traffic here yet.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: 'not ready' }
+
+/health/db:
+  get:
+    tags: [Health]
+    operationId: healthDatabase
+    summary: Database probe
+    description: |
+      Runs a trivial query against PostgreSQL on demand. Separate from
+      readiness so an operator can tell "the process is wedged" apart from
+      "the database is unreachable" without reading logs, and so the expensive
+      check is only paid when someone actually asks for it.
+    security: []
+    responses:
+      '200':
+        description: The database answered.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: ok }
+      '503':
+        description: The database did not answer.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: unreachable }

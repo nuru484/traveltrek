@@ -2,6 +2,16 @@
 
 Express 5 + TypeScript (ESM) API and background worker for the TravelTrek booking platform. PostgreSQL via Prisma, BullMQ on Redis, Paystack payments, Cloudinary media.
 
+## API reference
+
+Interactive docs for every endpoint are served by the API itself at **`/api/docs`**, with the raw OpenAPI 3.1 document at **`/api/docs.json`** so the whole API can be imported into Postman or fed to a client generator.
+
+**Trying it out.** Auth is an httpOnly cookie, not a bearer token, so there is nothing to paste into the Authorize dialog. Call `POST /api/v1/auth/demo-login` with `{"role": "ADMIN"}` from the docs page itself and the browser holds the session for every other endpoint. That route is gated by `DEMO_LOGIN_ENABLED`; where it is off, sign in through `POST /api/v1/auth/login` instead.
+
+**How the spec is maintained.** It lives in `docs/openapi/`, split one file per domain under `paths/` and `components/`, and is assembled at boot by `src/docs/openapi.ts`. Because hand-written docs rot, `npm run docs:check` validates the document and diffs it against the routes Express actually mounts; CI fails on an endpoint that ships without documentation or a documented path that no longer exists.
+
+Recovering those routes takes one trick worth knowing about: Express 5 compiles a mount path into a matcher closure and keeps no copy of the string, so walking the finished router can find `/tours/{id}` but never the `/api/v1` it hangs under. `scripts/check-openapi.ts` therefore records mount paths as they are registered, before the app is imported.
+
 ## Layout
 
 ```

@@ -1,0 +1,658 @@
+# Components for two staff-facing domains that share one paths file: flight
+# inventory and the staff roster.
+#
+# Flights carry three wire shapes on purpose, inherited from the handlers they
+# replaced: mutations (create, update, status) embed the FULL origin and
+# destination rows and omit the raw ids, the single-flight read uses the
+# four-field route summaries and adds the ids and `capacity`, and the list uses
+# the summaries and the ids but leaves `capacity` out. They are kept apart here
+# rather than merged so the documented shape is the shape that is actually
+# sent.
+#
+# Staff accounts have no schema of their own here: the roster returns the same
+# `StaffAccount` the session endpoints return, because it is the same row.
+
+schemas:
+  FlightStatus:
+    type: string
+    description: |
+      Where a flight sits in its lifecycle. `SCHEDULED` is the default a new
+      flight is created with; every later value is reached through
+      `PATCH /api/v1/flights/{id}/status`, which enforces the transitions:
+
+      - `SCHEDULED` to `DEPARTED` (only once the scheduled departure has
+        passed), `DELAYED`, or `CANCELLED`
+      - `DELAYED` to `DEPARTED` (only once the delayed departure has passed),
+        `CANCELLED`, or back to `SCHEDULED`
+      - `DEPARTED` to `LANDED` (only once the scheduled arrival has passed)
+      - `CANCELLED` back to `SCHEDULED`, but only while the original departure
+        is still in the future
+      - `LANDED` to nothing at all: a landed flight is history
+
+      Anything outside that table is a 400, which is why a client should treat
+      the status as server state to be observed rather than a field to be set.
+    enum: [SCHEDULED, DEPARTED, LANDED, CANCELLED, DELAYED]
+    examples: [SCHEDULED]
+
+  FlightClass:
+    type: string
+    description: |
+      Cabin class. Stored as a plain string column rather than a database
+      enum, so these four values are enforced at the request boundary and the
+      match is exact, capitalisation included.
+    enum: [Economy, Premium Economy, Business, First]
+    examples: [Economy]
+
+  FlightEndpointSummary:
+    type: object
+    description: |
+      A route endpoint as the read endpoints return it: the four fields a
+      client needs to label a leg, not the whole destination record.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Kotoka International] }
+      city:
+        type: [string, 'null']
+        examples: [Accra]
+      country: { type: string, examples: [Ghana] }
+
+  FlightEndpointFull:
+    type: object
+    description: |
+      A route endpoint as the mutation endpoints return it: the full
+      destination row, which is what those responses have always embedded.
+      Reads use `FlightEndpointSummary` instead.
+    required: [id, name, country, createdAt, updatedAt]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Kotoka International] }
+      description:
+        type: [string, 'null']
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        examples: [Accra]
+      photo:
+        type: [string, 'null']
+        format: uri
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  FlightRating:
+    type: object
+    description: |
+      Aggregate of the flight's **published** reviews, computed in one query
+      over the whole page rather than per row. An unreviewed flight reports
+      `{ "average": null, "count": 0 }`, so the block is always present and a
+      client never has to distinguish missing from unrated.
+    required: [average, count]
+    properties:
+      average:
+        type: [number, 'null']
+        description: Mean rating to one decimal place, or null when there are no reviews.
+        examples: [4.5]
+      count:
+        type: integer
+        minimum: 0
+        examples: [12]
+
+  FlightRecord:
+    type: object
+    description: |
+      The flight as create, update, and status change return it: the full
+      origin and destination rows are embedded and the raw `originId` and
+      `destinationId` are left out, because the caller of a mutation already
+      knows what it sent.
+
+      `duration` and `seatsAvailable` are derived, never supplied.
+      `duration` is recomputed in minutes from the effective departure and
+      arrival whenever either moves, and `seatsAvailable` starts at `capacity`
+      and is then owned by the booking path.
+    required:
+      [
+        id,
+        flightNumber,
+        airline,
+        departure,
+        arrival,
+        origin,
+        destination,
+        price,
+        flightClass,
+        status,
+        duration,
+        stops,
+        capacity,
+        seatsAvailable,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [17] }
+      flightNumber:
+        type: string
+        description: Unique across the whole table, soft-deleted rows included.
+        examples: [TA123]
+      airline: { type: string, examples: [Test Airways] }
+      departure:
+        type: string
+        format: date-time
+        description: |
+          Rewritten by the status endpoint on a delay, and stamped to the
+          moment of the call when a flight is marked `DEPARTED`.
+      arrival:
+        type: string
+        format: date-time
+        description: Stamped to the moment of the call when a flight is marked `LANDED`.
+      origin: { $ref: '#/components/schemas/FlightEndpointFull' }
+      destination: { $ref: '#/components/schemas/FlightEndpointFull' }
+      price: { $ref: '#/components/schemas/Money' }
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when the flight has no photo.
+      flightClass: { $ref: '#/components/schemas/FlightClass' }
+      status: { $ref: '#/components/schemas/FlightStatus' }
+      duration:
+        type: integer
+        description: Minutes between departure and arrival, derived server-side.
+        examples: [360]
+      stops:
+        type: integer
+        minimum: 0
+        maximum: 5
+        examples: [1]
+      capacity:
+        type: integer
+        minimum: 0
+        maximum: 850
+        examples: [180]
+      seatsAvailable:
+        type: integer
+        minimum: 0
+        description: |
+          Remaining seats. Seeded to `capacity` at creation and thereafter
+          moved only by the booking path, which claims seats inside a
+          transaction with a guarded atomic decrement, so the counter cannot go
+          negative under concurrent bookings. It is not a writable field: a
+          capacity change re-derives it as `capacity - bookedSeats`, keeping
+          seats that are already sold sold.
+        examples: [180]
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  FlightListItem:
+    type: object
+    description: |
+      A flight as the listing returns it: route summaries plus the raw ids,
+      plus the review aggregate, and no `capacity`. The list is a browse
+      surface, so it carries what a search result needs and nothing more.
+    required:
+      [
+        id,
+        flightNumber,
+        airline,
+        departure,
+        arrival,
+        origin,
+        originId,
+        destination,
+        destinationId,
+        price,
+        flightClass,
+        status,
+        duration,
+        stops,
+        seatsAvailable,
+        rating,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [17] }
+      flightNumber: { type: string, examples: [TA123] }
+      airline: { type: string, examples: [Test Airways] }
+      departure: { type: string, format: date-time }
+      arrival: { type: string, format: date-time }
+      origin: { $ref: '#/components/schemas/FlightEndpointSummary' }
+      originId: { type: integer, examples: [3] }
+      destination: { $ref: '#/components/schemas/FlightEndpointSummary' }
+      destinationId: { type: integer, examples: [8] }
+      price: { $ref: '#/components/schemas/Money' }
+      photo:
+        type: [string, 'null']
+        format: uri
+      flightClass: { $ref: '#/components/schemas/FlightClass' }
+      status: { $ref: '#/components/schemas/FlightStatus' }
+      duration: { type: integer, examples: [360] }
+      stops: { type: integer, minimum: 0, maximum: 5, examples: [1] }
+      seatsAvailable: { type: integer, minimum: 0, examples: [174] }
+      rating: { $ref: '#/components/schemas/FlightRating' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  FlightDetail:
+    description: |
+      The single-flight read: everything the list item carries plus
+      `capacity`, which is what turns `seatsAvailable` into a load figure a
+      staff screen can act on.
+    allOf:
+      - $ref: '#/components/schemas/FlightListItem'
+      - type: object
+        required: [capacity]
+        properties:
+          capacity:
+            type: integer
+            minimum: 0
+            maximum: 850
+            examples: [180]
+
+  FlightCreateRequest:
+    type: object
+    description: |
+      A new flight. Accepted as JSON or as `multipart/form-data`; under
+      multipart every scalar arrives as a string and is coerced, so the same
+      field rules apply to both.
+
+      Times are checked at the boundary: departure must be in the future,
+      arrival must be after it, and the two must be at least 30 minutes apart.
+      Origin and destination must differ and must both exist and not be
+      soft-deleted, which is checked against the database rather than at the
+      boundary and answers 404.
+
+      `status` is not accepted here. Every flight starts `SCHEDULED`.
+      `seatsAvailable` is not accepted either: it is seeded to `capacity` and
+      then belongs to the booking path.
+    required:
+      [airline, arrival, capacity, departure, destinationId, flightClass, flightNumber, originId, price]
+    properties:
+      flightNumber:
+        type: string
+        minLength: 3
+        maxLength: 15
+        pattern: '^[A-Z0-9]{2,3}[0-9]{1,4}$'
+        description: |
+          Two or three uppercase letters or digits followed by one to four
+          digits, for example `TA123` or `BA1234`. Unique across the table,
+          and the constraint spans soft-deleted rows, so a retired flight
+          keeps holding its number and reusing it answers 409.
+        examples: [TA123]
+      airline:
+        type: string
+        minLength: 2
+        maxLength: 60
+        pattern: '^[a-zA-Z\s\-&.()]+$'
+        description: Letters, spaces, hyphens, ampersands, dots, and parentheses only.
+        examples: [Test Airways]
+      departure:
+        type: string
+        format: date-time
+        description: Must be in the future at the time of the request.
+      arrival:
+        type: string
+        format: date-time
+        description: Must be after `departure`, by at least 30 minutes.
+      originId:
+        type: integer
+        minimum: 1
+        description: An existing destination. Must differ from `destinationId`.
+        examples: [3]
+      destinationId:
+        type: integer
+        minimum: 1
+        examples: [8]
+      price:
+        $ref: '#/components/schemas/Money'
+      flightClass: { $ref: '#/components/schemas/FlightClass' }
+      capacity:
+        type: integer
+        minimum: 1
+        maximum: 850
+        description: Total seats. `seatsAvailable` is seeded from this value.
+        examples: [180]
+      stops:
+        type: integer
+        minimum: 0
+        maximum: 5
+        default: 0
+        examples: [1]
+      flightPhoto:
+        type: string
+        format: binary
+        description: |
+          Sent as a file part named `flightPhoto` under
+          `multipart/form-data`: JPEG, PNG, or WebP, at most 5MB. It is
+          uploaded to Cloudinary and replaced by its URL before the row is
+          written, and a create that is then refused reclaims the upload, so a
+          failed request cannot leave an orphaned image behind.
+
+          Under `application/json` the same field is instead a string holding a
+          URL that is already hosted somewhere.
+
+  FlightUpdateRequest:
+    type: object
+    description: |
+      A partial update. Every field is optional, but at least one must be
+      present, counting an uploaded photo, which is why that rule is enforced
+      after the file middleware rather than at the schema.
+
+      Two bounds deliberately differ from create: `capacity` may go down to 0
+      here, and `price` has a floor of 100 pesewas rather than 0.
+
+      Several rules need the stored flight and therefore answer 400 rather
+      than a schema error: a route change is refused once any booking exists,
+      capacity may not drop below the seats already booked, origin and
+      destination must still differ once the omitted side falls back to the
+      stored value, arrival must still be at least 30 minutes after the
+      effective departure, a `DEPARTED` or `LANDED` flight cannot be updated
+      at all, and a `DELAYED` flight accepts only time, status, and photo
+      changes.
+
+      `status` here is limited to `DELAYED` and `CANCELLED`. Every other
+      transition belongs to `PATCH /api/v1/flights/{id}/status`, which owns the
+      state machine.
+    properties:
+      flightNumber:
+        type: string
+        minLength: 3
+        maxLength: 15
+        pattern: '^[A-Z0-9]{2,3}[0-9]{1,4}$'
+        examples: [TA123]
+      airline:
+        type: string
+        minLength: 2
+        maxLength: 60
+        pattern: '^[a-zA-Z\s\-&.()]+$'
+        examples: [Renamed Air]
+      departure:
+        type: string
+        format: date-time
+        description: |
+          Must be in the future when sent, and for a flight still `SCHEDULED`
+          the stored row is re-checked against the clock as well.
+      arrival:
+        type: string
+        format: date-time
+      originId:
+        type: integer
+        minimum: 1
+      destinationId:
+        type: integer
+        minimum: 1
+      price:
+        $ref: '#/components/schemas/Money'
+      flightClass: { $ref: '#/components/schemas/FlightClass' }
+      capacity:
+        type: integer
+        minimum: 0
+        maximum: 850
+        description: |
+          Moves seat inventory with it: `seatsAvailable` is re-derived as
+          `capacity - bookedSeats`, so raising capacity releases new seats and
+          lowering it can never unsell one. Dropping below the booked count is
+          refused.
+      stops:
+        type: integer
+        minimum: 0
+        maximum: 5
+      status:
+        type: string
+        enum: [DELAYED, CANCELLED]
+        description: |
+          The only two values this endpoint may set. Cancelling is refused
+          while active bookings exist.
+      flightPhoto:
+        type: string
+        format: binary
+        description: |
+          A replacement photo, as a file part under `multipart/form-data` or a
+          URL string under JSON. The empty string is the **remove** signal: the
+          column is nulled and the old Cloudinary image is deleted. Omitting
+          the field entirely leaves the current photo untouched.
+
+  FlightStatusUpdateRequest:
+    type: object
+    description: |
+      A lifecycle move. `status` is the target, and the two time fields are
+      accepted **only** when that target is `DELAYED`, where both are then
+      required. Sending times with any other target is a 400 rather than a
+      silently ignored field.
+
+      A delay is checked hard: the new departure must parse, must be in the
+      future, must be later than the departure already on file, arrival must
+      be after it, and the resulting duration must land between 10 minutes and
+      24 hours.
+    required: [status]
+    properties:
+      status: { $ref: '#/components/schemas/FlightStatus' }
+      departure:
+        type: string
+        format: date-time
+        description: Required for `DELAYED`, rejected for every other status.
+      arrival:
+        type: string
+        format: date-time
+        description: Required for `DELAYED`, rejected for every other status.
+
+  FlightDeleteSummary:
+    type: object
+    description: |
+      What was removed. Returned instead of a bare message so a client can
+      confirm which flight went, and in which state it went.
+    required: [id, flightNumber, status, deletedAt]
+    properties:
+      id: { type: integer, examples: [17] }
+      flightNumber: { type: string, examples: [TA123] }
+      status:
+        allOf:
+          - $ref: '#/components/schemas/FlightStatus'
+        description: The status the flight held at deletion, always `SCHEDULED` or `CANCELLED`.
+      deletedAt: { type: string, format: date-time }
+
+  FlightListFilters:
+    type: object
+    description: |
+      The filters that were actually applied, echoed back exactly as they were
+      received, unset ones included as absent keys. It lets a client render
+      "showing X of Y" without having to trust that its own query string
+      survived defaulting and coercion.
+    properties:
+      airline: { type: string }
+      departureFrom: { type: string }
+      departureTo: { type: string }
+      destinationId: { type: integer }
+      flightClass: { $ref: '#/components/schemas/FlightClass' }
+      maxDuration: { type: integer }
+      maxPrice: { $ref: '#/components/schemas/Money' }
+      maxStops: { type: integer }
+      minPrice: { $ref: '#/components/schemas/Money' }
+      minSeats: { type: integer }
+      originId: { type: integer }
+      search: { type: string }
+      sortBy: { type: string }
+      sortOrder: { type: string, enum: [asc, desc] }
+
+  FlightListMeta:
+    description: The standard pagination block, plus the echoed filters.
+    allOf:
+      - $ref: '#/components/schemas/PaginationMeta'
+      - type: object
+        required: [filters]
+        properties:
+          filters: { $ref: '#/components/schemas/FlightListFilters' }
+
+  FlightResponse:
+    type: object
+    description: The mutation envelope, carrying the full-relation flight shape.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Flight created successfully] }
+      data: { $ref: '#/components/schemas/FlightRecord' }
+
+  FlightDetailResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Flight retrieved successfully] }
+      data: { $ref: '#/components/schemas/FlightDetail' }
+
+  FlightListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Flights retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/FlightListItem' }
+      meta: { $ref: '#/components/schemas/FlightListMeta' }
+
+  FlightDeleteResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Flight deleted successfully] }
+      data: { $ref: '#/components/schemas/FlightDeleteSummary' }
+
+  UserStaffRole:
+    type: string
+    description: |
+      The roles a `User` row may hold. Deliberately narrower than the shared
+      `Role`: `CUSTOMER` is missing because customers are not users at all,
+      they live in a separate table with its own id sequence. Sending
+      `CUSTOMER` anywhere in this domain is a 400, not a silent downgrade.
+    enum: [ADMIN, AGENT]
+    examples: [AGENT]
+
+  UserCreateRequest:
+    type: object
+    description: |
+      A staff account created by an administrator. Accepted as JSON or
+      `multipart/form-data`.
+
+      `role` is required, because a staff account that nobody chose a role for
+      is not a thing this system has: there is no default.
+
+      There is no password field. A `password` key in the body is stripped
+      rather than honoured, so the account is created **passwordless** and its
+      owner establishes a credential through the forgot-password flow. That
+      keeps the person who holds the account the only person who ever knew its
+      password. No session cookie is issued either: this creates someone
+      else's account, it does not sign anyone in.
+    required: [address, email, name, role]
+    properties:
+      name:
+        type: string
+        maxLength: 100
+        examples: [Agent Smith]
+      email:
+        type: string
+        format: email
+        maxLength: 255
+        description: |
+          Required here, unlike a public signup. Must be free across both the
+          staff and the customer tables, so staff can never shadow a customer
+          login.
+        examples: [agent@traveltrek.test]
+      address:
+        type: string
+        maxLength: 100
+        examples: [99 Admin Way]
+      phone:
+        type: string
+        pattern: '^\+?[0-9]{10,15}$'
+        examples: ['+233201234567']
+      role: { $ref: '#/components/schemas/UserStaffRole' }
+      profilePicture:
+        type: string
+        format: binary
+        description: |
+          Sent as a file part under `multipart/form-data`, uploaded to
+          Cloudinary and replaced by its URL before the row is written. If
+          creation then fails, the upload is reclaimed. Under
+          `application/json` this is a string holding an existing URL.
+
+  UserUpdateRequest:
+    type: object
+    description: |
+      A partial profile update: every field is optional and omitted fields are
+      left untouched.
+
+      Two keys behave in ways worth knowing. `password` is not part of this
+      schema and a `password` key in the body is stripped, so a staff session
+      can never overwrite anyone's credential here; rotation happens only at
+      `POST /api/v1/auth/change-password`. `role` **is** validated but nothing
+      downstream reads it, kept for compatibility with older clients that sent
+      it; use `PATCH /api/v1/users/{userId}/role` to actually change a role.
+
+      `email` and `phone` are login identifiers, so who is editing decides
+      whether they may move. Editing another staff member's account is an
+      administrative override and changes them directly, subject to uniqueness
+      across both principal tables. Editing **your own** account is refused
+      with a 400 pointing at `POST /api/v1/auth/change-email` and
+      `POST /api/v1/auth/change-phone`, which prove control of the new contact
+      before it becomes something you can log in with. Sending the value you
+      already have stays a no-op, so a form that submits the whole profile
+      still works.
+    properties:
+      name:
+        type: string
+        maxLength: 100
+        examples: [Renamed Self]
+      email:
+        type: string
+        format: email
+        maxLength: 255
+      phone:
+        type: string
+        pattern: '^\+?[0-9]{10,15}$'
+        examples: ['+233201234567']
+      address:
+        type: string
+        maxLength: 100
+      role:
+        allOf:
+          - $ref: '#/components/schemas/UserStaffRole'
+        description: Accepted for compatibility and then ignored. It never changes a role.
+      profilePicture:
+        type: string
+        format: binary
+        description: |
+          A replacement picture, as a file part under `multipart/form-data` or
+          a URL string under JSON. The empty string removes the current
+          picture: the column is nulled and the old Cloudinary image is
+          deleted. Omitting the field leaves the picture alone.
+
+  UserRoleChangeRequest:
+    type: object
+    description: |
+      The role to move a staff member to. Only `ADMIN` and `AGENT` exist here,
+      and a role equal to the one already held is refused rather than treated
+      as a successful no-op, so a client that thinks it changed something is
+      told when it did not.
+    required: [role]
+    properties:
+      role: { $ref: '#/components/schemas/UserStaffRole' }
+
+  UserResponse:
+    type: object
+    description: |
+      A single staff account, in the same `StaffAccount` shape the session
+      endpoints return, because it is the same row read through the same
+      select. The password is excluded at the query, not stripped afterwards,
+      so it cannot appear here even by accident. Columns with no value are
+      omitted from the object rather than sent as null.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [User created successfully.] }
+      data: { $ref: '#/components/schemas/StaffAccount' }
+
+  UserListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Users retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/StaffAccount' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }

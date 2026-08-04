@@ -1,0 +1,518 @@
+# Money. Paystack checkout, the signed webhook that settles a booking, the
+# redirect callback, and the admin management surface.
+#
+# One thing to know before reading any operation below: this router carries no
+# `authorizeRole` middleware. Apart from the webhook, every route is behind the
+# session cookie and nothing more, and the role rules (who may refund, who may
+# delete, whose payments a caller may read) live in the service layer. That is
+# why the failures below are described per operation rather than inferable from
+# a middleware chain, and why an authorization failure here answers **401**
+# rather than 403: the service raises the same unauthorized error for a wrong
+# role as for a wrong owner.
+
+/api/v1/payments:
+  post:
+    tags: [Payments]
+    operationId: initializePayment
+    summary: Start or resume a Paystack checkout
+    description: |
+      Initializes a Paystack transaction for a booking and returns the checkout
+      URL to send the payer to.
+
+      The amount is never supplied by the client. It is the booking's stored
+      total, an integer in pesewas, handed to Paystack as minor units with no
+      conversion, which is the whole point of storing money that way: the figure
+      that is charged, the figure that comes back at verification, and the figure
+      on the payment row are the same integer, so reconciliation is an exact
+      comparison rather than a tolerance check.
+
+      Guards run in a fixed order, and the order is part of the contract:
+      booking exists, then ownership, then the booking-status gates, then the
+      payment-method whitelist, then the payer's email, then the existing-payment
+      triage. A request that is wrong in two ways is told about the first.
+
+      Calling this twice for the same booking does not create a second charge.
+      If a `PENDING` payment already exists, Paystack is re-initialized with that
+      payment's **original reference** and the response says
+      `Payment session resumed`, carrying the same `paymentId` and
+      `transactionReference` as the first call. Since the reference is what the
+      webhook and the callback settle on, resuming can never produce two
+      settlements to reconcile. A `COMPLETED` payment answers 400 rather than
+      charging again, and a `FAILED` one answers 400 directing the payer to
+      support instead of silently retrying a charge that already went wrong.
+
+      A customer may only pay for their own booking. Staff are not ownership
+      checked, which is what allows an agent to take a payment on a customer's
+      behalf.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentInitializeRequest' }
+    responses:
+      '200':
+        description: |
+          Checkout ready. 200 rather than 201 even for a fresh payment row: the
+          useful result is the authorization URL, and the same shape is returned
+          whether the session was created or resumed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentInitializeResponse' }
+      '400':
+        description: |
+          Validation failed on `bookingId`, or the booking cannot be paid for
+          right now. The latter group shares this status and is distinguished by
+          `message`: `Cannot pay for cancelled booking`,
+          `Booking already completed`, `Booking already paid for`,
+          `Invalid payment method`, `Payment already completed`,
+          `Previous payment failed. Please contact support`, or the request for
+          an email address on a phone-only account, since Paystack requires one
+          on every transaction.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or a customer trying to pay for a booking that is not
+          theirs (`You can only pay for your own bookings`). The ownership case
+          is an authorization failure that this domain reports as 401, so do not
+          read a 401 here as "refresh and retry" without checking the message.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: |
+          A refunded payment already exists for this booking. Refunded rows are
+          left in place for audit, and the unique constraint on `bookingId` then
+          refuses a replacement, so the booking cannot be re-paid through this
+          endpoint.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Payments]
+    operationId: listPayments
+    summary: List payments
+    description: |
+      A page of payments, newest first.
+
+      What the caller sees depends on the role, and the scoping is applied in
+      the service rather than by route middleware. A `CUSTOMER` is pinned to
+      their own rows unconditionally, so this endpoint is safe to expose to the
+      customer app without a separate route. `ADMIN` and `AGENT` see every
+      payment.
+
+      The `customerId` filter is honoured for `ADMIN` only. An agent that sends
+      it gets an unfiltered page rather than an error, which preserves the
+      long-standing rule that agents may see the whole table but may not slice
+      it by owner.
+
+      `search` matches the transaction reference, the payer's name, and the
+      payer's email, case-insensitively, so an operator can paste a reference
+      out of a Paystack dashboard and find the local row.
+    parameters:
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+      - { $ref: '#/components/parameters/Search' }
+      - { $ref: '#/components/parameters/PaymentStatusFilter' }
+      - { $ref: '#/components/parameters/PaymentMethodFilter' }
+      - { $ref: '#/components/parameters/PaymentCustomerIdFilter' }
+    responses:
+      '200':
+        description: A page of payments the caller is permitted to see.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentListResponse' }
+      '400':
+        description: |
+          A query parameter failed validation. Unlike the per-customer list,
+          this endpoint **rejects** an unknown `status` or `paymentMethod`
+          rather than ignoring it.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/payments/webhook:
+  post:
+    tags: [Payments]
+    operationId: paystackWebhook
+    summary: Receive a signed Paystack event
+    description: |
+      Called by Paystack, never by a user. It is mounted **before** the session
+      middleware, so it has no session and no cookie: the only thing that
+      authenticates it is the `x-paystack-signature` header.
+
+      The HMAC is computed over the **raw request body**, the exact bytes that
+      arrived, captured by the JSON body parser and kept aside for this handler.
+      It is deliberately not computed over a re-serialization of the parsed
+      object: `JSON.stringify` of a parsed body is not guaranteed to reproduce
+      the original bytes, since key order, whitespace, and number formatting can
+      all differ, and any such difference produces a different digest and rejects
+      a perfectly genuine event. Comparison is constant-time, so the endpoint
+      does not leak the expected digest through response timing.
+
+      Only `charge.success` does anything. The reference on the event is
+      re-verified against the Paystack API rather than trusted from the payload,
+      then the verified amount is reconciled against the booking total as an
+      integer comparison in pesewas.
+
+      **Idempotency.** The transaction reference is the key. Settlement is a
+      single guarded update that only moves a payment that is still `PENDING` or
+      `FAILED`, inside a transaction with the booking confirmation. A duplicate
+      delivery therefore matches zero rows and is acknowledged with
+      `Event received`: the booking is not re-confirmed, `paymentDate` is not
+      rewritten, and above all the receipt is not sent a second time, because the
+      receipt is dispatched only by the delivery that actually performed the
+      transition. The same guard is what makes the callback and this webhook safe
+      to race: whichever arrives first settles, the other is a no-op. It is also
+      what stops a replayed event from flipping a `REFUNDED` payment back to
+      completed.
+
+      Status codes are chosen around Paystack's retry behaviour: anything that
+      should not be retried answers 200, and the cases below that answer 4xx or
+      5xx are the ones where a retry is genuinely wanted.
+    security:
+      - paystackSignature: []
+    requestBody:
+      required: true
+      description: The Paystack event, sent as the exact bytes the signature was computed over.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentWebhookEvent' }
+    responses:
+      '200':
+        description: |
+          Acknowledged. Either this delivery settled the payment and confirmed
+          the booking, or there was nothing to do: an event type this service
+          ignores, or a duplicate `charge.success` for a payment already settled.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentWebhookAck' }
+      '400': { $ref: '#/components/responses/PaymentInvalidSignature' }
+      '404':
+        description: |
+          The event named a booking that does not exist, or a reference with no
+          payment row behind it. A missing payment row is answered 404 rather
+          than swallowed so Paystack retries: the initialize write may simply be
+          lagging behind the event. A booking is never confirmed on the strength
+          of a reference this service does not recognise.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+      '500':
+        description: |
+          The verified amount did not match the booking total. The payment is
+          marked `FAILED` first, and only if it was still `PENDING`, so a
+          mismatched replay cannot unsettle money that already completed or was
+          refunded. Reported as a server error rather than a 4xx because a charge
+          that reconciles against nothing is an operational incident, and the
+          5xx is what gets it retried and noticed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/payments/callback:
+  get:
+    tags: [Payments]
+    operationId: verifyPaymentCallback
+    summary: Verify a transaction after the Paystack redirect
+    description: |
+      Where Paystack sends the payer's browser after checkout, with the
+      transaction reference appended to the query string. It verifies that
+      reference against the Paystack API and settles the payment if the charge
+      is good.
+
+      Registered ahead of `GET /api/v1/payments/{id}`, so `callback` is matched
+      as a literal segment and never mistaken for a payment id.
+
+      This route sits behind the session cookie like the rest of the router. The
+      redirect is a browser navigation, so the session rides along with it.
+
+      **This endpoint does not use the standard envelope.** Success and failure
+      alike answer `{ message, success, data? }`, and its 400 and 404 replies are
+      that same shape rather than the standard error envelope, so they carry no
+      `requestId` in the body. Branch on `success`, not on the status code: a
+      charge that failed and a charge that succeeded are both 200.
+
+      Settlement goes through the same guarded, reference-keyed transaction the
+      webhook uses, so a callback that arrives after the webhook has already
+      settled still reports success without re-confirming anything. The callback
+      path deliberately sends **no** receipt: Paystack fires the webhook for the
+      same charge, and having both send one would double it.
+
+      An unsuccessful charge or an amount mismatch marks the payment `FAILED`,
+      but only while it is still `PENDING`, so a stale redirect replayed from a
+      browser's history cannot unsettle a completed or refunded payment.
+    parameters:
+      - { $ref: '#/components/parameters/PaymentReference' }
+    responses:
+      '200':
+        description: |
+          The transaction was verified. `success` is true only when the charge
+          succeeded **and** its amount reconciled against the booking total; a
+          failed charge and a mismatch are both 200 with `success: false` and a
+          `paymentStatus` of `FAILED`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentCallbackResponse' }
+      '400': { $ref: '#/components/responses/PaymentCallbackBadRequest' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '404': { $ref: '#/components/responses/PaymentCallbackNotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/payments/{id}:
+  parameters:
+    - { $ref: '#/components/parameters/PaymentId' }
+
+  get:
+    tags: [Payments]
+    operationId: getPayment
+    summary: Fetch one payment
+    description: |
+      Returns the payment with its payer summary and the derived booked item, so
+      a receipt view needs no follow-up request.
+
+      Ownership is checked in the service, not at the route: a `CUSTOMER` asking
+      for someone else's payment is refused with
+      `You can only view your own payments`. Staff may read any payment.
+
+      Soft-deleted payments are scoped out, so a deleted payment answers 404 and
+      is indistinguishable from one that never existed.
+    responses:
+      '200':
+        description: The payment.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or a customer reading a payment that is not theirs. This
+          domain reports the ownership failure as 401, not 403.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  patch:
+    tags: [Payments]
+    operationId: updatePaymentStatus
+    summary: Record a payment status manually
+    description: |
+      The manual settlement path, for money that did not move through Paystack,
+      typically cash taken in person. Administrators only, and that rule is
+      enforced in the service rather than by route middleware, so it is the
+      service that answers `Only administrators can update payment status`.
+
+      Checks run in this order: administrator gate, status whitelist, payment
+      exists, then the transition guards. A non-administrator therefore never
+      learns whether the payment id or the status was valid.
+
+      The booking follows the payment. `COMPLETED` confirms it, `FAILED` and
+      `REFUNDED` cancel it, and `PENDING` resets it, and the resulting booking
+      status is returned so the caller does not need a second request.
+
+      Completing a payment here sends the same receipt the webhook path sends,
+      which is why a cash settlement is not a silent write.
+
+      Two transitions are refused outright: a `COMPLETED` payment cannot be
+      moved back to `PENDING`, and nothing can move off `REFUNDED`. Both protect
+      the audit trail from a correction being made by overwriting history.
+
+      `REFUND_REQUESTED` is not accepted here. It is set only when a customer
+      cancels a booking they had already paid for, and it leaves only through the
+      refund endpoint, so the refund decision cannot be made by a status edit.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentStatusUpdateRequest' }
+    responses:
+      '200':
+        description: The new payment status and the booking status that followed it.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentStatusUpdateResponse' }
+      '400':
+        description: |
+          The path parameter failed validation, or `status` was missing or not
+          one of `COMPLETED`, `FAILED`, `PENDING`, `REFUNDED`
+          (`Invalid payment status`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or the caller is not an administrator
+          (`Only administrators can update payment status`). The role failure is
+          a 401 here, not a 403, because the check lives in the service and
+          raises the same unauthorized error the ownership checks do.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: |
+          A refused transition: `Cannot change completed payment back to pending`
+          or `Cannot change status of refunded payment`.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Payments]
+    operationId: deletePayment
+    summary: Delete a payment
+    description: |
+      Soft deletes the payment and reverts its booking to `PENDING`, which
+      returns the booking to a state where a fresh checkout can be started.
+
+      Administrators only, enforced in the service. `COMPLETED` payments are
+      protected and answer 409: settled money is an audit record, and the
+      correct move is a refund rather than a delete, which is what the message
+      says.
+
+      The row survives with a tombstone and is scoped out of every read. That is
+      deliberate rather than incidental: keeping the row keeps its
+      `transactionReference` unique, so a late webhook for that reference is
+      still recognised as a known reference instead of being treated as an
+      unknown one.
+    responses:
+      '200':
+        description: Deleted. Names the booking that was reverted.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentDeleteResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or the caller is not an administrator
+          (`Only administrators can delete payments`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: |
+          The payment is `COMPLETED` and is protected from deletion
+          (`Cannot delete completed payments. Consider refunding instead.`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/payments/{id}/refund:
+  patch:
+    tags: [Payments]
+    operationId: refundPayment
+    summary: Refund a payment
+    description: |
+      Marks the payment `REFUNDED` and cancels its booking. Administrators only,
+      enforced in the service rather than at the route.
+
+      Only two starting states are accepted: `COMPLETED`, and `REFUND_REQUESTED`.
+      The second is the customer-initiated half of the flow. When a customer
+      cancels a booking whose payment had already completed, the cancellation
+      does not move any money; the payment parks in `REFUND_REQUESTED` and waits
+      for an administrator here. That split is what keeps a customer from
+      triggering a payout by cancelling, while still giving the request a
+      recorded state rather than an email thread.
+
+      The refund is always for the full stored amount, in pesewas, echoed back as
+      `refundAmount` so it reconciles exactly against the original charge with no
+      arithmetic in between. There is no partial refund on this endpoint.
+
+      Note what this does **not** do: it records the refund locally, cancels the
+      booking, logs the amount, reference, and reason, and sends the customer a
+      refund-processed notice. It does not call the Paystack refund API, so the
+      money movement itself is completed out of band. Treat a 200 here as "the
+      refund is recorded and the customer has been told", not "the funds have
+      landed".
+
+      `reason` is optional free text; an omitted or empty one is recorded as
+      `No reason provided`, so the audit line is never blank.
+    parameters:
+      - { $ref: '#/components/parameters/PaymentId' }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentRefundRequest' }
+    responses:
+      '200':
+        description: Refund recorded, booking cancelled, customer notified.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentRefundResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or the caller is not an administrator
+          (`Only administrators can refund payments`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: |
+          The payment is neither `COMPLETED` nor `REFUND_REQUESTED`, so there is
+          nothing settled to refund (`Only completed payments can be refunded`).
+          A second refund of an already `REFUNDED` payment lands here too, which
+          is what makes this endpoint safe to retry.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/payments/customer/{customerId}:
+  get:
+    tags: [Payments]
+    operationId: listCustomerPayments
+    summary: List one customer's payments
+    description: |
+      The payment history for a single customer, newest first. Staff use it to
+      answer a billing question; a customer uses it for their own history.
+
+      A `CUSTOMER` may only pass their own id and is otherwise refused with
+      `You can only view your own payments`. That check is the entire access
+      control on this route, and it lives in the service.
+
+      One deviation worth knowing: an unknown `status` or `paymentMethod` here is
+      **silently ignored** rather than rejected, so the filter is dropped and the
+      unfiltered page is returned. `GET /api/v1/payments` rejects the same input
+      with a 400. The looser behaviour is preserved on this path because clients
+      already depend on it, so do not rely on a 400 to tell you a filter was
+      misspelled.
+    parameters:
+      - { $ref: '#/components/parameters/PaymentCustomerId' }
+      - { $ref: '#/components/parameters/Page' }
+      - { $ref: '#/components/parameters/Limit' }
+      - { $ref: '#/components/parameters/PaymentStatusFilter' }
+      - { $ref: '#/components/parameters/PaymentMethodFilter' }
+    responses:
+      '200':
+        description: |
+          A page of that customer's payments. Empty rather than 404 when the
+          customer has never paid for anything, and empty rather than 404 for an
+          id with no customer behind it: this route filters payments and does not
+          assert the customer exists.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or a customer asking for another customer's history
+          (`You can only view your own payments`).
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }

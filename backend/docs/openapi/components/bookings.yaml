@@ -1,0 +1,1049 @@
+# Components for the bookings and customers domains.
+#
+# A booking is a reservation against exactly one product: a tour, a hotel
+# room, or a flight. That choice shapes the whole response, so the wire format
+# is a union of three variants over one shared base rather than a single
+# object with three mostly-null branches.
+#
+# Customers are a principal type of their own, separate from staff. The
+# account shape used by the auth endpoints is `CustomerAccount`; the shapes
+# here are the customer-management view of the same rows, which carries no
+# role or two-factor flag and, on the single-customer read, adds a lifetime
+# activity block.
+
+schemas:
+  BookingStatus:
+    type: string
+    description: |
+      Lifecycle of a reservation. `PENDING` holds inventory but is not paid
+      for and expires at its payment deadline. `CONFIRMED` means a payment
+      completed. `CANCELLED` and `COMPLETED` are terminal: neither accepts a
+      further transition, which is why a finished trip can never be reopened
+      by a status write.
+
+      Allowed transitions are `PENDING` to `CONFIRMED` or `CANCELLED`, and
+      `CONFIRMED` to `COMPLETED` or `CANCELLED`. Anything else is refused.
+    enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+    examples: [PENDING]
+
+  BookingType:
+    type: string
+    description: |
+      Which product the booking is against. Derived from the relation that is
+      set on the row rather than stored, so it can never disagree with the
+      booking's contents.
+    enum: [TOUR, ROOM, FLIGHT]
+    examples: [TOUR]
+
+  BookingPaymentStatus:
+    type: string
+    description: |
+      State of the payment attached to a booking. `REFUND_REQUESTED` is the
+      hand-off state: a customer cancelled a booking that had already been
+      paid, so the money is parked until an administrator actions the refund.
+      It exists so that a self-service cancellation never moves money on its
+      own.
+    enum: [PENDING, COMPLETED, FAILED, REFUNDED, REFUND_REQUESTED]
+    examples: [COMPLETED]
+
+  BookingPaymentMethod:
+    type: string
+    enum: [CREDIT_CARD, DEBIT_CARD, MOBILE_MONEY, BANK_TRANSFER]
+    examples: [MOBILE_MONEY]
+
+  BookingDestinationSummary:
+    type: object
+    description: The place a booked product points at, trimmed to what a booking card needs.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        description: Null for destinations recorded at country granularity only.
+        examples: [Cape Coast]
+
+  BookingCustomerSummary:
+    type: object
+    description: |
+      Who the booking is for. Embedded rather than left as a bare id so a
+      staff list view can render names without a second round trip per row.
+    required: [id, name]
+    properties:
+      id: { type: integer, examples: [42] }
+      name: { type: string, examples: [Kofi Mensah] }
+      email:
+        type: [string, 'null']
+        format: email
+        description: Null for phone-only accounts, which have no email on file.
+
+  BookingStaffCreator:
+    type: object
+    description: |
+      The staff member who created the booking on the customer's behalf. Null
+      on a self-booking, which is what distinguishes a counter sale from an
+      online one after the fact.
+    required: [id, name]
+    properties:
+      id: { type: integer, examples: [7] }
+      name: { type: string, examples: [Ama Boateng] }
+
+  BookingPaymentSummary:
+    type: object
+    description: |
+      The payment attached to this booking, or null while none has been
+      started. A booking has at most one payment, so this is an object and
+      never a list.
+    required: [id, amount, paymentMethod, status]
+    properties:
+      id: { type: integer, examples: [15] }
+      amount: { $ref: '#/components/schemas/Money' }
+      paymentMethod: { $ref: '#/components/schemas/BookingPaymentMethod' }
+      status: { $ref: '#/components/schemas/BookingPaymentStatus' }
+
+  BookingTourSummary:
+    type: object
+    required: [id, name, destination]
+    properties:
+      id: { type: integer, examples: [12] }
+      name: { type: string, examples: [Cape Coast Castle Day Tour] }
+      description:
+        type: [string, 'null']
+      destination: { $ref: '#/components/schemas/BookingDestinationSummary' }
+
+  BookingHotelSummary:
+    type: object
+    required: [id, name, destination]
+    properties:
+      id: { type: integer, examples: [4] }
+      name: { type: string, examples: [Labadi Beach Hotel] }
+      description:
+        type: [string, 'null']
+      destination: { $ref: '#/components/schemas/BookingDestinationSummary' }
+
+  BookingRoomSummary:
+    type: object
+    description: |
+      The room, with the booking's own stay details folded in. The nights, the
+      room count, and the check-in and check-out dates live on the booking row
+      but are surfaced here because they only mean anything next to the room
+      they apply to.
+    required: [id, roomType, hotel, numberOfNights, numberOfRooms]
+    properties:
+      id: { type: integer, examples: [21] }
+      roomType: { type: string, examples: [Deluxe Double] }
+      description:
+        type: [string, 'null']
+      hotel: { $ref: '#/components/schemas/BookingHotelSummary' }
+      startDate:
+        type: [string, 'null']
+        format: date-time
+        description: |
+          Check-in. Always set on a room booking made through this API, since
+          creation refuses a room without a stay window.
+      endDate:
+        type: [string, 'null']
+        format: date-time
+        description: Check-out.
+      numberOfNights:
+        type: integer
+        minimum: 1
+        description: |
+          Derived midnight to midnight from the stay window, never sent by the
+          client, so the nights and the price can never disagree.
+        examples: [3]
+      numberOfRooms:
+        type: integer
+        minimum: 1
+        examples: [1]
+
+  BookingFlightSummary:
+    type: object
+    required: [id, airline, flightNumber, origin, destination]
+    properties:
+      id: { type: integer, examples: [9] }
+      airline: { type: string, examples: [Africa World Airlines] }
+      flightNumber: { type: string, examples: [AW126] }
+      origin: { $ref: '#/components/schemas/BookingDestinationSummary' }
+      destination: { $ref: '#/components/schemas/BookingDestinationSummary' }
+
+  BookingBase:
+    type: object
+    description: |
+      The fields every booking carries, whatever it was booked against.
+    required:
+      [
+        id,
+        customerId,
+        customer,
+        createdBy,
+        status,
+        numberOfGuests,
+        specialRequests,
+        totalPrice,
+        payment,
+        paymentDeadline,
+        bookingDate,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [101] }
+      customerId:
+        type: integer
+        description: |
+          Owner of the booking. Meaningful in the customer table only: staff
+          and customers have independent id sequences.
+        examples: [42]
+      customer: { $ref: '#/components/schemas/BookingCustomerSummary' }
+      createdBy:
+        description: |
+          Staff attribution, or null when the customer booked for themselves.
+        oneOf:
+          - $ref: '#/components/schemas/BookingStaffCreator'
+          - type: 'null'
+      status: { $ref: '#/components/schemas/BookingStatus' }
+      numberOfGuests:
+        type: integer
+        minimum: 1
+        description: |
+          Guests on a tour, occupants of the rooms, or seats on the flight.
+          This is the quantity that inventory is claimed and released in, so a
+          change to it re-accounts the product's counters.
+        examples: [2]
+      specialRequests:
+        type: [string, 'null']
+        description: |
+          Free text for the operations team. An empty string is stored as
+          null, so "cleared" and "never set" read identically.
+      totalPrice:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Recomputed server-side from the product's own price and the
+          quantities, never taken from the request. A client that posts the
+          wrong figure gets the right one back rather than an error, which is
+          why the price shown at checkout always matches what will be charged.
+      payment:
+        description: The payment attached to this booking, or null if none exists yet.
+        oneOf:
+          - $ref: '#/components/schemas/BookingPaymentSummary'
+          - type: 'null'
+      paymentDeadline:
+        type: [string, 'null']
+        format: date-time
+        description: |
+          When an unpaid booking stops holding its inventory. A background
+          sweep cancels every `PENDING` booking past this instant and returns
+          the slots, seats, or rooms to sale, so the deadline is a real
+          expiry rather than a display hint.
+
+          Set from how close the trip is: 24 hours before check-in normally,
+          2 hours from now when the trip starts within a day, and 30 minutes
+          from now when it starts within 2 hours. Null on a booking with no
+          trip date to measure against.
+      bookingDate:
+        type: string
+        format: date-time
+        description: |
+          When the reservation was placed. The list endpoints' `fromDate` and
+          `toDate` filter on this, not on the travel dates.
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  BookingTourVariant:
+    description: A booking against a guided tour.
+    allOf:
+      - $ref: '#/components/schemas/BookingBase'
+      - type: object
+        required: [type, tour, room, flight]
+        properties:
+          type:
+            type: string
+            const: TOUR
+          tour: { $ref: '#/components/schemas/BookingTourSummary' }
+          room:
+            type: 'null'
+          flight:
+            type: 'null'
+
+  BookingRoomVariant:
+    description: A booking against a hotel room, for a dated stay.
+    allOf:
+      - $ref: '#/components/schemas/BookingBase'
+      - type: object
+        required: [type, tour, room, flight]
+        properties:
+          type:
+            type: string
+            const: ROOM
+          tour:
+            type: 'null'
+          room: { $ref: '#/components/schemas/BookingRoomSummary' }
+          flight:
+            type: 'null'
+
+  BookingFlightVariant:
+    description: A booking of seats on a flight.
+    allOf:
+      - $ref: '#/components/schemas/BookingBase'
+      - type: object
+        required: [type, tour, room, flight]
+        properties:
+          type:
+            type: string
+            const: FLIGHT
+          tour:
+            type: 'null'
+          room:
+            type: 'null'
+          flight: { $ref: '#/components/schemas/BookingFlightSummary' }
+
+  Booking:
+    description: |
+      One reservation. Exactly one of `tour`, `room`, or `flight` is populated
+      and the other two are explicitly `null`, so a client can switch on
+      `type` and then read the one object it cares about without probing for
+      undefined keys.
+
+      The three variants differ in more than which object is filled in. A tour
+      booking is priced per guest against a fixed departure. A room booking
+      carries a stay window and is priced per night per room, which is why its
+      dates live inside `room`. A flight booking is priced per seat against a
+      departure time.
+    oneOf:
+      - $ref: '#/components/schemas/BookingTourVariant'
+      - $ref: '#/components/schemas/BookingRoomVariant'
+      - $ref: '#/components/schemas/BookingFlightVariant'
+    discriminator:
+      propertyName: type
+      mapping:
+        TOUR: '#/components/schemas/BookingTourVariant'
+        ROOM: '#/components/schemas/BookingRoomVariant'
+        FLIGHT: '#/components/schemas/BookingFlightVariant'
+
+  BookingCreateRequest:
+    type: object
+    description: |
+      A new reservation. `customerId` and `totalPrice` are required by the
+      schema, and **at least one** of `tourId`, `roomId`, or `flightId` must
+      be present; the service raises that last rule, so it reads as a 400 with
+      a plain message rather than a field error.
+
+      Send exactly one product id. Supplying several passes validation but is
+      not a supported combination: inventory would be claimed against every
+      item named, the price would settle on whichever was evaluated last, and
+      the response would describe only the first of tour, room, flight that is
+      set. There is no use case for it and no code path that unwinds it.
+
+      `totalPrice` is required for compatibility but is not trusted. The
+      server recalculates from the product's price and the quantities and
+      returns what it computed.
+    required: [customerId, totalPrice]
+    properties:
+      customerId:
+        type: integer
+        minimum: 1
+        description: |
+          The customer the booking is for. A `CUSTOMER` caller must pass their
+          own id; staff may book on behalf of anyone, and are recorded as the
+          creator when they do.
+        examples: [42]
+      totalPrice:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Required by the schema and then recalculated. Sending `0` is normal
+          for a client that lets the server price the booking.
+      tourId:
+        type: integer
+        minimum: 1
+        description: |
+          Books a seat on a guided tour. Refused when the tour is cancelled or
+          already completed, or when fewer slots remain than guests requested.
+      roomId:
+        type: integer
+        minimum: 1
+        description: |
+          Books a hotel room. Requires `startDate` and `endDate`, and the room
+          must have enough free inventory across the whole window.
+      flightId:
+        type: integer
+        minimum: 1
+        description: |
+          Books seats on a flight. Refused when the flight is cancelled or
+          fewer seats remain than guests requested.
+      numberOfGuests:
+        type: integer
+        minimum: 1
+        default: 1
+        description: |
+          Guests, occupants, or seats depending on the product. This is the
+          quantity inventory is claimed in and, for tours and flights, the
+          multiplier on the price.
+        examples: [2]
+      numberOfRooms:
+        type: integer
+        minimum: 1
+        default: 1
+        description: |
+          Room bookings only. Guests must fit inside `numberOfRooms` times the
+          room's capacity, and the error names the number of rooms actually
+          needed rather than just refusing.
+      startDate:
+        type: string
+        format: date-time
+        description: |
+          Room bookings only: check-in. Compared at day granularity, so a
+          same-day check-in is accepted while a past one is not.
+        examples: ['2026-08-20T00:00:00.000Z']
+      endDate:
+        type: string
+        format: date-time
+        description: |
+          Room bookings only: check-out. Must be after check-in, and the stay
+          must cover at least one night.
+        examples: ['2026-08-23T00:00:00.000Z']
+      specialRequests:
+        type: [string, 'null']
+        description: Free text for the operations team. An empty string is stored as null.
+      hotelId:
+        type: integer
+        minimum: 1
+        description: |
+          Accepted and validated for backward compatibility, then ignored: the
+          hotel is derived from the room. Sending it changes nothing.
+        deprecated: true
+
+  BookingCreationDetails:
+    type: object
+    description: |
+      The pricing and deadline decisions the server made while creating the
+      booking, returned alongside it as `bookingDetails`. It exists so a
+      checkout screen can explain the number it is about to charge and how
+      long the hold lasts without re-deriving either.
+    required: [calculatedPrice, paymentDeadline, requiresImmediatePayment]
+    properties:
+      calculatedPrice:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          What the booking was actually priced at, which is what `totalPrice`
+          on the booking now holds. Compare it against the figure you posted
+          if you need to tell the user the price moved.
+      paymentDeadline:
+        type: [string, 'null']
+        format: date-time
+        description: When the hold expires if no payment completes.
+      requiresImmediatePayment:
+        type: boolean
+        description: |
+          True when the trip is close enough that the deadline was measured
+          from now rather than from the trip date. A client should send the
+          user straight to checkout instead of offering to pay later.
+      numberOfNights:
+        type: integer
+        minimum: 1
+        description: Room bookings only.
+      tourStartDate:
+        type: string
+        format: date-time
+        description: Tour bookings only. The departure the deadline was measured against.
+      flightDeparture:
+        type: string
+        format: date-time
+        description: Flight bookings only. The departure the deadline was measured against.
+
+  BookingUpdateRequest:
+    type: object
+    description: |
+      Every field is optional; omitted fields are left alone.
+
+      Two kinds of change live here. Changing `status` walks the transition
+      map and is checked against the payment: a booking cannot become
+      `CONFIRMED` or `COMPLETED` without a completed payment, cannot fall back
+      to `PENDING` once paid, and cannot be cancelled here while paid, because
+      moving a paid booking to cancelled is the cancel endpoint's job and it
+      has to park the money on a refund request at the same time.
+
+      Changing the product, the quantities, or the dates re-accounts
+      inventory: the old tour slots or flight seats are released and the new
+      ones claimed in the same transaction, so a failed re-price never leaves
+      a product oversold. A booking already `COMPLETED` or `CANCELLED` refuses
+      any of these fields outright.
+    properties:
+      customerId:
+        type: integer
+        minimum: 1
+        description: Reassigns the booking to another customer. 404 if that customer does not exist.
+      status: { $ref: '#/components/schemas/BookingStatus' }
+      tourId: { type: integer, minimum: 1 }
+      roomId: { type: integer, minimum: 1 }
+      flightId: { type: integer, minimum: 1 }
+      numberOfGuests:
+        type: integer
+        minimum: 1
+        description: |
+          Re-checked against the product's remaining capacity, with this
+          booking's existing hold added back first so raising a count by one
+          does not have to fit as though the booking held nothing.
+      numberOfRooms: { type: integer, minimum: 1 }
+      startDate: { type: string, format: date-time }
+      endDate: { type: string, format: date-time }
+      specialRequests:
+        type: [string, 'null']
+      totalPrice:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Only used when nothing else forces a recalculation. Any change to
+          the product, quantities, or dates re-prices from the product itself
+          and overwrites this.
+      hotelId:
+        type: integer
+        minimum: 1
+        description: Accepted and ignored, as on creation.
+        deprecated: true
+
+  BookingDeleteSummary:
+    type: object
+    description: |
+      What the delete returned to sale. Reported explicitly because a delete
+      that silently failed to release inventory is otherwise invisible until
+      the product looks fully booked with nothing on it.
+    required: [deletedBookingId, restoredAvailability, restoredQuantities]
+    properties:
+      deletedBookingId: { type: integer, examples: [101] }
+      restoredAvailability:
+        type: object
+        required: [tour, room, flight]
+        properties:
+          tour: { type: boolean }
+          room:
+            description: |
+              `date-based` when the booking held rooms: room availability is
+              recomputed per date window rather than kept in a counter, so
+              there is no number to restore, the hold simply stops counting.
+              False when the booking was not a room booking.
+            oneOf:
+              - type: boolean
+                const: false
+              - type: string
+                const: date-based
+          flight: { type: boolean }
+      restoredQuantities:
+        type: object
+        required: [tourGuests, flightSeats]
+        properties:
+          tourGuests:
+            type: integer
+            minimum: 0
+            description: Guest slots returned to the tour, or 0.
+          flightSeats:
+            type: integer
+            minimum: 0
+            description: Seats returned to the flight, or 0.
+
+  BookingResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Booking retrieved successfully] }
+      data: { $ref: '#/components/schemas/Booking' }
+
+  BookingListResponse:
+    type: object
+    description: A page of bookings, newest first by creation time.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Bookings retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Booking' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  BookingCreateResponse:
+    type: object
+    description: |
+      The created booking, plus the `bookingDetails` block describing how it
+      was priced and how long the hold lasts.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Booking created successfully] }
+      data:
+        allOf:
+          - $ref: '#/components/schemas/Booking'
+          - type: object
+            required: [bookingDetails]
+            properties:
+              bookingDetails: { $ref: '#/components/schemas/BookingCreationDetails' }
+
+  BookingCancelResponse:
+    type: object
+    description: |
+      The cancelled booking, plus whether the cancellation left money to
+      settle. The message differs between the two cases as well, so it can be
+      shown to the user directly.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Booking cancelled successfully] }
+      data:
+        allOf:
+          - $ref: '#/components/schemas/Booking'
+          - type: object
+            required: [refundRequested]
+            properties:
+              refundRequested:
+                type: boolean
+                description: |
+                  True when the booking had a completed payment, which has now
+                  moved to `REFUND_REQUESTED` and is waiting on an
+                  administrator. False when nothing had been paid and there is
+                  nothing to return.
+
+  BookingDeleteResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Booking deleted successfully] }
+      data: { $ref: '#/components/schemas/BookingDeleteSummary' }
+
+  CustomerRecord:
+    type: object
+    description: |
+      A customer as the management endpoints see them: identity and contact
+      details, with no role, no two-factor flag, and no credential fields.
+      The password and the session bookkeeping columns are excluded at the
+      database query rather than stripped afterwards, so they cannot leak
+      through a new field being added carelessly.
+
+      Nullable columns are omitted from the JSON rather than sent as null, so
+      a key being absent means "not on file".
+    required: [id, name, createdAt, updatedAt]
+    properties:
+      id: { type: integer, examples: [42] }
+      name: { type: string, examples: [Kofi Mensah] }
+      email:
+        type: string
+        format: email
+        description: Absent on phone-only accounts. Every customer has an email or a phone.
+        examples: [kofi@example.com]
+      phone:
+        type: string
+        description: Absent when the account was created with an email only.
+        examples: ['+233241112222']
+      address:
+        type: string
+      profilePicture:
+        type: string
+        format: uri
+        description: Cloudinary URL. Absent when none has been uploaded.
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  CustomerSignupMethod:
+    type: string
+    description: |
+      How the account came to exist, derived rather than stored: a linked
+      Google subject wins, then an email on file, then phone-only. Useful for
+      telling a customer why they have no password to reset.
+    enum: [email, google, phone]
+    examples: [email]
+
+  CustomerFavoriteDestination:
+    type: object
+    required: [id, name]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Cape Coast] }
+
+  CustomerProfileStats:
+    type: object
+    description: |
+      Lifetime activity for one customer, computed on read from the live rows
+      rather than kept in maintained counters, so it can never drift out of
+      step with the bookings and payments it summarizes. Soft-deleted rows are
+      excluded, exactly as they are everywhere else.
+
+      Money figures count **completed payments only**. A pending or failed
+      payment is not spend and never appears in a total.
+    required:
+      [
+        averageBookingValue,
+        bookingsByStatus,
+        favoriteDestination,
+        lastBookingAt,
+        memberSince,
+        signupMethod,
+        totalBookings,
+        totalPayments,
+        totalSpent,
+        upcomingTrips,
+      ]
+    properties:
+      totalBookings:
+        type: integer
+        minimum: 0
+        description: Every booking ever placed, in any status.
+        examples: [4]
+      bookingsByStatus:
+        type: object
+        description: |
+          Booking count per status. A status with no bookings is absent rather
+          than present as zero, so an empty object means the customer has
+          never booked.
+        propertyNames:
+          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+        additionalProperties:
+          type: integer
+          minimum: 1
+        examples:
+          - PENDING: 2
+            COMPLETED: 1
+      upcomingTrips:
+        type: integer
+        minimum: 0
+        description: |
+          `PENDING` or `CONFIRMED` bookings whose travel has not started yet,
+          judged against the tour's start, the room's check-in, or the
+          flight's departure as appropriate. A cancelled future booking does
+          not count, and neither does a confirmed one whose trip has begun.
+        examples: [2]
+      lastBookingAt:
+        type: [string, 'null']
+        format: date-time
+        description: When the most recent booking was placed, or null if there are none.
+      totalPayments:
+        type: integer
+        minimum: 0
+        description: |
+          Every payment row, in any status. Deliberately not the same as the
+          number of payments that succeeded, so a support agent can see failed
+          attempts exist.
+        examples: [3]
+      totalSpent:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Sum of completed payments.
+      averageBookingValue:
+        description: |
+          Mean completed payment, rounded to the nearest pesewa. Null when no
+          payment has completed, rather than zero, so "never paid" is
+          distinguishable from "paid nothing".
+        oneOf:
+          - $ref: '#/components/schemas/Money'
+          - type: 'null'
+      favoriteDestination:
+        description: |
+          The destination booked most often across tours, rooms, and flights,
+          with ties going to the most recently booked one. Null when the
+          customer has never booked. Cancelled bookings still count here: they
+          express interest in a place even though no money followed.
+        oneOf:
+          - $ref: '#/components/schemas/CustomerFavoriteDestination'
+          - type: 'null'
+      memberSince:
+        type: string
+        format: date-time
+        description: |
+          Echoes the account's `createdAt` so the stats block is self-contained
+          for a profile widget that renders nothing else.
+      signupMethod: { $ref: '#/components/schemas/CustomerSignupMethod' }
+
+  CustomerProfile:
+    description: |
+      A customer plus the lifetime activity block. This is what the
+      single-customer read returns; the list returns the plain record, since
+      computing stats per row would mean several queries per customer.
+    allOf:
+      - $ref: '#/components/schemas/CustomerRecord'
+      - type: object
+        required: [stats]
+        properties:
+          stats: { $ref: '#/components/schemas/CustomerProfileStats' }
+
+  CustomerCreateRequest:
+    type: object
+    description: |
+      Staff-side creation, for a walk-in or telephone customer who has not
+      signed up themselves. Name is required, plus **at least one** of email
+      or phone, since an account with neither could never be signed into or
+      contacted.
+
+      The account is always created **passwordless**. A `password` key in the
+      body is dropped rather than honored, so staff never hold a customer's
+      credential; the customer signs in with a one-time code and sets a
+      password themselves if they want one.
+    required: [name]
+    properties:
+      name:
+        type: string
+        maxLength: 100
+        examples: [Walk-in Wanda]
+      email:
+        type: string
+        format: email
+        maxLength: 255
+        description: Provide this or `phone`.
+      phone:
+        type: string
+        pattern: '^\+?[0-9]{10,15}$'
+        description: Provide this or `email`.
+        examples: ['233551234567']
+      address:
+        type: string
+        maxLength: 100
+      profilePicture:
+        type: string
+        description: |
+          An existing image URL. This endpoint takes JSON only; file upload is
+          available on the update.
+
+  CustomerUpdateRequest:
+    type: object
+    description: |
+      Every field is optional. Credentials are not editable here at all: a
+      `password` key is dropped, because a password is only ever rotated by
+      the account holder through the authenticated change-password flow.
+
+      Email and phone are login identifiers, so who is asking matters. Staff
+      may set them directly as an administrative correction. A customer
+      editing their **own** profile may not, and gets a 400 pointing at the
+      verified change-email and change-phone flows, which confirm the new
+      contact before it becomes something you can sign in with. Sending the
+      current value unchanged is a no-op, so a form that submits the whole
+      profile keeps working.
+
+      Accepts JSON or `multipart/form-data`. Under multipart, `profilePicture`
+      is a file part uploaded to Cloudinary before the row is written; the
+      previous image is deleted afterwards, and a rejected update reclaims the
+      image it just uploaded so a refused request cannot leave an orphan.
+    properties:
+      name:
+        type: string
+        maxLength: 100
+      email:
+        type: string
+        format: email
+        maxLength: 255
+        description: Staff only. A self edit must use the verified change-email flow.
+      phone:
+        type: string
+        pattern: '^\+?[0-9]{10,15}$'
+        description: Staff only. A self edit must use the verified change-phone flow.
+      address:
+        type: string
+        maxLength: 100
+      profilePicture:
+        type: string
+        format: binary
+        description: |
+          A file part under `multipart/form-data`, or a URL string under JSON.
+          An empty string clears the picture and deletes the stored image.
+
+  CustomerResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Customer updated successfully.] }
+      data: { $ref: '#/components/schemas/CustomerRecord' }
+
+  CustomerProfileResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Customer retrieved successfully] }
+      data: { $ref: '#/components/schemas/CustomerProfile' }
+
+  CustomerListResponse:
+    type: object
+    description: A page of customers, newest first.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Customers retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/CustomerRecord' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  CustomerPaymentBookedItem:
+    type: object
+    description: |
+      What the payment ultimately paid for, flattened from the booking behind
+      it so a receipts list needs no per-row joins. The name is composed for
+      display: a room reads as "Hotel - Room type", a flight as
+      "Airline FlightNumber".
+    required: [id, name, description, type]
+    properties:
+      id:
+        type: integer
+        description: Id of the tour, room, or flight.
+        examples: [12]
+      name: { type: string, examples: [Cape Coast Castle Day Tour] }
+      description:
+        type: [string, 'null']
+        description: The item's own description, or the route for a flight.
+      type: { $ref: '#/components/schemas/BookingType' }
+
+  CustomerPaymentRecord:
+    type: object
+    description: |
+      One payment in a customer's history. This is the customer-scoped view of
+      a payment; the payments domain documents the same record for the
+      staff-facing endpoints.
+    required:
+      [
+        id,
+        bookingId,
+        customerId,
+        customer,
+        amount,
+        currency,
+        status,
+        paymentMethod,
+        paymentDate,
+        transactionReference,
+        bookedItem,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [15] }
+      bookingId: { type: integer, examples: [101] }
+      customerId: { type: integer, examples: [42] }
+      customer: { $ref: '#/components/schemas/BookingCustomerSummary' }
+      amount: { $ref: '#/components/schemas/Money' }
+      currency: { $ref: '#/components/schemas/Currency' }
+      status: { $ref: '#/components/schemas/BookingPaymentStatus' }
+      paymentMethod: { $ref: '#/components/schemas/BookingPaymentMethod' }
+      paymentDate:
+        type: [string, 'null']
+        format: date-time
+        description: When the money actually settled. Null while the payment has not completed.
+      transactionReference:
+        type: string
+        description: |
+          The processor's reference. An empty string when none was recorded,
+          which is the case for a payment created outside the checkout flow.
+      bookedItem: { $ref: '#/components/schemas/CustomerPaymentBookedItem' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  CustomerPaymentListResponse:
+    type: object
+    description: A page of payments, newest first.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Payments for customer 42 retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/CustomerPaymentRecord' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+parameters:
+  BookingIdPath:
+    name: id
+    in: path
+    required: true
+    description: Booking id.
+    schema:
+      type: integer
+      minimum: 1
+    example: 101
+
+  BookingCustomerIdPath:
+    name: customerId
+    in: path
+    required: true
+    description: Customer whose bookings are being listed.
+    schema:
+      type: integer
+      minimum: 1
+    example: 42
+
+  CustomerIdPath:
+    name: id
+    in: path
+    required: true
+    description: Customer id.
+    schema:
+      type: integer
+      minimum: 1
+    example: 42
+
+  BookingStatusFilter:
+    name: status
+    in: query
+    required: false
+    description: Only bookings in this status.
+    schema: { $ref: '#/components/schemas/BookingStatus' }
+
+  BookingTypeFilter:
+    name: type
+    in: query
+    required: false
+    description: |
+      Only bookings against this kind of product. Applied as "the relation is
+      set", so it overrides a `tourId`, `roomId`, or `flightId` filter for the
+      same product rather than narrowing it.
+    schema: { $ref: '#/components/schemas/BookingType' }
+
+  BookingTourIdFilter:
+    name: tourId
+    in: query
+    required: false
+    description: Only bookings against this tour.
+    schema:
+      type: integer
+      minimum: 1
+
+  BookingRoomIdFilter:
+    name: roomId
+    in: query
+    required: false
+    description: Only bookings against this room.
+    schema:
+      type: integer
+      minimum: 1
+
+  BookingFlightIdFilter:
+    name: flightId
+    in: query
+    required: false
+    description: Only bookings against this flight.
+    schema:
+      type: integer
+      minimum: 1
+
+  BookingCustomerIdFilter:
+    name: customerId
+    in: query
+    required: false
+    description: |
+      Only bookings owned by this customer. Ignored for a `CUSTOMER` caller,
+      whose results are already pinned to their own id, so it cannot be used
+      to widen a customer's view.
+    schema:
+      type: integer
+      minimum: 1
+
+  BookingFromDate:
+    name: fromDate
+    in: query
+    required: false
+    description: |
+      Earliest booking date, inclusive. Filters on when the reservation was
+      placed, not on when the trip happens. Must not be after `toDate`.
+    schema:
+      type: string
+      format: date-time
+
+  BookingToDate:
+    name: toDate
+    in: query
+    required: false
+    description: Latest booking date, inclusive.
+    schema:
+      type: string
+      format: date-time

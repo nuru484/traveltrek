@@ -1,0 +1,399 @@
+# Two read-only surfaces.
+#
+# /api/v1/public is the unauthenticated browse surface behind the landing page
+# and the live demo board. It is mounted BEFORE the authenticated router
+# precisely so its requests never reach the session middleware: there is no
+# token to check, no session to expire, and no code path where an anonymous
+# visitor is one middleware ordering mistake away from an authenticated
+# response. Everything under it is a GET, it exposes only what a marketing page
+# needs, and it carries its own rate limit.
+#
+# /api/v1/dashboard is the opposite: signed in, and it widens with the role.
+
+/api/v1/public/destinations:
+  get:
+    tags: [Public]
+    operationId: listPublicDestinations
+    summary: Browse destinations
+    description: |
+      The country and city hubs that tours, hotels, and flights hang off,
+      alphabetically by name so the list is stable between requests and between
+      deployments.
+
+      This is the minimal destination shape: the timestamps carried by the
+      authenticated endpoint are dropped, because a visitor has no use for when
+      a row was written and every published field is a field that has to stay
+      safe to publish.
+
+      Unauthenticated. This endpoint and its seven siblings sit under
+      `/api/v1/public`, which is mounted **ahead of** the session middleware,
+      so a request here never touches authentication at all.
+
+      Filtering is deliberately not offered here: pagination only. The
+      authenticated destination endpoints carry search, country, and city
+      filters, and there is no reason to reproduce that surface for anonymous
+      callers.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+    responses:
+      '200':
+        description: A page of destinations, ordered by name.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicDestinationListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/tours:
+  get:
+    tags: [Public]
+    operationId: listPublicTours
+    summary: Browse bookable tours
+    description: |
+      Bookable inventory only: `UPCOMING` and `ONGOING` tours, soonest start
+      first. Completed and cancelled tours are scoped out here, because a
+      browse list exists to show a visitor something they can act on, and a
+      finished trip is not that.
+
+      Each row carries its destination and an aggregate `rating` over published
+      reviews. The ratings for a whole page are fetched in one aggregate query
+      keyed on the page's ids, not one lookup per row, so page size does not
+      multiply database round trips.
+
+      `search` matches the tour name, its description, and its destination's
+      name, case-insensitively.
+
+      Unauthenticated, and rate limited on the public browse budget of 300
+      requests per 15 minutes per IP. That budget is generous for someone
+      reading a landing page and tight enough to bound anonymous scraping of
+      the catalogue.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/PublicSearch'
+      - $ref: '#/components/parameters/PublicTourTypeFilter'
+      - $ref: '#/components/parameters/PublicDestinationId'
+    responses:
+      '200':
+        description: A page of upcoming or ongoing tours, earliest departure first.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicTourListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/tours/{id}:
+  get:
+    tags: [Public]
+    operationId: getPublicTour
+    summary: One tour, with its published reviews
+    description: |
+      The tour, its rating aggregate, and the first five published reviews,
+      newest first, so a detail page renders from one request instead of three.
+      `reviewsTotal` reports how many published reviews exist in all, which is
+      what lets the page say "5 of 41" without asking again.
+
+      Note that this is **not** filtered to `UPCOMING` and `ONGOING` the way
+      the listing is. A bookmarked or shared link must keep resolving after the
+      trip runs, so a completed or cancelled tour is served here with its
+      `status` telling the client what it is looking at.
+
+      Hidden reviews feed neither the list nor the average, so moderating a
+      review removes it from the score as well as from the page.
+
+      Unauthenticated, and no review here carries anything about its author
+      beyond a display name.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/PublicTourId'
+    responses:
+      '200':
+        description: The tour, its rating, and its first page of published reviews.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicTourDetailResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/hotels:
+  get:
+    tags: [Public]
+    operationId: listPublicHotels
+    summary: Browse hotels
+    description: |
+      Hotels with their destination, their room types, and an aggregate rating,
+      newest first.
+
+      The room types ride along on the **listing**, not just the detail,
+      because a hotel card with no visible price is not something a visitor can
+      act on. What comes with them is the price per night and a photo; stock
+      levels, capacity, and availability stay on the authenticated room
+      endpoints.
+
+      The rating aggregates reviews of any of the hotel's rooms, since a review
+      is written against a booking and a hotel booking is always a booking of
+      one room.
+
+      `search` matches the hotel name, description, and address, plus its
+      destination's city and country, case-insensitively.
+
+      Unlike tours and flights there is no status to scope by: a hotel is
+      either on file or it is not.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/PublicSearch'
+      - $ref: '#/components/parameters/PublicDestinationId'
+    responses:
+      '200':
+        description: A page of hotels, newest first.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicHotelListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/hotels/{id}:
+  get:
+    tags: [Public]
+    operationId: getPublicHotel
+    summary: One hotel, with its rooms and published reviews
+    description: |
+      The hotel, its room types, its rating aggregate, and the first five
+      published reviews, newest first, with `reviewsTotal` giving the full
+      count.
+
+      A review of a hotel arrives here as a `ROOM` target carrying the room id,
+      its type, and the owning hotel, which is how a page can say which room a
+      given comment was actually about.
+
+      Unauthenticated.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/PublicHotelId'
+    responses:
+      '200':
+        description: The hotel, its rooms, its rating, and its first page of reviews.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicHotelDetailResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/flights:
+  get:
+    tags: [Public]
+    operationId: listPublicFlights
+    summary: Browse scheduled flights
+    description: |
+      Flights a visitor could still catch: status `SCHEDULED` **and** departing
+      in the future, earliest departure first. Both halves of that filter
+      matter, because a flight that was never marked departed is still gone
+      once its departure time has passed, and showing it would be worse than
+      showing nothing.
+
+      `capacity` is withheld from the listing and returned on the detail. The
+      list needs seats still for sale; the size of the aircraft is operations
+      data.
+
+      `search` matches the airline, the flight number, and both the origin's
+      and the destination's name, case-insensitively. `originId` and
+      `destinationId` combine to ask for a single route.
+
+      Unauthenticated.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/PublicSearch'
+      - $ref: '#/components/parameters/PublicOriginId'
+      - $ref: '#/components/parameters/PublicDestinationId'
+    responses:
+      '200':
+        description: A page of future scheduled flights, earliest departure first.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicFlightListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/flights/{id}:
+  get:
+    tags: [Public]
+    operationId: getPublicFlight
+    summary: One flight, with its published reviews
+    description: |
+      The flight, including the aircraft `capacity` the listing omits, plus its
+      rating aggregate and the first five published reviews. Capacity is what
+      makes `seatsAvailable` readable as a proportion, which a detail page
+      shows and a card does not.
+
+      As with tours, the detail is not filtered the way the listing is: a link
+      to a flight that has since departed or been cancelled still resolves, and
+      `status` says which it is.
+
+      Unauthenticated.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/PublicFlightId'
+    responses:
+      '200':
+        description: The flight, its capacity, its rating, and its first page of reviews.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicFlightDetailResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/public/reviews/recent:
+  get:
+    tags: [Public]
+    operationId: listRecentPublicReviews
+    summary: Latest published reviews across everything
+    description: |
+      The landing page's testimonial strip: the newest published reviews across
+      every tour, hotel room, and flight, newest first. Each one names what it
+      was about through its `target`, so the strip can link back to the item.
+
+      This is where the privacy boundary of the whole public surface is easiest
+      to see. A review is stored against a customer and a booking, and neither
+      leaves the building: the wire shape carries the reviewer's display name
+      and nothing else about them, no customer id, no email, no booking id, and
+      no moderation status. Only `PUBLISHED` rows are ever returned, so hiding
+      a review takes it off this strip at once.
+
+      There is no `page`. This is a fixed-size strip rather than a list, and
+      `limit` is capped at 50 because with no paging that cap is the only thing
+      between an anonymous caller and the entire review table. Asking for more
+      is a validation error, not a silent clamp, so a client is never told it
+      received more than it did.
+
+      Unauthenticated.
+    security: []
+    parameters:
+      - $ref: '#/components/parameters/PublicRecentReviewsLimit'
+    responses:
+      '200':
+        description: |
+          The most recent published reviews, newest first. No `meta` block:
+          there is no page after this one.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicRecentReviewsResponse' }
+      '400':
+        description: |
+          `limit` was not a positive integer, or exceeded the cap of 50.
+          Answered by the standard validation shape.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/dashboard:
+  get:
+    tags: [Dashboard]
+    operationId: getDashboardOverview
+    summary: Aggregate counts for the signed-in principal
+    description: |
+      One request behind the home screen of both the customer app and the staff
+      console, which is why **the payload widens with the role**.
+
+      Every principal gets the four inventory blocks: tours, hotels, flights,
+      and destinations. `ADMIN` and `AGENT` additionally get `bookings` and
+      `users`. For a customer those two keys are **absent rather than empty**,
+      so a client can never read "you may not see this" as "the number is
+      zero", and a customer response never even computes the counts it is not
+      allowed to see.
+
+      The figures are live counts, computed per request and not cached, and
+      they are system-wide rather than scoped to the caller. That is exactly
+      why the two blocks that describe people and commercial activity are the
+      staff-only ones.
+
+      `hotels.availableRooms` counts room **types** on file rather than nights
+      free tonight, and `users.total` is the sum of admins, agents, and
+      customers, because staff and customers live in separate tables.
+    responses:
+      '200':
+        description: |
+          The counts. Includes `bookings` and `users` for `ADMIN` and `AGENT`;
+          both are omitted for `CUSTOMER`.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardOverviewResponse' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/dashboard/needs-attention:
+  get:
+    tags: [Dashboard]
+    operationId: getDashboardNeedsAttention
+    summary: Operational counts that need a human
+    description: |
+      **Staff only**, `ADMIN` or `AGENT`. A customer gets 403. Unlike
+      `GET /api/v1/dashboard`, which serves everyone and simply shows less to a
+      customer, this one has no narrowed form: every count on it is bookings
+      and payments operations data, so there is nothing left once the
+      staff-only parts are removed.
+
+      Five live counts: bookings still pending, payments still pending,
+      payments that failed, tours starting soon that are underbooked, and
+      flights departing soon that are underfilled.
+
+      The last two are ratio judgements rather than plain filters. A tour
+      starting within 14 days with under 30% of its capacity booked counts, as
+      does a flight departing within 7 days with more than 70% of its seats
+      unsold. Comparing two columns against each other is not something a
+      plain database filter expresses, so the service pulls the small
+      time-windowed candidate sets and counts them itself. The windows are what
+      keep that cheap.
+
+      Nothing here is cached: an operations strip that lags is worse than one
+      that costs a few counts per load.
+    responses:
+      '200':
+        description: The five operational counts, as of this request.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DashboardNeedsAttentionResponse' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403':
+        description: |
+          The caller is a customer. The whole payload is operations data, so
+          there is no reduced view to fall back to.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }

@@ -1,0 +1,599 @@
+# The account-management half of /auth: the password, the email, and the phone
+# number of the signed-in account. Session lifecycle (register, login, refresh,
+# logout, the two-factor login step) lives in paths/auth.yaml.
+#
+# One idea runs through this whole file. Email and phone are login identifiers,
+# and a password is the thing that guards them, so none of these endpoints
+# treats a valid session as sufficient authority on its own. Each one asks for
+# something the session does not carry: the current password, a code delivered
+# out of band, or a token emailed to an address the caller has to actually be
+# able to read.
+
+/api/v1/auth/change-password:
+  post:
+    tags: [Account]
+    operationId: changeOwnPassword
+    summary: Set or rotate your password
+    description: |
+      The only way a password is written for an existing account. Profile
+      updates strip the field and administrators never set one, so an account
+      created by an admin, by Google sign-in, or by a minimal signup arrives
+      here to establish its first password.
+
+      Two modes, chosen by the account rather than by the caller. If the account
+      already has a password, `currentPassword` is required and must verify. If
+      it has none, `currentPassword` must be omitted and this call sets the
+      first one. Getting it the wrong way round is a 400, never a silently
+      ignored field.
+
+      A wrong `currentPassword` answers the same uniform 401 as a failed login
+      and increments the same lockout counter, five failures locking the account
+      for 15 minutes. That is deliberate: a session an attacker borrowed must
+      not become a faster oracle for guessing the password than the login form
+      is.
+
+      Succeeding bumps the account's session epoch, which invalidates every
+      access and refresh token already issued on every device, and drops every
+      outstanding one-time secret so no reset link or code from before the
+      change survives it. The caller is the one exception: this response carries
+      a freshly minted cookie pair, so the browser that changed the password
+      stays signed in while all the others are signed out.
+
+      Budgeted at 5 requests per hour per IP and account, well under what a
+      person needs and far under what grinding a password would need.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AccountChangePasswordRequest' }
+    responses:
+      '200':
+        description: |
+          Password set. Every other session is now dead; this one was re-issued.
+        headers:
+          Set-Cookie:
+            description: |
+              Replacement `accessToken` and `refreshToken` at the new session
+              epoch. Without these the caller would have logged itself out.
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          Failed validation, or `currentPassword` was sent for an account that
+          has none, or omitted for an account that has one.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or `currentPassword` did not verify. The wrong-password
+          case is reported exactly as a failed login is, and it counts toward
+          the same lockout.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429':
+        description: |
+          Either the hourly reset budget is spent, or the account is locked from
+          repeated wrong-password attempts and will accept another try after the
+          15-minute lock elapses.
+        headers:
+          Retry-After:
+            description: Seconds to wait before retrying.
+            schema: { type: integer }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/auth/forgot-password:
+  post:
+    tags: [Account]
+    operationId: requestPasswordReset
+    summary: Email a password reset link
+    description: |
+      Starts account recovery for staff and customers alike, resolving the
+      address against customers first and then staff, the same precedence login
+      uses.
+
+      The response is one fixed 200 whether or not the email belongs to an
+      account, and the unknown-email path does the same bcrypt work as the known
+      one so the timing does not answer the question either. Recovery is
+      reachable without a session by definition, so it must not double as a way
+      to discover who has an account here.
+
+      A real account gets a single-use link, valid for 30 minutes, and issuing a
+      new one invalidates any earlier unredeemed link, so the most recent email
+      in the inbox is always the one that works.
+
+      Budgeted at 5 requests per hour per IP, which caps how much mail one
+      caller can have the service send to an address it does not own.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AccountForgotPasswordRequest' }
+    responses:
+      '200':
+        description: |
+          Accepted. A link was emailed if, and only if, the address belongs to
+          an account. The response is identical either way.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/reset-password:
+  post:
+    tags: [Account]
+    operationId: resetPassword
+    summary: Set a new password from a reset link
+    description: |
+      Redeems the emailed token and sets the password on whichever principal the
+      token was issued for. No session is involved: possession of the link is
+      the credential, which is the whole point, since anyone using this endpoint
+      has by definition lost the ability to sign in.
+
+      The token is consumed atomically, so it works exactly once and two
+      concurrent redemptions cannot both succeed. Every failure mode, an unknown
+      token, an expired one, an already-redeemed one, collapses into the same
+      401 with the same wording, so a caller cannot probe which tokens ever
+      existed.
+
+      Success bumps the session epoch, so every session on every device is
+      signed out and the account has to be signed in again with the new
+      password. Unlike `change-password`, nothing is re-issued here, because
+      there was no session to preserve.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AccountResetPasswordRequest' }
+    responses:
+      '200':
+        description: Password set. Every session was signed out; log in again.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          The link is unknown, expired, or already used. The three are
+          deliberately indistinguishable.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/reauth/challenge:
+  post:
+    tags: [Account]
+    operationId: requestReauthCode
+    summary: Send a re-authentication code to your current contact
+    description: |
+      Issues the code that a **passwordless** account presents as `code` when
+      changing its email or phone number.
+
+      Accounts with a password re-authenticate with that password and never need
+      this. Accounts without one still have to prove more than a session, so the
+      code goes to the contact **currently** on file, email preferred and SMS
+      otherwise. Sending it to the current contact rather than the new one is
+      what makes it a re-authentication: it proves the caller still controls the
+      identity the account has today, not merely the one they are trying to
+      move to.
+
+      This is the same challenge engine `POST /api/v1/auth/2fa/challenge` uses,
+      so a code issued by either endpoint is accepted by the other and issuing a
+      new one replaces any code still outstanding.
+
+      Re-requests inside the 60-second cooldown are dropped silently and still
+      answer 200, so the response never reveals whether a message actually went
+      out. The code expires after 10 minutes and dies after 5 wrong guesses.
+    responses:
+      '200':
+        description: |
+          Accepted. A code was sent unless one had just been sent, in which case
+          the request was dropped and the existing code remains valid.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          The account has neither an email address nor a phone number, so there
+          is nowhere to deliver a code. Add a contact first.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/change-email:
+  post:
+    tags: [Account]
+    operationId: requestEmailChange
+    summary: Request a change of email address
+    description: |
+      Step one of two. The new address is parked on the account and a
+      confirmation link is emailed **to the new address**; nothing about the
+      account changes until that link is redeemed.
+
+      The out-of-band step is the point. An email address is a login identifier
+      and the destination for password resets, so letting a session rewrite it
+      directly would turn one borrowed session into permanent ownership of the
+      account. Requiring the link to be opened means the change only lands if
+      the person actually receives mail at the new address, and until then the
+      old address still logs in and still receives resets.
+
+      Re-authentication is required on top of the session: `currentPassword` for
+      accounts that have a password, or the code from
+      `POST /api/v1/auth/reauth/challenge` for accounts that do not. Exactly one
+      of the two, never both.
+
+      The address must be free across **both** the staff and the customer
+      tables, not just the caller's own. The two tables are separate but login
+      resolves an email by checking customers first, so a customer allowed to
+      claim a staff member's address would shadow that staff login entirely.
+      Uniqueness is checked here and checked again at confirmation time, because
+      the address can be taken in between.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AccountChangeEmailRequest' }
+    responses:
+      '200':
+        description: |
+          Parked. The confirmation link is on its way to the new address; the
+          account still uses the old one.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          Failed validation, both or neither re-auth proof was supplied, the new
+          address is the one already on the account, or a password was expected
+          and a code was sent instead.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or the re-authentication failed. A wrong password answers
+          the uniform `Invalid credentials` and counts toward the login lockout;
+          a wrong, expired, or spent code answers the uniform code error.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          Another account already holds that address. The check spans the staff
+          and customer tables, and a soft-deleted account keeps its address, so
+          a closed account still blocks the claim.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429':
+        description: |
+          The failed-attempt budget for this IP is spent, or the account is
+          locked after repeated wrong passwords.
+        headers:
+          Retry-After:
+            description: Seconds to wait before retrying.
+            schema: { type: integer }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/auth/confirm-email-change:
+  post:
+    tags: [Account]
+    operationId: confirmEmailChange
+    summary: Confirm a new email address from the emailed link
+    description: |
+      Step two of two, and **public**. The token emailed to the new address is
+      the credential, exactly as it is for a password reset. That is what lets
+      the link be opened in whatever browser happens to receive the mail, which
+      is often not the one that started the change.
+
+      Redeeming the token applies the parked address, and uniqueness is
+      re-checked across both principal tables first. If someone claimed the
+      address in the meantime, the answer is 409 and the parked change is
+      cleared, so the account is not left stuck pointing at an address it can
+      never have.
+
+      Success bumps the session epoch. Every session, including the one that
+      requested the change, is signed out, and the next sign-in uses the new
+      address. Any outstanding one-time secret is dropped with it, so nothing
+      issued against the old identifier survives.
+
+      The token is single use and expires 30 minutes after the change was
+      requested. Unknown, expired, spent, and no-pending-change all answer the
+      same 401.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccountConfirmEmailChangeRequest'
+    responses:
+      '200':
+        description: |
+          Address updated. All sessions were signed out; log in with the new
+          address.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          The link is unknown, expired, already used, or there is no pending
+          change to apply. All four are reported identically.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          The address was claimed by another account between the request and the
+          confirmation. The pending change has been cleared; start again with a
+          different address.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/change-phone:
+  post:
+    tags: [Account]
+    operationId: requestPhoneChange
+    summary: Request a change of phone number
+    description: |
+      Step one of two, mirroring the email flow. The new number is parked and a
+      six-digit code is texted **to the new number**; the account keeps its
+      current number until that code is confirmed.
+
+      A phone number is a login identifier for passwordless accounts and a
+      two-factor destination for everyone else, so the same reasoning applies:
+      the change only lands once someone demonstrably holds the handset, which
+      keeps a borrowed session from redirecting future codes to an attacker.
+
+      Re-authentication works exactly as it does for an email change,
+      `currentPassword` or the `POST /api/v1/auth/reauth/challenge` code,
+      exactly one of the two.
+
+      The number must be free across both the staff and the customer tables,
+      checked here and re-checked at confirmation time.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AccountChangePhoneRequest' }
+    responses:
+      '200':
+        description: |
+          Parked. A code is on its way to the new number; the account still uses
+          the old one.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          Failed validation, both or neither re-auth proof was supplied, the new
+          number is the one already on the account, or a password was expected
+          and a code was sent instead.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or the re-authentication failed. A wrong password answers
+          the uniform `Invalid credentials` and counts toward the login lockout.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          Another account already holds that number, in either the staff or the
+          customer table.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429':
+        description: |
+          The failed-attempt budget for this IP is spent, or the account is
+          locked after repeated wrong passwords.
+        headers:
+          Retry-After:
+            description: Seconds to wait before retrying.
+            schema: { type: integer }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/auth/confirm-phone-change:
+  post:
+    tags: [Account]
+    operationId: confirmPhoneChange
+    summary: Confirm a new phone number with the texted code
+    description: |
+      Step two of two, and unlike the email confirmation this one **requires the
+      session**. There is a reason for the asymmetry: an emailed link arrives in
+      a browser that may never have been signed in, whereas a texted code is
+      typed back into the app that is already open. The code proves the handset,
+      the session proves the account, and neither alone is enough.
+
+      The code is single use, expires 10 minutes after the change was requested,
+      and dies after 5 wrong guesses, after which the change has to be requested
+      again. Uniqueness is re-checked across both principal tables before the
+      number is applied, and a conflict clears the pending change rather than
+      leaving the account wedged.
+
+      Success bumps the session epoch, so every other device is signed out. As
+      with `change-password`, this response re-issues the caller's cookies at
+      the new epoch, so the browser that completed the change stays signed in.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TwoFactorCodeRequest' }
+    responses:
+      '200':
+        description: |
+          Number updated. Other sessions were signed out; this one was re-issued.
+        headers:
+          Set-Cookie:
+            description: |
+              Replacement `accessToken` and `refreshToken` at the new session
+              epoch.
+            schema: { type: string }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No session, or the code was wrong, expired, already used, or spent by
+          too many wrong guesses, or there is no pending change to confirm. All
+          of these answer identically, so a caller learns nothing from which one
+          it hit.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '409':
+        description: |
+          The number was claimed by another account between the request and the
+          confirmation. The pending change has been cleared.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/2fa/challenge:
+  post:
+    tags: [Account]
+    operationId: requestTwoFactorChallenge
+    summary: Send the code that enables or disables two-factor
+    description: |
+      Issues a six-digit code over the account's own channel, email when there
+      is an address on file and SMS otherwise, and requires a full session.
+
+      The same code gates the flag in **both** directions. Turning two-factor
+      off is as sensitive as turning it on, arguably more so, since it is what
+      an attacker holding a session would want to do first, so disabling
+      demands the same proof of channel possession that enabling does.
+
+      This is the same engine behind `POST /api/v1/auth/reauth/challenge`, so
+      one outstanding code serves either purpose and issuing a new one replaces
+      the previous one.
+
+      Re-requests inside the 60-second cooldown are dropped silently and still
+      answer 200. The code expires after 10 minutes and dies after 5 wrong
+      guesses.
+    responses:
+      '200':
+        description: |
+          Accepted. A code was sent unless one had just been sent, in which case
+          the existing code is still the valid one.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          The account has neither an email address nor a phone number, so a code
+          cannot be delivered and two-factor cannot be used yet.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/2fa/enable:
+  post:
+    tags: [Account]
+    operationId: enableTwoFactor
+    summary: Turn two-factor authentication on
+    description: |
+      Consumes the code from `POST /api/v1/auth/2fa/challenge` and sets the
+      flag. Requiring the code rather than trusting the session means the flag
+      is never switched on for a channel the account cannot actually receive
+      mail or messages at, which would otherwise lock its owner out at the next
+      login.
+
+      From here on, a password login answers with `twoFactorRequired` and a
+      ten-minute pending cookie instead of a session, and the sign-in finishes
+      at `POST /api/v1/auth/2fa/verify`. One-time-code login and Google sign-in
+      are unaffected, because each is already a possession factor in its own
+      right.
+
+      Enabling when it is already on is a 400, not a silent success.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TwoFactorCodeRequest' }
+    responses:
+      '200':
+        description: Two-factor is now on.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          Failed validation, or two-factor is already enabled on this account.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or the code was wrong, expired, already used, or spent by
+          too many wrong guesses. Request a fresh challenge.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/auth/2fa/disable:
+  post:
+    tags: [Account]
+    operationId: disableTwoFactor
+    summary: Turn two-factor authentication off
+    description: |
+      Clears the flag, gated by the same challenge and code that enabling
+      requires. A session on its own cannot switch the protection off, which is
+      exactly the case two-factor exists to cover: whoever borrowed the session
+      still has to receive a message on the account's own channel.
+
+      Any outstanding two-factor codes are dropped along with the flag, so a
+      code issued before it was switched off cannot be replayed against a later
+      re-enable.
+
+      Disabling when it is already off is a 400.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TwoFactorCodeRequest' }
+    responses:
+      '200':
+        description: Two-factor is now off.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400':
+        description: |
+          Failed validation, or two-factor is not enabled on this account.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No session, or the code was wrong, expired, already used, or spent by
+          too many wrong guesses.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }

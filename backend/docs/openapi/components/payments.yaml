@@ -1,0 +1,579 @@
+# Payment domain components: the Paystack checkout handshake, the settled
+# payment record, the signed webhook envelope, and the admin management
+# results. Every amount here is a Money integer in pesewas, which is what lets
+# a stored amount compare byte-for-byte against what Paystack reports.
+
+schemas:
+  PaymentStatus:
+    type: string
+    description: |
+      Lifecycle of a payment row.
+
+      `PENDING` is written the moment a Paystack transaction is initialized.
+      `COMPLETED` is only ever reached through a verified successful charge, or
+      through an administrator recording a manual (cash) settlement.
+      `FAILED` marks a charge Paystack did not settle, or one whose verified
+      amount did not reconcile against the booking total.
+      `REFUNDED` is terminal: nothing moves a refunded payment anywhere else.
+
+      `REFUND_REQUESTED` is the hand-off state. A customer who cancels a
+      booking they had already paid for does not get their money moved by that
+      cancellation; the payment parks here and waits for an administrator to
+      action it through `PATCH /api/v1/payments/{id}/refund`. It is deliberately
+      not accepted by the manual status update, so the only way out of it is the
+      refund endpoint, which keeps the refund decision in one auditable place.
+    enum: [PENDING, COMPLETED, FAILED, REFUNDED, REFUND_REQUESTED]
+    examples: [PENDING]
+
+  PaymentManualStatus:
+    type: string
+    description: |
+      The subset of `PaymentStatus` an administrator may write directly through
+      `PATCH /api/v1/payments/{id}`. `REFUND_REQUESTED` is absent on purpose: it
+      is set only by the customer self-cancel flow and left only by the refund
+      endpoint, so it can never be typed in by hand.
+    enum: [COMPLETED, FAILED, PENDING, REFUNDED]
+    examples: [COMPLETED]
+
+  PaymentMethod:
+    type: string
+    description: |
+      How the money is being taken. The value selects the Paystack channel the
+      checkout page opens on: `BANK_TRANSFER` maps to `bank`, `MOBILE_MONEY` to
+      `mobile_money`, and both card methods to `card`.
+
+      Note where this is validated. The request schema accepts any string, and
+      the whitelist is applied in the service **after** the booking guards, so a
+      request naming an unknown method against a cancelled booking reports the
+      booking problem first. That ordering is part of the contract, not an
+      accident.
+    enum: [CREDIT_CARD, DEBIT_CARD, MOBILE_MONEY, BANK_TRANSFER]
+    examples: [CREDIT_CARD]
+
+  PaymentBookingStatus:
+    type: string
+    description: |
+      The status of the booking this payment belongs to. The booking follows the
+      payment rather than the other way round: settling confirms it, failing or
+      refunding cancels it, and deleting an unsettled payment reverts it to
+      `PENDING`.
+    enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+    examples: [CONFIRMED]
+
+  PaymentCustomerSummary:
+    type: object
+    description: |
+      Just enough of the payer to render a payment row without a second request.
+      Deliberately a slice, not the full customer: nothing about a payment needs
+      the payer's address or profile picture.
+    required: [id, name, email]
+    properties:
+      id: { type: integer, examples: [42] }
+      name: { type: string, examples: [Kofi Mensah] }
+      email:
+        type: [string, 'null']
+        format: email
+        description: |
+          Nullable because a customer may have signed up with a phone number
+          only. Such an account cannot pay online at all: Paystack requires an
+          email on every transaction, so initializing one answers 400 until an
+          email is added to the profile.
+
+  PaymentBookedItem:
+    type: object
+    description: |
+      What the money actually bought, derived from the booking rather than
+      stored on the payment. A booking points at exactly one of a tour, a room,
+      or a flight, and this block flattens whichever it is into a single shape so
+      a client can render a payment list without knowing the three inventory
+      models.
+
+      Resolution order is tour, then room, then flight. A booking with no
+      inventory row attached still yields a well-formed block: `type` reads
+      `TOUR`, `name` reads `Unknown Item`, and `id` carries the booking id, so a
+      client never has to handle a null item.
+    required: [id, name, description, type]
+    properties:
+      id:
+        type: integer
+        description: |
+          Id of the tour, room, or flight. On the fallback block this is the
+          booking id instead, so the value is only meaningful alongside `type`.
+        examples: [12]
+      name:
+        type: string
+        description: |
+          Composed per type: the tour name, `"<hotel> - <room type>"` for a room,
+          or `"<airline> <flight number>"` for a flight.
+        examples: [Cape Coast Castle Day Tour]
+      description:
+        type: [string, 'null']
+        description: |
+          The item description, or for a flight the route as
+          `"<origin> to <destination>"`. Null when the item carries none.
+      type:
+        type: string
+        enum: [TOUR, ROOM, FLIGHT]
+
+  Payment:
+    type: object
+    description: |
+      A payment record as it is served. One payment per booking, enforced by a
+      unique constraint on `bookingId`, so a booking can never accumulate two
+      competing charges.
+
+      Soft-deleted payments are scoped out of every read here, so a deleted
+      payment is indistinguishable from one that never existed. The row itself
+      survives with a tombstone, which is what keeps `transactionReference`
+      unique and therefore still usable as an idempotency key after a delete.
+    required:
+      [
+        id,
+        amount,
+        currency,
+        status,
+        paymentMethod,
+        transactionReference,
+        bookingId,
+        customerId,
+        customer,
+        bookedItem,
+        paymentDate,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      id: { type: integer, examples: [31] }
+      amount:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          What was charged, copied from the booking total at initialization and
+          never recomputed. Because it is an integer in pesewas, it compares
+          exactly against the amount Paystack reports back at verification: the
+          reconciliation check is an integer equality, so no float rounding can
+          make a correct charge look wrong or a wrong one look correct.
+      currency: { $ref: '#/components/schemas/Currency' }
+      status: { $ref: '#/components/schemas/PaymentStatus' }
+      paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+      transactionReference:
+        type: string
+        description: |
+          The Paystack reference for this charge, unique across the table. This
+          is the idempotency key for the whole settlement path: the callback and
+          the webhook both settle **by reference**, so however many times either
+          arrives, the payment transitions at most once.
+
+          A fresh transaction gets `booking_<bookingId>_<epoch millis>`. Resuming
+          a pending payment reuses the reference the row already holds, which is
+          precisely why a resumed checkout cannot produce a second charge to
+          reconcile.
+
+          Empty string on the rare row that has no reference yet.
+        examples: [booking_18_1754300000000]
+      bookingId:
+        type: integer
+        description: Unique across payments, so a booking has at most one payment.
+        examples: [18]
+      customerId:
+        type: integer
+        description: |
+          The payer. Customers are a separate table from staff with an
+          independent id sequence, so this id is only meaningful as a customer
+          id.
+        examples: [42]
+      customer: { $ref: '#/components/schemas/PaymentCustomerSummary' }
+      bookedItem: { $ref: '#/components/schemas/PaymentBookedItem' }
+      paymentDate:
+        type: [string, 'null']
+        format: date-time
+        description: |
+          When the payment settled. Null until it does, and set once by whichever
+          settlement actually transitioned the row, so it records the moment the
+          money was confirmed rather than the moment a duplicate notification
+          arrived.
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  PaymentResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Payment retrieved successfully] }
+      data: { $ref: '#/components/schemas/Payment' }
+
+  PaymentListResponse:
+    type: object
+    description: |
+      A page of payments, newest first by creation time. The rows are already
+      scoped to what the caller may see, so `meta.total` counts the caller's
+      visible rows rather than the whole table.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Payments retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Payment' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  PaymentInitializeRequest:
+    type: object
+    description: |
+      Starts, or resumes, a Paystack checkout for a booking. There is no amount
+      here by design: the charge is always the booking's stored total, so a
+      client cannot propose what it would like to pay.
+    required: [bookingId]
+    properties:
+      bookingId:
+        type: integer
+        minimum: 1
+        description: The booking to pay for. Must exist and must not be cancelled, already paid, or completed.
+        examples: [18]
+      paymentMethod:
+        type: string
+        description: |
+          One of the `PaymentMethod` values. Typed as a plain string here rather
+          than an enum because the whitelist is enforced in the service, after
+          the booking guards, and an unknown value answers 400 with
+          `Invalid payment method` rather than a field-level validation error.
+        examples: [CREDIT_CARD]
+
+  PaymentInitializeResponse:
+    type: object
+    description: |
+      Where to send the payer, plus the identifiers needed to follow the charge
+      afterwards. `message` distinguishes the two cases: `Payment initialized
+      successfully` for a new transaction, `Payment session resumed` when an
+      existing pending payment was re-opened with its original reference.
+    required: [message, data]
+    properties:
+      message:
+        type: string
+        examples: [Payment initialized successfully]
+      data:
+        type: object
+        required: [authorization_url, paymentId, transactionReference]
+        properties:
+          authorization_url:
+            type: string
+            format: uri
+            description: |
+              The Paystack checkout page. Snake-cased, unlike everything else in
+              this API, because it is passed through from Paystack verbatim.
+            examples: ['https://checkout.paystack.com/0peioxfhpn']
+          paymentId:
+            type: integer
+            description: |
+              The local payment row. On a resumed session this is the id of the
+              payment that already existed, not a new one.
+            examples: [31]
+          transactionReference:
+            type: string
+            description: |
+              The reference to quote when verifying, and the key the webhook and
+              the callback both settle on.
+            examples: [booking_18_1754300000000]
+
+  PaymentStatusUpdateRequest:
+    type: object
+    description: |
+      The manual settlement path, for money that did not move through Paystack,
+      typically cash taken in person.
+    properties:
+      status:
+        type: string
+        description: |
+          One of the `PaymentManualStatus` values. Typed as a plain string
+          because the whitelist is applied in the service, after the
+          administrator gate, so a non-administrator sending nonsense is told
+          they may not update the status rather than that the status is invalid.
+        examples: [COMPLETED]
+
+  PaymentStatusUpdateResponse:
+    type: object
+    description: |
+      The payment's new status and the booking status that followed from it, so
+      a client does not need a second request to learn what happened to the
+      booking.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Payment status updated successfully] }
+      data:
+        type: object
+        required: [paymentId, status, bookingStatus, updatedAt]
+        properties:
+          paymentId: { type: integer, examples: [31] }
+          status: { $ref: '#/components/schemas/PaymentManualStatus' }
+          bookingStatus: { $ref: '#/components/schemas/PaymentBookingStatus' }
+          updatedAt: { type: string, format: date-time }
+
+  PaymentRefundRequest:
+    type: object
+    description: |
+      Free-text context for the refund, recorded in the log alongside the amount
+      and the transaction reference. Nothing here influences how much is
+      refunded: the amount is always the full stored payment amount.
+    properties:
+      reason:
+        type: string
+        description: |
+          Optional. An omitted or empty reason is recorded as
+          `No reason provided`, so the audit line always carries something.
+        examples: [Customer request]
+
+  PaymentRefundResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Payment refunded successfully] }
+      data:
+        type: object
+        required: [paymentId, status, bookingStatus, reason, refundAmount, updatedAt]
+        properties:
+          paymentId: { type: integer, examples: [31] }
+          status:
+            type: string
+            const: REFUNDED
+          bookingStatus:
+            type: string
+            const: CANCELLED
+            description: A refund always cancels the booking it paid for.
+          reason:
+            type: string
+            description: The reason as recorded, or `No reason provided`.
+            examples: [Customer request]
+          refundAmount:
+            allOf:
+              - $ref: '#/components/schemas/Money'
+            description: |
+              Always the full payment amount, in pesewas. Partial refunds are not
+              part of this flow, so this echoes `payment.amount` exactly and can
+              be reconciled against the original charge without any arithmetic.
+          updatedAt: { type: string, format: date-time }
+
+  PaymentDeleteResponse:
+    type: object
+    description: |
+      Confirms the soft delete and names the booking that was reverted, since
+      deleting a payment silently changes a second record.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Payment deleted successfully] }
+      data:
+        type: object
+        required: [paymentId, bookingId]
+        properties:
+          paymentId: { type: integer, examples: [31] }
+          bookingId:
+            type: integer
+            description: The booking whose status was reverted to `PENDING`.
+            examples: [18]
+
+  PaymentWebhookEvent:
+    type: object
+    description: |
+      A Paystack event body. Only `charge.success` is acted on; every other
+      event type is acknowledged and otherwise ignored, so Paystack does not
+      retry events this service has no interest in.
+
+      Send the exact bytes Paystack sent. The signature is verified over the raw
+      body, so re-serializing this object before forwarding it will change the
+      byte sequence and the event will be rejected.
+    properties:
+      event:
+        type: string
+        description: Event type. Only `charge.success` triggers settlement.
+        examples: [charge.success]
+      data:
+        type: object
+        properties:
+          reference:
+            type: string
+            description: |
+              The transaction reference. This is the idempotency key: the
+              service settles the payment row holding this reference, and only
+              if it is still unsettled.
+            examples: [booking_18_1754300000000]
+          metadata:
+            type: object
+            description: The metadata echoed back from initialization.
+            properties:
+              bookingId:
+                type: [integer, string]
+                description: |
+                  The booking to confirm. Sent at initialization and returned
+                  untouched by Paystack, so the service never has to guess which
+                  booking a charge belongs to.
+                examples: [18]
+
+  PaymentWebhookAck:
+    type: object
+    description: |
+      The webhook acknowledgement. `Payment verified and booking confirmed` means
+      this delivery is the one that settled the payment. `Event received` covers
+      everything else that is not an error: an event type this service ignores,
+      and, importantly, a duplicate `charge.success` for a payment that was
+      already settled.
+
+      Both are 200s on purpose. Paystack retries anything that is not a 2xx, so
+      answering anything else to a duplicate would guarantee more duplicates.
+    required: [message]
+    properties:
+      message:
+        type: string
+        enum: [Payment verified and booking confirmed, Event received]
+        examples: [Payment verified and booking confirmed]
+
+  PaymentCallbackResponse:
+    type: object
+    description: |
+      **Not the standard `{ message, data }` envelope.** This endpoint predates
+      it and keeps its own `{ message, success, data? }` shape, including on its
+      error replies, which are also not the standard error envelope. Branch on
+      `success`, not on the HTTP status: a verified failure and a successful
+      verification are both 200.
+    required: [message, success]
+    properties:
+      success:
+        type: boolean
+        description: |
+          True only when the charge verified successfully **and** its amount
+          reconciled against the booking total. False for a failed charge, an
+          amount mismatch, a missing reference, or a booking that could not be
+          found.
+      message:
+        type: string
+        description: |
+          `Payment verified successfully`, `Payment verification failed`,
+          `Payment amount does not match booking total price`,
+          `No reference provided`, or `Booking not found`.
+        examples: [Payment verified successfully]
+      data:
+        type: object
+        description: |
+          Present on the three 200 outcomes and absent on the 400 and 404 ones,
+          which is why it is optional here.
+        required: [amount, bookingId, paymentStatus, reference]
+        properties:
+          amount:
+            allOf:
+              - $ref: '#/components/schemas/Money'
+            description: |
+              The amount Paystack reports for the transaction, in pesewas. It is
+              returned unconverted so it can be compared directly against the
+              booking total and the stored payment amount, all three being the
+              same integer minor unit.
+          bookingId: { type: integer, examples: [18] }
+          paymentStatus:
+            type: string
+            enum: [COMPLETED, FAILED]
+            description: |
+              `COMPLETED` when the charge verified and reconciled, `FAILED`
+              otherwise. A mismatch or an unsuccessful charge also writes
+              `FAILED` to the payment row, but only if that row is still
+              `PENDING`, so a stray re-verify can never unsettle money that has
+              already completed or been refunded.
+          reference: { type: string, examples: [booking_18_1754300000000] }
+
+parameters:
+  PaymentId:
+    name: id
+    in: path
+    required: true
+    description: Payment id. Positive integer; anything else fails validation before the handler runs.
+    schema:
+      type: integer
+      minimum: 1
+
+  PaymentCustomerId:
+    name: customerId
+    in: path
+    required: true
+    description: Customer id. Positive integer.
+    schema:
+      type: integer
+      minimum: 1
+
+  PaymentStatusFilter:
+    name: status
+    in: query
+    required: false
+    description: Restrict to one payment status.
+    schema: { $ref: '#/components/schemas/PaymentStatus' }
+
+  PaymentMethodFilter:
+    name: paymentMethod
+    in: query
+    required: false
+    description: Restrict to one payment method.
+    schema: { $ref: '#/components/schemas/PaymentMethod' }
+
+  PaymentCustomerIdFilter:
+    name: customerId
+    in: query
+    required: false
+    description: |
+      Restrict to one payer. Honoured for `ADMIN` only. An `AGENT` sending it is
+      not refused, the filter is simply not applied, which is the long-standing
+      rule that agents may see every payment but may not slice the table by
+      owner. A `CUSTOMER` is already scoped to their own rows, so it changes
+      nothing for them.
+    schema:
+      type: integer
+      minimum: 1
+
+  PaymentReference:
+    name: reference
+    in: query
+    required: true
+    description: |
+      The Paystack transaction reference to verify. Paystack appends it to the
+      redirect itself, so a browser arriving from checkout already carries it.
+    schema:
+      type: string
+
+responses:
+  PaymentInvalidSignature:
+    description: |
+      The `x-paystack-signature` header was missing, or did not match an HMAC of
+      the raw request body.
+
+      **This is not the standard JSON error envelope.** The body is the plain
+      text `Invalid signature`, with no `status`, `message`, or `requestId`, and
+      the content type is text rather than JSON. Nothing is written and no event
+      is processed.
+    content:
+      text/plain:
+        schema:
+          type: string
+          const: Invalid signature
+
+  PaymentCallbackBadRequest:
+    description: |
+      No `reference` in the query string, or the verified transaction carried no
+      `bookingId` in its metadata so there is nothing to confirm.
+
+      Uses the callback's own `{ message, success: false }` shape, not the
+      standard error envelope, so there is no `requestId` in the body here.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/PaymentCallbackResponse' }
+        example:
+          message: No reference provided
+          success: false
+
+  PaymentCallbackNotFound:
+    description: |
+      The metadata named a booking that does not exist, or has been
+      soft-deleted. Uses the callback's own `{ message, success: false }` shape
+      rather than the standard error envelope.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/PaymentCallbackResponse' }
+        example:
+          message: Booking not found
+          success: false

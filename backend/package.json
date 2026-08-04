@@ -28,6 +28,7 @@
     "studio": "node --env-file .env ./node_modules/.bin/prisma studio",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "docs:check": "tsx scripts/check-openapi.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -39,6 +40,7 @@
   "license": "ISC",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@readme/openapi-parser": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
@@ -50,6 +52,7 @@
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "8.20.0",
     "@types/supertest": "^7.2.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^9.31.0",
     "eslint-plugin-perfectionist": "^5.9.1",
     "prettier": "^3.6.2",
@@ -87,6 +90,8 @@
     "pino-pretty": "^13.1.1",
     "prisma": "7.8.0",
     "rate-limit-redis": "^6.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   }
 }

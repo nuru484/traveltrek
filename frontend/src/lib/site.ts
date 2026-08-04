@@ -8,6 +8,17 @@ export const siteUrl = (
   process.env.NEXT_PUBLIC_BASE_URL || "https://traveltrek.manuru.dev"
 ).replace(/\/$/, "");
 
+/**
+ * The API's own reference page, served by the backend rather than this app.
+ * Derived from the same NEXT_PUBLIC_SERVER_URI the data layer uses, so a
+ * preview deployment links to its own backend's docs instead of production's.
+ * Empty when the backend URL is not configured, which lets callers hide the
+ * link rather than render one that goes nowhere.
+ */
+export const apiDocsUrl = process.env.NEXT_PUBLIC_SERVER_URI
+  ? `${process.env.NEXT_PUBLIC_SERVER_URI.replace(/\/$/, "")}/api/docs`
+  : "";
+
 export const siteConfig = {
   name: "Travel Trek",
   /** Full home-page title (the layout template's `default`). */

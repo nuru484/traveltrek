@@ -1,0 +1,168 @@
+# Root of the OpenAPI document.
+#
+# This file holds only the document-level keys. `paths` and `components` are
+# assembled from docs/openapi/paths/*.yaml and docs/openapi/components/*.yaml
+# by src/docs/openapi.ts, so every $ref in this spec is an internal one
+# (#/components/...) and the served document needs no external resolution.
+openapi: 3.1.0
+
+info:
+  title: Travel Trek API
+  version: 1.0.0
+  summary: Booking platform for tours, hotels, flights, and payments.
+  description: |
+    Travel Trek is a production booking system. Customers browse and book
+    tours, hotel rooms, and flights, pay through Paystack, and review the
+    trips they actually took. Staff manage the inventory, the bookings, and
+    the money behind it.
+
+    This document covers every HTTP endpoint the service exposes.
+
+    ## Authentication
+
+    Sessions are httpOnly cookies, not bearer tokens. A successful login sets
+    `accessToken` and `refreshToken`, and no token is ever returned in a
+    response body. Because the cookies are httpOnly, JavaScript cannot read or
+    set them, which removes the usual XSS token-theft path. Cross-origin
+    callers must send `credentials: 'include'`; an `Authorization` header is
+    never read.
+
+    **To try the API from this page:** call `POST /api/v1/auth/demo-login` with
+    a role of `ADMIN`, `AGENT`, or `CUSTOMER`. The browser stores the session
+    cookie and every other endpoint on this page becomes authenticated. There
+    is no token to paste into the Authorize dialog, and none is needed.
+
+    Demo login is gated by a server-side flag and answers 403 where it is
+    switched off. On a deployment with it disabled, sign in through
+    `POST /api/v1/auth/login` instead; the effect on this page is the same.
+
+    Access tokens carry a `tokenVersion` claim that is re-checked against the
+    live value on every request, so revoking a session takes effect
+    immediately rather than at token expiry.
+
+    ## Two kinds of principal
+
+    Staff and customers live in **separate tables** with independent id
+    sequences, and contact uniqueness is enforced across both, so a public
+    signup can never shadow a staff login. A token carries a `kind` of `staff`
+    or `customer` alongside its role.
+
+    Roles are `ADMIN`, `AGENT`, and `CUSTOMER`. Route middleware enforces the
+    role; per-record ownership rules (your own booking, your own profile, your
+    own review) are enforced in the service layer, so an endpoint that admits
+    `CUSTOMER` still only ever returns that customer's rows.
+
+    ## Money
+
+    **Every amount is an integer in minor units (pesewas), never a float and
+    never a decimal string.** A tour priced at GH₵ 1,250.00 is `125000`. This
+    holds from the database column through the API to the Paystack charge, so
+    amounts compare exactly and no rounding error can accumulate anywhere in
+    the payment path. Clients format at the edge; nothing upstream divides.
+
+    ## Response envelope
+
+    Successful responses are `{ "message": string, "data": ... }`. List
+    endpoints add `"meta"` with pagination counts, and a few reports add
+    `"summary"`. Action endpoints with nothing to return send only a
+    `message`.
+
+    Errors are uniform and come from a single handler:
+
+    ```json
+    {
+      "status": "error",
+      "message": "Validation Error",
+      "requestId": "3f1c9d2e-...",
+      "details": { "errors": [{ "field": "email", "message": "Invalid email address" }] }
+    }
+    ```
+
+    `status`, `message`, and `requestId` are always present. `requestId` is
+    echoed in the `X-Request-Id` response header, so a user-reported failure
+    can be traced to the exact log line.
+
+    Two fields are **environment-dependent and must not be relied on by
+    clients**: `code` and `errorId` appear outside production only. `details`
+    is returned in every environment for validation failures, where it names
+    each field that failed, and outside production for other errors carrying
+    context. In production a 500 has its message replaced with
+    `Internal Server Error`.
+
+    ## Pagination
+
+    List endpoints take `page` (default 1) and `limit` (default 10, maximum
+    100). `totalPages` is at least 1, so an empty list still reports a
+    coherent single page.
+
+  contact:
+    name: Nurudeen Abdul-Majeed
+    url: https://manuru.dev
+    email: abdulmajeednurudeen48@gmail.com
+  license:
+    name: ISC
+    url: https://opensource.org/license/isc-license-txt
+
+externalDocs:
+  description: Source on GitHub
+  url: https://github.com/nuru484/traveltrek
+
+servers:
+  # Relative on purpose: the docs are served by the API itself, so this
+  # resolves to whichever deployment you are reading, and "Try it out" is
+  # always same-origin, which is what lets the session cookie ride along.
+  - url: /
+    description: This deployment
+  - url: http://localhost:3000
+    description: Local development
+
+# Every operation requires a session cookie unless it overrides this with
+# `security: []` (public) or names a different scheme.
+security:
+  - sessionCookie: []
+
+tags:
+  - name: Health
+    description: Liveness and readiness probes. Unauthenticated, and outside the versioned API.
+  - name: Auth
+    description: |
+      Registration, login, and session lifecycle for both staff and customers.
+      Supports password login, one-time code login with no password, Google
+      sign-in, and optional two-factor.
+  - name: Account
+    description: |
+      Changing your own password, email, or phone. Contact changes are
+      confirmed out of band before the new value becomes a login identifier.
+  - name: Public
+    description: |
+      The unauthenticated browse surface behind the landing page and the live
+      demo board. Read-only, and the only endpoints in the service that need
+      no session.
+  - name: Payments
+    description: |
+      Paystack checkout, the signed webhook that settles a booking, and the
+      refund path. Amounts are integer pesewas throughout.
+  - name: Bookings
+    description: Reservations against a tour, a hotel room, or a flight, and their cancellation.
+  - name: Tours
+    description: Guided tour inventory, with guest capacity and status tracking.
+  - name: Destinations
+    description: The country and city hubs that tours, hotels, and flights hang off.
+  - name: Hotels
+    description: Hotel inventory.
+  - name: Rooms
+    description: Room inventory and per-night availability within a hotel.
+  - name: Flights
+    description: Flight inventory, seat counts, and live status.
+  - name: Users
+    description: Staff accounts. Administrators manage the roster.
+  - name: Customers
+    description: Customer accounts and their booking and payment history.
+  - name: Reviews
+    description: |
+      Verified reviews. A customer may only review a trip they actually took,
+      one review per booking, and staff moderate what gets published.
+  - name: Dashboard
+    description: Aggregated figures for the signed-in principal, widening for staff.
+  - name: Reports
+    description: Filtered reporting over bookings, payments, tours, and agent activity.

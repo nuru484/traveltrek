@@ -1,0 +1,171 @@
+# Request bodies for the account-management half of /auth: setting a password,
+# recovering one, and moving the email or phone that an account logs in with.
+#
+# Nothing here returns an account object. Every one of these operations answers
+# with the shared MessageResponse, because the interesting effect is on the
+# server (a parked pending contact, a bumped session epoch, a code in flight)
+# rather than in the body.
+
+schemas:
+  AccountChangePasswordRequest:
+    type: object
+    description: |
+      Two shapes in one, and which one applies is decided by the account rather
+      than by the caller.
+
+      An account that already has a password must send `currentPassword`;
+      sending it wrong is refused with the same uniform 401 login gives and
+      feeds the same lockout counter, so a borrowed session cannot grind for
+      the password here any faster than it could at `/auth/login`.
+
+      An account that has never had one (a minimal signup, a Google sign-in, or
+      a staff account an admin created) must **omit** `currentPassword`. Sending
+      it anyway is a 400 rather than an ignored field, because silently
+      accepting a value that was never checked would look like a verification
+      that did not happen.
+    required: [newPassword]
+    properties:
+      currentPassword:
+        type: string
+        format: password
+        minLength: 1
+        maxLength: 255
+        description: |
+          Required when the account has a password, forbidden when it does not.
+          The password hash never leaves the server, so a client that does not
+          already know which case it is in learns it from the 400 and retries
+          with the other shape.
+      newPassword:
+        type: string
+        format: password
+        minLength: 4
+        maxLength: 255
+        examples: [BrandNew9!]
+
+  AccountForgotPasswordRequest:
+    type: object
+    description: |
+      The email to send a reset link to. Resolved against customers first and
+      then staff, matching login precedence, so either kind of principal can
+      recover an account through this one endpoint.
+    required: [email]
+    properties:
+      email:
+        type: string
+        format: email
+        maxLength: 255
+        examples: [ama@traveltrek.test]
+
+  AccountResetPasswordRequest:
+    type: object
+    description: |
+      The token from the emailed link plus the password to set. The token is
+      the only credential: it is single use, expires 30 minutes after issue, and
+      records which principal it was issued for, so no session and no account
+      identifier is needed alongside it.
+    required: [password, token]
+    properties:
+      password:
+        type: string
+        format: password
+        minLength: 4
+        maxLength: 255
+      token:
+        type: string
+        minLength: 1
+        description: |
+          The 64-character value from the `?token=` query parameter of the reset
+          link. Only its hash is stored server-side, so a leaked database does
+          not hand an attacker usable links.
+        examples: ['9f2c1ab4e7d5...']
+
+  AccountReauthProof:
+    type: object
+    description: |
+      The re-authentication half of a contact change, shared by
+      `POST /api/v1/auth/change-email` and `POST /api/v1/auth/change-phone`.
+
+      Exactly one of `currentPassword` or `code` must be present. Sending both,
+      or neither, is a 400 at the boundary, so the proof that was actually
+      checked is never ambiguous.
+
+      Which one an account has to use is server state, not a choice. An account
+      with a password must send `currentPassword`. A passwordless account must
+      first call `POST /api/v1/auth/reauth/challenge`, which sends a code to the
+      contact **currently** on file, and send that as `code`. Either way the
+      caller has to prove something the session alone does not prove, which is
+      what stops a borrowed session from quietly redirecting the login
+      identifier to an address the attacker controls.
+    properties:
+      currentPassword:
+        type: string
+        format: password
+        minLength: 1
+        maxLength: 255
+        description: |
+          For accounts that have a password. A wrong value answers the uniform
+          `Invalid credentials` 401 and increments the login failure counter,
+          and five failures lock the account for 15 minutes.
+      code:
+        allOf:
+          - $ref: '#/components/schemas/SixDigitCode'
+        description: |
+          For passwordless accounts. The code most recently sent by
+          `POST /api/v1/auth/reauth/challenge` to the contact already on file.
+          Five wrong guesses kill the code outright, so it has to be re-issued.
+
+  AccountChangeEmailRequest:
+    description: |
+      A re-authentication proof plus the address to move to. The new address is
+      only parked at this point: the account keeps its current email until the
+      link sent to the new address is redeemed.
+    allOf:
+      - $ref: '#/components/schemas/AccountReauthProof'
+      - type: object
+        required: [newEmail]
+        properties:
+          newEmail:
+            type: string
+            format: email
+            maxLength: 255
+            description: |
+              Must differ from the address on file, and must not be held by any
+              other account in either the staff or the customer table. It is
+              checked here for early feedback and checked again when the
+              confirmation link is redeemed, because the address can be claimed
+              by someone else in between.
+            examples: [new-address@traveltrek.test]
+
+  AccountConfirmEmailChangeRequest:
+    type: object
+    description: |
+      The token from the confirmation email. Like a reset link, this token is
+      the credential in its own right, which is what makes possession of the new
+      mailbox the thing being proved.
+    required: [token]
+    properties:
+      token:
+        type: string
+        minLength: 1
+        description: |
+          The value from the `?token=` query parameter of the confirmation link.
+          Single use, and it expires 30 minutes after the change was requested.
+        examples: ['1d4f8c02b6ae...']
+
+  AccountChangePhoneRequest:
+    description: |
+      A re-authentication proof plus the number to move to. As with email, the
+      number is parked until a code texted to it is confirmed.
+    allOf:
+      - $ref: '#/components/schemas/AccountReauthProof'
+      - type: object
+        required: [newPhone]
+        properties:
+          newPhone:
+            type: string
+            pattern: '^\+?[0-9]{10,15}$'
+            description: |
+              Must differ from the number on file, and must not be held by any
+              other account in either principal table. Re-checked when the code
+              is confirmed, for the same reason the email address is.
+            examples: ['+233550771122']

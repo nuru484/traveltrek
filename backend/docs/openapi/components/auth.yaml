@@ -1,0 +1,218 @@
+schemas:
+  StaffAccount:
+    type: object
+    description: |
+      A staff principal. Lives in the `User` table, separate from customers,
+      with its own id sequence.
+    required: [id, name, email, role, createdAt, updatedAt]
+    properties:
+      id:
+        type: integer
+        description: |
+          Unique within the staff table only. Staff and customers have
+          independent id sequences, so an id is meaningful only alongside the
+          principal kind.
+        examples: [7]
+      name: { type: string, examples: [Ama Boateng] }
+      email: { type: string, format: email, examples: [ama@traveltrek.test] }
+      phone:
+        type: [string, 'null']
+        examples: ['+233201234567']
+      address:
+        type: [string, 'null']
+      profilePicture:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when none has been uploaded.
+      role:
+        type: string
+        enum: [ADMIN, AGENT]
+        description: Staff hold ADMIN or AGENT. CUSTOMER is never a staff role.
+      twoFactorEnabled: { type: boolean }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  CustomerAccount:
+    type: object
+    description: |
+      A customer principal. Lives in the `Customer` table. Contact uniqueness
+      is enforced across both tables, so a public signup can never claim an
+      address a staff account already uses, and therefore can never shadow a
+      staff login.
+    required: [id, name, role, createdAt, updatedAt]
+    properties:
+      id:
+        type: integer
+        examples: [42]
+      name: { type: string, examples: [Kofi Mensah] }
+      email:
+        type: [string, 'null']
+        format: email
+        description: |
+          Nullable because signup accepts an email **or** a phone number. At
+          least one of the two is always present.
+      phone:
+        type: [string, 'null']
+        examples: ['+233241112222']
+      address:
+        type: [string, 'null']
+      profilePicture:
+        type: [string, 'null']
+        format: uri
+      role:
+        type: string
+        const: CUSTOMER
+      twoFactorEnabled: { type: boolean }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  Principal:
+    description: |
+      The signed-in account. The password hash and token version are stripped
+      before serialization and never appear on the wire.
+    oneOf:
+      - $ref: '#/components/schemas/StaffAccount'
+      - $ref: '#/components/schemas/CustomerAccount'
+
+  SessionResponse:
+    type: object
+    description: |
+      A completed sign-in. The tokens are not here: they are set as httpOnly
+      cookies on this response and the body carries only the account.
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Login successful] }
+      data: { $ref: '#/components/schemas/Principal' }
+
+  TwoFactorRequiredResponse:
+    type: object
+    description: |
+      The password was correct but the account has two-factor enabled. No
+      session cookie is set; a ten-minute pending cookie is set instead, and
+      the flow continues at `POST /api/v1/auth/2fa/verify`.
+    required: [message, data]
+    properties:
+      message: { type: string }
+      data:
+        type: object
+        required: [twoFactorRequired]
+        properties:
+          twoFactorRequired:
+            type: boolean
+            const: true
+
+  LoginRequest:
+    type: object
+    required: [email, password]
+    properties:
+      email:
+        type: string
+        format: email
+        description: |
+          Resolved against staff and customers alike, so both principal types
+          sign in through this one endpoint.
+        examples: [ama@traveltrek.test]
+      password:
+        type: string
+        format: password
+        examples: [Passw0rd!]
+
+  DemoLoginRequest:
+    type: object
+    required: [role]
+    properties:
+      role:
+        type: string
+        enum: [ADMIN, AGENT, CUSTOMER]
+        description: |
+          Which seeded demo account to sign in as. `ADMIN` and `AGENT` resolve
+          a staff account, `CUSTOMER` a customer one. No credentials cross the
+          wire; the server holds them.
+        examples: [ADMIN]
+
+  RegisterRequest:
+    type: object
+    description: |
+      Public signup. Always creates a **customer**: there is no role concept on
+      the public surface, and a `role` key in the body is stripped rather than
+      honored, so this endpoint cannot mint staff.
+    required: [name]
+    properties:
+      name: { type: string, examples: [Kofi Mensah] }
+      email:
+        type: string
+        format: email
+        description: Provide this or `phone`. At least one is required.
+      phone:
+        type: string
+        description: Provide this or `email`. At least one is required.
+        examples: ['+233241112222']
+      password:
+        type: string
+        format: password
+        description: |
+          Optional. Omitting it creates a passwordless account that signs in
+          with a one-time code, which is why the phone-only path works at all.
+      address: { type: string }
+      profilePicture:
+        type: string
+        format: binary
+        description: |
+          Sent as a file part under `multipart/form-data`. Uploaded to
+          Cloudinary and replaced by its URL before the account is written.
+
+  OtpRequestBody:
+    type: object
+    description: |
+      Exactly one of `email` or `phone`. Sending both is a validation error
+      rather than a silent preference, so the delivery channel is never
+      ambiguous.
+    properties:
+      email: { type: string, format: email }
+      phone: { type: string, examples: ['+233241112222'] }
+
+  OtpVerifyRequest:
+    type: object
+    required: [code]
+    properties:
+      code: { $ref: '#/components/schemas/SixDigitCode' }
+      email: { type: string, format: email }
+      phone: { type: string, examples: ['+233241112222'] }
+
+  SixDigitCode:
+    type: string
+    pattern: '^\d{6}$'
+    description: Six digits. Single use, and expires shortly after issue.
+    examples: ['418302']
+
+  TwoFactorCodeRequest:
+    type: object
+    required: [code]
+    properties:
+      code: { $ref: '#/components/schemas/SixDigitCode' }
+
+  GoogleSignInRequest:
+    type: object
+    required: [idToken]
+    properties:
+      idToken:
+        type: string
+        minLength: 1
+        description: |
+          The ID token from Google Identity Services, verified server-side
+          against Google's keys. The client never asserts who the user is.
+
+  TwoFactorStatusResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string }
+      data:
+        type: object
+        required: [enabled, channel]
+        properties:
+          enabled: { type: boolean }
+          channel:
+            type: [string, 'null']
+            enum: [email, sms, null]
+            description: Where a code would be delivered, or null when two-factor is off.

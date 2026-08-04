@@ -49,6 +49,11 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/prisma ./prisma
 COPY prisma.config.ts ./
 COPY docker-entrypoint.sh ./
+# The OpenAPI spec is read from disk at boot, not compiled into build/, so the
+# image needs the YAML itself. Without it the app throws on startup rather than
+# quietly serving docs-less: that is deliberate, since a reference that half
+# exists is worse than one that refuses to boot.
+COPY docs ./docs
 
 RUN chmod +x docker-entrypoint.sh && chown -R node:node /app
 USER node

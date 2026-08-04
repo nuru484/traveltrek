@@ -1,0 +1,1011 @@
+# Components for the Reviews and Reports domains.
+#
+# Reviews are verified: a review hangs off ONE completed booking, and the
+# thing being reviewed (tour, room, or flight) is derived from that booking
+# rather than stored on the review, which is why every review carries a
+# `target` block instead of a target id.
+#
+# Reports share one period vocabulary (startDate/endDate, month, year) and one
+# envelope quirk: their aggregates sit in `data.summary`, nested inside the
+# payload, not in the envelope-level `summary` key that `sendSuccess` also
+# supports. Nothing in this domain sets that envelope key.
+
+schemas:
+  ReviewStatus:
+    type: string
+    description: |
+      Moderation state. `PUBLISHED` is the default a review is created with,
+      so a customer's review is live immediately; `HIDDEN` is what an
+      administrator flips it to. Only `PUBLISHED`, non-deleted reviews reach
+      the unauthenticated browse surface and the star averages on tours,
+      hotels, and flights, so hiding a review retroactively changes those
+      aggregates.
+    enum: [PUBLISHED, HIDDEN]
+
+  ReviewTargetTour:
+    type: object
+    required: [id, name, type]
+    properties:
+      type: { type: string, const: TOUR }
+      id: { type: integer, examples: [12] }
+      name: { type: string, examples: [Cape Coast Heritage Tour] }
+
+  ReviewTargetRoom:
+    type: object
+    description: |
+      A hotel stay. The id is the **room** id, with the hotel carried
+      alongside, because the booking reserved a room and the rating rolls up
+      to the hotel through it.
+    required: [hotel, id, roomType, type]
+    properties:
+      type: { type: string, const: ROOM }
+      id: { type: integer, examples: [31] }
+      roomType: { type: string, examples: [Deluxe Double] }
+      hotel:
+        type: object
+        required: [id, name]
+        properties:
+          id: { type: integer, examples: [4] }
+          name: { type: string, examples: [Labadi Beach Hotel] }
+
+  ReviewTargetFlight:
+    type: object
+    required: [airline, flightNumber, id, type]
+    properties:
+      type: { type: string, const: FLIGHT }
+      id: { type: integer, examples: [88] }
+      airline: { type: string, examples: [Africa World Airlines] }
+      flightNumber: { type: string, examples: [AW302] }
+
+  ReviewTarget:
+    description: |
+      What the reviewed booking was for, resolved from the booking's relations
+      at read time. A review has no target columns of its own: a booking is
+      always exactly one of a tour, a room, or a flight, so the target is
+      derived rather than duplicated and can never drift from the booking it
+      describes. Discriminate on `type`.
+    oneOf:
+      - $ref: '#/components/schemas/ReviewTargetTour'
+      - $ref: '#/components/schemas/ReviewTargetRoom'
+      - $ref: '#/components/schemas/ReviewTargetFlight'
+
+  Review:
+    type: object
+    description: |
+      A review as seen by its author or by staff. The reviewer is identified
+      by id and display name only; nothing else about the customer is exposed
+      here, and the public browse surface trims this further to the display
+      name alone.
+    required:
+      [bookingId, comment, createdAt, customer, id, rating, status, target, title, updatedAt]
+    properties:
+      id: { type: integer, examples: [501] }
+      bookingId:
+        type: integer
+        description: |
+          The reviewed booking. Unique across reviews: one booking can carry
+          at most one review, which is what makes a review verifiable rather
+          than repeatable.
+        examples: [1204]
+      rating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        description: Whole stars, 1 to 5. Halves are rejected at the boundary.
+        examples: [4]
+      title:
+        type: [string, 'null']
+        maxLength: 120
+        examples: [Wonderful]
+      comment:
+        type: [string, 'null']
+        maxLength: 2000
+        examples: [Everything was perfect.]
+      status: { $ref: '#/components/schemas/ReviewStatus' }
+      target: { $ref: '#/components/schemas/ReviewTarget' }
+      customer:
+        type: object
+        description: The reviewer, reduced to what a review card needs.
+        required: [id, name]
+        properties:
+          id: { type: integer, examples: [42] }
+          name: { type: string, examples: [Kofi Mensah] }
+      createdAt:
+        type: string
+        format: date-time
+        description: |
+          Also the clock the 30-day edit window runs from, so a client can
+          compute locally whether editing is still open.
+      updatedAt: { type: string, format: date-time }
+
+  ReviewCreateRequest:
+    type: object
+    description: |
+      Names the booking being reviewed, never the tour, room, or flight. The
+      target is read off the booking, which is precisely what prevents a
+      review of something the reviewer never bought.
+    required: [bookingId, rating]
+    properties:
+      bookingId:
+        type: integer
+        minimum: 1
+        description: |
+          Must be a booking owned by the caller and in `COMPLETED` status, and
+          must not already carry a review.
+        examples: [1204]
+      rating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        examples: [4]
+      title:
+        type: string
+        maxLength: 120
+        description: Optional. Trimmed before storage.
+        examples: [Wonderful]
+      comment:
+        type: string
+        maxLength: 2000
+        description: Optional. Trimmed before storage.
+        examples: [Everything was perfect.]
+
+  ReviewUpdateRequest:
+    type: object
+    description: |
+      Every field is optional and omitted fields are left untouched, so a
+      client can send just the field the user changed. The booking cannot be
+      re-pointed: a review stays attached to the trip it was written about.
+    properties:
+      rating:
+        type: integer
+        minimum: 1
+        maximum: 5
+        examples: [3]
+      title:
+        type: string
+        maxLength: 120
+      comment:
+        type: string
+        maxLength: 2000
+        examples: [Updated thoughts.]
+
+  ReviewStatusRequest:
+    type: object
+    description: The moderation flip. The only field an administrator may change on a review.
+    required: [status]
+    properties:
+      status: { $ref: '#/components/schemas/ReviewStatus' }
+
+  ReviewResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Review created successfully] }
+      data: { $ref: '#/components/schemas/Review' }
+
+  ReviewListResponse:
+    type: object
+    description: A page of reviews, newest first.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Reviews retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Review' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  # ---- Reports ----
+
+  ReportPeriod:
+    type: object
+    description: |
+      The window the report was computed over, echoed back so a dashboard can
+      label its own chart without re-deriving what it asked for.
+
+      `startDate` and `endDate` are the client's raw strings and are **absent
+      from the JSON entirely** when they were not sent, rather than null.
+      `month` is null when no month was requested. `year` is always present:
+      when the client sends none, the server's current year is filled in, so
+      every report is date-bounded whether or not the caller said so.
+    required: [month, year]
+    properties:
+      year: { type: integer, examples: [2026] }
+      month:
+        type: [integer, 'null']
+        minimum: 1
+        maximum: 12
+        examples: [3]
+      startDate:
+        type: string
+        description: Present only when the caller sent it. Echoed verbatim, unparsed.
+        examples: ['2026-04-01']
+      endDate:
+        type: string
+        description: Present only when the caller sent it. Echoed verbatim, unparsed.
+        examples: ['2026-04-30']
+
+  ReportTrend:
+    type: object
+    description: |
+      One KPI's movement against the equal-length window immediately before
+      this one, so a March report compares with February and a full-year
+      report with the year before.
+
+      `percentage` is the **absolute** size of the change to two decimals and
+      is never negative; the sign lives in `direction`. When the previous
+      window had no activity at all there is no meaningful denominator, so any
+      activity now reads as `up` 100 and no activity reads as `flat` 0.
+    required: [direction, percentage]
+    properties:
+      direction:
+        type: string
+        enum: [up, down, flat]
+      percentage:
+        type: number
+        minimum: 0
+        examples: [50]
+
+  ReportMonthKey:
+    type: string
+    pattern: '^\d{4}-\d{2}$'
+    description: |
+      A calendar month bucket, `YYYY-MM`, derived in UTC from the row's date.
+    examples: ['2026-03']
+
+  ReportMeanAmount:
+    type: number
+    minimum: 0
+    description: |
+      An **average** amount in minor units (pesewas). It is the one place in
+      the API where a money value is not the integer `Money` schema: a mean of
+      integers rarely is one. Treat it as pesewas with a fraction, format it
+      at the edge, and never feed it back into a write, where only `Money` is
+      accepted.
+    examples: [45000.5]
+
+  ReportAmountCount:
+    type: object
+    description: A count of rows and the pesewas they add up to.
+    required: [amount, count]
+    properties:
+      amount: { $ref: '#/components/schemas/Money' }
+      count: { type: integer, minimum: 0, examples: [2] }
+
+  ReportRecentBooking:
+    type: object
+    description: |
+      A booking in the ordinary booking DTO shape, produced by the same mapper
+      the Bookings endpoints use, so a client already rendering a booking card
+      renders these unchanged. Only the fields a report view reads are pinned
+      here; the full shape is documented under the `Bookings` tag.
+    properties:
+      id: { type: integer, examples: [1204] }
+      type:
+        type: string
+        enum: [TOUR, ROOM, FLIGHT]
+        description: Which of `tour`, `room`, or `flight` is populated; the other two are null.
+      status:
+        type: string
+        enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+      totalPrice: { $ref: '#/components/schemas/Money' }
+      bookingDate: { type: string, format: date-time }
+      customerId: { type: integer, examples: [42] }
+    additionalProperties: true
+
+  ReportSelfSummary:
+    type: object
+    required:
+      [averageBookingValue, cancelledBookings, period, totalSpent, totalTrips, upcomingTrips]
+    properties:
+      totalTrips:
+        type: integer
+        minimum: 0
+        description: Bookings in the period that reached `COMPLETED`, so trips actually taken.
+        examples: [1]
+      upcomingTrips:
+        type: integer
+        minimum: 0
+        description: |
+          `PENDING` or `CONFIRMED` bookings whose trip start is still in the
+          future. The start is the tour's start date, or the flight's
+          departure, or the stay's start date, whichever applies, so a booking
+          made long ago for next month still counts as upcoming.
+        examples: [2]
+      cancelledBookings: { type: integer, minimum: 0, examples: [1] }
+      totalSpent:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Only `COMPLETED` payments dated inside the period. Money that is
+          pending, failed, or refunded is deliberately excluded, so this is
+          what the customer actually paid, not what they were billed.
+      averageBookingValue:
+        allOf:
+          - $ref: '#/components/schemas/ReportMeanAmount'
+        description: |
+          Mean booking value over the period's bookings, to two decimals, and
+          0 when there were none.
+      period: { $ref: '#/components/schemas/ReportPeriod' }
+
+  ReportSelfReport:
+    type: object
+    description: The authenticated customer's own travel activity for the period.
+    required: [byType, monthlySpend, recentBookings, summary]
+    properties:
+      summary: { $ref: '#/components/schemas/ReportSelfSummary' }
+      byType:
+        type: object
+        description: |
+          Booking count and booked value per item type. A type with no
+          bookings in the period has **no key at all** rather than a zeroed
+          one, so iterate the object rather than indexing it blindly.
+        propertyNames:
+          enum: [TOUR, ROOM, FLIGHT]
+        additionalProperties: { $ref: '#/components/schemas/ReportAmountCount' }
+      monthlySpend:
+        type: array
+        description: |
+          Chronological month buckets, **zero-filled across the whole window**,
+          so a year report always returns 12 entries and a chart never has to
+          invent the empty months. `amount` counts `COMPLETED` payments made
+          that month; `bookings` counts bookings made that month, which is why
+          a month can show bookings with no spend.
+        items:
+          type: object
+          required: [amount, bookings, month]
+          properties:
+            month: { $ref: '#/components/schemas/ReportMonthKey' }
+            amount: { $ref: '#/components/schemas/Money' }
+            bookings: { type: integer, minimum: 0 }
+      recentBookings:
+        type: array
+        maxItems: 5
+        description: The five newest bookings in the period, for a preview list.
+        items: { $ref: '#/components/schemas/ReportRecentBooking' }
+
+  ReportSelfResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Your travel report retrieved successfully] }
+      data: { $ref: '#/components/schemas/ReportSelfReport' }
+
+  ReportAgentActivitySummary:
+    type: object
+    required:
+      [bookingsRecorded, customersServed, pendingFromRecorded, period, revenueFromRecorded]
+    properties:
+      bookingsRecorded:
+        type: integer
+        minimum: 0
+        description: |
+          Bookings in the period that this staff member recorded on a
+          customer's behalf. Scoped by who created the booking, not by who it
+          belongs to, so a customer's self-service booking never lands in an
+          agent's numbers.
+        examples: [3]
+      customersServed:
+        type: integer
+        minimum: 0
+        description: Distinct customers among those bookings.
+        examples: [2]
+      revenueFromRecorded:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          The `COMPLETED` payments attached to those bookings. Booked value
+          that has not been paid is excluded here and surfaces in
+          `pendingFromRecorded` instead.
+      pendingFromRecorded:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Pipeline value, the booked total of recorded bookings still
+          `PENDING`.
+      period: { $ref: '#/components/schemas/ReportPeriod' }
+
+  ReportAgentActivity:
+    type: object
+    description: One staff member's recorded-booking activity for the period.
+    required: [monthly, recentBookings, summary]
+    properties:
+      summary: { $ref: '#/components/schemas/ReportAgentActivitySummary' }
+      monthly:
+        type: array
+        description: |
+          Chronological month buckets, zero-filled across the whole window, so
+          a year report always returns 12 entries. `revenue` counts only the
+          `COMPLETED` payments of that month's recorded bookings, which is why
+          a month can show bookings against zero revenue.
+        items:
+          type: object
+          required: [bookings, month, revenue]
+          properties:
+            month: { $ref: '#/components/schemas/ReportMonthKey' }
+            bookings: { type: integer, minimum: 0 }
+            revenue: { $ref: '#/components/schemas/Money' }
+      recentBookings:
+        type: array
+        maxItems: 5
+        description: The five newest bookings this staff member recorded in the period.
+        items: { $ref: '#/components/schemas/ReportRecentBooking' }
+
+  ReportAgentActivityResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Agent activity report retrieved successfully] }
+      data: { $ref: '#/components/schemas/ReportAgentActivity' }
+
+  ReportBookingRow:
+    type: object
+    description: |
+      A booking row as the monthly summary selects it: enough to render a
+      table, not the full booking DTO.
+    required: [bookingDate, customer, id, status, totalPrice, tour]
+    properties:
+      id: { type: integer, examples: [1204] }
+      bookingDate: { type: string, format: date-time }
+      status:
+        type: string
+        enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+      totalPrice: { $ref: '#/components/schemas/Money' }
+      customer:
+        type: object
+        required: [email, id, name]
+        properties:
+          id: { type: integer, examples: [42] }
+          name: { type: string, examples: [Kofi Mensah] }
+          email:
+            type: [string, 'null']
+            format: email
+            description: Null for a customer who signed up with a phone number only.
+      tour:
+        type: [object, 'null']
+        description: Null when the booking was for a room or a flight rather than a tour.
+        required: [id, name]
+        properties:
+          id: { type: integer }
+          name: { type: string }
+
+  ReportBookingsMonthlySummary:
+    type: object
+    required: [averageBookingValue, period, totalBookings, totalRevenue, trends]
+    properties:
+      totalBookings: { type: integer, minimum: 0, examples: [3] }
+      totalRevenue:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Booked value, the sum of `totalPrice` over every matching booking.
+          This is not settled money: a booking counts here the moment it
+          exists, whatever its payment says. Use the payments summary for
+          revenue that was actually collected.
+      averageBookingValue:
+        allOf:
+          - $ref: '#/components/schemas/ReportMeanAmount'
+        description: Booked value divided by booking count, to two decimals, and 0 when empty.
+      trends:
+        type: object
+        description: Each KPI against the equal-length previous window.
+        required: [averageBookingValue, totalBookings, totalRevenue]
+        properties:
+          totalBookings: { $ref: '#/components/schemas/ReportTrend' }
+          totalRevenue: { $ref: '#/components/schemas/ReportTrend' }
+          averageBookingValue: { $ref: '#/components/schemas/ReportTrend' }
+      period: { $ref: '#/components/schemas/ReportPeriod' }
+
+  ReportBookingsMonthly:
+    type: object
+    required: [bookings, monthlyBreakdown, statusBreakdown, summary]
+    properties:
+      summary: { $ref: '#/components/schemas/ReportBookingsMonthlySummary' }
+      monthlyBreakdown:
+        type: array
+        description: |
+          One entry per month that actually had a booking, in first-appearance
+          order. Unlike the self reports these buckets are **not** zero-filled,
+          so a quiet month is simply missing and a chart has to fill its own
+          gaps.
+        items:
+          type: object
+          required: [averageValue, bookingCount, month, revenue]
+          properties:
+            month: { $ref: '#/components/schemas/ReportMonthKey' }
+            bookingCount: { type: integer, minimum: 0 }
+            revenue: { $ref: '#/components/schemas/Money' }
+            averageValue:
+              allOf:
+                - $ref: '#/components/schemas/ReportMeanAmount'
+              description: Unrounded, unlike the two-decimal summary average.
+      statusBreakdown:
+        type: object
+        description: |
+          Booking count per status, restricted to statuses present in the
+          period. A status with no bookings has no key rather than a zero.
+        propertyNames:
+          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+        additionalProperties: { type: integer, minimum: 0 }
+        examples:
+          - { CONFIRMED: 2, PENDING: 1 }
+      bookings:
+        type: array
+        maxItems: 10
+        description: |
+          A sample of at most ten matching bookings, for a preview table. It
+          is a slice of the matched set in database order, not a ranked or
+          paginated list, so do not present it as "the latest ten".
+        items: { $ref: '#/components/schemas/ReportBookingRow' }
+
+  ReportBookingsMonthlyResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Monthly bookings summary retrieved successfully] }
+      data: { $ref: '#/components/schemas/ReportBookingsMonthly' }
+
+  ReportPaymentRow:
+    type: object
+    required:
+      [amount, booking, currency, customer, id, paymentDate, paymentMethod, status,
+       transactionReference]
+    properties:
+      id: { type: integer, examples: [77] }
+      amount: { $ref: '#/components/schemas/Money' }
+      currency: { $ref: '#/components/schemas/Currency' }
+      status:
+        type: string
+        enum: [PENDING, COMPLETED, FAILED, REFUNDED, REFUND_REQUESTED]
+      paymentMethod:
+        type: string
+        enum: [CREDIT_CARD, DEBIT_CARD, MOBILE_MONEY, BANK_TRANSFER]
+      paymentDate:
+        type: [string, 'null']
+        format: date-time
+        description: |
+          Null until the charge settles. An undated payment still counts in
+          the status and method breakdowns but cannot land in a month bucket,
+          so the month totals can be smaller than `totalPayments`.
+      transactionReference:
+        type: [string, 'null']
+        description: The Paystack reference, absent for payments recorded outside the gateway.
+      customer:
+        type: object
+        required: [email, id, name]
+        properties:
+          id: { type: integer }
+          name: { type: string }
+          email: { type: [string, 'null'], format: email }
+      booking:
+        type: object
+        required: [id, totalPrice, tour]
+        properties:
+          id: { type: integer }
+          totalPrice: { $ref: '#/components/schemas/Money' }
+          tour:
+            type: [object, 'null']
+            description: Null when the paid booking was for a room or a flight.
+            required: [id, name]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+
+  ReportPaymentsSummaryBlock:
+    type: object
+    required:
+      [currency, failedAmount, pendingAmount, period, refundedAmount, totalPayments,
+       totalRevenue, trends]
+    properties:
+      currency:
+        allOf:
+          - $ref: '#/components/schemas/Currency'
+        description: |
+          Echo of the currency the report filtered on. Every amount below is
+          in this currency's minor units, which is why the filter is always
+          applied rather than optional: mixing currencies would make the sums
+          meaningless.
+      totalPayments:
+        type: integer
+        minimum: 0
+        description: Rows matched, every status included.
+        examples: [3]
+      totalRevenue:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          `COMPLETED` payments only. This is money actually collected, and it
+          is the figure to trust over the bookings report's booked value.
+      pendingAmount:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Charges started but not settled.
+      failedAmount:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Charges the gateway rejected.
+      refundedAmount:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Money already returned. Refunds still awaiting an administrator sit
+          in `REFUND_REQUESTED` and are counted in neither this nor
+          `totalRevenue`, so a requested refund is visible only through
+          `statusBreakdown`.
+      trends:
+        type: object
+        description: Each KPI against the equal-length previous window.
+        required:
+          [failedAmount, pendingAmount, refundedAmount, totalPayments, totalRevenue]
+        properties:
+          totalRevenue: { $ref: '#/components/schemas/ReportTrend' }
+          totalPayments: { $ref: '#/components/schemas/ReportTrend' }
+          pendingAmount: { $ref: '#/components/schemas/ReportTrend' }
+          failedAmount: { $ref: '#/components/schemas/ReportTrend' }
+          refundedAmount: { $ref: '#/components/schemas/ReportTrend' }
+      period: { $ref: '#/components/schemas/ReportPeriod' }
+
+  ReportPaymentsSummary:
+    type: object
+    required:
+      [methodBreakdown, monthlyBreakdown, recentPayments, statusBreakdown, summary]
+    properties:
+      summary: { $ref: '#/components/schemas/ReportPaymentsSummaryBlock' }
+      statusBreakdown:
+        type: object
+        description: |
+          Amount and count per payment status, restricted to statuses present
+          in the period. Absent keys mean no rows, not zero.
+        propertyNames:
+          enum: [PENDING, COMPLETED, FAILED, REFUNDED, REFUND_REQUESTED]
+        additionalProperties: { $ref: '#/components/schemas/ReportAmountCount' }
+      methodBreakdown:
+        type: object
+        description: Amount and count per payment method, restricted the same way.
+        propertyNames:
+          enum: [CREDIT_CARD, DEBIT_CARD, MOBILE_MONEY, BANK_TRANSFER]
+        additionalProperties: { $ref: '#/components/schemas/ReportAmountCount' }
+      monthlyBreakdown:
+        type: array
+        description: |
+          One entry per month with at least one dated payment, not zero-filled.
+          `count` counts every dated payment in the month whatever its status,
+          while `revenue` counts only the `COMPLETED` ones, so a month with
+          traffic and no settlement reports a count against zero revenue.
+        items:
+          type: object
+          required: [count, month, revenue]
+          properties:
+            month: { $ref: '#/components/schemas/ReportMonthKey' }
+            count: { type: integer, minimum: 0 }
+            revenue: { $ref: '#/components/schemas/Money' }
+      recentPayments:
+        type: array
+        maxItems: 10
+        description: |
+          The ten matching payments with the latest `paymentDate`, newest
+          first. Undated payments sort last.
+        items: { $ref: '#/components/schemas/ReportPaymentRow' }
+
+  ReportPaymentsSummaryResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Payments summary retrieved successfully] }
+      data: { $ref: '#/components/schemas/ReportPaymentsSummary' }
+
+  ReportTopTour:
+    type: object
+    description: The tour fields the ranking carries, enough to render a leaderboard row.
+    required:
+      [description, destination, duration, endDate, id, maxGuests, name, price, startDate,
+       status, type]
+    properties:
+      id: { type: integer, examples: [12] }
+      name: { type: string, examples: [Cape Coast Heritage Tour] }
+      description: { type: [string, 'null'] }
+      type:
+        type: string
+        enum: [ADVENTURE, CULTURAL, BEACH, CITY, WILDLIFE, CRUISE]
+      status:
+        type: string
+        enum: [UPCOMING, ONGOING, COMPLETED, CANCELLED]
+      duration: { type: integer, description: Days., examples: [5] }
+      price: { $ref: '#/components/schemas/Money' }
+      maxGuests: { type: integer, examples: [20] }
+      startDate: { type: string, format: date-time }
+      endDate: { type: string, format: date-time }
+      destination:
+        type: object
+        required: [city, country, id, name]
+        properties:
+          id: { type: integer }
+          name: { type: string, examples: [Cape Coast] }
+          country: { type: string, examples: [Ghana] }
+          city: { type: [string, 'null'], examples: [Cape Coast] }
+
+  ReportTopTourEntry:
+    type: object
+    required: [statistics, tour]
+    properties:
+      tour: { $ref: '#/components/schemas/ReportTopTour' }
+      statistics:
+        type: object
+        description: Counted over the tour's bookings **inside the period only**.
+        required: [confirmedBookings, totalBookings, totalRevenue]
+        properties:
+          totalBookings:
+            type: integer
+            minimum: 0
+            description: The ranking key. Ties keep database order.
+            examples: [3]
+          confirmedBookings:
+            type: integer
+            minimum: 0
+            description: The subset in `CONFIRMED` status.
+            examples: [2]
+          totalRevenue:
+            allOf:
+              - $ref: '#/components/schemas/Money'
+            description: |
+              Booked value of those bookings, every status included, so a
+              cancelled booking still contributes here.
+
+  ReportTopToursSummary:
+    type: object
+    description: |
+      Totals over **every** tour the filters matched, not just the ones that
+      made the list. `limit` and `minBookings` trim the list, so these totals
+      stay larger and give the ranking a denominator.
+    required:
+      [filters, period, totalBookingsAnalyzed, totalRevenueAnalyzed, totalToursAnalyzed]
+    properties:
+      totalToursAnalyzed: { type: integer, minimum: 0, examples: [3] }
+      totalBookingsAnalyzed: { type: integer, minimum: 0, examples: [4] }
+      totalRevenueAnalyzed: { $ref: '#/components/schemas/Money' }
+      filters:
+        type: object
+        description: |
+          Echo of the ranking filters as they were applied, defaults included.
+          `tourStatus` and `tourType` are absent from the JSON when they were
+          not sent rather than null, matching the period echo.
+        required: [limit, minBookings]
+        properties:
+          limit: { type: integer, minimum: 1, maximum: 20, examples: [10] }
+          minBookings: { type: integer, minimum: 0, examples: [1] }
+          tourStatus:
+            type: string
+            enum: [UPCOMING, ONGOING, COMPLETED, CANCELLED]
+          tourType:
+            type: string
+            enum: [ADVENTURE, CULTURAL, BEACH, CITY, WILDLIFE, CRUISE]
+      period: { $ref: '#/components/schemas/ReportPeriod' }
+
+  ReportTopTours:
+    type: object
+    required: [summary, topTours]
+    properties:
+      summary: { $ref: '#/components/schemas/ReportTopToursSummary' }
+      topTours:
+        type: array
+        description: |
+          Tours with at least `minBookings` bookings in the period, ordered by
+          booking count descending and capped at `limit`. Empty when nothing
+          clears the threshold.
+        items: { $ref: '#/components/schemas/ReportTopTourEntry' }
+
+  ReportTopToursResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message:
+        type: string
+        description: Carries the size of the returned list, which may be 0.
+        examples: [Top 2 tours by booking count retrieved successfully]
+      data: { $ref: '#/components/schemas/ReportTopTours' }
+
+parameters:
+  ReviewId:
+    name: id
+    in: path
+    required: true
+    description: The review's id. Coerced and range-checked before any handler runs.
+    schema:
+      type: integer
+      minimum: 1
+
+  ReviewStatusFilter:
+    name: status
+    in: query
+    required: false
+    description: |
+      Restrict to one moderation state. Omit it to see published and hidden
+      reviews together, which is the moderation queue's default view.
+    schema: { $ref: '#/components/schemas/ReviewStatus' }
+
+  ReviewRatingFilter:
+    name: rating
+    in: query
+    required: false
+    description: Exact star count, not a minimum. Use it to pull the one-star complaints.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 5
+
+  ReportYear:
+    name: year
+    in: query
+    required: false
+    description: |
+      Calendar year, bounded to 2020 through 2030 because the platform has no
+      data outside that span and an unbounded year is almost always a typo.
+      When omitted the server's current year is used, so a report is always
+      date-bounded and never scans the whole table.
+    schema:
+      type: integer
+      minimum: 2020
+      maximum: 2030
+
+  ReportMonth:
+    name: month
+    in: query
+    required: false
+    description: |
+      Month of `year`, 1 to 12. Ignored when an explicit `startDate` and
+      `endDate` pair is sent, which takes precedence over it.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 12
+
+  ReportStartDate:
+    name: startDate
+    in: query
+    required: false
+    description: |
+      Inclusive window start, ISO 8601 date or date-time. **Only honoured
+      together with `endDate`**: one half of a range on its own is silently
+      ignored and the report falls back to the year or year-and-month window.
+      No maximum span is enforced, so a multi-year range is accepted and will
+      simply be slower.
+    schema:
+      type: string
+    examples:
+      date:
+        value: '2026-04-01'
+      dateTime:
+        value: '2026-04-01T00:00:00Z'
+
+  ReportEndDate:
+    name: endDate
+    in: query
+    required: false
+    description: |
+      Inclusive window end, ISO 8601 date or date-time. Interpreted as the
+      instant itself, so a bare date means midnight at the start of that day,
+      not the end of it. Only honoured together with `startDate`.
+    schema:
+      type: string
+    examples:
+      date:
+        value: '2026-04-30'
+
+  ReportCustomerId:
+    name: customerId
+    in: query
+    required: false
+    description: Restrict the report to one customer.
+    schema:
+      type: integer
+      minimum: 1
+
+  ReportTourId:
+    name: tourId
+    in: query
+    required: false
+    description: Restrict the report to bookings of one tour.
+    schema:
+      type: integer
+      minimum: 1
+
+  ReportBookingStatus:
+    name: status
+    in: query
+    required: false
+    description: |
+      Restrict to one booking status. Note that this narrows the whole report,
+      so `statusBreakdown` then contains that single status.
+    schema:
+      type: string
+      enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+
+  ReportPaymentStatus:
+    name: status
+    in: query
+    required: false
+    description: |
+      Restrict to one payment status. The summary still reports every status
+      bucket, so filtering to `FAILED` leaves `totalRevenue` at 0 by
+      construction.
+    schema:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED, REFUNDED, REFUND_REQUESTED]
+
+  ReportPaymentMethod:
+    name: paymentMethod
+    in: query
+    required: false
+    schema:
+      type: string
+      enum: [CREDIT_CARD, DEBIT_CARD, MOBILE_MONEY, BANK_TRANSFER]
+
+  ReportCurrency:
+    name: currency
+    in: query
+    required: false
+    description: |
+      ISO 4217 code, exactly three letters. Defaults to `GHS` and is **always**
+      applied as a filter rather than left open, because summing amounts across
+      currencies would produce a number that means nothing.
+    schema:
+      type: string
+      minLength: 3
+      maxLength: 3
+      default: GHS
+
+  ReportUserId:
+    name: userId
+    in: query
+    required: false
+    description: |
+      Whose activity to report on. **ADMIN only.** An agent that sends any
+      other staff member's id is refused; sending their own id is accepted and
+      is the same as omitting it. Omitted, the report covers the caller.
+    schema:
+      type: integer
+      minimum: 1
+
+  ReportTopToursLimit:
+    name: limit
+    in: query
+    required: false
+    description: |
+      How many tours the ranking returns, 1 to 20, default 10. This caps the
+      list only: the `summary` totals still cover every tour the filters
+      matched.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 20
+      default: 10
+
+  ReportMinBookings:
+    name: minBookings
+    in: query
+    required: false
+    description: |
+      Minimum bookings in the period for a tour to appear in the list, default
+      1, which is what keeps never-booked tours out of a "top tours" board.
+      Pass 0 to include them.
+    schema:
+      type: integer
+      minimum: 0
+      default: 1
+
+  ReportTourStatus:
+    name: tourStatus
+    in: query
+    required: false
+    description: Restrict the analyzed set of tours to one lifecycle status.
+    schema:
+      type: string
+      enum: [UPCOMING, ONGOING, COMPLETED, CANCELLED]
+
+  ReportTourType:
+    name: tourType
+    in: query
+    required: false
+    description: Restrict the analyzed set of tours to one category.
+    schema:
+      type: string
+      enum: [ADVENTURE, CULTURAL, BEACH, CITY, WILDLIFE, CRUISE]

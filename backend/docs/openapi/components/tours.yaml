@@ -1,0 +1,567 @@
+# Tour and destination components.
+#
+# Destinations are the country/city hubs that tours, hotels and flights hang
+# off, and a tour is dated, priced inventory sold against one of them. The two
+# are documented together because a tour cannot exist without a destination
+# and a destination cannot be deleted while one still points at it.
+#
+# Three fields on a tour are derived and never accepted from a client:
+# `duration` (recomputed from the date range), `guestsBooked` (moved only by
+# the booking transaction) and `status` (moved only by the status endpoint).
+# They appear on every tour response and on no request body.
+
+schemas:
+  TourType:
+    type: string
+    description: |
+      What kind of trip this is. Purely descriptive: the type drives browsing
+      and filtering and has no effect on pricing, capacity, or the status
+      lifecycle.
+    enum: [ADVENTURE, CULTURAL, BEACH, CITY, WILDLIFE, CRUISE]
+    examples: [ADVENTURE]
+
+  TourStatus:
+    type: string
+    description: |
+      Where the tour sits in its lifecycle. A new tour is always `UPCOMING`,
+      and only `PATCH /api/v1/tours/{id}/status` moves it from there.
+
+      `UPCOMING` is the only bookable state alongside `ONGOING`, and the
+      unauthenticated browse surface shows exactly those two. `COMPLETED` is
+      terminal. `CANCELLED` can be reversed back to `UPCOMING`, but only while
+      the start date is still in the future.
+    enum: [UPCOMING, ONGOING, COMPLETED, CANCELLED]
+    examples: [UPCOMING]
+
+  TourDestinationSummary:
+    type: object
+    description: |
+      The destination a tour runs to, embedded on every tour response so a
+      list can be rendered without a second round trip per row. Four fields
+      only: the full destination record is at
+      `GET /api/v1/destinations/{id}`.
+    required: [id, name, country]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Volta Region] }
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        examples: [Ho]
+
+  TourRatingSummary:
+    type: object
+    description: |
+      Aggregate of the tour's **published** reviews. Reviews awaiting
+      moderation are excluded, so this figure only ever reflects what a
+      visitor can actually read.
+
+      Computed with one aggregate query across the whole page rather than a
+      lookup per row, which is why a list of fifty tours still costs two
+      queries.
+    required: [average, count]
+    properties:
+      average:
+        type: [number, 'null']
+        description: |
+          Mean rating to one decimal place, or null when the tour has no
+          published reviews. Null rather than 0, because an unrated tour is
+          not a badly rated one.
+        examples: [4.5]
+      count:
+        type: integer
+        minimum: 0
+        examples: [12]
+
+  Tour:
+    type: object
+    description: |
+      A tour as returned by every tour read and by create and update.
+
+      `duration`, `guestsBooked` and `status` are server-owned. `duration` is
+      recomputed whenever either date moves, `guestsBooked` is moved only by
+      the booking transaction, and `status` is moved only by the status
+      endpoint. Sending any of them in a request body has no effect.
+    required:
+      - id
+      - name
+      - type
+      - status
+      - duration
+      - price
+      - maxGuests
+      - guestsBooked
+      - startDate
+      - endDate
+      - destination
+      - rating
+      - createdAt
+      - updatedAt
+    properties:
+      id: { type: integer, examples: [17] }
+      name: { type: string, examples: [Volta Highlands Trek] }
+      description:
+        type: [string, 'null']
+        examples: [Seven days across the Volta highlands]
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: |
+          Cover image URL, or null when the tour has none. Normally a
+          Cloudinary URL minted by the upload pipeline, but a client that
+          supplied its own URL instead gets that value back unchanged.
+      type: { $ref: '#/components/schemas/TourType' }
+      status: { $ref: '#/components/schemas/TourStatus' }
+      duration:
+        type: integer
+        minimum: 1
+        description: |
+          Whole days between the start and end dates, partial days rounded up.
+          Derived, never client-supplied: a body that sends `duration` is
+          simply ignored, so the number can never disagree with the dates.
+        examples: [7]
+      price:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Price per guest, in integer pesewas.
+      maxGuests:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        description: Capacity. An update may not push this below `guestsBooked`.
+        examples: [12]
+      guestsBooked:
+        type: integer
+        minimum: 0
+        description: |
+          Seats already claimed. Moved only by the booking transaction, which
+          increments it with a conditional write that lands only while the
+          result stays within `maxGuests`, so two concurrent bookings cannot
+          both pass an earlier read-then-check and oversell the tour.
+          Cancelling a booking decrements it. No endpoint in this domain sets
+          it.
+        examples: [4]
+      startDate: { type: string, format: date-time }
+      endDate:
+        type: string
+        format: date-time
+        description: |
+          Always after `startDate`. Completing a tour snaps this to the moment
+          of completion, so a tour that ran long does not keep advertising a
+          date it did not actually end on.
+      destination: { $ref: '#/components/schemas/TourDestinationSummary' }
+      rating: { $ref: '#/components/schemas/TourRatingSummary' }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  TourStatusSummary:
+    type: object
+    description: |
+      The slimmer shape returned by the status endpoint. It carries the fields
+      a status change can affect (the status itself, and the end date, which
+      completing a tour snaps to now) plus enough identity to update a row in
+      place. Nothing else about the tour can change through that endpoint, so
+      nothing else is returned.
+    required: [id, name, status, startDate, endDate, destination]
+    properties:
+      id: { type: integer, examples: [17] }
+      name: { type: string, examples: [Volta Highlands Trek] }
+      status: { $ref: '#/components/schemas/TourStatus' }
+      startDate: { type: string, format: date-time }
+      endDate: { type: string, format: date-time }
+      destination: { $ref: '#/components/schemas/TourDestinationSummary' }
+
+  TourCreateRequest:
+    type: object
+    description: |
+      Everything needed to open a tour for sale. The destination must already
+      exist and must not be soft-deleted, which is checked before the insert
+      rather than left to the foreign key, so the refusal is a clean 404
+      instead of a database error.
+
+      `duration` is derived from the dates and `status` always starts at
+      `UPCOMING`, so neither is accepted here. Capacity is `maxGuests` alone:
+      `guestsBooked` belongs to the booking path.
+
+      Numbers are coerced from strings, because under `multipart/form-data`
+      every field arrives as text. `"12"` and `12` are both accepted for
+      `maxGuests`.
+    required: [name, type, destinationId, price, maxGuests, startDate, endDate]
+    properties:
+      name:
+        type: string
+        minLength: 3
+        maxLength: 200
+        description: Trimmed before length is checked.
+        examples: [Volta Highlands Trek]
+      description:
+        type: string
+        maxLength: 5000
+      type: { $ref: '#/components/schemas/TourType' }
+      destinationId:
+        type: integer
+        minimum: 1
+        description: |
+          The destination this tour runs to. A missing or soft-deleted
+          destination answers 404: a soft-deleted hub cannot host new
+          inventory.
+        examples: [3]
+      price:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: |
+          Price per guest in integer pesewas, capped at 1,000,000,000 (GH₵ 10
+          million). `0` is allowed, which is how a complimentary trip is
+          listed.
+      maxGuests:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        examples: [12]
+      startDate:
+        type: string
+        format: date-time
+        description: |
+          Must be in the future at the moment of creation. Any value the
+          runtime can parse as a date is accepted, so a plain `2027-03-01`
+          works as well as a full timestamp.
+        examples: ['2027-03-01']
+      endDate:
+        type: string
+        format: date-time
+        description: Must be strictly after `startDate`.
+        examples: ['2027-03-08']
+      tourPhoto:
+        type: string
+        description: |
+          Typed as a plain string rather than a file because the request is
+          validated before the image is uploaded. Under
+          `multipart/form-data` the picture arrives as the `tourPhoto` **file
+          part**, which validation never sees; the Cloudinary middleware then
+          writes the resulting URL into this same field before the row is
+          written. Under JSON there is no file at all and this is simply a URL
+          the client already holds.
+
+          Either way the column ends up holding a string, and a create that is
+          then refused reclaims the freshly uploaded image rather than
+          orphaning it on Cloudinary.
+        format: uri
+        examples: ['https://example.com/tour.jpg']
+
+  TourUpdateRequest:
+    type: object
+    description: |
+      Every field is optional and omitted fields are left untouched, so
+      despite the `PUT` this is a merge rather than a replacement. It is a
+      `PUT` because the resource is addressed directly and the write is
+      idempotent, not because the body has to be complete.
+
+      Editing is only possible while the tour is still entirely in the future.
+      A tour that has already started or already ended is frozen, because its
+      dates and price are what its bookings were sold against.
+
+      `status` is not accepted here: lifecycle moves go through
+      `PATCH /api/v1/tours/{id}/status`, which enforces the transition rules.
+    properties:
+      name:
+        type: string
+        minLength: 3
+        maxLength: 200
+      description:
+        type: string
+        maxLength: 5000
+      type: { $ref: '#/components/schemas/TourType' }
+      destinationId:
+        type: integer
+        minimum: 1
+        description: |
+          Moving a tour to another destination is refused once it has
+          bookings, since the trip those customers bought would no longer be
+          the trip on file. Sending the destination it already has is always
+          fine.
+      price:
+        allOf:
+          - $ref: '#/components/schemas/Money'
+        description: Price per guest, in integer pesewas.
+      maxGuests:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        description: |
+          May not be lowered below the tour's current `guestsBooked`. The
+          refusal names the current figure, so a client can show the minimum
+          capacity that is still allowed.
+      startDate:
+        type: string
+        format: date-time
+        description: Must still be in the future, and before the resulting end date.
+      endDate:
+        type: string
+        format: date-time
+        description: |
+          Must still be in the future, and after the resulting start date.
+          Sending one date is enough: the other is taken from the stored row
+          and the ordering is checked against it. `duration` is recomputed
+          whenever either moves.
+      tourPhoto:
+        type: string
+        description: |
+          Three distinct meanings, which is why this cannot be a file type.
+
+          Omitted leaves the existing photo alone. A `multipart/form-data`
+          file part uploads a new image and replaces the field with its URL,
+          after which the previous image is deleted from Cloudinary. An empty
+          string is the explicit remove signal: the column is set to null and
+          the old image is reclaimed.
+
+          A refused update also reclaims the image it had just uploaded, so a
+          rejected request never leaves a stray file behind.
+        examples: ['https://example.com/tour.jpg']
+
+  TourStatusUpdateRequest:
+    type: object
+    description: |
+      The single field the lifecycle endpoint accepts. The transition is
+      validated against the tour's current status, its dates, and the state of
+      its payments, so a value that is legal here can still be refused as a
+      transition.
+    required: [status]
+    properties:
+      status: { $ref: '#/components/schemas/TourStatus' }
+
+  TourResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Tour retrieved successfully] }
+      data: { $ref: '#/components/schemas/Tour' }
+
+  TourListResponse:
+    type: object
+    description: The standard paginated envelope, one page of tours.
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Tours retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Tour' }
+      meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+  TourStatusUpdateResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Tour status updated successfully] }
+      data: { $ref: '#/components/schemas/TourStatusSummary' }
+
+  Destination:
+    type: object
+    description: |
+      A country and city hub. Tours, hotels and flights all reference one, so
+      a destination is a shared root rather than a per-domain lookup table,
+      which is why deleting one is guarded rather than cascading.
+    required: [id, name, country, createdAt, updatedAt]
+    properties:
+      id: { type: integer, examples: [3] }
+      name: { type: string, examples: [Volta Region] }
+      description:
+        type: [string, 'null']
+      country: { type: string, examples: [Ghana] }
+      city:
+        type: [string, 'null']
+        description: Optional, because a destination can be a whole country.
+        examples: [Ho]
+      photo:
+        type: [string, 'null']
+        format: uri
+        description: Cloudinary URL, or null when none has been uploaded.
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+
+  DestinationCreateRequest:
+    type: object
+    description: |
+      A new hub. Uniqueness is on the whole place rather than the name alone:
+      the name is compared case-insensitively against the country, and against
+      the city too when one is given, so `Accra, Ghana` and `Accra, Nigeria`
+      can coexist while a second `Accra, Ghana` cannot.
+
+      Country and city accept letters, spaces, hyphens and apostrophes only.
+      That rules out digits and punctuation in a field that exists to be
+      matched against other place names.
+    required: [name, country]
+    properties:
+      name:
+        type: string
+        minLength: 2
+        maxLength: 100
+        description: Trimmed before length is checked. No character restriction.
+        examples: [Volta Region]
+      description:
+        type: string
+        maxLength: 1000
+      country:
+        type: string
+        minLength: 2
+        maxLength: 100
+        pattern: "^[a-zA-Z\\s\\-']+$"
+        examples: [Ghana]
+      city:
+        type: string
+        maxLength: 100
+        pattern: "^[a-zA-Z\\s\\-']+$"
+        examples: [Ho]
+      destinationPhoto:
+        type: string
+        description: |
+          Typed as a plain string for the same reason the tour photo is: the
+          body is validated before the image is uploaded. Under
+          `multipart/form-data` the picture arrives as the `destinationPhoto`
+          **file part**, and the Cloudinary middleware writes the resulting URL
+          into this field before the row is written. Under JSON it is simply a
+          URL the client already holds.
+
+          A create that is then refused, by the uniqueness guard for instance,
+          reclaims the freshly uploaded image.
+        format: uri
+
+  DestinationUpdateRequest:
+    type: object
+    description: |
+      Every field is optional, but **at least one must be present**. An empty
+      body is refused rather than treated as a no-op, so a client that lost
+      its form state finds out instead of believing it saved something.
+
+      Renaming re-runs the uniqueness check, comparing against the stored
+      country and city when the request does not send them, so a rename cannot
+      collide with a place that already exists.
+    properties:
+      name:
+        type: string
+        minLength: 2
+        maxLength: 100
+      description:
+        type: string
+        maxLength: 1000
+      country:
+        type: string
+        minLength: 2
+        maxLength: 100
+        pattern: "^[a-zA-Z\\s\\-']+$"
+      city:
+        type: string
+        maxLength: 100
+        pattern: "^[a-zA-Z\\s\\-']+$"
+      destinationPhoto:
+        type: string
+        description: |
+          Omitted leaves the existing photo alone, a file part replaces it and
+          deletes the previous image, and an empty string is the explicit
+          remove signal that nulls the column and reclaims the old image. A
+          refused update reclaims whatever it had just uploaded.
+
+          Because the file never passes through the validated body, an upload
+          on its own still counts as the one field an update needs.
+
+  DestinationResponse:
+    type: object
+    required: [message, data]
+    properties:
+      message: { type: string, examples: [Destination retrieved successfully] }
+      data: { $ref: '#/components/schemas/Destination' }
+
+  DestinationListMeta:
+    description: |
+      The standard pagination block, plus an echo of the filters that produced
+      this page. The echo exists so a client rendering from a shared link can
+      show what is currently applied without re-parsing the query string.
+      Filters that were not sent are absent rather than null.
+    allOf:
+      - $ref: '#/components/schemas/PaginationMeta'
+      - type: object
+        properties:
+          filters:
+            type: object
+            properties:
+              city: { type: string }
+              country: { type: string }
+              search: { type: string }
+              sortBy: { type: string }
+              sortOrder: { type: string, enum: [asc, desc] }
+
+  DestinationListResponse:
+    type: object
+    required: [message, data, meta]
+    properties:
+      message: { type: string, examples: [Destinations retrieved successfully] }
+      data:
+        type: array
+        items: { $ref: '#/components/schemas/Destination' }
+      meta: { $ref: '#/components/schemas/DestinationListMeta' }
+
+parameters:
+  TourIdPath:
+    name: id
+    in: path
+    required: true
+    description: |
+      The tour's numeric id. Validated and coerced before any handler runs, so
+      a non-numeric value is a 400 rather than a 404.
+    schema:
+      type: integer
+      minimum: 1
+    example: 17
+
+  DestinationIdPath:
+    name: id
+    in: path
+    required: true
+    description: The destination's numeric id. Coerced and validated at the boundary.
+    schema:
+      type: integer
+      minimum: 1
+    example: 3
+
+responses:
+  TourWriteRefused:
+    description: |
+      The write was refused. Two different causes share this status and the
+      same error envelope, and they are told apart by whether `details.errors`
+      is present.
+
+      Schema failures carry `details.errors` naming each field. Domain guards
+      carry a plain message instead, because the request was well-formed and
+      it is the tour's current state that refuses it: a tour that has already
+      started or ended, a capacity below the guests already booked, a
+      destination change on a tour with bookings, an illegal status
+      transition, or a delete with bookings still attached.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+        example:
+          status: error
+          message: Cannot update tour that has already started
+          requestId: 3f1c9d2e-5b7a-4c11-9f60-2a8e4d0b7c31
+
+  DestinationWriteRefused:
+    description: |
+      The write was refused, either by schema validation, which carries
+      `details.errors`, or by a domain guard, which carries a plain message.
+
+      The guards are uniqueness, an update with no fields at all, and a delete
+      blocked by hotels, tours or flights that still point at this
+      destination. Note that a duplicate place answers **400 and not 409**:
+      the collision is on a case-insensitive comparison of name, country and
+      city rather than on a database unique index, so it is reported as a
+      rejected value rather than as a resource conflict.
+    headers:
+      X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/Error' }
+        example:
+          status: error
+          message: A destination with this name already exists in the specified country/city
+          requestId: 3f1c9d2e-5b7a-4c11-9f60-2a8e4d0b7c31

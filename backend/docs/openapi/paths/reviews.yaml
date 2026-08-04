@@ -1,0 +1,538 @@
+# Reviews and reports.
+#
+# Two domains in one file because they share nothing but a shape: both are
+# read-heavy surfaces over data written elsewhere. Reviews are the one place a
+# customer writes about a trip, and the rules that make a review trustworthy
+# (own booking, completed booking, one per booking, staff moderation) are
+# enforced in the service layer rather than by the route gate alone. Reports
+# are pure aggregates, gated by role and scoped by actor.
+#
+# On the envelope: these reports return their aggregates at `data.summary`,
+# inside the payload. The envelope's own optional `summary` key is not used by
+# any operation here, so read `data.summary`, not `summary`.
+
+/api/v1/reviews:
+  post:
+    tags: [Reviews]
+    operationId: createReview
+    summary: Review a completed booking
+    description: |
+      **CUSTOMER only.** Staff cannot write reviews at all, which is what
+      keeps the ratings on the site customer-generated: an agent gets 403 here
+      even for a booking they recorded.
+
+      Three rules make a review verifiable, and all three are enforced in the
+      service against the database rather than by the request shape:
+
+      1. **It must be your booking.** The booking's customer is compared with
+         the caller, and a mismatch is refused with 401. Note the status: this
+         is an authorization failure raised from the service, not the route
+         gate, so it comes back as 401 rather than 403.
+      2. **The booking must be `COMPLETED`.** Reviewing a trip that has not
+         happened yet is a 400. A soft-deleted booking reads as missing and
+         answers 404.
+      3. **One review per booking.** The booking id is unique across reviews,
+         and a soft-deleted review keeps holding its booking's slot, so
+         deleting a review does not buy a second attempt. A duplicate is 409.
+
+      The review is created `PUBLISHED`, so it is live immediately and an
+      administrator hides it afterwards if it needs moderating. There is no
+      target field to send: what was reviewed is derived from the booking, and
+      the created review comes back with the resolved `target` block.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReviewCreateRequest' }
+    responses:
+      '201':
+        description: Review created and published.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewResponse' }
+      '400':
+        description: |
+          Either the body failed validation, in which case `details.errors`
+          names the fields, or the booking exists but is not `COMPLETED` and
+          so cannot be reviewed yet.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No valid session, or the booking belongs to another customer. The
+          ownership case is deliberately reported here rather than as a 403,
+          because it is raised by the service after the role gate has already
+          passed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409':
+        description: |
+          The booking already carries a review. Editing the existing one is
+          the only way forward, and only within its edit window.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  get:
+    tags: [Reviews]
+    operationId: listReviews
+    summary: List every review (moderation queue)
+    description: |
+      **ADMIN and AGENT.** Customers are refused with 403 and use
+      `GET /api/v1/reviews/mine` instead.
+
+      Returns reviews of every status, newest first, which is what makes this
+      the moderation view rather than a public feed. Filter with `status` to
+      separate what is live from what has been hidden.
+
+      `search` matches the review title, the review body, or the reviewer's
+      name, case-insensitively, so a complaint can be found either by its
+      wording or by who wrote it. It must be 1 to 100 characters.
+
+      Soft-deleted reviews never appear here.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ReviewStatusFilter'
+      - $ref: '#/components/parameters/ReviewRatingFilter'
+    responses:
+      '200':
+        description: A page of reviews.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reviews/mine:
+  get:
+    tags: [Reviews]
+    operationId: listMyReviews
+    summary: List your own reviews
+    description: |
+      **CUSTOMER only.** Staff are refused with 403, since they have no
+      reviews to list.
+
+      Scoped to the calling customer by the service, not by a query parameter,
+      so there is no id to pass and no way to widen it. Returns the caller's
+      reviews of every status, newest first: a customer sees their own review
+      even after an administrator has hidden it, which is deliberate, because
+      the alternative is a review that silently disappears from its author's
+      account.
+
+      No filters beyond pagination, on purpose: this is a short personal list,
+      not a search surface.
+    parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+    responses:
+      '200':
+        description: A page of the caller's own reviews.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewListResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reviews/{id}:
+  parameters:
+    - $ref: '#/components/parameters/ReviewId'
+
+  put:
+    tags: [Reviews]
+    operationId: updateReview
+    summary: Edit your own review
+    description: |
+      **CUSTOMER only, and only the review's author.** An administrator cannot
+      rewrite someone's review through this endpoint; moderation is a status
+      flip, not an edit, so what a customer said is never altered on their
+      behalf. A staff caller is refused by the route gate with 403, and
+      another customer by the service with 401.
+
+      Editing closes **30 days after the review was posted**, measured from
+      `createdAt`, not from the last edit. Past that the review is final and
+      the request is a 400. The window exists so a review stays anchored to
+      the trip it describes rather than being quietly rewritten years later.
+
+      Only `rating`, `title`, and `comment` may change, and omitted fields are
+      left untouched. Editing does not send the review back for re-moderation:
+      its status is unchanged.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReviewUpdateRequest' }
+    responses:
+      '200':
+        description: The updated review.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewResponse' }
+      '400':
+        description: |
+          Either the body or the id failed validation, or the 30-day edit
+          window has closed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '401':
+        description: |
+          No valid session, or the review was written by another customer.
+          Reported as 401 because the service raises it after the role gate.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+  delete:
+    tags: [Reviews]
+    operationId: deleteReview
+    summary: Delete a review
+    description: |
+      **ADMIN and CUSTOMER.** An agent is refused with 403. An administrator
+      may delete any review; a customer only their own, and another
+      customer's review answers 401 from the service.
+
+      Unlike editing, deleting is not time-limited: an author can retract a
+      review at any point.
+
+      The delete is a soft delete. The row is tombstoned, disappears from
+      every read, and a second delete of the same id answers 404 as though it
+      had never existed. Crucially the tombstone **keeps holding the
+      booking's review slot**, so deleting does not let the same booking be
+      reviewed again. Retraction is permanent, not a reset.
+    responses:
+      '200':
+        description: Deleted. No body beyond the confirmation message.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MessageResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No valid session, or a customer tried to delete a review they did
+          not write.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reviews/{id}/status:
+  parameters:
+    - $ref: '#/components/parameters/ReviewId'
+
+  patch:
+    tags: [Reviews]
+    operationId: setReviewStatus
+    summary: Publish or hide a review
+    description: |
+      **ADMIN only.** Agents can read the moderation queue but not act on it,
+      and are refused with 403.
+
+      This is the whole of moderation: a flip between `PUBLISHED` and
+      `HIDDEN`. The wording is never touched, so a hidden review can be
+      restored intact, and the action is reversible in both directions.
+
+      Hiding has reach beyond the review itself. Only published, non-deleted
+      reviews feed the public browse surface and the star averages on tours,
+      hotels, and flights, so hiding a one-star review immediately raises the
+      average it was dragging down. That is why this is administrator-only.
+
+      The moderation action is logged with the acting administrator's id.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReviewStatusRequest' }
+    responses:
+      '200':
+        description: The review at its new status.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reports/me:
+  get:
+    tags: [Reports]
+    operationId: getMyTravelReport
+    summary: Your own travel activity
+    description: |
+      **CUSTOMER only.** Staff are refused with 403: the report is scoped by
+      customer id, and a staff account does not have one.
+
+      Self-service, so there is no id parameter. The scope comes from the
+      session and cannot be widened, which is why this endpoint is safe to
+      expose to every customer.
+
+      Covers trips taken, trips still ahead, cancellations, what was actually
+      paid, a per-item-type split, and the five newest bookings in the window.
+      Spend counts `COMPLETED` payments only, so it reflects money that left
+      the customer's hands rather than what they were quoted.
+
+      The month buckets in `monthlySpend` are **zero-filled across the whole
+      window**, so a year always returns twelve entries and a chart never has
+      to guess at the gaps. `byType`, by contrast, omits types with no
+      activity entirely.
+
+      Window rules, shared with every report here: an explicit
+      `startDate` **and** `endDate` pair wins; otherwise `year` plus `month`;
+      otherwise the whole of `year`, and `year` itself defaults to the
+      server's current year.
+
+      The aggregates live at `data.summary`, inside the payload, not in the
+      envelope's optional top-level `summary` key.
+    parameters:
+      - $ref: '#/components/parameters/ReportStartDate'
+      - $ref: '#/components/parameters/ReportEndDate'
+      - $ref: '#/components/parameters/ReportMonth'
+      - $ref: '#/components/parameters/ReportYear'
+    responses:
+      '200':
+        description: The calling customer's activity for the window.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportSelfResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reports/agent-activity:
+  get:
+    tags: [Reports]
+    operationId: getAgentActivityReport
+    summary: A staff member's recorded-booking activity
+    description: |
+      **ADMIN and AGENT.** Customers are refused with 403.
+
+      The two roles do not see the same thing, and the asymmetry is the point:
+
+      - An **AGENT** always gets their own activity. `userId` is accepted by
+        the query validator but the service pins the target to the caller:
+        passing another staff member's id is refused with **401**, message
+        "You can only view your own activity". Passing their own id is
+        allowed and is identical to omitting it.
+      - An **ADMIN** may pass `userId` to inspect any staff member. Omitting
+        it does not mean "everyone": an administrator with no `userId` sees
+        their **own** activity, which for a non-selling administrator is
+        usually all zeroes. To look at an agent, name them.
+
+      Activity is scoped by who **recorded** the booking, not by who it
+      belongs to, so a customer's own self-service booking never appears in
+      anyone's agent numbers. `revenueFromRecorded` counts only the
+      `COMPLETED` payments on those bookings, while booked value that has not
+      been paid shows up in `pendingFromRecorded` as pipeline.
+
+      Month buckets are zero-filled across the window, so a year returns
+      twelve entries. Window rules and the `data.summary` placement are the
+      same as `GET /api/v1/reports/me`.
+    parameters:
+      - $ref: '#/components/parameters/ReportUserId'
+      - $ref: '#/components/parameters/ReportStartDate'
+      - $ref: '#/components/parameters/ReportEndDate'
+      - $ref: '#/components/parameters/ReportMonth'
+      - $ref: '#/components/parameters/ReportYear'
+    responses:
+      '200':
+        description: The target staff member's recorded activity for the window.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportAgentActivityResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401':
+        description: |
+          No valid session, or an agent asked for another staff member's
+          activity through `userId`. The second case is a service-level
+          refusal after the role gate has passed, which is why it is a 401
+          rather than a 403.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reports/bookings/monthly-summary:
+  get:
+    tags: [Reports]
+    operationId: getMonthlyBookingsReport
+    summary: Bookings and booked value by month
+    description: |
+      **ADMIN only.** Agents and customers are both refused with 403, even
+      though agents may read their own activity report.
+
+      Aggregates the period's bookings into totals, month buckets, and a
+      status breakdown, with each headline figure trended against the
+      equal-length window immediately before it.
+
+      Read `totalRevenue` as **booked value**, not settled money: a booking
+      counts here the moment it exists, whatever its payment says, and a
+      cancelled booking still contributes. For money actually collected use
+      `GET /api/v1/reports/payments/summary`.
+
+      Unlike the self reports, `monthlyBreakdown` is **not** zero-filled: only
+      months with bookings appear, in first-appearance order. `bookings` is a
+      ten-row sample of the matched set for a preview table, not a ranked or
+      paginated list.
+
+      Window rules and the `data.summary` placement are the same as the other
+      reports. `customerId`, `tourId`, and `status` narrow the whole report,
+      trends and breakdowns included.
+    parameters:
+      - $ref: '#/components/parameters/ReportStartDate'
+      - $ref: '#/components/parameters/ReportEndDate'
+      - $ref: '#/components/parameters/ReportMonth'
+      - $ref: '#/components/parameters/ReportYear'
+      - $ref: '#/components/parameters/ReportCustomerId'
+      - $ref: '#/components/parameters/ReportTourId'
+      - $ref: '#/components/parameters/ReportBookingStatus'
+    responses:
+      '200':
+        description: Booking aggregates for the window.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportBookingsMonthlyResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reports/payments/summary:
+  get:
+    tags: [Reports]
+    operationId: getPaymentsSummaryReport
+    summary: Revenue by status, method, and month
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403. This is the
+      money view, so it is the most tightly gated report in the domain.
+
+      Every amount is an integer in minor units (pesewas) of `currency`, which
+      defaults to `GHS` and is always applied as a filter. That filter is not
+      optional by oversight: summing amounts across currencies would produce a
+      figure that means nothing, so exactly one currency is summarised per
+      call.
+
+      `totalRevenue` counts `COMPLETED` payments only. `pendingAmount`,
+      `failedAmount`, and `refundedAmount` isolate the rest, and money sitting
+      in `REFUND_REQUESTED`, awaiting an administrator, is counted in none of
+      them and visible only through `statusBreakdown`. Each figure is trended
+      against the equal-length previous window.
+
+      A payment with no `paymentDate` still counts in the status and method
+      breakdowns but cannot land in a month bucket, so `monthlyBreakdown` can
+      total less than `totalPayments`. Within a bucket, `count` counts every
+      dated payment while `revenue` counts only the completed ones.
+      `recentPayments` returns the ten latest by payment date.
+
+      Window rules and the `data.summary` placement are the same as the other
+      reports.
+    parameters:
+      - $ref: '#/components/parameters/ReportStartDate'
+      - $ref: '#/components/parameters/ReportEndDate'
+      - $ref: '#/components/parameters/ReportMonth'
+      - $ref: '#/components/parameters/ReportYear'
+      - $ref: '#/components/parameters/ReportCurrency'
+      - $ref: '#/components/parameters/ReportCustomerId'
+      - $ref: '#/components/parameters/ReportPaymentMethod'
+      - $ref: '#/components/parameters/ReportPaymentStatus'
+    responses:
+      '200':
+        description: Payment aggregates for the window, in one currency.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportPaymentsSummaryResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }
+
+/api/v1/reports/tours/top-by-bookings:
+  get:
+    tags: [Reports]
+    operationId: getTopToursReport
+    summary: Best-selling tours in a period
+    description: |
+      **ADMIN only.** Agents and customers are refused with 403.
+
+      Ranks tours by how many bookings they took **inside the window**, so a
+      long-running favourite does not outrank this month's hit on lifetime
+      numbers alone. Ties keep database order.
+
+      Two knobs shape the list and nothing else: `minBookings` (default 1)
+      sets the floor a tour must clear, which is what keeps never-booked tours
+      off a "top tours" board, and `limit` (default 10, maximum 20) caps its
+      length. Both are echoed back under `summary.filters`.
+
+      The `summary` totals deliberately cover **every** tour the filters
+      matched, not just the ones that made the list, so the ranking has a
+      denominator: `totalToursAnalyzed` can be far larger than the length of
+      `topTours`. `tourType` and `tourStatus` narrow that analyzed set itself,
+      so filtering to a type with no tours returns an empty list and zeroed
+      totals rather than an error. The response message carries the size of
+      the returned list, which may be 0.
+
+      Soft-deleted bookings are excluded from the counts. Per-tour
+      `totalRevenue` is booked value across every booking status, so a
+      cancelled booking still contributes to it.
+
+      Window rules and the `data.summary` placement are the same as the other
+      reports.
+    parameters:
+      - $ref: '#/components/parameters/ReportStartDate'
+      - $ref: '#/components/parameters/ReportEndDate'
+      - $ref: '#/components/parameters/ReportMonth'
+      - $ref: '#/components/parameters/ReportYear'
+      - $ref: '#/components/parameters/ReportTopToursLimit'
+      - $ref: '#/components/parameters/ReportMinBookings'
+      - $ref: '#/components/parameters/ReportTourStatus'
+      - $ref: '#/components/parameters/ReportTourType'
+    responses:
+      '200':
+        description: The ranking plus the totals it was drawn from.
+        headers:
+          X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportTopToursResponse' }
+      '400': { $ref: '#/components/responses/ValidationError' }
+      '401': { $ref: '#/components/responses/Unauthorized' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '429': { $ref: '#/components/responses/RateLimited' }

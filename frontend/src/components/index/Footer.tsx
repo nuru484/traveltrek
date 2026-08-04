@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight } from "lucide-react";
+import { apiDocsUrl } from "@/lib/site";
 
 const CONTACT_EMAIL = "abdulmajeednurudeen48@gmail.com";
 
@@ -77,6 +78,21 @@ const Footer = ({ numbered = true }: { numbered?: boolean }) => (
                   <ArrowUpRight className="h-3 w-3" aria-hidden />
                 </Link>
               </li>
+              {/* Served by the API itself, so it is only linkable when the
+                  backend URL is configured for this deployment. */}
+              {apiDocsUrl && (
+                <li>
+                  <Link
+                    href={apiDocsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-night-foreground transition-colors"
+                  >
+                    API reference
+                    <ArrowUpRight className="h-3 w-3" aria-hidden />
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/login"

@@ -9,6 +9,7 @@ import morgan from 'morgan';
 
 import ENV from '#config/env.js';
 import prisma from '#config/prismaClient.js';
+import { mountApiDocs } from '#docs/mount.js';
 import {
   errorHandler,
   UnauthorizedError,
@@ -105,6 +106,11 @@ app.get('/health/db', async (_req: Request, res: Response) => {
     res.status(503).json({ status: 'unreachable' });
   }
 });
+
+// Public API reference. Mounted before the global rate limiter so a burst of
+// docs page views cannot spend a reader's API budget, and before the versioned
+// router so the docs are reachable without a session.
+mountApiDocs(app);
 
 app.use(rateLimiter as express.RequestHandler);
 app.use('/api/v1', routes);

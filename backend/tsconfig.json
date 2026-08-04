@@ -23,6 +23,7 @@
     "./src/**/*",
     "types",
     "test",
+    "scripts",
     "vitest.config.ts",
     "prisma.config.ts",
     "prisma"
