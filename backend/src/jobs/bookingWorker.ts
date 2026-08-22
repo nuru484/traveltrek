@@ -13,15 +13,15 @@ import logger from '#utils/logger.js';
 export const bookingDeadlineWorker = new Worker(
   'bookingDeadlineQueue',
   async (_job) => {
-    logger.info('🔍 Checking for expired booking payment deadlines...');
+    logger.info('Checking for expired booking payment deadlines...');
 
     const summary = await cancelExpiredBookings();
 
     if (summary.cancelledCount === 0 && summary.failureCount === 0) {
-      logger.info('✅ No expired bookings found.');
+      logger.info('No expired bookings found.');
     } else {
       logger.info(
-        `✅ Booking deadline check completed. Cancelled: ${summary.cancelledCount}, Failures: ${summary.failureCount}`,
+        `Booking deadline check completed. Cancelled: ${summary.cancelledCount}, Failures: ${summary.failureCount}`,
       );
     }
 
@@ -33,9 +33,9 @@ export const bookingDeadlineWorker = new Worker(
 );
 
 bookingDeadlineWorker.on('failed', (job, err) => {
-  logger.error(`❌ Booking deadline job ${job?.id} failed: ${err.message}`);
+  logger.error(`Booking deadline job ${job?.id} failed: ${err.message}`);
 });
 
 bookingDeadlineWorker.on('completed', (job) => {
-  logger.info(`✅ Booking deadline job ${job.id} completed successfully.`);
+  logger.info(`Booking deadline job ${job.id} completed successfully.`);
 });

@@ -19,7 +19,7 @@ let shuttingDown = false;
 const shutdown = async (signal: string): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
-  logger.info(`🛑 Received ${signal}, shutting down workers...`);
+  logger.info(`Received ${signal}, shutting down workers...`);
 
   const forceExit = setTimeout(() => {
     logger.error('Graceful shutdown timed out; forcing exit');
@@ -53,6 +53,6 @@ process.on('uncaughtException', (error) => {
 });
 
 startWorkers().catch((err: unknown) => {
-  logger.error({ err }, '❌ Failed to start worker');
+  logger.error({ err }, 'Failed to start worker');
   process.exit(1);
 });

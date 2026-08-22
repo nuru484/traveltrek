@@ -33,7 +33,7 @@ if (ENV.WEB_DISABLE_WORKERS) {
   );
 } else {
   startWorkers().catch((err: unknown) => {
-    logger.error({ err }, '❌ Failed to start background workers');
+    logger.error({ err }, 'Failed to start background workers');
   });
 }
 

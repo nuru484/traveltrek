@@ -11,7 +11,7 @@ import { TourStatus } from '../../generated/prisma/client.js';
 export const tourStatusWorker = new Worker(
   'tourStatusQueue',
   async (_job) => {
-    logger.info('🗺️  Checking and updating tour statuses...');
+    logger.info('Checking and updating tour statuses...');
 
     const now = new Date();
 
@@ -24,11 +24,11 @@ export const tourStatusWorker = new Worker(
     });
 
     if (tours.length === 0) {
-      logger.info('✅ No tours to update.');
+      logger.info('No tours to update.');
       return { updatedCount: 0 };
     }
 
-    logger.info(`🔍 Found ${tours.length} tours to check.`);
+    logger.info(`Found ${tours.length} tours to check.`);
 
     let updatedCount = 0;
     let failureCount = 0;
@@ -64,13 +64,13 @@ export const tourStatusWorker = new Worker(
 
             updatedCount++;
             logger.info(
-              `🗺️  Updated tour "${tour.name}": ${tour.status} → ${newStatus}`,
+              `Updated tour "${tour.name}": ${tour.status} → ${newStatus}`,
             );
           }
         } catch (err) {
           failureCount++;
           logger.error(
-            `⚠️  Failed to update tour ${tour.name}: ${String(err)}`,
+            `Failed to update tour ${tour.name}: ${String(err)}`,
           );
         }
       },
@@ -78,7 +78,7 @@ export const tourStatusWorker = new Worker(
     );
 
     logger.info(
-      `✅ Tour status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
+      `Tour status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
     );
 
     return { failureCount, updatedCount };
@@ -89,9 +89,9 @@ export const tourStatusWorker = new Worker(
 );
 
 tourStatusWorker.on('failed', (job, err) => {
-  logger.error(`❌ Tour status job ${job?.id} failed: ${err.message}`);
+  logger.error(`Tour status job ${job?.id} failed: ${err.message}`);
 });
 
 tourStatusWorker.on('completed', (job) => {
-  logger.info(`✅ Tour status job ${job.id} completed successfully.`);
+  logger.info(`Tour status job ${job.id} completed successfully.`);
 });

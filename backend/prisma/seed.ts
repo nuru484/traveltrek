@@ -47,7 +47,7 @@ const SALT_ROUNDS = 10;
 
 async function main() {
   if (!ENV.ADMIN_SEED_ENABLED) {
-    logger.info('🌱 Seed skipped (ADMIN_SEED_ENABLED is not true).');
+    logger.info('Seed skipped (ADMIN_SEED_ENABLED is not true).');
     return;
   }
 
@@ -69,7 +69,7 @@ async function seedAdmin() {
 
   if (!adminEmail || !adminPassword || !adminName || !adminPhone) {
     logger.error(
-      '❌ Admin seed: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME and ADMIN_PHONE must all be set to run the seed.',
+      'Admin seed: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME and ADMIN_PHONE must all be set to run the seed.',
     );
     process.exit(1);
   }
@@ -92,7 +92,7 @@ async function seedAdmin() {
 
   if (byEmail && byPhone && byEmail.id !== byPhone.id) {
     logger.error(
-      `❌ Admin seed: ADMIN_EMAIL belongs to user ${String(byEmail.id)} but ` +
+      `Admin seed: ADMIN_EMAIL belongs to user ${String(byEmail.id)} but ` +
         `ADMIN_PHONE belongs to user ${String(byPhone.id)} — ambiguous ` +
         `target. Change one of them (or free the contact in the app) and rerun.`,
     );
@@ -116,7 +116,7 @@ async function seedAdmin() {
   ]);
   if (customerByEmail || customerByPhone) {
     logger.error(
-      '❌ Admin seed: the admin email/phone is already held by a CUSTOMER ' +
+      'Admin seed: the admin email/phone is already held by a CUSTOMER ' +
         'account — seeding staff onto it would shadow that login. Use a ' +
         'different contact.',
     );
@@ -125,7 +125,7 @@ async function seedAdmin() {
 
   if (existing && !ENV.ADMIN_SEED_FORCE_UPDATE) {
     logger.info(
-      `🌱 Admin seed: admin already exists as ${existing.email ?? existing.phone ?? String(existing.id)} — ` +
+      `Admin seed: admin already exists as ${existing.email ?? existing.phone ?? String(existing.id)} — ` +
         `no changes (ADMIN_SEED_FORCE_UPDATE is not true).`,
     );
     return;
@@ -165,8 +165,8 @@ async function seedAdmin() {
       role: admin.role,
     },
     message: existing
-      ? '✅ Admin user updated (ADMIN_SEED_FORCE_UPDATE=true)'
-      : '✅ Admin user created',
+      ? 'Admin user updated (ADMIN_SEED_FORCE_UPDATE=true)'
+      : 'Admin user created',
   });
 }
 
@@ -728,7 +728,7 @@ async function seedCatalogAndBookings(): Promise<void> {
     destinations: DESTINATIONS.length,
     flights: flights.length,
     hotels: HOTELS.length,
-    message: '✅ Catalog + bookings seeded (idempotent, anchored to today)',
+    message: 'Catalog + bookings seeded (idempotent, anchored to today)',
     reviews: reviewCount,
     rooms: rooms.length,
     tours: tours.length,
@@ -753,7 +753,7 @@ async function seedDemoAgent() {
   });
   if (customerClash) {
     logger.error(
-      `❌ Demo agent seed: ${email} is already held by a CUSTOMER account - ` +
+      `Demo agent seed: ${email} is already held by a CUSTOMER account - ` +
         'seeding staff onto it would shadow that login. Point ' +
         'DEMO_AGENT_EMAIL at a free address and rerun.',
     );
@@ -769,7 +769,7 @@ async function seedDemoAgent() {
 
   if (existing && !ENV.ADMIN_SEED_FORCE_UPDATE) {
     logger.info(
-      `🌱 Demo agent seed: ${email} already exists - no changes ` +
+      `Demo agent seed: ${email} already exists - no changes ` +
         '(ADMIN_SEED_FORCE_UPDATE is not true).',
     );
     return;
@@ -796,8 +796,8 @@ async function seedDemoAgent() {
   logger.info({
     demoAgent: { email: agent.email, id: agent.id, role: agent.role },
     message: existing
-      ? '✅ Demo agent updated (ADMIN_SEED_FORCE_UPDATE=true)'
-      : '✅ Demo agent created',
+      ? 'Demo agent updated (ADMIN_SEED_FORCE_UPDATE=true)'
+      : 'Demo agent created',
   });
 }
 
@@ -814,7 +814,7 @@ async function seedDemoCustomer() {
   });
   if (staffClash) {
     logger.error(
-      `❌ Demo customer seed: ${email} is already held by a STAFF account - ` +
+      `Demo customer seed: ${email} is already held by a STAFF account - ` +
         'seeding a customer onto it would collide with that login. Point ' +
         'DEMO_CUSTOMER_EMAIL at a free address and rerun.',
     );
@@ -828,7 +828,7 @@ async function seedDemoCustomer() {
 
   if (existing && !ENV.ADMIN_SEED_FORCE_UPDATE) {
     logger.info(
-      `🌱 Demo customer seed: ${email} already exists - no changes ` +
+      `Demo customer seed: ${email} already exists - no changes ` +
         '(ADMIN_SEED_FORCE_UPDATE is not true).',
     );
     return;
@@ -853,15 +853,15 @@ async function seedDemoCustomer() {
   logger.info({
     demoCustomer: { email: customer.email, id: customer.id },
     message: existing
-      ? '✅ Demo customer updated (ADMIN_SEED_FORCE_UPDATE=true)'
-      : '✅ Demo customer created',
+      ? 'Demo customer updated (ADMIN_SEED_FORCE_UPDATE=true)'
+      : 'Demo customer created',
   });
 }
 
 main()
   .catch((e: unknown) => {
     // pino takes the merge object first — (msg, err) silently drops the error
-    logger.error({ err: e }, '❌ Error seeding database');
+    logger.error({ err: e }, 'Error seeding database');
     process.exit(1);
   })
   .finally(async () => {

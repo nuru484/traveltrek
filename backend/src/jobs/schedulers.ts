@@ -20,7 +20,7 @@ export async function setupJobSchedulers() {
     { name: 'check-booking-deadlines' },
   );
 
-  logger.info('📅 Scheduled: Booking deadline checker (every 5 minutes)');
+  logger.info('Scheduled: Booking deadline checker (every 5 minutes)');
 
   // Flight status update - runs every 15 minutes
   await removeLegacyRepeatables(flightStatusQueue, 'update-flight-statuses');
@@ -30,7 +30,7 @@ export async function setupJobSchedulers() {
     { name: 'update-flight-statuses' },
   );
 
-  logger.info('📅 Scheduled: Flight status updater (every 15 minutes)');
+  logger.info('Scheduled: Flight status updater (every 15 minutes)');
 
   // Tour status update - runs every 30 minutes
   await removeLegacyRepeatables(tourStatusQueue, 'update-tour-statuses');
@@ -40,7 +40,7 @@ export async function setupJobSchedulers() {
     { name: 'update-tour-statuses' },
   );
 
-  logger.info('📅 Scheduled: Tour status updater (every 30 minutes)');
+  logger.info('Scheduled: Tour status updater (every 30 minutes)');
 }
 
 /**
@@ -59,7 +59,7 @@ async function removeLegacyRepeatables(
   await Promise.all(
     legacy.map(async (job) => {
       await queue.removeJobScheduler(job.key);
-      logger.info(`🧹 Removed legacy repeatable ${job.key} from ${queue.name}`);
+      logger.info(`Removed legacy repeatable ${job.key} from ${queue.name}`);
     }),
   );
 }

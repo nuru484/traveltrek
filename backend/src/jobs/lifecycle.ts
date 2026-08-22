@@ -26,7 +26,7 @@ let running: null | RunningJobs = null;
 export async function startWorkers(): Promise<void> {
   if (running) return;
 
-  logger.info('🚀 Starting background workers...');
+  logger.info('Starting background workers...');
 
   const [
     { bookingDeadlineWorker },
@@ -67,10 +67,10 @@ export async function startWorkers(): Promise<void> {
     ],
   };
 
-  logger.info('✅ All workers started and listening for jobs...');
-  logger.info('📧 Booking Deadline Worker: Active');
+  logger.info('All workers started and listening for jobs...');
+  logger.info('Booking Deadline Worker: Active');
   logger.info('✈️  Flight Status Worker: Active');
-  logger.info('🗺️  Tour Status Worker: Active');
+  logger.info('Tour Status Worker: Active');
   logger.info('✉️  Notification Worker: Active');
 }
 
@@ -86,5 +86,5 @@ export async function stopWorkers(): Promise<void> {
   await Promise.all(workers.map((worker) => worker.close()));
   await Promise.all(queues.map((queue) => queue.close()));
 
-  logger.info('✅ All workers closed gracefully');
+  logger.info('All workers closed gracefully');
 }

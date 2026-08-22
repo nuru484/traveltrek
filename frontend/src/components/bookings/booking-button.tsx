@@ -156,7 +156,7 @@ export function BookingButton({
       toast.success("Booking created successfully");
 
       if (result.data.bookingDetails?.requiresImmediatePayment) {
-        toast.success("⚠️ Immediate payment required for this booking", {
+        toast.success("Immediate payment required for this booking", {
           duration: 5000,
         });
       } else if (result.data.bookingDetails?.paymentDeadline) {

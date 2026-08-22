@@ -31,7 +31,7 @@ export const notificationWorker = new Worker<NotificationJob>(
 
 notificationWorker.on('failed', (job, err) => {
   if (!job) {
-    logger.error({ err }, '❌ Notification job failed (job data unavailable)');
+    logger.error({ err }, 'Notification job failed (job data unavailable)');
     return;
   }
 
@@ -39,7 +39,7 @@ notificationWorker.on('failed', (job, err) => {
   if (job.attemptsMade >= maxAttempts) {
     logger.error(
       { err, what: job.data.what },
-      `❌ Notification permanently failed after ${String(maxAttempts)} attempt(s)`,
+      `Notification permanently failed after ${String(maxAttempts)} attempt(s)`,
     );
   } else {
     logger.warn(

@@ -1,14 +1,14 @@
-# 🌍 TravelTrek - Travel & Tour Booking Platform
+# TravelTrek - Travel & Tour Booking Platform
 
 **TravelTrek** is a production-grade travel booking system covering tours, hotels & rooms, flights, and payments, built end-to-end by one engineer, from the PostgreSQL schema to the phone-first UI.
 
 It is both a working product and a portfolio piece: the landing page tells the story, and the **live demo** exhibits the running system with real inventory served by its public API.
 
-🔗 **Live:** [traveltrek.manuru.dev](https://traveltrek.manuru.dev/) · **Demo board:** [traveltrek.manuru.dev/demo](https://traveltrek.manuru.dev/demo)
+**Live:** [traveltrek.manuru.dev](https://traveltrek.manuru.dev/) · **Demo board:** [traveltrek.manuru.dev/demo](https://traveltrek.manuru.dev/demo)
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 * [Features](#-features)
 * [Tech Stack](#-tech-stack)
@@ -22,9 +22,9 @@ It is both a working product and a portfolio piece: the landing page tells the s
 
 ---
 
-## ✨ Features
+## Features
 
-### 🧳 Customer experience
+### Customer experience
 
 * Browse live tours, destinations, hotels, and flights on the public demo board - no account needed.
 * Book tours, room stays (date-ranged, inventory-aware), and flights; pay with **Paystack** (cards, mobile money, bank transfer).
@@ -32,7 +32,7 @@ It is both a working product and a portfolio piece: the landing page tells the s
 * Review completed trips (verified: only trips actually taken, within an edit window).
 * A professional profile with travel stats, booking and payment history.
 
-### 🔐 Authentication & security
+### Authentication & security
 
 * Password login with **optional two-factor authentication** (code over email/SMS).
 * **Passwordless OTP login** and **Google sign-in** for customers; minimal signup with email *or* phone.
@@ -40,14 +40,14 @@ It is both a working product and a portfolio piece: the landing page tells the s
 * **Verified contact changes** - a new email is confirmed by link, a new phone by OTP, before it ever becomes a login identifier.
 * Account lockout, enumeration-safe uniform 401s, rate limiting, webhook signature verification (HMAC over raw bytes).
 
-### 🛡️ Staff operations (ADMIN / AGENT)
+### Staff operations (ADMIN / AGENT)
 
 * Full inventory management: destinations, tours, hotels & rooms, flights - with cover photos via Cloudinary.
 * Book and pay on behalf of customers (attributed to the acting staff member); action refund requests.
 * Customer management with complete booking/payment history; review moderation.
 * Role-aware **reports and dashboard**: monthly bookings, payments, top tours, needs-attention queues.
 
-### ⚙️ Background automation (BullMQ + Redis)
+### Background automation (BullMQ + Redis)
 
 Workers run as part of the web process by default, or as a dedicated process:
 
@@ -58,7 +58,7 @@ Workers run as part of the web process by default, or as a dedicated process:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer                  | Technology                                                       |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -78,7 +78,7 @@ Workers run as part of the web process by default, or as a dedicated process:
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 Customer / Agent / Admin browser (Next.js + RTK Query)
@@ -99,7 +99,7 @@ The service layer is dependency-injected (`makeXService(deps)`) for Prisma, Pays
 
 ---
 
-## 🗄️ Data Model
+## Data Model
 
 Two principal tables, **staff** (`User`: `ADMIN`/`AGENT`) and **`Customer`**, are deliberately separated, with cross-table contact uniqueness so a public signup can never shadow a staff login.
 
@@ -115,7 +115,7 @@ Soft deletes everywhere (a Prisma client extension auto-scopes reads); `Restrict
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -147,7 +147,7 @@ Each app's own README covers its env vars, scripts, and conventions in detail: [
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 cd backend  && npm test     # 350+ supertest integration tests against a real
@@ -160,7 +160,7 @@ CI (GitHub Actions) gates every push and PR on lint, type-check, build, and test
 
 ---
 
-## 🌐 Deployment
+## Deployment
 
 * **Frontend** - Vercel (landing and `/demo` are static with 5-minute ISR).
 * **Backend** - Render: web process (+ workers in-process), or set `WEB_DISABLE_WORKERS=true` and run `npm run worker` as a dedicated process.
@@ -169,7 +169,7 @@ CI (GitHub Actions) gates every push and PR on lint, type-check, build, and test
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 traveltrek/
@@ -193,8 +193,8 @@ traveltrek/
 
 ---
 
-## 🧾 License
+## License
 
 **MIT** - © 2026 Nurudeen Abdul-Majeed
 
-📩 [abdulmajeednurudeen48@gmail.com](mailto:abdulmajeednurudeen48@gmail.com)
+[abdulmajeednurudeen48@gmail.com](mailto:abdulmajeednurudeen48@gmail.com)

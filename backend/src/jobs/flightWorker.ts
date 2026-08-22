@@ -24,11 +24,11 @@ export const flightStatusWorker = new Worker(
     });
 
     if (flights.length === 0) {
-      logger.info('✅ No flights to update.');
+      logger.info('No flights to update.');
       return { updatedCount: 0 };
     }
 
-    logger.info(`🔍 Found ${flights.length} flights to check.`);
+    logger.info(`Found ${flights.length} flights to check.`);
 
     let updatedCount = 0;
     let failureCount = 0;
@@ -70,7 +70,7 @@ export const flightStatusWorker = new Worker(
         } catch (err) {
           failureCount++;
           logger.error(
-            `⚠️  Failed to update flight ${flight.flightNumber}: ${String(err)}`,
+            `Failed to update flight ${flight.flightNumber}: ${String(err)}`,
           );
         }
       },
@@ -78,7 +78,7 @@ export const flightStatusWorker = new Worker(
     );
 
     logger.info(
-      `✅ Flight status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
+      `Flight status update completed. Updated: ${updatedCount}, Failures: ${failureCount}`,
     );
 
     return { failureCount, updatedCount };
@@ -89,9 +89,9 @@ export const flightStatusWorker = new Worker(
 );
 
 flightStatusWorker.on('failed', (job, err) => {
-  logger.error(`❌ Flight status job ${job?.id} failed: ${err.message}`);
+  logger.error(`Flight status job ${job?.id} failed: ${err.message}`);
 });
 
 flightStatusWorker.on('completed', (job) => {
-  logger.info(`✅ Flight status job ${job.id} completed successfully.`);
+  logger.info(`Flight status job ${job.id} completed successfully.`);
 });
