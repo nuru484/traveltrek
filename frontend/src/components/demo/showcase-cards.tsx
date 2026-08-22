@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowRight, Hotel, MapPin, Plane } from "lucide-react";
+import { ArrowRight, Hotel, MapPin, Plane, Star } from "lucide-react";
 import { RatingStars } from "@/components/ui/rating";
 import { formatMoney } from "@/utils/format-money";
 import type { IPublicDestination } from "@/lib/public-api";
@@ -17,6 +17,28 @@ export const Eyebrow = ({ children }: { children: React.ReactNode }) => (
     {children}
   </p>
 );
+
+/** A hotel's class (1-5) as a row of filled stars, sized for the caption line. */
+const HotelStarClass = ({ starRating }: { starRating: number }) => {
+  const count = Math.max(1, Math.min(5, starRating));
+
+  return (
+    <span
+      className="inline-flex items-center gap-px align-middle"
+      role="img"
+      aria-label={`${count}-star hotel`}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <Star
+          key={index}
+          className="h-2.5 w-2.5 fill-current"
+          strokeWidth={1.5}
+          aria-hidden
+        />
+      ))}
+    </span>
+  );
+};
 
 export const TourCard = ({ tour }: { tour: ITour }) => (
   <Link
@@ -129,7 +151,7 @@ export const HotelCard = ({ hotel }: { hotel: IHotel }) => (
     </span>
     <span className="flex min-w-0 flex-1 flex-col gap-1">
       <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
-        Hotel · {"★".repeat(Math.max(1, Math.min(5, hotel.starRating)))}
+        Hotel · <HotelStarClass starRating={hotel.starRating} />
       </span>
       <span className="truncate text-[15px] font-semibold leading-snug">
         {hotel.name}

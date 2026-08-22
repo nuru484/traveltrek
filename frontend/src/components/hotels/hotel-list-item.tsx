@@ -2,7 +2,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { Hotel } from "lucide-react";
+import { Hotel, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RatingStars } from "@/components/ui/rating";
 import { IHotel } from "@/types/hotel.types";
@@ -17,6 +17,7 @@ interface IHotelListItemProps {
  */
 export function HotelListItem({ hotel }: IHotelListItemProps) {
   const roomCount = hotel.rooms?.length ?? 0;
+  const starCount = Math.max(1, Math.min(5, hotel.starRating));
 
   return (
     <Link
@@ -39,7 +40,20 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
           </div>
         )}
         <Badge className="absolute right-3 top-3 border-transparent bg-card/95 text-foreground">
-          {"★".repeat(Math.max(1, Math.min(5, hotel.starRating)))}
+          <span
+            className="flex items-center gap-0.5"
+            role="img"
+            aria-label={`${starCount}-star hotel`}
+          >
+            {Array.from({ length: starCount }, (_, index) => (
+              <Star
+                key={index}
+                className="h-3 w-3 fill-current"
+                strokeWidth={1.5}
+                aria-hidden
+              />
+            ))}
+          </span>
         </Badge>
       </div>
 

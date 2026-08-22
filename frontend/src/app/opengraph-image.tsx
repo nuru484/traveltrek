@@ -64,7 +64,7 @@ export default function OpengraphImage() {
               letterSpacing: 6,
             }}
           >
-            <div style={{ display: "flex" }}>TRAVEL TREK ✈ BOARDING PASS</div>
+            <div style={{ display: "flex" }}>TRAVEL TREK · BOARDING PASS</div>
             <div style={{ display: "flex", opacity: 0.7 }}>
               2026
             </div>

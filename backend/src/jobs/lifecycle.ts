@@ -69,9 +69,9 @@ export async function startWorkers(): Promise<void> {
 
   logger.info('All workers started and listening for jobs...');
   logger.info('Booking Deadline Worker: Active');
-  logger.info('✈️  Flight Status Worker: Active');
+  logger.info('Flight Status Worker: Active');
   logger.info('Tour Status Worker: Active');
-  logger.info('✉️  Notification Worker: Active');
+  logger.info('Notification Worker: Active');
 }
 
 /**

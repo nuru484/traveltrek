@@ -52,7 +52,7 @@ export default function OpengraphImage() {
           }}
         >
           <div style={{ display: "flex" }}>
-            TRAVEL TREK ✈ FLIGHT INFORMATION
+            TRAVEL TREK · FLIGHT INFORMATION
           </div>
           <div
             style={{

@@ -11,7 +11,7 @@ import { FlightStatus } from '../../generated/prisma/client.js';
 export const flightStatusWorker = new Worker(
   'flightStatusQueue',
   async (_job) => {
-    logger.info('✈️  Checking and updating flight statuses...');
+    logger.info('Checking and updating flight statuses...');
 
     const now = new Date();
 
@@ -64,7 +64,7 @@ export const flightStatusWorker = new Worker(
 
             updatedCount++;
             logger.info(
-              `✈️  Updated flight ${flight.flightNumber}: ${flight.status} → ${newStatus}`,
+              `Updated flight ${flight.flightNumber}: ${flight.status} → ${newStatus}`,
             );
           }
         } catch (err) {
