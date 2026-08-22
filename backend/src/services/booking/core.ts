@@ -30,7 +30,7 @@ export const makeBookingCore = (d: BookingDeps) => {
   const notices = makeBookingNotifications(d);
 
   /**
-   * Payment deadline tiers by proximity to check-in (legacy bookingHelpers):
+   * Payment deadline tiers by proximity to check-in:
    * within 2 hours → 30 minutes from now (immediate), within 24 hours →
    * 2 hours from now (immediate), otherwise 24 hours before check-in.
    */
@@ -57,7 +57,7 @@ export const makeBookingCore = (d: BookingDeps) => {
     return { deadline, requiresImmediatePayment: false };
   };
 
-  /** Stay-date sanity checks (legacy bookingHelpers), day-granular. */
+  /** Stay-date sanity checks, day-granular. */
   const validateBookingDates = (
     startDate: Date,
     endDate: Date,
@@ -91,8 +91,8 @@ export const makeBookingCore = (d: BookingDeps) => {
 
   /**
    * Rooms still free for a window: totalRooms minus rooms held by PENDING or
-   * CONFIRMED bookings whose stay overlaps it (legacy bookingHelpers — note
-   * the inclusive lte/gte overlap, unlike room.service's lt/gt variant).
+   * CONFIRMED bookings whose stay overlaps it. Note the inclusive lte/gte
+   * overlap, unlike room.service's lt/gt variant.
    */
   const checkRoomAvailability = async (
     roomId: number,
@@ -248,7 +248,7 @@ export const makeBookingCore = (d: BookingDeps) => {
     }
   };
 
-  /** The tour/room/hotel/flight/user text-search OR list (legacy, verbatim). */
+  /** The tour/room/hotel/flight/user text-search OR list. */
   const buildSearchOr = (search: string): Prisma.BookingWhereInput['OR'] => [
     { tour: { name: { contains: search, mode: 'insensitive' } } },
     { tour: { description: { contains: search, mode: 'insensitive' } } },
@@ -268,8 +268,8 @@ export const makeBookingCore = (d: BookingDeps) => {
 
   /**
    * Shared filter block: status, item-id filters, bookingDate window, then
-   * the type filter (which — as in the legacy handlers — overrides a tourId/
-   * roomId/flightId equality filter with `{ not: null }`), then search.
+   * the type filter (which overrides a tourId/roomId/flightId equality
+   * filter with `{ not: null }`), then search.
    */
   const applyListFilters = (
     where: Prisma.BookingWhereInput,

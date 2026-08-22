@@ -42,10 +42,10 @@ export const makeFlightCreateService = (d: FlightDeps, core: FlightCore) => {
         throw new BadRequestError('Arrival time must be after departure time');
       }
 
-      // flightNumber uniqueness stays a DB constraint (as before); a duplicate
-      // surfaces as a Prisma P2002 handled by the central error middleware.
-      // Note: the constraint spans soft-deleted rows too (khadys convention) —
-      // a soft-deleted flight keeps holding its flightNumber.
+      // flightNumber uniqueness is a DB constraint; a duplicate surfaces as a
+      // Prisma P2002 handled by the central error middleware. Note: the
+      // constraint spans soft-deleted rows too, so a soft-deleted flight keeps
+      // holding its flightNumber.
       return await prisma.flight.create({
         data: {
           airline: input.airline,

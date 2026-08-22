@@ -61,8 +61,8 @@ export const compactMoney = (pesewas: number): string => {
 
 /**
  * Categorical palette: the app's chart tokens in a FIXED assignment order
- * validated with the dataviz palette checker in both themes (adjacent-pair
- * CVD separation + contrast vs the card surface). Never cycle or reorder.
+ * chosen for adjacent-pair CVD separation and contrast against the card
+ * surface in both themes. Never cycle or reorder.
  */
 export const PALETTE = [
   "var(--chart-1)",

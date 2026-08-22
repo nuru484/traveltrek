@@ -1,11 +1,11 @@
 // src/components/dashboard/dashboard-overview.tsx
 //
-// The dashboard, dms-architecture edition: header → platform stats (row A)
-// → business stats with trends (row B, staff) → needs-attention strip →
-// paired widget rows (trend chart | status donut, recent bookings | top
-// tours). Every widget owns its own query and renders its own
-// skeleton/error/retry — no page-level all-or-nothing. Customers keep the
-// platform stats, quick actions and their travel-summary block.
+// The dashboard: header → platform stats (row A) → business stats with
+// trends (row B, staff) → needs-attention strip → paired widget rows (trend
+// chart | status donut, recent bookings | top tours). Every widget owns its
+// own query and renders its own skeleton/error/retry, so there is no
+// page-level all-or-nothing. Customers keep the platform stats, quick
+// actions and their travel-summary block.
 //
 // Role note: the revenue/avg-booking cards, charts and ranked lists read the
 // ADMIN-only report endpoints, so they render (and query) for admins ONLY —

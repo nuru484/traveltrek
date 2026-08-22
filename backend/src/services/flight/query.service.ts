@@ -26,7 +26,7 @@ export const makeFlightQueryService = (d: FlightDeps) => {
   const getFlightById = async (
     id: number,
   ): Promise<FlightWithSummaryRelations> => {
-    // findFirst so soft-deleted flights 404 like hard-deleted ones did.
+    // findFirst so soft-deleted flights 404 instead of being returned.
     const flight = await prisma.flight.findFirst({
       include: flightSummaryInclude,
       where: { id },
@@ -156,7 +156,7 @@ export const makeFlightQueryService = (d: FlightDeps) => {
     return { flights, total };
   };
 
-  /** Aggregated dashboard numbers, ported verbatim from the legacy handler. */
+  /** Aggregated dashboard numbers for the flights overview. */
   const getFlightStats = async () => {
     const now = clock.now();
 

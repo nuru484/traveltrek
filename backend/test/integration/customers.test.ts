@@ -1,6 +1,6 @@
 // test/integration/customers.test.ts
 //
-// The customers domain (Phase 5b): staff-side CRUD over the customer base,
+// The customers domain: staff-side CRUD over the customer base,
 // the full-profile read (identity + lifetime activity counters), the COMPLETE
 // paginated booking/payment history endpoints, and the self-access rule —
 // a customer may reach exactly their own profile/history, staff reach anyone.

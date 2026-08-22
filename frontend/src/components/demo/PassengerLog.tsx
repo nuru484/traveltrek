@@ -1,7 +1,6 @@
 // The passenger log: latest published reviews from /public/reviews/recent,
 // rendered as stamped log entries. Renders nothing when no reviews have been
-// published (or the backend is down). Moved from the landing page's
-// TestimonialsSection when the demo got its own page.
+// published (or the backend is down).
 import { RatingValue } from "@/components/ui/rating";
 import type { IPublicReview } from "@/types/review.types";
 import { reviewTargetLine } from "./showcase-logic";

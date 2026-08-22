@@ -1,7 +1,7 @@
 // src/routes/user.ts
 //
-// STAFF management (Phase 5b): every endpoint is staff-gated — customers have
-// their own /customers surface and never touch /users anymore.
+// STAFF management: every endpoint is staff-gated; customers have their own
+// /customers surface and never touch /users.
 import { Router } from 'express';
 
 import { adminCreateUser } from '#controllers/authentication/index.js';

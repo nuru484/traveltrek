@@ -1,8 +1,8 @@
 // src/validations/common-validation.ts
 //
-// Shared request-validation building blocks (zod). These replace hand-rolled
-// param guards and raw pagination parsing inside controllers, moving both to
-// the route boundary where the rest of the codebase validates input.
+// Shared request-validation building blocks (zod). Param guards and
+// pagination parsing run at the route boundary, where the rest of the
+// codebase validates input, rather than inside controllers.
 import { z } from 'zod';
 
 /**

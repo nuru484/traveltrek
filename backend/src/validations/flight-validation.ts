@@ -1,7 +1,7 @@
 // src/validations/flight-validation.ts
 //
-// Zod schemas for the flight domain (replaces the express-validator chains).
-// Boundary rules only — shape, formats, ranges, enums and date ordering.
+// Zod schemas for the flight domain. Boundary rules only: shape, formats,
+// ranges, enums and date ordering.
 // Invariants that need the database (origin/destination existence, route and
 // capacity guards, the status state machine, cross-field checks that fall
 // back to the stored flight, flightNumber uniqueness — a DB constraint) live
@@ -13,7 +13,7 @@ import { FlightStatus } from '#config/prismaClient.js';
 import { FLIGHT_SORT_FIELDS } from '#services/flight.service.js';
 import { paginationQuery } from '#validations/common-validation.js';
 
-/** Cabin classes the legacy validation accepted (the column is a string). */
+/** Accepted cabin classes (the column is a string). */
 export const FLIGHT_CLASSES = [
   'Economy',
   'Premium Economy',
@@ -115,8 +115,8 @@ export const createFlightSchema = flightFields
 // omitted (origin/destination distinctness, the 30-minute arrival gap), the
 // "at least one field" rule (a photo may arrive as a file zod cannot see) and
 // the DELAYED/CANCELLED-only status rule are enforced by the update service.
-// Update-specific bounds differ from create on purpose: the legacy chains
-// allowed price >= 1 and capacity >= 0 here.
+// Update-specific bounds differ from create on purpose: price >= 1 GHS and
+// capacity >= 0 are allowed here.
 export const updateFlightSchema = flightFields
   .partial()
   .extend({
@@ -126,7 +126,7 @@ export const updateFlightSchema = flightFields
       .min(0, 'Capacity must be an integer between 0 and 850')
       .max(850, 'Capacity must be an integer between 0 and 850')
       .optional(),
-    // Legacy floor was 1 GHS; ×100 in pesewas.
+    // Floor is 1 GHS, expressed in pesewas.
     price: z.coerce
       .number('Price must be an integer (pesewas) greater than or equal to 100')
       .int('Price must be an integer (pesewas) greater than or equal to 100')
@@ -159,8 +159,8 @@ export const updateFlightSchema = flightFields
 
 /**
  * PATCH /flights/:id/status body. Times stay raw strings: only the DELAYED
- * path may use them, and the service parses/rejects them with the legacy
- * messages ("Invalid date format for departure or arrival time.").
+ * path may use them, and the service parses/rejects them
+ * ("Invalid date format for departure or arrival time.").
  */
 export const flightStatusSchema = z.object({
   arrival: z.string().optional(),
@@ -170,7 +170,7 @@ export const flightStatusSchema = z.object({
 
 export const flightListQuery = paginationQuery
   .extend({
-    // The legacy chain capped airline at 60 but reported "100" — kept as-is.
+    // The airline filter is capped at 60 though the message names 100.
     airline: z
       .string('Airline filter must be between 2 and 100 characters')
       .min(2, 'Airline filter must be between 2 and 100 characters')

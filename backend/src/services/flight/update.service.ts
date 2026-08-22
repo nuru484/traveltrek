@@ -32,8 +32,8 @@ export const makeFlightUpdateService = (d: FlightDeps, core: FlightCore) => {
     const uploadedPhotoUrl = input.photo;
 
     try {
-      // Previously the express-validator "updateFields" custom check; it lives
-      // here because the photo may arrive as a multer file zod cannot see.
+      // The "at least one field" check lives here rather than in zod because
+      // the photo may arrive as a multer file zod cannot see.
       const providedFields = (
         Object.keys(input) as (keyof FlightUpdateInput)[]
       ).filter((key) => input[key] !== undefined);
@@ -43,9 +43,9 @@ export const makeFlightUpdateService = (d: FlightDeps, core: FlightCore) => {
         );
       }
 
-      // PUT may only move status to DELAYED or CANCELLED — checked before any
-      // row is fetched, as the legacy handler did. The state-machine endpoint
-      // owns every other transition.
+      // PUT may only move status to DELAYED or CANCELLED, checked before any
+      // row is fetched. The state-machine endpoint owns every other
+      // transition.
       if (
         input.status !== undefined &&
         input.status !== FlightStatus.DELAYED &&
@@ -67,8 +67,8 @@ export const makeFlightUpdateService = (d: FlightDeps, core: FlightCore) => {
       });
       if (!existingFlight) throw new NotFoundError('Flight not found');
 
-      // Previously validation-chain custom checks that read the stored flight
-      // for fallbacks; kept verbatim, message included.
+      // Route guards that need the stored flight for their fallbacks, so they
+      // cannot run at the boundary.
       if (input.originId !== undefined || input.destinationId !== undefined) {
         const effectiveOriginId = input.originId ?? existingFlight.originId;
         const effectiveDestinationId =
@@ -107,7 +107,7 @@ export const makeFlightUpdateService = (d: FlightDeps, core: FlightCore) => {
 
       if (existingFlight.status === FlightStatus.DELAYED) {
         const allowedUpdatesForDelayed = ['arrival', 'departure', 'status'];
-        // The photo is exempt, as the legacy check exempted flightPhoto.
+        // The photo is exempt from the DELAYED field whitelist.
         const invalidUpdates = providedFields.filter(
           (key) => key !== 'photo' && !allowedUpdatesForDelayed.includes(key),
         );

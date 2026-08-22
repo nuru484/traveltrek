@@ -1,15 +1,13 @@
 // src/services/destination.service.ts
 //
-// Destinations domain logic, extracted from the legacy fat controller. Pure,
-// DI'd functions: they take typed inputs, own every Prisma access and domain
-// invariant (name uniqueness, dependency guards, Cloudinary photo cleanup),
-// throw the typed CustomError subclasses and never touch req/res.
+// Destinations domain logic. Pure, DI'd functions: they take typed inputs,
+// own every Prisma access and domain invariant (name uniqueness, dependency
+// guards, Cloudinary photo cleanup), throw the typed CustomError subclasses
+// and never touch req/res.
 //
-// Role enforcement note: the legacy handlers re-checked req.user.role inline
-// (ADMIN/AGENT gates on create/update/delete). Those duplicates were
-// deliberately dropped in this refactor — routes/destination.ts already
-// enforces roles via authorizeRole, which is the single authorization
-// boundary.
+// Role enforcement note: no handler here re-checks req.user.role.
+// routes/destination.ts enforces the ADMIN/AGENT gates via authorizeRole,
+// which is the single authorization boundary.
 import type { Prisma } from '#config/prismaClient.js';
 
 import {
@@ -54,8 +52,7 @@ export type DestinationUpdateInput = Partial<DestinationInput>;
 /**
  * Narrow relation counts used by the delete guards. Nested reads are not
  * scoped by the soft-delete extension, so each carries an explicit
- * `deletedAt: null` — soft-deleted dependents no longer block a delete
- * (matching the old hard-delete world where they no longer existed).
+ * `deletedAt: null`, so soft-deleted dependents never block a delete.
  */
 const dependencyInclude = {
   destinationFlights: { select: { id: true }, where: { deletedAt: null } },
@@ -91,8 +88,7 @@ export const makeDestinationService = (
 
   /**
    * Case-insensitive uniqueness guard for name + country (+ city when one is
-   * in play), previously a validation-chain custom check. `excludeId` skips
-   * the row being updated.
+   * in play). `excludeId` skips the row being updated.
    */
   const assertNameAvailable = async (
     name: string,
@@ -162,8 +158,8 @@ export const makeDestinationService = (
     const uploadedPhotoUrl = input.photo;
 
     try {
-      // Previously a validation-chain custom check; it lives here because the
-      // photo may arrive as a multer file that zod (body-only) cannot see.
+      // The at-least-one-field check lives here because the photo may arrive
+      // as a multer file that zod (body-only) cannot see.
       if (
         !input.name &&
         !input.description &&

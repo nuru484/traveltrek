@@ -1,6 +1,6 @@
 // src/controllers/customerController.ts
 //
-// Thin HTTP adapters for the customers domain (Phase 5b): each export is a
+// Thin HTTP adapters for the customers domain: each export is a
 // RequestHandler bundle of [multer/picture middleware where relevant, zod
 // validation middleware, asyncHandler(handler)]. Handlers read the typed
 // req.query/body/params the middleware wrote back, call the customer service,

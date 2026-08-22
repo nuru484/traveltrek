@@ -1,6 +1,6 @@
 // test/component/tour-list-item.test.tsx
 //
-// The tour card's new cover-photo + rating treatment: photo banner when a
+// The tour card's cover-photo + rating treatment: photo banner when a
 // photo exists, placeholder otherwise, and the rating aggregate either way.
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";

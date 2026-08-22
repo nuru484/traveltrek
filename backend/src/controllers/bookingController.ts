@@ -7,13 +7,11 @@
 // (per-type availability, deadlines, counters, guard chains) lives in
 // services/booking.service.ts.
 //
-// Unlike other converted domains, the booking role rules are NOT duplicated
-// by routes/booking.ts, so they were moved into the service as actor-based
-// rules rather than dropped: every handler that had an in-handler check
-// passes `{ id, role }` down (create/get/list/user-list/delete);
-// updateBooking had none and still has none. The `!user` guards below only
-// narrow the optional type (authenticate-jwt always sets req.user) and fail
-// closed with the legacy messages if middleware order ever breaks.
+// The booking role rules are NOT enforced by routes/booking.ts: they live in
+// the service as actor-based rules, so create/get/list/user-list/delete each
+// pass `{ id, role }` down. updateBooking carries no role rule. The `!user`
+// guards below only narrow the optional type (authenticate-jwt always sets
+// req.user) and fail closed if middleware order ever breaks.
 import { Request, RequestHandler, Response } from 'express';
 
 import { HTTP_STATUS_CODES } from '#config/constants.js';
@@ -104,8 +102,8 @@ export const getBooking: RequestHandler[] = [
   handleGetBooking,
 ];
 
-// The legacy update handler enforced no role rule (any authenticated
-// ADMIN/AGENT/CUSTOMER the route admits may update) — preserved as-is.
+// No role rule on update: any authenticated ADMIN/AGENT/CUSTOMER the route
+// admits may update.
 const handleUpdateBooking = asyncHandler(
   async (req: Request, res: Response) => {
     const body = req.body as UpdateBookingBody;

@@ -1,9 +1,9 @@
 // test/integration/bookings-extra.test.ts
 //
-// Coverage the baseline bookings suite lacks, pinned against the service-layer
-// refactor: room and flight booking happy paths (price/nights math, seat and
-// availability accounting), admin updates (guest counts, the status guard
-// rails), and the role rules on the per-user listing endpoint.
+// Coverage the baseline bookings suite lacks: room and flight booking happy
+// paths (price/nights math, seat and availability accounting), admin updates
+// (guest counts, the status guard rails), and the role rules on the per-user
+// listing endpoint.
 import { describe, expect, it } from 'vitest';
 
 import prisma from '#config/prismaClient.js';

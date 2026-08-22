@@ -109,7 +109,7 @@ externalDocs:
 
 servers:
   # Relative on purpose: the docs are served by the API itself, so this
-  # resolves to whichever deployment you are reading, and "Try it out" is
+  # resolves to whichever deployment is serving the page, and "Try it out" is
   # always same-origin, which is what lets the session cookie ride along.
   - url: /
     description: This deployment

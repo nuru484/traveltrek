@@ -77,7 +77,7 @@ export interface BookingListParams {
   /** Filter by owner; ignored for customers (always scoped to themselves). */
   customerId?: number;
   flightId?: number;
-  /** Raw date strings, parsed here the way the legacy handler did. */
+  /** Raw date strings; the service parses them. */
   fromDate?: string;
   limit: number;
   page: number;
@@ -122,7 +122,7 @@ export const VALID_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> =
     PENDING: [BookingStatusEnum.CONFIRMED, BookingStatusEnum.CANCELLED],
   };
 
-/** Nights between two dates, midnight-to-midnight (legacy bookingHelpers). */
+/** Nights between two dates, midnight-to-midnight. */
 export const calculateNights = (startDate: Date, endDate: Date): number => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -133,7 +133,7 @@ export const calculateNights = (startDate: Date, endDate: Date): number => {
   return Math.ceil((end.getTime() - start.getTime()) / DAY_MS);
 };
 
-/** Total price for a room stay (legacy bookingHelpers). */
+/** Total price for a room stay. */
 export const calculateRoomBookingPrice = (
   pricePerNight: number,
   numberOfNights: number,

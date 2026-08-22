@@ -1,8 +1,8 @@
 // src/components/settings/contact-change/MethodToggle.tsx
 //
 // The two-way re-auth proof toggle shared by both contact-change dialogs:
-// prove it's you with your password, or with a code sent to your current
-// contact (the passwordless path).
+// the account password, or a code sent to the account's current contact
+// (the passwordless path).
 "use client";
 import * as React from "react";
 import { type ReauthMethod } from "../contact-change-logic";

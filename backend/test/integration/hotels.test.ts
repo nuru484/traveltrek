@@ -1,7 +1,7 @@
 // test/integration/hotels.test.ts
 //
-// Behaviour of the hotel CRUD surface after the service-layer refactor: role
-// gates, validation, pagination, filters and the delete-with-rooms guard.
+// Behaviour of the hotel CRUD surface: role gates, validation, pagination,
+// filters and the delete-with-rooms guard.
 import { describe, expect, it } from 'vitest';
 
 import { authedApi } from '../helpers/auth.js';

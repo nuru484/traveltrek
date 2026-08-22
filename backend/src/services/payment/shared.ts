@@ -19,7 +19,7 @@ export type PaymentDeps = Pick<
   'clock' | 'config' | 'logger' | 'notify' | 'paystack' | 'prisma'
 >;
 
-/** Payment methods the legacy handler accepted (mirrors PaymentMethod). */
+/** Payment methods the API accepts (mirrors PaymentMethod). */
 export const PAYMENT_METHODS = [
   'BANK_TRANSFER',
   'CREDIT_CARD',
@@ -41,8 +41,8 @@ export type PaymentActor = Pick<IUser, 'id' | 'role'>;
 
 /**
  * Outcome of the GET /payments/callback verification. `no_booking_id` and
- * `booking_not_found` were legacy early-return responses (400/404); the
- * remaining kinds are the three 200 bodies (failed / mismatch / completed).
+ * `booking_not_found` are the early-return responses (400/404); the remaining
+ * kinds are the three 200 bodies (failed / mismatch / completed).
  */
 export type PaymentCallbackResult =
   | {
@@ -74,7 +74,7 @@ export interface PaymentInitializeResult {
 }
 
 export interface PaymentListParams {
-  /** Filter by owner; the legacy handler honoured it for ADMIN only. */
+  /** Filter by owner; honoured for ADMIN only. */
   customerId?: number;
   limit: number;
   page: number;
@@ -116,7 +116,7 @@ export const isPaymentStatus = (
   value !== undefined &&
   (PAYMENT_STATUSES as readonly string[]).includes(value);
 
-/** Paystack channel for a validated payment method (legacy mapping). */
+/** Paystack channel for a validated payment method. */
 export const getPaystackChannel = (paymentMethod: PaymentMethod): string => {
   switch (paymentMethod) {
     case 'BANK_TRANSFER':

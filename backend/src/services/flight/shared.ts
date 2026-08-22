@@ -14,10 +14,7 @@ export type FlightDeps = Pick<
   'clock' | 'cloudinary' | 'logger' | 'prisma'
 >;
 
-/**
- * Whitelisted `sortBy` fields for flight listings — the columns the legacy
- * search validation allowed.
- */
+/** Whitelisted `sortBy` fields for flight listings. */
 export const FLIGHT_SORT_FIELDS = [
   'airline',
   'arrival',
@@ -54,7 +51,7 @@ export interface FlightInput {
 
 export interface FlightListParams {
   airline?: string;
-  /** Raw date strings, parsed here the way the legacy handler did. */
+  /** Raw date strings; the service parses them. */
   departureFrom?: string;
   departureTo?: string;
   destinationId?: number;
@@ -76,7 +73,7 @@ export type FlightSortField = (typeof FLIGHT_SORT_FIELDS)[number];
 
 /**
  * PATCH /flights/:id/status payload. Times stay raw strings: the DELAYED path
- * parses and rejects them with the legacy messages.
+ * parses and rejects them.
  */
 export interface FlightStatusChangeInput {
   arrival?: string;

@@ -1,6 +1,5 @@
 // Inventory cards for the live demo page: real rows from the public API,
-// each linking through the login redirect into the dashboard. Moved from the
-// landing page's LiveShowcaseSection when the demo got its own page.
+// each linking through the login redirect into the dashboard.
 import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";

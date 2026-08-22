@@ -52,9 +52,8 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * Guards the multer-parsed photo file (type + size) before the Cloudinary
- * upload middleware runs. Zod validates req.body only, so this keeps the
- * legacy hotelPhotoValidation checks — same messages, same validation-error
- * envelope.
+ * upload middleware runs. Zod validates req.body only, so the photo checks
+ * run here, reported through the standard validation-error envelope.
  */
 const validatePhotoFile: RequestHandler = (req, _res, next) => {
   const { file } = req;

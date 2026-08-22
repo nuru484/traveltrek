@@ -35,7 +35,7 @@ export const makePaymentCheckoutService = (
 
   /**
    * POST /payments — initialize a Paystack transaction for a booking. Guard
-   * order is the legacy one: booking existence → ownership → booking-status
+   * order: booking existence → ownership → booking-status
    * gates → payment-method whitelist → existing-payment triage (COMPLETED
    * 400, PENDING resumes the session with its original reference, FAILED
    * 400). Only then is a fresh transaction initialized and the Payment row
@@ -47,9 +47,8 @@ export const makePaymentCheckoutService = (
   ): Promise<PaymentInitializeResult> => {
     const { bookingId, paymentMethod } = input;
 
-    // The legacy handler also fetched tour/room/flight relations here but
-    // never read them; only the payment and the payer's email are used.
-    // findFirst so soft-deleted bookings 404 like hard-deleted ones did.
+    // Only the payment and the payer's email are read from this row.
+    // findFirst so soft-deleted bookings 404.
     const booking = await prisma.booking.findFirst({
       include: {
         customer: true,
@@ -78,8 +77,8 @@ export const makePaymentCheckoutService = (
       throw new BadRequestError('Booking already paid for');
     }
 
-    // (The legacy handler had a final `status !== PENDING` fallback here —
-    // unreachable, since the three guards above cover every other status.)
+    // No fallback branch for a non-PENDING status: the three guards above
+    // cover every other status.
 
     if (!isPaymentMethod(paymentMethod)) {
       throw new BadRequestError('Invalid payment method');
@@ -101,9 +100,8 @@ export const makePaymentCheckoutService = (
 
       if (booking.payment.status === PaymentStatus.PENDING) {
         // Re-initialize Paystack for the existing pending payment.
-        // totalPrice is already integer pesewas — exactly the minor units
-        // Paystack expects, so no ×100 conversion (the legacy Float-GHS one
-        // was removed).
+        // totalPrice is already integer pesewas: exactly the minor units
+        // Paystack expects, so no ×100 conversion.
         const resumed = await paystack.initialize({
           amount: booking.totalPrice,
           callbackUrl: callbackUrl(),
@@ -127,8 +125,8 @@ export const makePaymentCheckoutService = (
           'Previous payment failed. Please contact support',
         );
       }
-      // A REFUNDED payment falls through, as before — the unique bookingId
-      // constraint then rejects the second Payment row (Prisma P2002).
+      // A REFUNDED payment falls through: the unique bookingId constraint
+      // then rejects the second Payment row (Prisma P2002).
     }
 
     // totalPrice is already integer pesewas (Paystack minor units); no ×100.
@@ -166,7 +164,7 @@ export const makePaymentCheckoutService = (
    * GET /payments/callback — verify a transaction after Paystack redirects
    * back. Marks the payment FAILED on an unsuccessful charge or an amount
    * mismatch, COMPLETED (+ booking CONFIRMED) on success; the controller
-   * translates each outcome into the legacy bespoke envelope.
+   * translates each outcome into the callback's bespoke envelope.
    */
   const verifyPaymentCallback = async (
     reference: string,
@@ -175,7 +173,7 @@ export const makePaymentCheckoutService = (
 
     const rawBookingId = verified.metadata?.bookingId;
 
-    // Legacy falsy check: a missing (or zero) bookingId is 'not found'.
+    // A missing (or zero) bookingId reads as 'not found'.
     if (
       !rawBookingId ||
       (typeof rawBookingId !== 'number' && typeof rawBookingId !== 'string')
@@ -193,9 +191,9 @@ export const makePaymentCheckoutService = (
       return { kind: 'booking_not_found' };
     }
 
-    // Paystack reports amounts in minor units — the same unit totalPrice now
+    // Paystack reports amounts in minor units, the same unit totalPrice
     // stores (pesewas), so both the comparison and the returned amount are
-    // unit-for-unit (the legacy ÷100 GHS conversions were removed).
+    // unit-for-unit; no ÷100 conversion.
     // The FAILED writes below only touch unsettled rows so a stray re-verify
     // can never clobber a payment that already COMPLETED or refunded.
     if (verified.status !== 'success') {
@@ -251,7 +249,7 @@ export const makePaymentCheckoutService = (
    * POST /payments/webhook — process a (signature-verified) Paystack event.
    * charge.success is re-verified against the Paystack API, reconciled
    * against the booking total (mismatch marks the payment FAILED and raises
-   * the legacy 500), then completes the payment and confirms the booking.
+   * a 500), then completes the payment and confirms the booking.
    * Every other event type is acknowledged untouched.
    */
   const handleWebhookEvent = async (
@@ -292,8 +290,8 @@ export const makePaymentCheckoutService = (
           transactionReference: reference,
         },
       });
-      // Legacy threw a bare Error here (an unhandled 500); same status and
-      // message, now as a typed CustomError.
+      // A typed CustomError so the central error middleware answers 500 with
+      // this message instead of a bare unhandled throw.
       throw new InternalServerError(
         'Payment amount does not match booking total price',
       );

@@ -5,9 +5,8 @@ import { defaultDeps } from '#services/deps.js';
 // modules under ./report: shared.ts (Prisma selects, wire-payload types, the
 // pure period-window/trend helpers), core.ts (report-year resolution), and one
 // module per report (bookings, payments, tours, and the per-actor self
-// reports). Every report returns its legacy `data` payload bit-for-bit, so the
-// dashboards are unaffected. makeReportService builds the core once and spreads
-// each feature factory into one object, preserving the public surface.
+// reports). makeReportService builds the core once and spreads each feature
+// factory into one object, preserving the public surface.
 import { makeReportBookingsService } from '#services/report/bookings.service.js';
 import { makeReportCore } from '#services/report/core.js';
 import { makeReportPaymentsService } from '#services/report/payments.service.js';
@@ -35,8 +34,7 @@ import {
 } from '#services/report/shared.js';
 import { makeReportToursService } from '#services/report/tours.service.js';
 
-// Re-export the public types controllers/tests import from this module path
-// (unchanged from the pre-split surface).
+// Re-export the public types controllers/tests import from this module path.
 export {
   type AgentActivityParams,
   type AgentActivityReport,

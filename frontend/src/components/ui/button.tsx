@@ -14,7 +14,7 @@ const buttonVariants = cva(
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         // Neutral hover: this theme repurposes --accent as a brand turquoise
         // (white foreground), so the stock hover:bg-accent/text-accent-foreground
-        // turned outline buttons teal with unreadable text.
+        // would turn outline buttons teal with unreadable text.
         outline:
           "border border-foreground/20 bg-transparent hover:bg-muted/60 hover:text-foreground dark:border-input dark:hover:bg-input/50",
         secondary:

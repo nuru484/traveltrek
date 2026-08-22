@@ -1,10 +1,10 @@
 // src/components/settings/ContactSettings.tsx
 //
-// Settings -> Contact: the account's login identifiers. Email and phone can
-// no longer be edited on the profile forms (self-service) - each card shows
-// the current value read-only and expands its verified change form inline
-// (like the password tab) instead of opening a dialog. Only one form is
-// open at a time so small screens never stack two flows.
+// Settings -> Contact: the account's login identifiers. Email and phone are
+// not editable on the profile forms, so each card shows the current value
+// read-only and expands its verified change form inline (like the password
+// tab) instead of opening a dialog. Only one form is open at a time so small
+// screens never stack two flows.
 "use client";
 import * as React from "react";
 import { useSelector } from "react-redux";

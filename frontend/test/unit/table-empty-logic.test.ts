@@ -1,6 +1,6 @@
 // test/unit/table-empty-logic.test.ts
 //
-// Empty-state semantics (dms/website pattern): no data + no filters replaces
+// Empty-state semantics: no data + no filters replaces
 // the whole table scaffold with an EmptyState (no toolbar/headers/pagination);
 // an empty FILTERED result keeps the toolbar and offers a clear action.
 import { describe, expect, it } from "vitest";

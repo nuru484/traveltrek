@@ -5,9 +5,8 @@
 // lives in exactly one place and raw DB records never leak.
 //
 // The password is excluded at the SELECT, not stripped afterwards, so it can
-// never appear in a DTO. toUserDTO reproduces the legacy read responses
-// bit-for-bit: nullable columns are mapped to undefined (dropped from the
-// JSON), and role is narrowed to the shared UserRole enum.
+// never appear in a DTO. toUserDTO maps nullable columns to undefined (so
+// they drop out of the JSON) and narrows role to the shared UserRole enum.
 import type { Prisma } from '#config/prismaClient.js';
 
 import { UserRole } from '#types/user-profile.types.js';

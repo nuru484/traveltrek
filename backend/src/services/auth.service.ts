@@ -9,8 +9,8 @@ import { makePasswordResetService } from '#services/auth/password-reset.service.
 import { makeRegistrationService } from '#services/auth/registration.service.js';
 // src/services/auth.service.ts
 //
-// Thin composer for the authentication domain (Phase 5b's two-principal
-// model — customers + staff Users). The implementation is split into
+// Thin composer for the authentication domain (two principals — customers
+// and staff Users). The implementation is split into
 // focused modules under ./auth: shared.ts (constants/types/pure helpers),
 // core.ts (the DI'd engine — principal resolution, session/lockout state,
 // token minting/rotation, the single-use security-code engine, the 2FA
@@ -43,7 +43,7 @@ import { makeTwoFactorService } from '#services/auth/two-factor.service.js';
 import { defaultDeps } from '#services/deps.js';
 
 // Re-export the public types and pure helpers controllers/tests import from
-// this module path (unchanged from the pre-split surface).
+// this module path.
 export {
   type AuthDeps,
   type AuthPrincipal,

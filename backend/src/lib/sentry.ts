@@ -1,6 +1,6 @@
 // src/lib/sentry.ts
 //
-// Error tracking (ported from khadys). Optional and fail-safe: when
+// Error tracking. Optional and fail-safe: when
 // SENTRY_DSN is unset the whole module is a no-op — nothing is initialized
 // and nothing leaves the box. Only UNEXPECTED errors (5xx / HIGH-CRITICAL
 // severity) are reported by the central error handler; expected 4xx

@@ -2,9 +2,9 @@ import Image from "next/image";
 import { Plane } from "lucide-react";
 
 /**
- * Full-page branded loader for the dashboard boot (replaces the old
- * all-skeleton screen). TravelTrek's own signature: a plane orbits a dashed
- * route ring around the logo while a runway bar taxis beneath the label.
+ * Full-page branded loader for the dashboard boot. TravelTrek's own
+ * signature: a plane orbits a dashed route ring around the logo while a
+ * runway bar taxis beneath the label.
  * CSS-only (keyframes in globals.css), reduced-motion aware.
  */
 export function DashboardLoader() {

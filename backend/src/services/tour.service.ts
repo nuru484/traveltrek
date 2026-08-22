@@ -26,7 +26,7 @@ import { makeTourStatusService } from '#services/tour/status.service.js';
 import { makeTourUpdateService } from '#services/tour/update.service.js';
 
 // Re-export the public types/consts controllers/validation/tests import from
-// this module path (unchanged from the pre-split surface).
+// this module path.
 export {
   type PublicTourListParams,
   TOUR_SORT_FIELDS,

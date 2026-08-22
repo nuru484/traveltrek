@@ -5,12 +5,11 @@
 // typed req.query the middleware wrote back (numbers coerced, defaults for
 // currency/limit/minBookings applied), call the report service, and reply
 // through the standard envelope helpers. All aggregate math and Prisma
-// access lives in services/report.service.ts, which returns the legacy
-// `data` payload unchanged — including the `summary.period` / `filters`
-// echoes the frontend dashboards read.
+// access lives in services/report.service.ts, whose `data` payload goes out
+// as-is, including the `summary.period` / `filters` echoes the frontend
+// dashboards read.
 //
-// Routes gate all three endpoints to ADMIN, as before; no in-handler actor
-// rules existed in the legacy controller.
+// Routes gate all three endpoints to ADMIN; no handler re-checks the actor.
 import { Request, RequestHandler, Response } from 'express';
 
 import {

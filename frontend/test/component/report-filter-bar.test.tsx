@@ -2,7 +2,7 @@
 //
 // ReportFilterBar's two renderings: at or under the inline threshold the
 // controls render straight into the toolbar (no Filters button/panel);
-// above it they collapse behind the dms-style Filters button.
+// above it they collapse behind the Filters button.
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

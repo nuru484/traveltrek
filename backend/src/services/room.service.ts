@@ -27,7 +27,7 @@ import {
 import { makeRoomUpdateService } from '#services/room/update.service.js';
 
 // Re-export the public types/consts controllers/validation/tests import from
-// this module path (unchanged from the pre-split surface).
+// this module path.
 export {
   type DateWindowInput,
   ROOM_SORT_FIELDS,

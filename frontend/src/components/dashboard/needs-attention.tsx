@@ -1,8 +1,8 @@
 // src/components/dashboard/needs-attention.tsx
 //
-// The staff dashboard's operational strip (dms NeedsAttention architecture):
-// live counts of work needing action, each tile linking to the page where it
-// gets done. Windows/thresholds in the descriptions mirror the backend
+// The staff dashboard's operational strip: live counts of work needing
+// action, each tile linking to the page where it gets done. Windows and
+// thresholds in the descriptions mirror the backend
 // (services/dashboard.service.ts) so each link shows what was counted.
 "use client";
 

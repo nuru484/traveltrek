@@ -1,7 +1,7 @@
 // src/components/dashboard/skeletons.tsx
 //
 // Per-widget loading placeholders that mirror each widget's REAL DOM
-// node-for-node (the dms Skeletons pattern): same card paddings, the
+// node-for-node: same card paddings, the
 // boarding-pass label row with its dotted leader and code tag, the dashed
 // tear line, bordered list rows, varied chart bar heights. Composed inside
 // the same page grids as the loaded widgets, so nothing shifts when data

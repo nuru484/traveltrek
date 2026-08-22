@@ -299,8 +299,8 @@ export const handlePrismaError = (error: unknown): CustomError => {
 };
 
 /**
- * Wrapper for Prisma operations with automatic error handling
- * (Optional - you can use this in controllers if you want explicit handling)
+ * Wrapper for Prisma operations with automatic error handling, for call sites
+ * that prefer explicit handling over the middleware.
  */
 export const prismaErrorWrapper = async <T>(
   operation: () => Promise<T>,

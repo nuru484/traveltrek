@@ -1,9 +1,9 @@
 // test/integration/reports.test.ts
 //
-// Reports + dashboard endpoints, pinned against the service-layer refactor:
-// the aggregate keys and math the frontend dashboards read (summaries,
-// monthly/status/method breakdowns, top-N capping and ordering, the
-// period/filters echoes), the ADMIN-only route gates, and the zod filter
+// Reports + dashboard endpoints: the aggregate keys and math the frontend
+// dashboards read (summaries, monthly/status/method breakdowns, top-N
+// capping and ordering, the period/filters echoes), the ADMIN-only route
+// gates, and the zod filter
 // 400s. Rows are seeded directly through Prisma so booking/payment dates are
 // deterministic; mid-month UTC noon instants keep the server-local month
 // windows unambiguous in any timezone.
@@ -97,7 +97,7 @@ describe('GET /api/v1/reports/bookings/monthly-summary', () => {
 
     expect(summary.totalBookings).toBe(3);
     expect(summary.totalRevenue).toBe(1000);
-    // 1000 / 3, rounded to 2dp like the legacy Math.round(x * 100) / 100.
+    // 1000 / 3, rounded to 2dp.
     expect(summary.averageBookingValue).toBe(333.33);
     // No explicit range sent: startDate/endDate keys are absent, month null.
     expect(summary.period).toEqual({ month: null, year: 2026 });

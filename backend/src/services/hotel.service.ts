@@ -1,10 +1,9 @@
 // src/services/hotel.service.ts
 //
-// Hotels domain logic, extracted from the legacy fat controller. Pure, DI'd
-// functions: they take typed inputs, own every Prisma access and domain
-// invariant (destination existence, delete-with-rooms guards, Cloudinary
-// photo cleanup), throw the typed CustomError subclasses and never touch
-// req/res.
+// Hotels domain logic. Pure, DI'd functions: they take typed inputs, own
+// every Prisma access and domain invariant (destination existence,
+// delete-with-rooms guards, Cloudinary photo cleanup), throw the typed
+// CustomError subclasses and never touch req/res.
 import { type Prisma } from '#config/prismaClient.js';
 import {
   BadRequestError,
@@ -16,8 +15,8 @@ import { photoColumnValue } from '#utils/photo-removal.js';
 
 /**
  * Whitelisted `sortBy` fields for hotel listings. `city` and `country` live
- * on the related destination and sort through it (the legacy controller
- * accepted them but crashed on the flat orderBy; here they work).
+ * on the related destination and sort through the relation, not a flat
+ * orderBy on the hotel row.
  */
 export const HOTEL_SORT_FIELDS = [
   'city',
@@ -248,7 +247,7 @@ export const makeHotelService = (
       };
     }
 
-    // Exact match first; a min/max bound replaces it, like the legacy filter.
+    // Exact match first; a min/max bound replaces it.
     if (params.starRating !== undefined) where.starRating = params.starRating;
     if (
       params.minStarRating !== undefined ||

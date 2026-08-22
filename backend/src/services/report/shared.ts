@@ -1,8 +1,8 @@
 // src/services/report/shared.ts
 //
 // Dependency-free building blocks for the reports domain: the Prisma select
-// shapes, the wire-payload types (preserved bit-for-bit for the dashboards),
-// and the pure period-window / trend helpers. Shared by every report module.
+// shapes, the wire-payload types the dashboards consume, and the pure
+// period-window / trend helpers. Shared by every report module.
 import {
   type BookingStatus,
   type PaymentMethod,
@@ -19,7 +19,7 @@ import {
 /** The deps the reports domain draws from the app container. */
 export type ReportDeps = Pick<AppDeps, 'clock' | 'prisma'>;
 
-// ---- Prisma select shapes (the legacy controller never reshaped rows) ----
+// ---- Prisma select shapes (rows go out unreshaped) ----
 
 export const monthlyBookingSelect = {
   bookingDate: true,
@@ -195,7 +195,7 @@ export interface PaymentMonthBucket {
 }
 
 export interface PaymentsSummaryParams extends ReportPeriodParams {
-  /** Always present (zod defaults to GHS), so it always filters — as before. */
+  /** Always present (zod defaults to GHS), so it always filters. */
   currency: string;
   customerId?: number;
   paymentMethod?: PaymentMethod;
@@ -238,7 +238,7 @@ export interface PeriodWindow {
 
 /**
  * The `summary.period` echo. startDate/endDate are the client's raw strings
- * and are omitted from the JSON when not sent (legacy behaviour).
+ * and are omitted from the JSON when not sent.
  */
 export interface ReportPeriod {
   endDate?: string;
@@ -300,8 +300,8 @@ type TopTourRow = Prisma.TourGetPayload<{ select: typeof topTourSelect }>;
 // ---- Pure period / trend helpers ----
 
 /**
- * The trend math (dms getDateRanges pattern): if the previous window has no
- * activity, any current activity reads as +100% up; otherwise the percentage
+ * The trend math: if the previous window has no activity, any current
+ * activity reads as +100% up; otherwise the percentage
  * is the absolute change rounded to 2dp with the sign in `direction`.
  */
 export const calculateTrend = (
@@ -324,9 +324,9 @@ export const calculateTrend = (
 };
 
 /**
- * The legacy date-window precedence: explicit range → year+month → whole
- * year. Month windows are built in server-local time and the range endpoints
- * with `new Date(string)`, exactly as the old handlers did.
+ * Date-window precedence: explicit range → year+month → whole year. Month
+ * windows are built in server-local time, the range endpoints with
+ * `new Date(string)`.
  */
 export const periodWindow = (
   params: ReportPeriodParams,
@@ -353,8 +353,8 @@ export const periodWindow = (
 };
 
 /**
- * The equal-length window immediately before `window` (dms getDateRanges
- * "previous" pattern): ends 1ms before the current start.
+ * The equal-length window immediately before `window`: ends 1ms before the
+ * current start.
  */
 export const previousWindow = (window: PeriodWindow): PeriodWindow => {
   const end = new Date(window.start.getTime() - 1);

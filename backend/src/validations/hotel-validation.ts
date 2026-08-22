@@ -1,7 +1,7 @@
 // src/validations/hotel-validation.ts
 //
-// Zod schemas for the hotel domain (replaces the express-validator chains).
-// Boundary rules only — shape, lengths, ranges and character patterns.
+// Zod schemas for the hotel domain. Boundary rules only: shape, lengths,
+// ranges and character patterns.
 // Invariants that need the database (destination existence, delete-with-rooms
 // guards) and the multer file checks (zod only sees req.body) live in
 // services/hotel.service.ts and the controller's photo-file middleware.
@@ -10,10 +10,10 @@ import { z } from 'zod';
 import { HOTEL_SORT_FIELDS } from '#services/hotel.service.js';
 import { paginationQuery } from '#validations/common-validation.js';
 
-/** Letters, spaces, hyphens and apostrophes — the legacy place-name pattern. */
+/** Place names: letters, spaces, hyphens and apostrophes. */
 const PLACE_NAME_PATTERN = /^[a-zA-Z\s\-']+$/;
 
-/** Optional +, then 10–15 digits — the legacy phone pattern. */
+/** Phone numbers: optional +, then 10-15 digits. */
 const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
 
 const amenityItem = z
@@ -73,8 +73,8 @@ const hotelFields = z.object({
 
 export const createHotelSchema = hotelFields;
 
-// Empty updates were accepted by the legacy handler (a no-op update returning
-// the hotel), so no "at least one field" refinement here. hotelPhoto: '' is
+// Empty updates are accepted (a no-op update returning the hotel), so no
+// "at least one field" refinement here. hotelPhoto: '' is
 // the remove-photo signal (the service nulls the column and deletes the old
 // Cloudinary image).
 export const updateHotelSchema = hotelFields.partial();

@@ -1,7 +1,7 @@
 // test/integration/two-factor.test.ts
 //
-// Two-factor authentication over both principals (khadys pattern, adapted to
-// kind-tagged JWTs and email/SMS channels). Covers: the enable handshake
+// Two-factor authentication over both principals, on kind-tagged JWTs and
+// email/SMS channels. Covers: the enable handshake
 // (authed challenge + code), password login answering twoFactorRequired with
 // the pending cookie and NO auth cookies, verify completing the login with
 // the normal envelope, the wrong-code attempts cap, the silent resend

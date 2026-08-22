@@ -1,13 +1,12 @@
 # Components for two staff-facing domains that share one paths file: flight
 # inventory and the staff roster.
 #
-# Flights carry three wire shapes on purpose, inherited from the handlers they
-# replaced: mutations (create, update, status) embed the FULL origin and
-# destination rows and omit the raw ids, the single-flight read uses the
-# four-field route summaries and adds the ids and `capacity`, and the list uses
-# the summaries and the ids but leaves `capacity` out. They are kept apart here
-# rather than merged so the documented shape is the shape that is actually
-# sent.
+# Flights carry three wire shapes on purpose: mutations (create, update,
+# status) embed the FULL origin and destination rows and omit the raw ids, the
+# single-flight read uses the four-field route summaries and adds the ids and
+# `capacity`, and the list uses the summaries and the ids but leaves
+# `capacity` out. They are kept apart here rather than merged so the
+# documented shape is the shape that is actually sent.
 #
 # Staff accounts have no schema of their own here: the roster returns the same
 # `StaffAccount` the session endpoints return, because it is the same row.

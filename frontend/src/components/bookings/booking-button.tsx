@@ -88,7 +88,7 @@ export function BookingButton({
   );
   const [searchTerm, setSearchTerm] = useState("");
 
-  // New state for additional booking details. The counts are kept as raw
+  // State for the additional booking details. The counts are kept as raw
   // strings so the field can be cleared while typing; they are clamped on
   // blur and when the booking is submitted.
   const [numberOfGuests, setNumberOfGuests] = useState<string>("1");

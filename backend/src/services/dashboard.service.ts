@@ -7,13 +7,12 @@ import {
 import { type AppDeps, defaultDeps } from '#services/deps.js';
 // src/services/dashboard.service.ts
 //
-// Dashboard domain logic, extracted from the legacy fat controller. Pure,
-// DI'd functions: they own every Prisma count/aggregate and never touch
-// req/res. getDashboardStats returns the legacy `data` payload bit-for-bit —
-// base inventory stats for everyone, plus the bookings/users blocks only
-// when the actor is ADMIN or AGENT (customers never see them; the keys are
-// absent, not empty). getNeedsAttention powers the staff dashboard's
-// operational strip.
+// Dashboard domain logic. Pure, DI'd functions: they own every Prisma
+// count/aggregate and never touch req/res. getDashboardStats returns the
+// documented `data` payload: base inventory stats for everyone, plus the
+// bookings/users blocks only when the actor is ADMIN or AGENT (customers
+// never see them; the keys are absent, not empty). getNeedsAttention powers
+// the staff dashboard's operational strip.
 import { UserRole } from '#types/user-profile.types.js';
 
 export interface DashboardStats {
@@ -91,7 +90,7 @@ export const makeDashboardService = (
       prisma.tour.count({ where: { status: TourStatus.UPCOMING } }),
       prisma.tour.count({ where: { status: TourStatus.ONGOING } }),
       prisma.hotel.count(),
-      // Legacy counted room ROWS (room types), not the totalRooms stock sum.
+      // Counts room ROWS (room types), not the totalRooms stock sum.
       prisma.room.count(),
       prisma.flight.count(),
       prisma.flight.aggregate({ _sum: { seatsAvailable: true } }),
@@ -118,8 +117,8 @@ export const makeDashboardService = (
     };
 
     if (role === UserRole.ADMIN || role === UserRole.AGENT) {
-      // Phase 5b: customers live in their own table; User is staff-only.
-      // `total` keeps its legacy meaning (every account) as staff + customers.
+      // Customers live in their own table; User is staff-only, so `total`
+      // (every account) is staff + customers.
       const [
         totalBookings,
         pendingBookings,

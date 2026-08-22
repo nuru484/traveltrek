@@ -4,13 +4,12 @@
 // bookingInclude below); controllers map them through here so the wire format
 // lives in exactly one place and raw DB records never leak.
 //
-// toBookingDTO reproduces the legacy formatBookingResponse bit-for-bit: one
-// base shape plus a per-type variant (TOUR / ROOM / FLIGHT, checked in that
-// order), where the ROOM variant folds the booking-level stay fields
-// (startDate/endDate/numberOfNights/numberOfRooms) into the room object. A
-// booking with no associated item throws the same 400 the legacy helper did.
-// Phase 5b: bookings belong to Customers — the DTO emits customerId + a
-// nested customer summary where userId/user used to be.
+// toBookingDTO emits one base shape plus a per-type variant (TOUR / ROOM /
+// FLIGHT, checked in that order), where the ROOM variant folds the
+// booking-level stay fields (startDate/endDate/numberOfNights/numberOfRooms)
+// into the room object. A booking with no associated item throws a 400.
+// Bookings belong to Customers, so the DTO carries customerId plus a nested
+// customer summary.
 import type { Prisma } from '#config/prismaClient.js';
 
 import { BadRequestError } from '#middlewares/error-handler.js';
@@ -23,7 +22,7 @@ const bookingDestinationSelect = {
   name: true,
 } satisfies Prisma.DestinationSelect;
 
-/** Shared include for every booking read/write — the legacy bookingInclude. */
+/** Shared include for every booking read/write. */
 export const bookingInclude = {
   // Staff attribution: who created the booking on the customer's behalf
   // (null for customer self-bookings).
@@ -95,7 +94,7 @@ export interface RoomBookingDTO extends BookingBaseDTO {
   type: 'ROOM';
 }
 
-/** The room object with the booking's stay details folded in (legacy shape). */
+/** The room object with the booking's stay details folded in. */
 export interface RoomBookingRoomDTO {
   description: null | string;
   endDate: BookingWithRelations['endDate'];

@@ -1,7 +1,7 @@
 // src/middlewares/validate-request.ts
 //
-// Zod validation at the route boundary — the single request-validation
-// mechanism (the legacy express-validator ValidationFactory is gone).
+// Zod validation at the route boundary: the single request-validation
+// mechanism in this codebase.
 import { NextFunction, Request, Response } from 'express';
 import { ZodError, ZodType } from 'zod';
 

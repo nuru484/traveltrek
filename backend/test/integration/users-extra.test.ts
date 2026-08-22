@@ -1,14 +1,14 @@
 // test/integration/users-extra.test.ts
 //
-// Coverage the baseline users suite lacks, updated for Phase 5b (STAFF-only
-// users): the staff-vs-customer route gates, uniqueness conflicts, the
+// Coverage the baseline users suite lacks, over the STAFF-only /users
+// surface: the staff-vs-customer route gates, uniqueness conflicts, the
 // password field being stripped from profile updates (rotation is POST
 // /auth/change-password only), role-change guard rails (including the
 // legacy-reserved CUSTOMER value) and their effect, and the delete
-// protections (admin self-delete, the bulk confirmation gate). Staff carry no bookings/payments anymore, so the
-// legacy payment-based delete guards are gone — deletes are plain soft
-// deletes. JSON-only flows — no multipart, so the Cloudinary upload path
-// stays out of scope here.
+// protections (admin self-delete, the bulk confirmation gate). Staff carry no
+// bookings/payments, so deletes are plain soft deletes with no payment guard.
+// JSON-only flows — no multipart, so the Cloudinary upload path stays out of
+// scope here.
 import bcrypt from 'bcrypt';
 import { describe, expect, it } from 'vitest';
 
@@ -52,8 +52,8 @@ describe('PUT /api/v1/users/:userId (gates and rules)', () => {
     expect(res.body.data.password).toBeUndefined();
   });
 
-  // Contact-uniqueness 409s are now exercised via ANOTHER staff member's
-  // administrative edit: self-service email/phone changes moved to the
+  // Contact-uniqueness 409s are exercised via ANOTHER staff member's
+  // administrative edit, since self-service email/phone changes belong to the
   // verified /auth/change-email / /auth/change-phone flows (see
   // contact-change.test.ts for the self-service 400 rule).
   it('rejects an update to an email already taken by another user with 409', async () => {

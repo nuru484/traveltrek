@@ -1,7 +1,7 @@
 // test/component/table-empty-states.test.tsx
 //
-// Data-table empty-state semantics (dms/website pattern), driven through the
-// customers table: with NO data and NO filters the page shows ONLY an
+// Data-table empty-state semantics, driven through the customers table:
+// with NO data and NO filters the page shows ONLY an
 // EmptyState (no toolbar, no headers, no pagination); with filters active
 // and zero matches, the toolbar stays and the body offers a clear action.
 import { describe, expect, it, vi } from "vitest";

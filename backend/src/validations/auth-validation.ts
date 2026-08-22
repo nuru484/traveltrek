@@ -1,14 +1,13 @@
 // src/validations/auth-validation.ts
 //
-// Zod schemas for the authentication domain (replaces the express-validator
-// chain in the legacy auth-validations.ts). Boundary rules only — shape,
-// formats, enums. Notes on legacy fidelity:
+// Zod schemas for the authentication domain. Boundary rules only: shape,
+// formats, enums. Notes:
 //
 // - registerUser is the MINIMAL public signup: name plus at least one contact
 //   (email OR phone); password/address are optional — the profile is
 //   completed later via PUT /customers/:id. Public signups always create a
-//   Customer (Phase 5b).
-// - adminCreateUser creates STAFF ONLY: the legacy required fields (address,
+//   Customer.
+// - adminCreateUser creates STAFF ONLY: the required fields (address,
 //   email, name) and role required + restricted to ADMIN | AGENT. No
 //   password — accounts start passwordless (see the schema note).
 // - profilePicture is declared minimally: the Cloudinary middleware
@@ -43,7 +42,7 @@ const phoneField = z
     'Phone must be a valid phone number (10-15 digits)',
   );
 
-// POST /users creates STAFF ONLY (Phase 5b): customers are a separate model
+// POST /users creates STAFF ONLY: customers are a separate model
 // created via public signup or POST /customers, so the role is required here
 // and restricted to the staff roles.
 const staffRoleField = z.enum(
@@ -83,7 +82,7 @@ export const registerUserSchema = z
     path: ['email'],
   });
 
-/** Admin STAFF creation: the legacy required fields and the role mandatory +
+/** Admin STAFF creation: address, email and name required, and the role +
  * staff-only (ADMIN | AGENT). NO password — admins never set one (a `password`
  * key in the body is simply stripped): the account starts passwordless and
  * its owner establishes a password via forgot-password. */

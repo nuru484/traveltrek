@@ -29,7 +29,7 @@ export default function EditUserPage() {
   const user = userData?.data;
   const errorMessage = extractApiErrorMessage(error).message;
 
-  // ✅ Dynamic title based on search params
+  // The title follows the search params: own profile vs staff record.
   const isMyProfile = Boolean(searchUserId);
   const pageTitle = isMyProfile ? "Update My Profile" : "Edit Staff";
   const pageSubtitle = isMyProfile

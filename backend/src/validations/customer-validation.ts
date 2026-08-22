@@ -1,6 +1,6 @@
 // src/validations/customer-validation.ts
 //
-// Zod schemas for the customers domain (Phase 5b). Boundary rules only —
+// Zod schemas for the customers domain. Boundary rules only:
 // shape, formats — mirroring the user-domain field rules so the two profile
 // surfaces validate identically:
 //

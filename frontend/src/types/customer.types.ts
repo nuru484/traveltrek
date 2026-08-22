@@ -1,7 +1,7 @@
 // src/types/customer.types.ts
 //
-// Customers are their own principal (backend Phase 5b): bookings/payments
-// hang off a Customer record, and customers have NO role field. The DTO
+// Customers are their own principal: bookings/payments hang off a Customer
+// record, and customers have NO role field. The DTO
 // shapes mirror backend src/utils/mappers/customer.mapper.ts.
 import type { ReactNode } from "react";
 import type { BookingStatus } from "./booking.types";

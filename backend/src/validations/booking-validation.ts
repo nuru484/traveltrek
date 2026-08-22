@@ -1,22 +1,17 @@
 // src/validations/booking-validation.ts
 //
-// Zod schemas for the booking domain (replaces the express-validator chains).
-// Boundary rules only — shape, formats, ranges, enums. Invariants that need
-// the database (user/tour/room/flight existence, capacity and availability
-// guards, the status transition map) and the "at least one of tourId, roomId,
-// or flightId" rule live in services/booking.service.ts with their legacy
-// messages (the old validation-factory custom checks for that rule and for
-// roomId-requires-hotelId were attached to absent body fields, so `optional()`
-// skipped them — they never actually ran; the handler check was the real
-// enforcement and stays the only one).
+// Zod schemas for the booking domain. Boundary rules only: shape, formats,
+// ranges, enums. Invariants that need the database (user/tour/room/flight
+// existence, capacity and availability guards, the status transition map)
+// and the "at least one of tourId, roomId, or flightId" rule live in
+// services/booking.service.ts, which owns their messages and is the only
+// place they are enforced.
 //
-// The legacy chains only validated the owner id, the item ids, hotelId and
-// totalPrice; the other fields the handler read (numberOfGuests,
-// numberOfRooms, specialRequests, startDate, endDate) went unvalidated. They
-// are declared here so the parsed body keeps them, with minimal typing —
-// stay dates remain raw strings because the service parses and rejects them
-// with the legacy messages ('Check-in date cannot be in the past', ...).
-// Phase 5b: bookings belong to Customers, so the owner field is customerId.
+// numberOfGuests, numberOfRooms, specialRequests, startDate and endDate are
+// declared here with minimal typing so the parsed body keeps them: stay dates
+// stay raw strings because the service parses them and owns the rejection
+// messages ('Check-in date cannot be in the past', ...).
+// Bookings belong to Customers, so the owner field is customerId.
 import { z } from 'zod';
 
 import { BookingStatus } from '#config/prismaClient.js';
@@ -30,7 +25,7 @@ const BOOKING_STATUSES = [
   'COMPLETED',
 ] as const;
 
-/** Positive integer body field, with the legacy validation-factory messages. */
+/** Positive integer body field; every message names the field. */
 const intField = (field: string) =>
   z.coerce
     .number(`${field} must be an integer`)
@@ -45,11 +40,11 @@ const dateQuery = (message: string) =>
 
 const bookingFields = z.object({
   // Admins/agents book on behalf of a customer; customers must self-book
-  // (the actor rule in the service keeps the legacy 401).
+  // (the actor rule in the service answers a 401).
   customerId: intField('customerId'),
   endDate: z.string().optional(),
   flightId: intField('flightId').optional(),
-  // Accepted (the legacy chain validated it) but nothing reads it.
+  // Accepted and validated, but nothing reads it.
   hotelId: intField('hotelId').optional(),
   numberOfGuests: intField('numberOfGuests').optional(),
   numberOfRooms: intField('numberOfRooms').optional(),
@@ -65,9 +60,8 @@ const bookingFields = z.object({
 });
 
 /**
- * POST /bookings. customerId and totalPrice stay required — the service
- * recalculates the price, but the legacy contract (and its baseline tests)
- * pin both as mandatory.
+ * POST /bookings. customerId and totalPrice are both required by the wire
+ * contract, even though the service recalculates the price.
  */
 export const createBookingSchema = bookingFields;
 
@@ -81,7 +75,7 @@ export const updateBookingSchema = bookingFields.partial().extend({
     .optional(),
 });
 
-/** `/bookings/:id` route param (legacy express-validator message kept). */
+/** `/bookings/:id` route param. */
 export const bookingIdParam = z.object({
   id: z.coerce
     .number('Booking ID must be a positive integer')
@@ -89,7 +83,7 @@ export const bookingIdParam = z.object({
     .min(1, 'Booking ID must be a positive integer'),
 });
 
-/** `/bookings/customer/:customerId` route param (legacy message adapted). */
+/** `/bookings/customer/:customerId` route param. */
 export const bookingCustomerIdParam = z.object({
   customerId: z.coerce
     .number('Invalid customer ID')
@@ -98,9 +92,8 @@ export const bookingCustomerIdParam = z.object({
 });
 
 /**
- * List filters for GET /bookings and GET /bookings/customer/:customerId —
- * the union of what the two legacy handlers parsed by hand, with their
- * messages.
+ * List filters for GET /bookings and GET /bookings/customer/:customerId -
+ * the union of what both endpoints accept.
  */
 export const bookingListQuery = paginationQuery
   .extend({

@@ -11,7 +11,7 @@ import { defaultDeps } from '#services/deps.js';
 //
 // Role enforcement note: routes/flight.ts is the single authorization
 // boundary (authorizeRole); the service modules carry no duplicate role
-// checks, as before.
+// checks.
 import { makeFlightCore } from '#services/flight/core.js';
 import { makeFlightCreateService } from '#services/flight/create.service.js';
 import { makeFlightQueryService } from '#services/flight/query.service.js';
@@ -31,7 +31,7 @@ import { makeFlightStatusService } from '#services/flight/status.service.js';
 import { makeFlightUpdateService } from '#services/flight/update.service.js';
 
 // Re-export the public types/consts controllers/validation/tests import from
-// this module path (unchanged from the pre-split surface).
+// this module path.
 export {
   FLIGHT_SORT_FIELDS,
   type FlightActor,

@@ -22,7 +22,7 @@ export interface RankedItem {
 }
 
 /**
- * The dms ranked leaderboard: rank number, name (link), amount, and a bar
+ * Ranked leaderboard: rank number, name (link), amount, and a bar
  * proportional to the top entry. One hue — magnitude is carried by length.
  */
 export const RankedBarList = ({

@@ -54,8 +54,8 @@ const uiOptions: swaggerUi.SwaggerUiOptions = {
 
 /**
  * Mounts the reference UI at /api/docs and the raw document at
- * /api/docs.json. The JSON is what tooling consumes: import it into Postman
- * or Insomnia, or point a client generator at it.
+ * /api/docs.json. The JSON is the machine-readable half, for Postman,
+ * Insomnia and client generators.
  */
 export const mountApiDocs = (app: Express): void => {
   const document = getOpenApiDocument();

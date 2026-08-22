@@ -29,9 +29,9 @@ export const makePaymentCore = (d: PaymentDeps) => {
       where: { id: customerId },
     });
 
-  /** The callback URL Paystack redirects to (legacy env-or-default). */
+  /** The callback URL Paystack redirects to (env value or the default). */
   const callbackUrl = (): string =>
-    // Legacy semantics: an empty env value falls back to the default.
+    // An empty env value must fall back to the default, hence `||` not `??`.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     config.PAYSTACK_CALLBACK_URL ||
     'http://localhost:3000/dashboard/payments/callback';

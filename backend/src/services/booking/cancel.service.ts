@@ -29,7 +29,7 @@ export const makeBookingCancelService = (d: BookingDeps, core: BookingCore) => {
   const { notices, restoreItemCounters } = core;
 
   /**
-   * Deletes one booking after the legacy guard chain (COMPLETED status,
+   * Deletes one booking after the guard chain (COMPLETED status,
    * payment status, past confirmed bookings), restoring tour-guest / flight-
    * seat counters and removing a non-completed payment in one transaction.
    */
@@ -91,9 +91,8 @@ export const makeBookingCancelService = (d: BookingDeps, core: BookingCore) => {
     await prisma.$transaction(async (tx) => {
       await restoreItemCounters(tx, booking);
 
-      // Soft-delete the payment alongside the booking. Legacy removed
-      // 'CANCELLED'/FAILED/PENDING payments explicitly and REFUNDED ones via
-      // the Payment→Booking FK cascade; with soft deletes the payment must be
+      // Soft-delete the payment alongside the booking: the Payment→Booking FK
+      // cascade never fires for a soft delete, so the payment must be
       // tombstoned explicitly in every deletable case.
       if (booking.payment) {
         await tx.payment.update({

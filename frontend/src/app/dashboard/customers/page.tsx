@@ -22,7 +22,7 @@ const FILTERS_SPEC: TableFiltersSpec<ICustomersTableFilters> = {
 
 const CustomersManagePage = () => {
   // URL + session table state: deep links win, and navigating to a detail
-  // and back restores the page/filters you left.
+  // and back restores the page/filters the list was left on.
   const {
     page,
     pageSize,

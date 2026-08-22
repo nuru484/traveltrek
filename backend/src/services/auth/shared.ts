@@ -1,7 +1,7 @@
 // src/services/auth/shared.ts
 //
-// Shared, dependency-free building blocks for the auth service (Phase 5b's
-// two-principal model — customers + staff Users). Constants, request/result
+// Shared, dependency-free building blocks for the auth service and its
+// two-principal model (customers + staff Users). Constants, request/result
 // types, the pure principal helpers, and the registration selects live here
 // so every auth feature module and the core share one definition. No closure
 // over the injected deps — those live in ./core and the feature modules.
@@ -40,7 +40,7 @@ export const LOGIN_LOCK_MINUTES = 15;
 export const REFRESH_REUSE_GRACE_MS = 30_000;
 
 /** OTP login codes: lifetime, wrong-guess cap per code, and the minimum gap
- * between two codes for the same account (khadys's resend-cooldown shape). */
+ * between two codes for the same account (the resend cooldown). */
 export const OTP_TTL_MINUTES = 10;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_COOLDOWN_SECONDS = 60;

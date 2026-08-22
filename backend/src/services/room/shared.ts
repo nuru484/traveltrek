@@ -16,9 +16,8 @@ export type RoomDeps = Pick<
 >;
 
 /**
- * Whitelisted `sortBy` fields for room listings — the columns the legacy
- * controller ordered by (anything else fell back to createdAt desc; now it is
- * rejected at the boundary).
+ * Whitelisted `sortBy` fields for room listings: anything else is rejected at
+ * the boundary.
  */
 export const ROOM_SORT_FIELDS = [
   'capacity',
@@ -26,7 +25,7 @@ export const ROOM_SORT_FIELDS = [
   'pricePerNight',
 ] as const;
 
-/** Raw start/end query strings; resolved by the legacy date-window rules. */
+/** Raw start/end query strings; resolved by the service's date-window rules. */
 export interface DateWindowInput {
   endDate?: string;
   startDate?: string;

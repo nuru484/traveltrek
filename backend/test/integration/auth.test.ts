@@ -1,7 +1,7 @@
 // test/integration/auth.test.ts
 //
 // Behaviour of the hardened authentication flows over the two principal
-// tables (Phase 5b): enumeration-safe password login with account lockout
+// tables: enumeration-safe password login with account lockout
 // (customer first, then staff — first match wins), refresh-token ROTATION
 // (single-use tokens, theft response via the tokenVersion session epoch), and
 // logout consuming the refresh registration.
@@ -128,8 +128,8 @@ describe('POST /api/v1/auth/login', () => {
     expect(res.status).toBe(401);
   });
 
-  // Hardened: unknown email and wrong password return the SAME uniform 401,
-  // so responses no longer leak which emails have an account.
+  // Unknown email and wrong password return the SAME uniform 401, so
+  // responses never leak which emails have an account.
   it('rejects an unknown email with the same 401 (no enumeration)', async () => {
     const res = await api()
       .post('/api/v1/auth/login')

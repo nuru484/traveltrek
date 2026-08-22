@@ -9,14 +9,13 @@
 // Cloudinary cleanup) lives in services/user.service.ts.
 //
 // Like payments, the self-vs-others profile rules are NOT duplicated by
-// routes/user.ts (authorizeRole only gates the broad role sets), so every
-// legacy in-handler check moved into the service as an actor-based rule and
-// each handler passes `{ id, role }` down. The `!user` guards below only
-// narrow the optional type (authenticate-jwt always sets req.user) and fail
-// closed with the legacy messages.
+// routes/user.ts (authorizeRole only gates the broad role sets): they live in
+// the service as actor-based rules, so each handler passes `{ id, role }`
+// down. The `!user` guards below only narrow the optional type
+// (authenticate-jwt always sets req.user) and fail closed.
 //
-// POST /users (registerUser) still belongs to the authentication controllers
-// and is borrowed by routes/user.ts unchanged — it converts in a later phase.
+// POST /users (registerUser) belongs to the authentication controllers and is
+// mounted by routes/user.ts.
 import { Request, RequestHandler, Response } from 'express';
 
 import { CLOUDINARY_UPLOAD_OPTIONS } from '#config/constants.js';

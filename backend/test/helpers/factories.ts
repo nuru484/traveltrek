@@ -12,7 +12,7 @@ export const TEST_PASSWORD = 'Password1!';
 let uniq = 0;
 const next = () => ++uniq;
 
-/** A STAFF user (Phase 5b: the User table is staff-only). Default AGENT. */
+/** A STAFF user (the User table is staff-only). Default AGENT. */
 export const createUser = async (
   overrides: {
     email?: string;

@@ -1,6 +1,6 @@
 // src/routes/customer.ts
 //
-// Customers domain (Phase 5b). Staff (ADMIN/AGENT) manage the customer base;
+// Customers domain. Staff (ADMIN/AGENT) manage the customer base;
 // the CUSTOMER role passes the per-record gates so customers can reach their
 // OWN profile/history — the self-vs-others rule is enforced in the service.
 import { Router } from 'express';

@@ -13,7 +13,7 @@ import ENV from '#config/env.js';
 import app from '../../app.js';
 
 /**
- * What the token helpers need. Phase 5b tokens carry a principal `kind`;
+ * What the token helpers need. Tokens carry a principal `kind`;
  * when omitted it is derived from the role — a Customer row (no role, or
  * role CUSTOMER) mints a customer token, staff roles mint staff tokens — so
  * `authedApi(customer)` and `authedApi(admin)` both Just Work.
@@ -22,7 +22,7 @@ interface TokenUser {
   id: number;
   kind?: PrincipalKind;
   /** Token-level role: staff DB roles plus the app-level 'CUSTOMER' role
-   * customers present on their access tokens (not a Prisma Role anymore). */
+   * customers present on their access tokens (not a Prisma Role). */
   role?: 'ADMIN' | 'AGENT' | 'CUSTOMER';
   tokenVersion?: number;
 }

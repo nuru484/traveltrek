@@ -237,7 +237,7 @@ export const makeFlightStatusService = (d: FlightDeps, core: FlightCore) => {
 
     // Cancelling cascades to the flight's active bookings, releasing them.
     // (With the guards above, a flight only reaches CANCELLED bookingless, so
-    // this is a safety net — preserved from the legacy handler.)
+    // this is a safety net.)
     if (newStatus === FlightStatus.CANCELLED) {
       await prisma.booking.updateMany({
         data: { status: BookingStatus.CANCELLED },
@@ -258,7 +258,7 @@ export const makeFlightStatusService = (d: FlightDeps, core: FlightCore) => {
   };
 
   /**
-   * Deletes one flight after the legacy guard chain, in order: non-deletable
+   * Deletes one flight after the guard chain, in order: non-deletable
    * status (DEPARTED/LANDED/DELAYED), active bookings, then bookings holding
    * COMPLETED/PENDING payment records. Historical bookings never block, they
    * are only logged (they survive as orphans).

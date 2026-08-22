@@ -1,7 +1,7 @@
 // src/controllers/authentication/two-factor.ts
 //
-// Two-factor authentication over BOTH principals (customer + staff), khadys
-// pattern adapted to kind-tagged identities and email/SMS channels:
+// Two-factor authentication over BOTH principals (customer + staff), on
+// kind-tagged identities and email/SMS channels:
 //
 // - Login second step (verify/resend): UNauthenticated, gated by the signed
 //   twoFactorPending cookie the login controller set — it proves the password

@@ -1,29 +1,27 @@
 // src/validations/user-validation.ts
 //
-// Zod schemas for the user domain (replaces the express-validator chain in
-// the legacy user-validations.ts). Boundary rules only — shape, formats,
-// enums. Notes on legacy fidelity:
+// Zod schemas for the user domain. Boundary rules only — shape, formats,
+// enums:
 //
-// - updateUserProfile mirrors the legacy chain field-for-field (name, email,
-//   role, address, phone — all optional, same messages). `role` is validated
-//   but IGNORED downstream, exactly as before: the legacy chain checked it
-//   yet the handler never wrote it. `password` is GONE from this surface —
-//   passwords rotate only through POST /auth/change-password. profilePicture
-//   is declared with minimal typing to survive the parse (the Cloudinary
-//   middleware overwrites it after parsing when a file is uploaded).
-// - changeUserRole: the legacy in-handler check ('Valid role is required')
-//   moved here — same 400, now in the standard validation envelope.
-// - list query: an invalid role FILTER was silently ignored by the legacy
-//   handler (an includes() check), so `.catch(undefined)` preserves that.
+// - updateUserProfile takes name, email, role, address and phone, all
+//   optional. `role` is validated but IGNORED downstream: nothing writes it
+//   from this surface. `password` is not accepted at all — passwords rotate
+//   only through POST /auth/change-password. profilePicture is declared with
+//   minimal typing to survive the parse (the Cloudinary middleware
+//   overwrites it after parsing when a file is uploaded).
+// - changeUserRole answers a bad role with a 400 in the standard validation
+//   envelope.
+// - list query: an invalid role FILTER is silently ignored via
+//   `.catch(undefined)` rather than rejected.
 import { z } from 'zod';
 
 import { Role } from '#config/prismaClient.js';
 import { paginationQuery } from '#validations/common-validation.js';
 
-/** PUT /users/:userId — every field optional, legacy messages kept. NO
- * password (a `password` key in the body is simply stripped): passwords
- * rotate only through the authenticated POST /auth/change-password, so a
- * staff session can never overwrite another account's credential.
+/** PUT /users/:userId — every field optional. NO password (a `password` key
+ * in the body is simply stripped): passwords rotate only through the
+ * authenticated POST /auth/change-password, so a staff session can never
+ * overwrite another account's credential.
  *
  * email/phone stay in the schema for edits of OTHER accounts (administrative
  * override, cross-principal-checked in the service), but a staff member
@@ -51,22 +49,21 @@ export const updateUserProfileSchema = z.object({
     )
     .optional(),
   profilePicture: z.string('profilePicture must be a string').optional(),
-  // Accepted (the legacy chain validated it) but nothing reads it.
+  // Validated but never written: nothing downstream reads it.
   role: z
     .enum(Role, 'role must be one of: ADMIN, AGENT')
     .optional(),
 });
 
-/** PATCH /users/:userId/role — legacy in-handler message kept. Staff-only
- * (Phase 5b): no User row may become a CUSTOMER — customers are a separate
- * model. */
+/** PATCH /users/:userId/role — staff-only: no User row may become a
+ * CUSTOMER, since customers are a separate model. */
 export const changeUserRoleSchema = z.object({
   role: z.enum([Role.ADMIN, Role.AGENT], 'Valid role is required'),
 });
 
 /**
- * List filters for GET /users — an invalid role value falls back to undefined
- * (ignored), exactly as the legacy includes-check did.
+ * List filters for GET /users — an invalid role value falls back to
+ * undefined (the filter is ignored rather than rejected).
  */
 export const userListQuery = paginationQuery.extend({
   role: z.enum(Role).optional().catch(undefined),

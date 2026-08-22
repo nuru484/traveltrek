@@ -36,7 +36,7 @@ import { makeBookingUpdateService } from '#services/booking/update.service.js';
 import { defaultDeps } from '#services/deps.js';
 
 // Re-export the public types/consts controllers/validation/tests import from
-// this module path (unchanged from the pre-split surface).
+// this module path.
 export {
   BOOKING_TYPES,
   type BookingActor,

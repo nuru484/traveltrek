@@ -1,13 +1,13 @@
 // test/integration/contact-change.test.ts
 //
-// Self-service contact changes (dms pattern): email/phone are login
+// Self-service contact changes: email/phone are login
 // identifiers, so changing one takes (1) a session, (2) re-auth — the
 // current password, or the /auth/reauth/challenge code for passwordless
 // accounts — and (3) proof of the NEW contact: a confirmation link emailed
 // to the new address (EMAIL_CHANGE, public confirm) / an OTP texted to the
 // new phone (PHONE_CHANGE, authed confirm). Uniqueness is re-checked at
 // confirm time across BOTH principal tables; applying bumps the session
-// epoch. Profile updates now 400 self-service email/phone changes while
+// epoch. Profile updates 400 self-service email/phone changes while
 // admin (staff) edits keep the direct path.
 import { beforeEach, describe, expect, it } from 'vitest';
 

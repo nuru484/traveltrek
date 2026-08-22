@@ -4,7 +4,7 @@
 // rows for every soft-deletable model, so a new query can never accidentally
 // leak soft-deleted records by forgetting a `deletedAt: null` filter.
 //
-// Design notes (mirrors khadys-kitchen-backend):
+// Design notes:
 //   - Only multi-row / predicate reads are scoped: findMany, findFirst(OrThrow),
 //     count, aggregate, groupBy. `findUnique` is intentionally NOT scoped — it
 //     looks rows up by a unique key and is the seam the app relies on to find

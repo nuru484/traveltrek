@@ -4,13 +4,11 @@
 // `paymentInclude` relations); controllers map them through here so the wire
 // format lives in exactly one place and raw DB records never leak.
 //
-// toPaymentDTO reproduces the legacy response shape bit-for-bit, including
-// the derived `bookedItem` block (legacy getBookedItemFromBooking): TOUR /
-// ROOM / FLIGHT checked in that order, with the same name/description
-// composition, and the same 'Unknown Item' TOUR fallback (carrying the
-// booking id) for a booking with no associated item. Phase 5b: payments
-// belong to Customers — the DTO emits customerId + a nested customer summary
-// where userId/user used to be.
+// toPaymentDTO also derives the `bookedItem` block: TOUR / ROOM / FLIGHT
+// checked in that order, each with its own name/description composition, and
+// an 'Unknown Item' TOUR fallback (carrying the booking id) for a booking
+// with no associated item. Payments belong to Customers, so the DTO carries
+// customerId plus a nested customer summary.
 import type { Prisma } from '#config/prismaClient.js';
 
 /** Relations every payment read fetches; services pass this to Prisma. */
@@ -36,7 +34,7 @@ export const paymentInclude = {
   },
 } satisfies Prisma.PaymentInclude;
 
-/** The booked item a payment ultimately paid for (legacy derived block). */
+/** The booked item a payment ultimately paid for; derived, not stored. */
 export interface PaymentBookedItemDTO {
   description: null | string;
   id: number;
@@ -64,7 +62,7 @@ export type PaymentWithRelations = Prisma.PaymentGetPayload<{
   include: typeof paymentInclude;
 }>;
 
-/** Derives the booked item from the payment's booking (legacy helper). */
+/** Derives the booked item from the payment's booking. */
 const toBookedItemDTO = (
   booking: PaymentWithRelations['booking'],
 ): PaymentBookedItemDTO => {

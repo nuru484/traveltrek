@@ -5,7 +5,7 @@ import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 /**
- * Shared list toolbar, mobile-first (mirrors khadys-kitchen's FilterBar):
+ * Shared list toolbar, mobile-first:
  *
  * - Narrow containers (phones, and tablets with the sidebar open): the
  *   search is always visible and spans the full width; beneath it a Filters

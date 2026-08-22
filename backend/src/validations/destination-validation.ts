@@ -1,7 +1,7 @@
 // src/validations/destination-validation.ts
 //
-// Zod schemas for the destination domain (replaces the express-validator
-// chains). Boundary rules only — shape, lengths and character patterns.
+// Zod schemas for the destination domain. Boundary rules only: shape,
+// lengths and character patterns.
 // Invariants that need the database (name uniqueness, dependency guards) and
 // the multer file checks (zod only sees req.body) live in
 // services/destination.service.ts and the controller's photo-file middleware.
@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { DESTINATION_SORT_FIELDS } from '#services/destination.service.js';
 import { paginationQuery } from '#validations/common-validation.js';
 
-/** Letters, spaces, hyphens and apostrophes — the legacy place-name pattern. */
+/** Place names: letters, spaces, hyphens and apostrophes. */
 const PLACE_NAME_PATTERN = /^[a-zA-Z\s\-']+$/;
 
 const destinationFields = z.object({

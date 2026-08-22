@@ -1,14 +1,12 @@
 // src/validations/room-validation.ts
 //
-// Zod schemas for the room domain (the legacy controller validated nothing at
-// the boundary — inputs went straight through Number()/trim()). Boundary
-// rules only — shape, lengths and ranges. Invariants that need the database
-// (hotel existence, duplicate room types, booking-aware guards) and the
-// availability date-window rules (both dates or neither; "Invalid date
-// format"; end after start — kept in the service so the legacy messages and
-// error order survive) live in services/room.service.ts; the multer file
-// checks (zod only sees req.body) live in the controller's photo-file
-// middleware.
+// Zod schemas for the room domain. Boundary rules only: shape, lengths and
+// ranges. Invariants that need the database (hotel existence, duplicate room
+// types, booking-aware guards) and the availability date-window rules (both
+// dates or neither; "Invalid date format"; end after start) live in
+// services/room.service.ts, which keeps their messages and error order in one
+// place; the multer file checks (zod only sees req.body) live in the
+// controller's photo-file middleware.
 import { z } from 'zod';
 
 import { ROOM_SORT_FIELDS } from '#services/room.service.js';
@@ -32,8 +30,8 @@ const amenitiesList = z
 
 /**
  * Optional start/end availability params, passed through as raw strings: the
- * service resolves them with the legacy rules (defaults apply unless BOTH are
- * sent; empty strings count as absent, as before).
+ * service resolves them (defaults apply unless BOTH are sent; empty strings
+ * count as absent).
  */
 export const roomAvailabilityQuery = z.object({
   endDate: z.string().optional(),
@@ -78,10 +76,9 @@ const roomFields = z.object({
 
 export const createRoomSchema = roomFields;
 
-// Empty updates were accepted by the legacy handler (a no-op update returning
-// the room), so no "at least one field" refinement here. roomPhoto: '' is
-// the remove-photo signal (the service nulls the column and deletes the old
-// Cloudinary image).
+// An empty update is accepted as a no-op returning the room, so there is no
+// "at least one field" refinement here. roomPhoto: '' is the remove-photo
+// signal (the service nulls the column and deletes the old Cloudinary image).
 export const updateRoomSchema = roomFields.partial();
 
 export const roomListQuery = paginationQuery

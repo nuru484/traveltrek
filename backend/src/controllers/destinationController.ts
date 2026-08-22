@@ -44,9 +44,8 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * Guards the multer-parsed photo file (type + size) before the Cloudinary
- * upload middleware runs. Zod validates req.body only, so this keeps the
- * legacy destinationPhotoValidation checks — same messages, same
- * validation-error envelope.
+ * upload middleware runs. Zod validates req.body only, so the file checks
+ * live here and answer in the same validation-error envelope.
  */
 const validatePhotoFile: RequestHandler = (req, _res, next) => {
   const { file } = req;
@@ -168,7 +167,7 @@ const handleGetAllDestinations = asyncHandler(
   async (req: Request, res: Response) => {
     const query = req.query as unknown as DestinationListQuery;
     const { destinations, total } = await listDestinations(query);
-    // The legacy list meta also echoed the applied filters; keep that shape.
+    // The list meta echoes the applied filters alongside the page numbers.
     const meta = {
       ...buildPaginationMeta(total, query.page, query.limit),
       filters: {

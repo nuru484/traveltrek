@@ -1,6 +1,6 @@
 // test/integration/auth-features.test.ts
 //
-// Phase 4b auth features: minimal signup (name + email OR phone, password
+// Auth features: minimal signup (name + email OR phone, password
 // optional), passwordless OTP login over email/SMS (enumeration-safe request,
 // capped verify attempts, single-use codes), forgot/reset password (opaque
 // single-use link token, session-epoch bump kills every live session), Google

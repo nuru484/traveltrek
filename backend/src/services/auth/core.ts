@@ -440,8 +440,8 @@ export const makeAuthCore = (d: AuthDeps) => {
   /**
    * 409 when another row of the SAME principal table already holds the
    * contact. findUnique on purpose (unscoped): soft-deleted rows keep their
-   * unique contact (khadys convention), so a tombstone still blocks the
-   * claim. The cross-table half is assertContactFreeAcrossPrincipals.
+   * unique contact, so a tombstone still blocks the claim. The cross-table
+   * half is assertContactFreeAcrossPrincipals.
    */
   const assertContactFreeSameTable = async (
     kind: PrincipalKind,

@@ -142,8 +142,8 @@ export const makeLoginService = (d: AuthDeps, core: AuthCore) => {
       throw invalidRefreshError();
     }
 
-    // Tokens minted before the customer/staff split name no principal table
-    // and can't be resolved — their holders just log in again.
+    // A token that names no principal table cannot be resolved to an
+    // account; its holder signs in again.
     if (!isPrincipalKind(decoded.kind)) throw invalidRefreshError();
     const kind = decoded.kind;
 
@@ -162,8 +162,8 @@ export const makeLoginService = (d: AuthDeps, core: AuthCore) => {
         { code: 'STALE_TOKEN_VERSION', layer: 'auth' },
       );
     }
-    // Tokens minted before rotation existed carry no jti — they can't be
-    // tracked, so they can't be exchanged. Their holders just log in again.
+    // A token without a jti cannot be tracked, so it cannot be exchanged;
+    // its holder signs in again.
     if (!decoded.jti) throw invalidRefreshError();
 
     const record = await prisma.userSecurityToken.findUnique({

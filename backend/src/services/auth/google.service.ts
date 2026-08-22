@@ -42,8 +42,8 @@ export const makeGoogleService = (d: AuthDeps) => {
     }
 
     // findFirst on both lookups: a soft-deleted account can neither sign in
-    // nor be linked. Its unique email/googleId stay held (khadys convention),
-    // so a re-signup for that identity surfaces as a P2002 conflict.
+    // nor be linked. Its unique email/googleId stay held, so a re-signup for
+    // that identity surfaces as a P2002 conflict.
     const byGoogleId = await prisma.customer.findFirst({
       where: { googleId: identity.googleId },
     });

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Container entrypoint. Applies pending migrations (idempotent) before starting
 # the API, so a deploy that ships a schema change is safe. Set RUN_MIGRATIONS=false
-# to skip this (e.g. if you run migrations as a separate release step, or on the
+# to skip this (e.g. when migrations run as a separate release step, or on the
 # dedicated worker container so only the web container migrates).
 set -e
 

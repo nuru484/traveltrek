@@ -7,8 +7,7 @@ import logger from '#utils/logger.js';
 
 // prisma/seed.ts
 //
-// Seed, gated by two env flags (chosen-fintech pattern) so running
-// `npm run seed` is always safe:
+// Seed, gated by two env flags so running `npm run seed` is always safe:
 //   ADMIN_SEED_ENABLED       — false (default) makes the seed a logged no-op.
 //   ADMIN_SEED_FORCE_UPDATE  — false (default) makes it CREATE-ONLY: an
 //                              existing row is never overwritten. Set true

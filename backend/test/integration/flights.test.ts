@@ -1,8 +1,7 @@
 // test/integration/flights.test.ts
 //
-// Behaviour of the flight CRUD surface after the service-layer refactor: role
-// gates, validation, pagination, filters, the status state machine and the
-// booking-aware delete guards.
+// Behaviour of the flight CRUD surface: role gates, validation, pagination,
+// filters, the status state machine and the booking-aware delete guards.
 import { describe, expect, it } from 'vitest';
 
 import prisma, { BookingStatus } from '#config/prismaClient.js';

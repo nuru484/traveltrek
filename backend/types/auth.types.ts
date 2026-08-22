@@ -19,8 +19,8 @@ export interface AccessTokenPayload {
 }
 
 /**
- * Which principal table a session belongs to (Phase 5b): customers and staff
- * live in separate tables with overlapping numeric ids, so every token names
+ * Which principal table a session belongs to: customers and staff live in
+ * separate tables with overlapping numeric ids, so every token names
  * its table explicitly and every lookup (tokenVersion, refresh registration)
  * resolves against the right one.
  */
@@ -30,9 +30,9 @@ export type PrincipalKind = 'customer' | 'staff';
  * Refresh-token payload. `jti` (standard claim, set via jwt's `jwtid` option)
  * is the rotation id registered server-side at issuance and consumed at
  * exchange, so a refresh token can be rotated at most once. Optional only
- * because a foreign/legacy token may decode without one — the service rejects
- * those. `kind` is likewise checked on exchange (a pre-split token without it
- * is rejected).
+ * because a foreign token may decode without one; the service rejects those.
+ * `kind` is likewise checked on exchange, and a token that carries none is
+ * rejected.
  */
 export interface RefreshTokenPayload {
   id: number;

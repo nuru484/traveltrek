@@ -52,8 +52,8 @@ bookingRoutes.get(
   getAllBookings,
 );
 
-// Phase 5b: bookings hang off Customers — the old /bookings/user/:userId
-// path is REMOVED (not aliased).
+// Bookings hang off Customers, so the per-owner listing is keyed by
+// customerId; there is no /bookings/user/:userId alias.
 bookingRoutes.get(
   '/bookings/customer/:customerId',
   authorizeRole([UserRole.ADMIN, UserRole.AGENT, UserRole.CUSTOMER]),

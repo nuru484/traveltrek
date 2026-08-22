@@ -17,7 +17,7 @@ export type PrincipalTable = 'customer' | 'staff';
 /**
  * Throws 409 when the email/phone is already held by the OTHER principal
  * table. findUnique on purpose (unscoped): soft-deleted rows keep their
- * unique contact (khadys convention), so a tombstone still blocks the claim.
+ * unique contact, so a tombstone still blocks the claim.
  * The message deliberately does not say which kind of account holds it.
  */
 export const assertContactFreeAcrossPrincipals = async (

@@ -65,7 +65,7 @@ export function AdminReviewList({ isAdmin }: { isAdmin: boolean }) {
   const [deleteTarget, setDeleteTarget] = useState<IReview | null>(null);
 
   // URL + session table state: deep links win, and navigating away and back
-  // restores the page/filters you left.
+  // restores the page and filters that were in effect.
   const { filters, queryParams, handlePageChange, handleFiltersChange } =
     useTableQueryState<IReviewsTableFilters>({ spec: FILTERS_SPEC });
 

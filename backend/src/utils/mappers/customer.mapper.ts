@@ -1,6 +1,6 @@
 // src/utils/mappers/customer.mapper.ts
 //
-// Pure DTO mapper for the customer domain (Phase 5b). Services return Prisma
+// Pure DTO mapper for the customer domain. Services return Prisma
 // rows selected through `customerSelect`; controllers map them through here so
 // the wire format lives in exactly one place and raw DB records never leak.
 //

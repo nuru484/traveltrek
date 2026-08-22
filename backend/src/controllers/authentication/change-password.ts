@@ -1,7 +1,7 @@
 // src/controllers/authentication/change-password.ts
 //
 // POST /auth/change-password — the ONLY way to set or rotate a password once
-// an account exists (profile updates no longer carry one, and admins never
+// an account exists (profile updates carry no password, and admins never
 // set passwords). Authenticated, works for BOTH principals; the conditional
 // currentPassword rule (required when a password exists, forbidden for the
 // passwordless first-set) lives in the service.

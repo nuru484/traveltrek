@@ -1,6 +1,6 @@
 // src/components/ui/table-empty-logic.ts
 //
-// Pure empty-state semantics shared by the data tables (dms/website pattern):
+// Pure empty-state semantics shared by the data tables:
 //
 // - no data AND no active filters/search  -> the page shows ONLY an
 //   EmptyState (no filter toolbar, no table headers, no pagination);

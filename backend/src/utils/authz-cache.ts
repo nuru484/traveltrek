@@ -8,7 +8,7 @@
 // epoch bump (refresh-theft response, password change, role change,
 // deletion) deletes the shared entry and takes effect on all instances at
 // once, not within a per-process TTL. When Redis is unavailable (test runs,
-// a Redis hiccup) the module degrades to the previous per-process map with
+// a Redis hiccup) the module degrades to a per-process map with
 // the same TTL - correct on one instance, TTL-bounded on many - rather than
 // failing requests.
 //

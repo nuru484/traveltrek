@@ -34,8 +34,8 @@ export const makePaymentManagementService = (
 
   /**
    * PATCH /payments/:id — admin-only manual status update (the cash/manual
-   * path). Guard order is the legacy one: admin gate → status whitelist →
-   * existence → transition guards (COMPLETED→PENDING and any change off
+   * path). Guard order: admin gate → status whitelist → existence →
+   * transition guards (COMPLETED→PENDING and any change off
    * REFUNDED are 409s). The booking follows the payment: COMPLETED confirms
    * it, FAILED/REFUNDED cancels it, PENDING resets it.
    */
@@ -135,10 +135,9 @@ export const makePaymentManagementService = (
   /**
    * PATCH /payments/:id/refund — admin-only; COMPLETED payments and
    * REFUND_REQUESTED ones (a customer self-cancelled a paid booking) only.
-   * Marks the payment REFUNDED and cancels its booking (the legacy flow never
-   * called the Paystack refund API — it only recorded the refund locally and
-   * logged the request; preserved, with the console.log now on the injected
-   * logger). The customer gets a refund-processed notice.
+   * Marks the payment REFUNDED and cancels its booking. The Paystack refund
+   * API is never called: the refund is recorded locally and logged, and the
+   * money is moved by hand. The customer gets a refund-processed notice.
    */
   const refundPayment = async (
     actor: PaymentActor,
@@ -182,7 +181,7 @@ export const makePaymentManagementService = (
       where: { id: payment.bookingId },
     });
 
-    // Legacy semantics: an empty reason string reads as absent.
+    // An empty reason string reads as absent.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const recordedReason = reason || 'No reason provided';
 
@@ -216,8 +215,8 @@ export const makePaymentManagementService = (
 
   /**
    * DELETE /payments/:id — admin-only; COMPLETED payments are protected for
-   * audit (409). The booking reverts to PENDING (delete and revert were
-   * sequential writes in the legacy handler, not a transaction; preserved).
+   * audit (409). The booking reverts to PENDING; the delete and the revert
+   * are sequential writes, not one transaction.
    */
   const deletePayment = async (
     actor: PaymentActor,

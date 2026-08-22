@@ -3,8 +3,8 @@
 // Building blocks for the dual-render list pattern: below `md` every data
 // table renders as a dense, tappable row-card list (all of a row's key data,
 // no side-scroll), while `hidden md:block` keeps the real <table> from `md`
-// up. Ported from khadys-kitchen's admin table-bits and re-tokenized for this
-// design system (border/muted/foreground tokens instead of kk ink colors).
+// up. Every colour comes from the design tokens (border/muted/foreground),
+// never a hard-coded ink value.
 "use client";
 
 import type { ReactNode } from "react";

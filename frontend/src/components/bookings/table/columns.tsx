@@ -60,7 +60,6 @@ export const createBookingColumns = (
       ),
       enableSorting: false,
       enableHiding: false },
-    // Removed Booking ID column
     {
       accessorKey: "type",
       header: "Type",
@@ -177,7 +176,6 @@ export const createBookingColumns = (
       cell: ({ row }) => {
         return <DateCell value={row.getValue("bookingDate") as string} />;
       } }
-    // Removed Created At column
   );
 
   if (showActions) {

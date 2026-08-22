@@ -3,7 +3,7 @@
 // The durable notification channel. Production sends are enqueued onto the
 // BullMQ notificationQueue (3 attempts, exponential backoff — see
 // src/jobs/notificationQueue.ts) so a crashed process or a flaky SMTP/SMS
-// provider can no longer lose a customer notification; a send that exhausts
+// provider cannot lose a customer notification; a send that exhausts
 // its attempts stays in Redis as a failed job for inspection. The queue
 // module is imported lazily on first use, so merely importing the service
 // layer never opens a Redis connection (scripts, tests).
@@ -56,8 +56,8 @@ export const makeQueuedNotify = (logger: Logger): NotifyClient => {
 };
 
 /**
- * Inline wiring (NOTIFICATIONS_INLINE=true): the legacy direct send through
- * the shared fire-and-forget dispatch helper. No durability or retries —
+ * Inline wiring (NOTIFICATIONS_INLINE=true): a direct send through the
+ * shared fire-and-forget dispatch helper. No durability or retries —
  * meant for tests and Redis-less local runs only.
  */
 export const makeInlineNotify = (d: {

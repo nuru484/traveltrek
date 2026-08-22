@@ -1,19 +1,18 @@
 // src/validations/payment-validation.ts
 //
-// Zod schemas for the payment domain. Boundary rules only — shape, formats,
-// enums. The legacy fat controller validated almost nothing at the boundary
-// (bookingId went straight into Prisma), so these schemas are deliberately
-// conservative to preserve the legacy contract:
+// Zod schemas for the payment domain. Boundary rules only: shape, formats,
+// enums. They are deliberately conservative so the response contract stays
+// what the service defines:
 //
 // - createPayment: paymentMethod stays an optional string here because the
-//   legacy handler checked it AFTER the booking guards, with its own 400
-//   ('Invalid payment method') — that check (and its ordering) lives in
+//   method check must run AFTER the booking guards, with its own 400
+//   ('Invalid payment method'); that check (and its ordering) lives in
 //   services/payment.service.ts.
 // - updatePaymentStatus: status stays an optional string for the same reason
-//   (the legacy 401 admin gate ran before the 400 'Invalid payment status').
+//   (the 401 admin gate must answer before the 400 'Invalid payment status').
 // - GET /payments/customer/:customerId silently IGNORES invalid
-//   status/paymentMethod filters instead of rejecting them (the legacy
-//   /payments/user behaviour); `.catch(undefined)` preserves that.
+//   status/paymentMethod filters instead of rejecting them;
+//   `.catch(undefined)` is what drops them.
 import { z } from 'zod';
 
 import { PaymentMethod, PaymentStatus } from '#config/prismaClient.js';
@@ -47,8 +46,8 @@ export const paymentListQuery = paginationQuery.extend({
 });
 
 /**
- * List filters for GET /payments/customer/:customerId — invalid enum values
- * fall back to undefined (ignored), exactly as the legacy includes-check did.
+ * List filters for GET /payments/customer/:customerId: invalid enum values
+ * fall back to undefined and are ignored rather than rejected.
  */
 export const customerPaymentsQuery = paginationQuery.extend({
   paymentMethod: z.enum(PaymentMethod).optional().catch(undefined),

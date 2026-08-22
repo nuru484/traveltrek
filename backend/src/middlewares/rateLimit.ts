@@ -95,8 +95,8 @@ export const createRateLimiter = (
 
     windowMs,
 
-    // Enable trust proxy on your Express app instance for proper IP handling behind proxies
-    // (Set app.set('trust proxy', true) in your main server file)
+    // Correct client IPs behind a proxy depend on the app's `trust proxy`
+    // setting, which app.ts pins to a single hop.
   });
 };
 

@@ -1,7 +1,7 @@
 // test/integration/rooms.test.ts
 //
-// Behaviour of the room CRUD surface after the service-layer refactor: role
-// gates, validation, pagination, filters, availability counts and the
+// Behaviour of the room CRUD surface: role gates, validation, pagination,
+// filters, availability counts and the
 // booking-aware delete guards.
 import { describe, expect, it } from 'vitest';
 

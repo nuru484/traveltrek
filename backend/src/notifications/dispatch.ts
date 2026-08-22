@@ -1,9 +1,9 @@
 // src/notifications/dispatch.ts
 //
-// Shared fire-and-forget delivery helper (khadys `dispatch` pattern,
-// extracted from auth.service so every notification module uses the same
-// discipline): a slow or failed email/SMS send must NEVER block or fail the
-// request (or job) that triggered it — failures are logged and swallowed.
+// Shared fire-and-forget delivery helper every notification module uses, so
+// they all keep the same discipline: a slow or failed email/SMS send must
+// NEVER block or fail the request (or job) that triggered it. Failures are
+// logged and swallowed.
 import { type Logger } from '#services/deps.js';
 
 export type Dispatch = (delivery: Promise<void>, what: string) => void;

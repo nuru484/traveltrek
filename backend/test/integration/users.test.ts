@@ -1,7 +1,7 @@
 // test/integration/users.test.ts
 //
-// Baseline behaviour of STAFF management (Phase 5b: the User table is
-// staff-only — customers live in /customers): role gates on listing, admin
+// Behaviour of STAFF management (the User table is staff-only: customers
+// live in /customers): role gates on listing, admin
 // staff creation with a required staff role, role changes, self-updates.
 import { describe, expect, it, vi } from 'vitest';
 

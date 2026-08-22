@@ -1,8 +1,8 @@
 // src/services/customer.service.ts
 //
-// Thin composer for the customers domain (Phase 5b: customers are a separate
-// principal from staff, so an admin can open a customer profile and see the
-// full identity plus the complete booking/payment history). The implementation
+// Thin composer for the customers domain. Customers are a separate principal
+// from staff, so an admin can open a customer profile and see the full
+// identity plus the complete booking/payment history. The implementation
 // is split into modules under ./customer: shared.ts (types, the self-or-staff
 // predicate), core.ts (picture cleanup, contact-uniqueness pre-check, the
 // scoped existence read), write.service.ts (create/update/delete), and
@@ -25,8 +25,7 @@ import {
 import { makeCustomerWriteService } from '#services/customer/write.service.js';
 import { defaultDeps } from '#services/deps.js';
 
-// Re-export the public types controllers/tests import from this module path
-// (unchanged from the pre-split surface).
+// Re-export the public types controllers/tests import from this module path.
 export {
   type CustomerActor,
   type CustomerCreateInput,

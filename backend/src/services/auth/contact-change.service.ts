@@ -1,8 +1,8 @@
 // src/services/auth/contact-change.service.ts
 //
-// Self-service contact changes (dms email-change pattern). Email and phone are
-// LOGIN IDENTIFIERS, so changing one is a re-auth + prove-possession flow that
-// only applies the new value once confirmed, bumping the session epoch. The
+// Self-service contact changes. Email and phone are LOGIN IDENTIFIERS, so
+// changing one is a re-auth + prove-possession flow that only applies the new
+// value once confirmed, bumping the session epoch. The
 // re-auth / cross-table guards and the uniform error factories live in core.
 import { TokenType } from '#config/prismaClient.js';
 import {

@@ -1,10 +1,10 @@
 // src/lib/public-api.ts
 //
 // Server-side fetchers for the unauthenticated /public browse surface — the
-// landing page's live showcase sections. Mirrors the khadys-kitchen pattern:
-// responses are ISR-cached (5 minutes) and every failure is swallowed into an
-// empty result, so a stopped backend can never blank the portfolio page —
-// the sections simply degrade to their static fallbacks.
+// landing page's live showcase sections. Responses are ISR-cached (5
+// minutes) and every failure is swallowed into an empty result, so a stopped
+// backend can never blank the portfolio page: the sections simply degrade to
+// their static fallbacks.
 import type { IFlight } from "@/types/flight.types";
 import type { IHotel } from "@/types/hotel.types";
 import type { IPublicReview } from "@/types/review.types";

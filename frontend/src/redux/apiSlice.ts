@@ -21,8 +21,8 @@ const baseQuery = fetchBaseQuery({
 });
 
 /**
- * 401 codes that mean "the credential you just typed is wrong", not "your
- * session expired": wrong password at login/change-password, wrong 2FA/OTP
+ * 401 codes that mean "the submitted credential is wrong", not "the session
+ * expired": wrong password at login/change-password, wrong 2FA/OTP
  * code, missing 2FA-pending cookie. Refresh-and-retry must NOT fire for
  * these — the retry would silently re-submit the bad credential and register
  * a second failed attempt toward the backend's lockout counters.

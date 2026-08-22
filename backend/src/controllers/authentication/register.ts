@@ -1,24 +1,24 @@
 // src/controllers/authentication/register.ts
 //
-// Two thin bundles over the auth service's account creation (Phase 5b —
-// customers and staff are separate principals):
+// Two thin bundles over the auth service's account creation; customers and
+// staff are separate principals:
 //
 // - registerUser — the PUBLIC signup (POST /auth/register-user), MINIMAL:
 //   name + (email OR phone), password optional (passwordless accounts sign in
 //   via OTP/Google and complete their profile later). No authentication runs
 //   before it and there is NO role concept: every public signup creates a
 //   Customer, and a customer session is issued immediately.
-// - adminCreateUser — POST /users (borrowed by routes/user.ts, behind
+// - adminCreateUser — POST /users (mounted by routes/user.ts, behind
 //   authenticate-jwt + authorizeRole). Creates STAFF ONLY: only an ADMIN
-//   actor may create users (agents pass the route gate but are refused here,
-//   as in the legacy handler), the role is required and zod-restricted to
-//   ADMIN | AGENT, and NO session cookies are issued for the created account.
+//   actor may create users (agents pass the route gate but are refused
+//   here), the role is required and zod-restricted to ADMIN | AGENT, and NO
+//   session cookies are issued for the created account.
 //   Admins never set passwords: the account starts PASSWORDLESS (zod strips
 //   any sent value) and its owner establishes one via forgot-password.
 //
 // Both share the multer -> zod -> Cloudinary pipeline; if account creation
 // fails after the middleware already uploaded a picture, that upload is
-// reclaimed best-effort before rethrowing (legacy behaviour).
+// reclaimed best-effort before rethrowing.
 import { Request, RequestHandler, Response } from 'express';
 
 import { cloudinaryService } from '#config/claudinary.js';
@@ -110,8 +110,8 @@ const handleRegisterUser = asyncHandler(
 
 const handleAdminCreateUser = asyncHandler(
   async (req: Request, res: Response) => {
-    // authorizeRole lets AGENT through to this route; the legacy handler
-    // narrowed it to ADMIN with a 401 — preserved.
+    // authorizeRole lets AGENT through to this route; staff creation is
+    // ADMIN-only, so it is narrowed here with a 401.
     if (req.user?.role !== UserRole.ADMIN) {
       throw new UnauthorizedError('Unauthorized. Only admins can add users.');
     }
@@ -130,7 +130,7 @@ const handleAdminCreateUser = asyncHandler(
 );
 
 /** Shared multer -> zod -> Cloudinary pipeline; the schema differs (public
- * signup is minimal, admin creation keeps the legacy requirements). */
+ * signup is minimal, admin creation is stricter). */
 const creationPipeline = (schema: Parameters<typeof zodValidation.body>[0]) => [
   multerUpload.single('profilePicture'),
   ...zodValidation.body(schema),

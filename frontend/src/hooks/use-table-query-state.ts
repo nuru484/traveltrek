@@ -1,8 +1,8 @@
 // src/hooks/use-table-query-state.ts
 //
-// URL + session table state (ported from dms-frontend). Owns a list page's
-// page/pageSize/filters so links are shareable, ?status= deep links keep
-// working, and navigating to a detail and back restores where you left off.
+// URL + session table state. Owns a list page's page/pageSize/filters so
+// links are shareable, ?status= deep links keep working, and navigating to a
+// detail and back restores where the list was left.
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -49,8 +49,8 @@ export interface IUseTableQueryStateOptions<
  * - page reset on filter/pageSize change, scroll-to-top on page change
  * - `queryParams` with empty values stripped, ready for the RTK Query hook
  * - session memory: re-entering the list through the nav (a bare URL, no
- *   table params) restores where you left it; an explicit URL always wins
- *   and a fresh browser session starts clean
+ *   table params) restores where the list was left; an explicit URL always
+ *   wins and a fresh browser session starts clean
  */
 export const useTableQueryState = <
   TFilters extends Record<string, TableFilterValue>

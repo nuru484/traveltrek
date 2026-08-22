@@ -72,8 +72,8 @@ export const makeBookingQueryService = (d: BookingDeps, core: BookingCore) => {
 
     const where: Prisma.BookingWhereInput = { customerId };
 
-    // The legacy handler trimmed and truncated the search term (the general
-    // list endpoint used it raw); preserved.
+    // The search term is trimmed and capped here; the general list endpoint
+    // takes it raw.
     applyListFilters(where, params, params.search?.trim().slice(0, 100));
 
     return findPage(where, params.page, params.limit);

@@ -1,8 +1,7 @@
 // test/integration/tours.test.ts
 //
-// Baseline behaviour of the tour CRUD surface before the service-layer
-// refactor: role gates, validation, pagination and filters — plus the
-// soft-delete semantics introduced with the deletedAt column.
+// Behaviour of the tour CRUD surface: role gates, validation, pagination and
+// filters, plus the soft-delete semantics of the deletedAt column.
 import { describe, expect, it } from 'vitest';
 
 import prisma from '#config/prismaClient.js';

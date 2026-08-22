@@ -1,11 +1,11 @@
 // src/lib/sms.ts
 //
 // Default SMS transport for the `sms` dep in AppDeps, via the Frog (Wigal)
-// API — same provider/contract as khadys/dms. Auth is two custom headers
-// (API-KEY + USERNAME); the sender id goes in the body; success is HTTP 200
-// with `status: "ACCEPTD"`. When the FROG_* env vars are absent the
-// "transport" just logs the message (dev/CI-friendly). Never throws — callers
-// fire-and-forget, and a delivery failure must never fail the request.
+// API. Auth is two custom headers (API-KEY + USERNAME); the sender id goes
+// in the body; success is HTTP 200 with `status: "ACCEPTD"`. When the
+// FROG_* env vars are absent the "transport" just logs the message
+// (dev/CI-friendly). Never throws: callers fire-and-forget, and a delivery
+// failure must never fail the request.
 import ENV from '#config/env.js';
 import logger from '#utils/logger.js';
 

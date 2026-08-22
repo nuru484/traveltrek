@@ -1,20 +1,17 @@
 // src/validations/report-validation.ts
 //
-// Zod schemas for the reports domain (replaces the express-validator chains
-// in the legacy reports-validations.ts). Boundary rules only — shape, ranges,
-// enums — with the legacy messages kept field-for-field:
+// Zod schemas for the reports domain. Boundary rules only — shape, ranges,
+// enums:
 //
 // - year is bounded 2020–2030 and month 1–12, both optional; the "default to
 //   the current year" rule stays in the report service (via the injected
-//   clock), matching the legacy destructure default.
-// - startDate/endDate accept any ISO 8601 date or datetime, like the legacy
-//   isISO8601() check. The strings pass through unparsed: the service both
-//   builds the Prisma window from them and echoes them verbatim in
-//   `summary.period`, exactly as before.
-// - limit (1–20, default 10) and minBookings (>= 0, default 1) move their
-//   handler-side destructure defaults here; the wire echo in
-//   `summary.filters` is unchanged. (The limit default was raised from the
-//   legacy 5 to 10 for the reports rebuild — the UI no longer sends it.)
+//   clock).
+// - startDate/endDate accept any ISO 8601 date or datetime. The strings pass
+//   through unparsed: the service both builds the Prisma window from them and
+//   echoes them verbatim in `summary.period`.
+// - limit (1–20, default 10) and minBookings (>= 0, default 1) carry the
+//   defaults the handlers rely on; both are echoed in `summary.filters`. The
+//   UI never sends limit, so its default is what the leaderboards show.
 import { z } from 'zod';
 
 import {

@@ -1,4 +1,4 @@
--- Phase 5b: separate customers from staff.
+-- Separate customers from staff.
 --
 -- User becomes STAFF-ONLY (ADMIN/AGENT); customers move to their own Customer
 -- table, keeping their ids, and Booking/Payment re-point at Customer. Hand

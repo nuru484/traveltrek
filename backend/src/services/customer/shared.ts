@@ -1,7 +1,7 @@
 // src/services/customer/shared.ts
 //
-// Dependency-free building blocks for the customers domain (Phase 5b: a
-// customer is a separate principal from staff): the request/result types and
+// Dependency-free building blocks for the customers domain (a customer is a
+// separate principal from staff): the request/result types and
 // the self-or-staff authorization predicate. Shared by the customer core and
 // every feature module.
 import { type BookingStatus } from '#config/prismaClient.js';

@@ -183,7 +183,7 @@ export function RecentPaymentsCard({
   );
 }
 
-/** The dms ranked-bar leaderboard applied to top tours. */
+/** Ranked-bar leaderboard for the top tours. */
 export function TopToursRankedCard({ topTours }: { topTours: ITourTopStats[] }) {
   return (
     <RankedBarList

@@ -1,9 +1,8 @@
 // src/services/room/core.ts
 //
 // The shared rooms engine: best-effort photo cleanup, the availability-window
-// resolution and the booked/available counting math (preserved bit-for-bit
-// from the legacy helper), the default-window availability, and the list
-// where-clause builder. Built once per deps.
+// resolution and the booked/available counting math, the default-window
+// availability, and the list where-clause builder. Built once per deps.
 import { BookingStatus, type Prisma } from '#config/prismaClient.js';
 import { BadRequestError } from '#middlewares/error-handler.js';
 import {
@@ -30,9 +29,9 @@ export const makeRoomCore = (d: RoomDeps) => {
   };
 
   /**
-   * Resolves the availability window the legacy way: default to
-   * [now, now + 1 day], and only when BOTH dates are sent, parse and check
-   * them (falsy/empty params fall back to the default, as before).
+   * Resolves the availability window: defaults to [now, now + 1 day], and
+   * only when BOTH dates are sent are they parsed and checked (falsy/empty
+   * params fall back to the default).
    */
   const resolveDateWindow = (
     startDate?: string,
@@ -58,7 +57,7 @@ export const makeRoomCore = (d: RoomDeps) => {
     return { end, start };
   };
 
-  /** Booked/available counts for a date range — legacy math, bit-for-bit. */
+  /** Booked/available counts for a date range. */
   const getAvailableRoomsCount = async (
     roomId: number,
     startDate: Date,

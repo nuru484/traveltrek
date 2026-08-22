@@ -1,6 +1,6 @@
 // src/services/room/delete.service.ts
 //
-// Room delete: the legacy guard chain in order — completed payments, active
+// Room delete: the guard chain in order — completed payments, active
 // bookings, future bookings, ongoing stays, pending payments, and the hotel's
 // last room — then soft-delete + photo cleanup. Historical bookings never
 // block; they are only counted for the response.

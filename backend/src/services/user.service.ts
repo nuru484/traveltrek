@@ -1,19 +1,19 @@
 // src/services/user.service.ts
 //
-// STAFF management domain logic (Phase 5b: customers moved to their own
-// Customer model/service — every User row is an ADMIN or AGENT). Pure, DI'd
+// STAFF management domain logic (customers live in their own Customer
+// model/service — every User row is an ADMIN or AGENT). Pure, DI'd
 // functions: they take typed inputs, own every Prisma access and domain
 // invariant (email/phone uniqueness, role-change and delete guards,
 // Cloudinary picture cleanup), throw the typed CustomError subclasses and
 // never touch req/res. Credentials are OUT of scope: profile updates carry no
 // password (rotation happens only through POST /auth/change-password).
 //
-// Authorization note: routes/user.ts now gates every endpoint to staff; the
+// Authorization note: routes/user.ts gates every endpoint to staff; the
 // per-record rules stay here as explicit actor checks — staff may view/update
 // their own profile, ADMIN/AGENT may touch anyone, admins may not change
 // their own role or delete themselves, and only admins may delete other
-// users. The legacy payment-based delete guards are GONE: staff users have no
-// bookings/payments relations anymore (those hang off Customer).
+// users. Deletes need no payment guard: staff users carry no
+// bookings/payments relations (those hang off Customer).
 //
 // Cleanup note: every Cloudinary delete is best-effort via the injected
 // cloudinary dep — a cleanup failure never fails the request.
@@ -93,7 +93,7 @@ export const makeUserService = (
       );
     }
 
-    // findFirst so soft-deleted users 404 like hard-deleted ones did.
+    // findFirst so soft-deleted users 404 instead of being returned.
     const user = await prisma.user.findFirst({
       select: userSelect,
       where: { id: userId },
@@ -139,12 +139,11 @@ export const makeUserService = (
   };
 
   /**
-   * PUT /users/:userId — self or ADMIN/AGENT only. Guard order is the legacy
-   * one: actor rule → existence → email uniqueness → phone uniqueness →
-   * update. A replaced profile picture has its old image cleaned up
-   * best-effort; if anything fails after the middleware already uploaded a
-   * new image, that fresh upload is cleaned up before rethrowing (the legacy
-   * catch block, which logged this path at error level).
+   * PUT /users/:userId — self or ADMIN/AGENT only. Guard order: actor rule →
+   * existence → email uniqueness → phone uniqueness → update. A replaced
+   * profile picture has its old image cleaned up best-effort; if anything
+   * fails after the middleware already uploaded a new image, that fresh
+   * upload is cleaned up before rethrowing, logged at error level.
    */
   const updateUserProfile = async (
     actor: UserActor,
@@ -170,7 +169,7 @@ export const makeUserService = (
       }
 
       // Email/phone are LOGIN IDENTIFIERS: a staff member editing their OWN
-      // profile may no longer change them here — the dedicated verified flows
+      // profile may not change them here — the dedicated verified flows
       // (POST /auth/change-email / /auth/change-phone, which re-authenticate
       // and confirm possession of the new contact) are the only self-service
       // path. Editing ANOTHER account keeps the direct administrative path
@@ -190,9 +189,9 @@ export const makeUserService = (
       }
 
       // Uniqueness pre-checks use findUnique ON PURPOSE (unscoped): the DB
-      // unique constraints span soft-deleted rows (khadys convention), so a
-      // tombstoned user still holds its email/phone and the pre-check must
-      // see it — otherwise the update would die on a raw P2002 instead.
+      // unique constraints span soft-deleted rows, so a tombstoned user still
+      // holds its email/phone and the pre-check must see it — otherwise the
+      // update would die on a raw P2002 instead.
       if (input.email && input.email !== existingUser.email) {
         const userByEmail = await prisma.user.findUnique({
           where: { email: input.email },
@@ -277,8 +276,8 @@ export const makeUserService = (
 
   /**
    * PATCH /users/:userId/role — admins may not change their own role, and a
-   * no-op change is refused (same guard order as the legacy handler; the
-   * role whitelist itself moved to the zod schema).
+   * no-op change is refused. The role whitelist itself lives in the zod
+   * schema.
    */
   const changeUserRole = async (
     actor: UserActor,
@@ -317,11 +316,10 @@ export const makeUserService = (
 
   /**
    * DELETE /users/:userId — admins may not delete themselves; only admins
-   * may delete others (a non-admin self-delete fell through in the legacy
-   * handler — unreachable anyway, routes gate this endpoint to ADMIN). Staff
-   * users carry no bookings/payments (those belong to Customers), so the
-   * legacy payment guard is gone. The profile picture is cleaned up
-   * best-effort after the row is gone.
+   * may delete others (routes gate this endpoint to ADMIN anyway). Staff
+   * users carry no bookings/payments (those belong to Customers), so no
+   * payment guard is needed. The profile picture is cleaned up best-effort
+   * after the row is gone.
    */
   const deleteUser = async (
     actor: UserActor,

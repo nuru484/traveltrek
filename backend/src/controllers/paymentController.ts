@@ -7,21 +7,19 @@
 // (booking gates, Paystack I/O, reconciliation, transition/delete guards)
 // lives in services/payment.service.ts.
 //
-// Like bookings, the payment role rules are NOT duplicated by
-// routes/payment.ts, so every legacy in-handler check moved into the service
-// as an actor-based rule and each handler passes `{ id, role }` down. The
-// `!user` guards below only narrow the optional type (authenticate-jwt always
-// sets req.user) and fail closed with the legacy messages.
+// Like bookings, the payment role rules are NOT enforced by
+// routes/payment.ts: they live in the service as actor-based rules, so each
+// handler passes `{ id, role }` down. The `!user` guards below only narrow
+// the optional type (authenticate-jwt always sets req.user) and fail closed.
 //
-// Two endpoints keep legacy bespoke envelopes instead of sendSuccess:
+// Two endpoints answer with bespoke envelopes instead of sendSuccess:
 // - handleWebhook (public, mounted before authenticateJWT) verifies the
 //   Paystack HMAC over the RAW request bytes (req.rawBody, captured in
-//   app.ts) — the legacy code hashed JSON.stringify(req.body), which breaks
-//   whenever re-serialization differs from the wire bytes. Response codes are
-//   unchanged: 400 'Invalid signature', otherwise 200s (Paystack retries
-//   anything else).
-// - handleCallback translates the service's verification outcome into the
-//   legacy `{ message, success, data? }` shape with its exact status codes.
+//   app.ts); hashing a re-serialized JSON.stringify(req.body) breaks whenever
+//   re-serialization differs from the wire bytes. Response codes: 400
+//   'Invalid signature', otherwise 200s (Paystack retries anything else).
+// - handleCallback translates the service's verification outcome into a
+//   `{ message, success, data? }` shape with its own status codes.
 import { Request, RequestHandler, Response } from 'express';
 
 import { HTTP_STATUS_CODES } from '#config/constants.js';
@@ -95,8 +93,8 @@ export const createPayment: RequestHandler[] = [
   handleCreatePayment,
 ];
 
-// GET /payments/callback — legacy bespoke `{ message, success, data? }`
-// envelope, preserved verbatim (no zod: a missing reference has its own 400).
+// GET /payments/callback: bespoke `{ message, success, data? }` envelope
+// (no zod: a missing reference has its own 400).
 const handlePaymentCallback = asyncHandler(
   async (req: Request, res: Response<IPaymentVerificationResponse>) => {
     const { reference } = req.query;

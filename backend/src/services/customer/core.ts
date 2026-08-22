@@ -33,9 +33,9 @@ export const makeCustomerCore = (d: CustomerDeps) => {
   };
 
   /** Uniqueness pre-checks use findUnique ON PURPOSE (unscoped): the DB
-   * unique constraints span soft-deleted rows (khadys convention), so a
-   * tombstoned customer still holds its email/phone and the pre-check must
-   * see it — otherwise the write would die on a raw P2002 instead. */
+   * unique constraints span soft-deleted rows, so a tombstoned customer
+   * still holds its email/phone and the pre-check must see it, or the write
+   * would die on a raw P2002 instead. */
   const assertContactAvailable = async (
     input: Pick<CustomerUpdateInput, 'email' | 'phone'>,
     excludeId?: number,

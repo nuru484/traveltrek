@@ -1,8 +1,8 @@
 // src/controllers/authentication/contact-change.ts
 //
-// Self-service email/phone changes (dms email-change pattern, over BOTH
-// principals). Profile updates no longer write login identifiers — these
-// verified flows are the only self-service path:
+// Self-service email/phone changes, over BOTH principals. Profile updates
+// never write login identifiers; these verified flows are the only
+// self-service path:
 //
 // - change-email / change-phone (authenticated): re-auth with the current
 //   password (or, for passwordless accounts, the /auth/reauth/challenge

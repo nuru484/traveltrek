@@ -4,12 +4,12 @@
 // one of the includes below); controllers map them through here so the wire
 // format lives in exactly one place and raw DB records never leak.
 //
-// Three DTO shapes because the legacy wire format differed per endpoint:
-// mutations (create/update/status) embedded the FULL origin/destination rows
-// and omitted originId/destinationId; the detail read used the four-field
-// destination summaries and added the ids; the list used the summaries and
-// ids but omitted capacity. All three are preserved bit-for-bit, with the
-// detail/list read shapes gaining an aggregate `rating` block.
+// Three DTO shapes because the wire format differs per endpoint: mutations
+// (create/update/status) embed the FULL origin/destination rows and omit
+// originId/destinationId; the detail read uses the four-field destination
+// summaries and adds the ids; the list uses the summaries and ids but omits
+// capacity. The detail and list shapes also carry an aggregate `rating`
+// block.
 import type { Prisma } from '#config/prismaClient.js';
 import type { RatingSummary } from '#utils/mappers/review.mapper.js';
 
@@ -22,8 +22,7 @@ export const flightDestinationSelect = {
 } satisfies Prisma.DestinationSelect;
 
 /**
- * Relations for flight mutations — the full destination rows, matching the
- * legacy `include: { destination: true, origin: true }`.
+ * Relations for flight mutations: the full origin and destination rows.
  */
 export const flightFullInclude = {
   destination: true,

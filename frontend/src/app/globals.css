@@ -134,10 +134,9 @@
   --input: oklch(0.30 0.03 250); /* Input field */
   --ring: oklch(0.65 0.20 230); /* Bright blue ring */
   
-  /* Chart colors - dark mode. Tuned to the dataviz lightness band
-     (OKLCH L 0.48–0.67 against the dark card surface) so every step keeps
-     >= 3:1 contrast and adjacent hues stay CVD-distinguishable — validated
-     with the dataviz palette checker, not by eye. */
+  /* Chart colors - dark mode. Held to an OKLCH lightness band
+     (L 0.48–0.67 against the dark card surface) so every step keeps
+     >= 3:1 contrast and adjacent hues stay CVD-distinguishable. */
   --chart-1: oklch(0.62 0.15 230); /* Ocean blue */
   --chart-2: oklch(0.60 0.14 180); /* Turquoise */
   --chart-3: oklch(0.65 0.11 50); /* Sand */

@@ -1,6 +1,6 @@
 // test/unit/table-query-state-logic.test.ts
 //
-// The pure half of the URL + session table-state port (dms pattern):
+// The pure half of the URL + session table state:
 // parse <-> serialize round-trips, garbage tolerance, default detection and
 // the API param builder.
 import { describe, expect, it } from "vitest";

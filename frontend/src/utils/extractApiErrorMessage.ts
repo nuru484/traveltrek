@@ -61,7 +61,7 @@ export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
       };
     }
 
-    // RTK Query error with status and data (API responses from your backend)
+    // RTK Query error with status and data (API error responses)
     if ("status" in error && "data" in error) {
       const { data } = error;
 
@@ -70,7 +70,7 @@ export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
       }
 
       if (data && typeof data === "object") {
-        // Handle your backend's error structure
+        // Handle the API's error structure
         if ("status" in data && data.status === "error") {
           const result: ApiErrorResult = {
             message:
@@ -88,7 +88,7 @@ export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
             result.code = data.code;
           }
 
-          // Check for field-specific validation errors in details.errors (your format)
+          // Check for field-specific validation errors in details.errors
           if (
             "details" in data &&
             data.details &&
@@ -120,7 +120,6 @@ export const extractApiErrorMessage = (error: unknown): ApiErrorResult => {
               const formattedFieldErrors: Record<string, string> = {};
               Object.entries(fieldErrors).forEach(([field, messages]) => {
                 formattedFieldErrors[field] = messages[0]; // Use first error message
-                // Or join multiple messages: messages.join(', ')
               });
 
               result.fieldErrors = formattedFieldErrors;

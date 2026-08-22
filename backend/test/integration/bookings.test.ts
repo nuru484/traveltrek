@@ -1,7 +1,7 @@
 // test/integration/bookings.test.ts
 //
-// Baseline behaviour of the booking flows before the service-layer refactor:
-// self-booking rules, capacity guards, duplicate protection, role-scoped reads.
+// Behaviour of the booking flows: self-booking rules, capacity guards,
+// duplicate protection, role-scoped reads.
 import { describe, expect, it } from 'vitest';
 
 import prisma from '#config/prismaClient.js';

@@ -1,9 +1,9 @@
 // src/routes/public.ts
 //
 // UNAUTHENTICATED browse surface for the portfolio landing page, mounted
-// under /api/v1/public BEFORE authenticateJWT (see routes/index.ts — the
-// khadys public/admin route split). Read-only, rate limited on its own
-// budget, and privacy-scoped: see publicController.ts for the boundary.
+// under /api/v1/public BEFORE authenticateJWT (see routes/index.ts for the
+// public/admin route split). Read-only, rate limited on its own budget, and
+// privacy-scoped: see publicController.ts for the boundary.
 import { Router } from 'express';
 
 import {

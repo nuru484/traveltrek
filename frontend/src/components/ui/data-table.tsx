@@ -1,11 +1,11 @@
 // src/components/ui/data-table.tsx
 //
 // The ONE list-table scaffold. Every entity data table (bookings, payments,
-// customers, staff) previously copy-adapted the same ~250 lines: tanstack
-// table setup, the dual render (dense row cards below md, the real table from
-// md up), the empty-state semantics, loading skeletons, and pagination. That
-// orchestration now lives here once; entity files keep only what is truly
-// theirs - columns, the row-card content, the toolbar, and delete flows.
+// customers, staff) shares the same orchestration: tanstack table setup, the
+// dual render (dense row cards below md, the real table from md up), the
+// empty-state semantics, loading skeletons, and pagination. It lives here
+// once; entity files keep only what is truly theirs - columns, the row-card
+// content, the toolbar, and delete flows.
 //
 // Split into a hook + a shell so entity code OWNS the table instance: the
 // toolbar (column toggles, selection count) and delete flows need it, and

@@ -1,11 +1,11 @@
 // src/types/user.ts
 //
-// /users is STAFF-ONLY (backend Phase 5b): every User row is an ADMIN or
-// AGENT account. Customers are a separate principal under /customers.
+// /users is STAFF-ONLY: every User row is an ADMIN or AGENT account.
+// Customers are a separate principal under /customers.
 import type { ReactNode } from "react";
 export type UserRole = "ADMIN" | "CUSTOMER" | "AGENT";
 
-/** The only roles a User row may carry (customers are not users anymore). */
+/** The only roles a User row may carry; customers are not users. */
 export type StaffRole = "ADMIN" | "AGENT";
 
 /** Mirrors backend UserDTO (src/utils/mappers/user.mapper.ts). */

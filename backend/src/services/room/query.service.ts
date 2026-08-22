@@ -25,7 +25,7 @@ export const makeRoomQueryService = (d: RoomDeps, core: RoomCore) => {
 
   /**
    * Fetches a room with counts for the requested window. The 404 fires before
-   * the date checks, matching the legacy handler's order.
+   * the date checks.
    */
   const getRoomById = async (
     id: number,
@@ -76,8 +76,8 @@ export const makeRoomQueryService = (d: RoomDeps, core: RoomCore) => {
 
   /**
    * Availability report for an explicit window (both dates required). The
-   * counts are computed before the room lookup, so — as in the legacy
-   * handler — a missing room 404s only after the date checks pass.
+   * counts are computed before the room lookup, so a missing room 404s only
+   * after the date checks pass.
    */
   const checkAvailability = async (
     roomId: number,

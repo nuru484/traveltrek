@@ -58,8 +58,7 @@ export const makeReportBookingsService = (d: ReportDeps, core: ReportCore) => {
     const averageBookingValue =
       totalBookings > 0 ? totalRevenue / totalBookings : 0;
 
-    // Buckets keyed by "YYYY-MM", in first-appearance order (legacy object
-    // insertion order).
+    // Buckets keyed by "YYYY-MM", in first-appearance order.
     const monthlyBuckets = new Map<string, BookingMonthBucket>();
     const statusBreakdown: Partial<Record<BookingStatus, number>> = {};
 

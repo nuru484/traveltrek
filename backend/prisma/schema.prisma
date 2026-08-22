@@ -18,7 +18,7 @@ enum Role {
   AGENT
 }
 
-/// STAFF ONLY (Phase 5b): every row is an ADMIN or AGENT operating the system.
+/// STAFF ONLY: every row is an ADMIN or AGENT operating the system.
 /// Customers live in the separate Customer model below.
 model User {
   id   Int    @id @default(autoincrement())
@@ -78,8 +78,8 @@ model User {
   @@index([deletedAt])
 }
 
-/// The customer principal (Phase 5b), split out of User so the business can
-/// manage customer profiles (full booking/payment history, contact details)
+/// The customer principal, kept separate from User so the business can manage
+/// customer profiles (full booking/payment history, contact details)
 /// independently of staff accounts. Same auth surface as staff — optional
 /// password (OTP/Google otherwise), lockout counters, tokenVersion session
 /// epoch — but no role: a customer is always exactly a customer.
@@ -145,9 +145,9 @@ enum TokenType {
   /// (rotation); presenting an already-consumed jti outside the concurrency
   /// grace window is treated as theft and bumps the session epoch.
   REFRESH
-  /// 6-digit email OTP for passwordless login (next phase).
+  /// 6-digit email OTP for passwordless login.
   OTP_LOGIN
-  /// Long random opaque token embedded in a password-reset link (next phase).
+  /// Long random opaque token embedded in a password-reset link.
   PASSWORD_RESET
   /// 6-digit second-factor code: sent on password login when the principal has
   /// twoFactorEnabled, and by the authed /auth/2fa/challenge step that gates

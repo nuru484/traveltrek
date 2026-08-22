@@ -61,7 +61,7 @@ export const makeRoomCreateService = (d: RoomDeps, core: RoomCore) => {
       return { availability: await getCurrentAvailability(room.id), room };
     } catch (error) {
       // The photo was already uploaded by the route middleware; don't orphan
-      // it on Cloudinary when the create is refused (the legacy handler did).
+      // it on Cloudinary when the create is refused.
       if (input.photo) {
         await cleanupPhoto(input.photo, 'Failed to clean up Cloudinary image');
       }

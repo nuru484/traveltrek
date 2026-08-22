@@ -1,13 +1,13 @@
 // test/integration/payments.test.ts
 //
-// Payments domain coverage, pinned against the service-layer refactor: the
+// Payments domain coverage: the
 // Paystack initialize flow (fresh + resumed sessions, ownership and method
 // guards), the webhook (REAL raw-body HMAC signature verification against
 // PAYSTACK_SECRET_KEY, charge.success completion, amount reconciliation),
 // the redirect callback, customer scoping on reads, and the manual status /
 // refund / delete admin flows.
 //
-// The Paystack HTTP client is faked below (khadys pattern): initialize
+// The Paystack HTTP client is faked below: initialize
 // echoes an authorization_url + reference and records the amount/metadata it
 // was called with; verify replays them keyed by reference, so the service's
 // amount-reconciliation check behaves exactly like real Paystack. The

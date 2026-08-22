@@ -1,7 +1,7 @@
 // src/validations/tour-validation.ts
 //
-// Zod schemas for the tour domain (replaces the express-validator chains).
-// Boundary rules only — shape, ranges, enums and date ordering. Invariants
+// Zod schemas for the tour domain. Boundary rules only — shape, ranges,
+// enums and date ordering. Invariants
 // that need the database (destination existence, booking guards, status
 // transitions) live in services/tour.service.ts.
 import { z } from 'zod';

@@ -47,8 +47,8 @@ export const makePaymentQueryService = (d: PaymentDeps, core: PaymentCore) => {
 
   /**
    * GET /payments — customers are always scoped to their own rows; the
-   * customerId filter is honoured for admins only (legacy rule: agents may
-   * see everything but not filter by owner).
+   * customerId filter is honoured for admins only (agents may see everything
+   * but not filter by owner).
    */
   const listPayments = async (
     actor: PaymentActor,

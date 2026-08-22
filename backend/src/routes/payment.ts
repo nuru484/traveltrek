@@ -26,8 +26,8 @@ paymentRoutes.post('/payments', createPayment);
 paymentRoutes.get('/payments/callback', handleCallback);
 paymentRoutes.get('/payments/:id', getPayment);
 paymentRoutes.get('/payments', getAllPayments);
-// Phase 5b: payments hang off Customers — the old /payments/user/:userId
-// path is REMOVED (not aliased).
+// Payments hang off Customers, so the per-owner listing is keyed by
+// customerId; there is no /payments/user/:userId alias.
 paymentRoutes.get('/payments/customer/:customerId', getCustomerPayments);
 
 export default paymentRoutes;

@@ -1,6 +1,6 @@
 // test/unit/booking-detail-format.test.ts
 //
-// The pure presentation helpers extracted from the booking detail view: the
+// The pure presentation helpers behind the booking detail view: the
 // status/payment badge colour maps and the payment-deadline check.
 import { describe, expect, it, vi } from "vitest";
 import {

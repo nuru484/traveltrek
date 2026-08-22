@@ -1,6 +1,6 @@
 // test/integration/ops.test.ts
 //
-// Phase 6 ops hardening: health probes (mounted before the rate limiter),
+// Ops hardening: health probes (mounted before the rate limiter),
 // request correlation (X-Request-Id echo + requestId in error envelopes),
 // and helmet security headers.
 import { describe, expect, it } from 'vitest';

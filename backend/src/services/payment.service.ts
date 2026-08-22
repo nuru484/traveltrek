@@ -34,7 +34,7 @@ import {
 } from '#services/payment/shared.js';
 
 // Re-export the public types/consts controllers/tests import from this module
-// path (unchanged from the pre-split surface).
+// path.
 export {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,

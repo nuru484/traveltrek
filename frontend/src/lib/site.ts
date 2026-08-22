@@ -1,8 +1,7 @@
 /**
  * Central site config - canonical URL, brand strings, and SEO defaults.
- * Mirrors the khadys-kitchen-frontend convention: the base URL comes from
- * NEXT_PUBLIC_BASE_URL with a production fallback, trailing slash stripped
- * so `${siteUrl}/path` is always safe.
+ * The base URL comes from NEXT_PUBLIC_BASE_URL with a production fallback,
+ * trailing slash stripped so `${siteUrl}/path` is always safe.
  */
 export const siteUrl = (
   process.env.NEXT_PUBLIC_BASE_URL || "https://traveltrek.manuru.dev"

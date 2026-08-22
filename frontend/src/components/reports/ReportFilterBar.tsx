@@ -6,7 +6,7 @@
 // - At or under the threshold (period-only tabs): the controls render INLINE
 //   in the toolbar - no Filters button, no collapsed panel (period-only tabs
 //   shouldn't hide their one select behind a click).
-// - Above it (dms pattern): a Filters button with an active-count badge that
+// - Above it: a Filters button with an active-count badge that
 //   rolls out an inline panel below the toolbar on every screen size - the
 //   same drop-down behaviour as the list-page filter bars.
 "use client";

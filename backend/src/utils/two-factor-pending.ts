@@ -1,7 +1,7 @@
 // src/utils/two-factor-pending.ts
 //
-// The short-lived "password verified, awaiting 2FA code" proof (khadys
-// pattern, adapted to dual principals). After a correct password on a
+// The short-lived "password verified, awaiting 2FA code" proof, over both
+// principals. After a correct password on a
 // 2FA-enabled account we don't issue a session — the login controller sets a
 // signed, httpOnly, 10-minute pending cookie carrying this token instead. It
 // proves the password step so /auth/2fa/verify and /auth/2fa/resend know

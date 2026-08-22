@@ -27,7 +27,7 @@ const FILTERS_SPEC: TableFiltersSpec<IUsersTableFilters> = {
 
 const UsersManagePage = () => {
   // URL + session table state: deep links win, and navigating to a detail
-  // and back restores the page/filters you left.
+  // and back restores the page and filters that were in effect.
   const {
     page,
     pageSize,

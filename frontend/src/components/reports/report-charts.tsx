@@ -10,8 +10,8 @@
 //   trend-chart     — TrendChart (+ TrendPoint)
 //   ranked-bar-list — RankedBarList (+ RankedItem)
 //   skeletons       — Chart/Kpi/List card skeletons
-// Re-exporting here keeps every "@/components/reports/report-charts" import
-// working unchanged.
+// Re-exporting here keeps "@/components/reports/report-charts" as the one
+// import path for all of them.
 export * from "./report-charts/primitives";
 export * from "./report-charts/card-states";
 export * from "./report-charts/kpi-card";

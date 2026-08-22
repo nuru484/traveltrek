@@ -7,8 +7,7 @@
 // and reply through the standard envelope helpers. All domain logic (status
 // state machine and seat accounting included) lives in
 // services/flight.service.ts; role gates live in routes/flight.ts
-// (authorizeRole), so the legacy in-handler role re-checks on
-// status/delete were dropped as duplicates.
+// (authorizeRole), so no handler re-checks req.user.role.
 import { Request, RequestHandler, Response } from 'express';
 
 import {
@@ -66,9 +65,8 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * Guards the multer-parsed photo file (type + size) before the Cloudinary
- * upload middleware runs. Zod validates req.body only, so this keeps the
- * legacy flightPhotoValidation checks — same messages, same
- * validation-error envelope.
+ * upload middleware runs. Zod validates req.body only, so the file checks
+ * live here and answer the standard validation-error envelope.
  */
 const validatePhotoFile: RequestHandler = (req, _res, next) => {
   const { file } = req;
@@ -193,7 +191,7 @@ const handleGetAllFlights = asyncHandler(
       'flight',
       flights.map((f) => f.id),
     );
-    // The legacy list meta also echoed the applied filters; keep that shape.
+    // The list meta echoes the applied filters back to the caller.
     const meta = {
       ...buildPaginationMeta(total, query.page, query.limit),
       filters: {
@@ -265,9 +263,9 @@ export const deleteFlight: RequestHandler[] = [
   handleDeleteFlight,
 ];
 
-// No route mounts this handler today, so there is no authorizeRole gate to
-// lean on — the legacy in-handler user/role guard is kept (the one deliberate
-// exception to the "roles live in routes" rule above).
+// No route mounts this handler, so there is no authorizeRole gate to lean
+// on: it carries its own user/role guard, the one deliberate exception to
+// the "roles live in routes" rule above.
 const handleGetFlightStats = asyncHandler(
   async (req: Request, res: Response) => {
     const { user } = req;

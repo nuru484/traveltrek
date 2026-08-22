@@ -85,12 +85,12 @@ export const makeCustomerWriteService = (
       }
 
       // Email/phone are LOGIN IDENTIFIERS: a customer editing their OWN
-      // profile may no longer change them here — the dedicated verified flows
+      // profile may not change them here. The dedicated verified flows
       // (POST /auth/change-email / /auth/change-phone, which re-authenticate
       // and confirm possession of the new contact) are the only self-service
-      // path. Staff edits keep the direct administrative path (zod cannot
+      // path. Staff edits take the direct administrative path (zod cannot
       // know the actor, so the rule lives here). Sending the unchanged
-      // current value stays a no-op so full-profile form submits keep working.
+      // current value is a no-op so full-profile form submits keep working.
       const isSelf = actor.kind === 'customer' && actor.id === customerId;
       if (isSelf) {
         if (input.email !== undefined && input.email !== existing.email) {

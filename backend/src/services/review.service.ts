@@ -117,7 +117,7 @@ export const makeReviewService = (
     }
 
     // findUnique on purpose (unscoped): a soft-deleted review still holds the
-    // booking's unique slot (khadys convention), so it blocks a re-review too.
+    // booking's unique slot, so it blocks a re-review too.
     const existing = await prisma.review.findUnique({
       select: { id: true },
       where: { bookingId: input.bookingId },

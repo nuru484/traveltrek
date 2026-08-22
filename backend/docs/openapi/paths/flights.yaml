@@ -4,8 +4,8 @@
 # gated by role at the route and then narrowed again by rules that need the
 # stored row, and in both the interesting behaviour is what the server refuses
 # rather than what it accepts. Those refusals are documented per operation,
-# because a 400 here usually means "the state does not allow that", not "your
-# JSON was malformed".
+# because a 400 here usually means "the state does not allow that", not "the
+# request body was malformed".
 
 /api/v1/flights:
   post:

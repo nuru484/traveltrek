@@ -47,7 +47,7 @@ const BookingsPage = () => {
   const urlCustomerId = Number(searchParams.get("customerId"));
 
   // URL + session table state: deep links win, and navigating to a detail
-  // and back restores the page/filters you left.
+  // and back restores the page/filters last used.
   const {
     page,
     pageSize,

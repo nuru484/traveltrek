@@ -1,8 +1,8 @@
 // test/unit/report-charts-primitives.test.ts
 //
-// The pure primitives behind the report/dashboard chart cards, now split into
-// their own module: the compact-money axis formatter, the status/method label
-// map, and the segment value formatter. Input money is integer pesewas.
+// The pure primitives behind the report/dashboard chart cards, in their own
+// module: the compact-money axis formatter, the status/method label map, and
+// the segment value formatter. Input money is integer pesewas.
 import { describe, expect, it } from "vitest";
 import {
   compactMoney,

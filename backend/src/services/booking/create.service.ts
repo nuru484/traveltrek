@@ -68,8 +68,8 @@ export const makeBookingCreateService = (d: BookingDeps, core: BookingCore) => {
       );
     }
 
-    // findFirst everywhere below so soft-deleted rows 404 like hard-deleted
-    // ones did (the soft-delete extension does not scope findUnique).
+    // findFirst everywhere below so soft-deleted rows 404 (the soft-delete
+    // extension does not scope findUnique).
     const targetCustomer = await prisma.customer.findFirst({
       where: { id: customerId },
     });
@@ -197,9 +197,9 @@ export const makeBookingCreateService = (d: BookingDeps, core: BookingCore) => {
     // The checks above give friendly errors on plainly unavailable inventory;
     // the guarded claims below are what actually prevent overselling when
     // concurrent requests pass those checks together.
-    // Note: the duplicate-booking unique constraints span soft-deleted rows
-    // (khadys convention) — a soft-deleted booking still holds its
-    // customer+tour/room/flight slot until it is restored or hard-purged.
+    // Note: the duplicate-booking unique constraints span soft-deleted rows,
+    // so a soft-deleted booking still holds its customer+tour/room/flight
+    // slot until it is restored or hard-purged.
     const booking = await prisma.$transaction(async (tx) => {
       if (tourId && tour) {
         const guestsToBook = numberOfGuests ?? 1;
@@ -258,7 +258,7 @@ export const makeBookingCreateService = (d: BookingDeps, core: BookingCore) => {
           paymentDeadline: paymentDeadline,
           requiresImmediatePayment: requiresImmediatePayment,
           room: roomId ? { connect: { id: roomId } } : undefined,
-          // Legacy semantics: an empty string is stored as null.
+          // An empty string is stored as null.
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           specialRequests: specialRequests || null,
           startDate: roomId && startDate ? new Date(startDate) : null,
