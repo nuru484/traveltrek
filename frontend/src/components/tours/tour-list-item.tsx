@@ -52,22 +52,30 @@ export function TourListItem({ tour }: ITourListItemProps) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-          {tour.destination?.name ?? "—"}
-        </p>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="min-w-0 truncate font-sans text-lg font-semibold leading-snug text-foreground">
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="min-w-0">
+          <p className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {tour.destination?.name ?? "—"}
+          </p>
+          <h3
+            className="mt-1.5 line-clamp-2 font-sans text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-base lg:text-lg"
+            title={tour.name}
+          >
             {tour.name}
           </h3>
-          <div className="flex-none text-right">
-            <p className="text-lg font-semibold text-foreground">
-              <Money amount={tour.price} />
-            </p>
-            <p className="text-[11px] text-muted-foreground">per guest</p>
-          </div>
         </div>
-        <RatingStars rating={tour.rating} />
+
+        {/* The price rides with the rating rather than beside the title: a
+            two-line title would squeeze it into the corner. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <RatingStars rating={tour.rating} />
+          <p className="text-sm font-semibold tabular-nums text-foreground sm:text-[15px]">
+            <Money amount={tour.price} />
+            <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+              / guest
+            </span>
+          </p>
+        </div>
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
           <span>

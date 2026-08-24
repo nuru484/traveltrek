@@ -58,16 +58,24 @@ export function HotelListItem({ hotel }: IHotelListItemProps) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-          {hotel.destination?.name ?? "—"}
-        </p>
-        <p className="truncate text-lg font-semibold text-foreground">
-          {hotel.name}
-        </p>
-        <p className="truncate text-sm text-muted-foreground">
-          {hotel.address}
-        </p>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="min-w-0">
+          <p className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {hotel.destination?.name ?? "—"}
+          </p>
+          <p
+            className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-base lg:text-lg"
+            title={hotel.name}
+          >
+            {hotel.name}
+          </p>
+          <p
+            className="mt-1 line-clamp-1 [overflow-wrap:anywhere] text-sm text-muted-foreground"
+            title={hotel.address}
+          >
+            {hotel.address}
+          </p>
+        </div>
         <RatingStars rating={hotel.rating} />
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">

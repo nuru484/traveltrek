@@ -20,6 +20,7 @@ import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import { loginRedirectPath } from "@/components/authentication/login-redirect-logic";
 import { useRouter } from "next/navigation";
 import Header from "@/components/index/Header";
+import { ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,6 +30,12 @@ export default function LoginPage() {
   // A 2FA account's password step answers { twoFactorRequired: true } with
   // no session - the card swaps to the code step until verify completes.
   const [twoFactorPending, setTwoFactorPending] = React.useState(false);
+
+  // Which demo account is being minted, so the row that was tapped is the one
+  // that spins instead of all three dimming together.
+  const [pendingRole, setPendingRole] = React.useState<DemoLoginRole | null>(
+    null
+  );
 
   const form = useForm<ILoginFormSchema>({
     resolver: zodResolver(loginFormSchema),
@@ -80,13 +87,17 @@ export default function LoginPage() {
   // bundle). A 403 (demo disabled) or 404 (account not seeded) surfaces as the
   // server's message.
   const handleDemoLogin = async (role: DemoLoginRole) => {
+    setPendingRole(role);
     try {
       await demoLoginUser({ role }).unwrap();
       toast.success("Login successful! Redirecting...");
+      // The spinner stays through the redirect - clearing it here would flash
+      // the row back to its resting state before the route changes.
       router.push(loginRedirectPath(window.location.search));
     } catch (err) {
       const { message } = extractApiErrorMessage(err);
       toast.error(message || "Demo login is unavailable right now.");
+      setPendingRole(null);
     }
   };
 
@@ -128,40 +139,62 @@ export default function LoginPage() {
 
             {/* Demo access */}
             <div className="mt-8">
-              <div className="mb-4 flex items-center gap-3">
+              <div className="mb-3 flex items-center gap-3">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                   Quick demo access
                 </span>
                 <div className="h-px flex-1 bg-foreground/15" />
               </div>
 
-              {/* Full-width rows on phones; compact 3-up cards on desktop so
-                  the wide column doesn't leave dead space to the right. */}
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {/* Phones: compact two-line rows, code on the right.
-                    Desktop (3-up grid): cards with the code on top. */}
-                {demoAccounts.map(({ role, code, label, description }) => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => handleDemoLogin(role)}
-                    disabled={isLoading || isDemoLoading}
-                    className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-foreground/15 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40 active:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 lg:flex-col lg:items-start lg:justify-start lg:gap-1"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground">
-                        {label}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {description}
-                      </span>
-                    </span>
-                    <span className="flex-none font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground lg:order-first">
-                      {code}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <p className="mb-4 max-w-prose text-sm text-muted-foreground">
+                Pick a seat and you are signed straight in - nothing to type,
+                nothing to remember.
+              </p>
+
+              {/* Full-width rows at every width. Three of these side by side
+                  in this column leave each label wrapping over four lines,
+                  and a row keeps the code, the name and the arrow on one
+                  readable line from 280px up. */}
+              <ul className="space-y-2.5">
+                {demoAccounts.map(({ role, code, label, description }) => {
+                  const isPending = pendingRole === role;
+
+                  return (
+                    <li key={role}>
+                      <button
+                        type="button"
+                        onClick={() => handleDemoLogin(role)}
+                        disabled={isLoading || isDemoLoading}
+                        aria-busy={isPending}
+                        className="group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-foreground/15 bg-card px-3 py-3 text-left transition-colors hover:border-foreground/30 hover:bg-muted/40 active:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+                      >
+                        <span className="flex h-9 w-11 flex-none items-center justify-center rounded-md border border-foreground/15 bg-muted/50 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {code}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-foreground">
+                            {label}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {description}
+                          </span>
+                        </span>
+                        {isPending ? (
+                          <Loader2
+                            className="h-4 w-4 flex-none animate-spin text-muted-foreground"
+                            aria-hidden
+                          />
+                        ) : (
+                          <ArrowRight
+                            className="h-4 w-4 flex-none text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                            aria-hidden
+                          />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </div>
 

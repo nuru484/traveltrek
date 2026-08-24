@@ -63,18 +63,23 @@ export const TourCard = ({ tour }: { tour: ITour }) => (
         {tour.type}
       </span>
     </div>
-    <div className="flex flex-1 flex-col gap-2 p-4">
-      <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-        {tour.destination
-          ? destinationLine(tour.destination)
-          : "Destination TBA"}
-      </p>
-      <p className="truncate text-lg font-semibold text-foreground">
-        {tour.name}
-      </p>
+    <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="min-w-0">
+        <p className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          {tour.destination
+            ? destinationLine(tour.destination)
+            : "Destination TBA"}
+        </p>
+        <p
+          className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-base lg:text-lg"
+          title={tour.name}
+        >
+          {tour.name}
+        </p>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <RatingStars rating={tour.rating} />
-        <p className="text-base font-semibold text-foreground">
+        <p className="text-sm font-semibold tabular-nums text-foreground sm:text-[15px]">
           {formatMoney(tour.price)}
           <span className="ml-1 text-[11px] font-normal text-muted-foreground">
             / guest
@@ -153,10 +158,10 @@ export const HotelCard = ({ hotel }: { hotel: IHotel }) => (
       <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
         Hotel · <HotelStarClass starRating={hotel.starRating} />
       </span>
-      <span className="truncate text-[15px] font-semibold leading-snug">
+      <span className="line-clamp-2 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
         {hotel.name}
       </span>
-      <span className="truncate text-xs text-muted-foreground">
+      <span className="line-clamp-1 [overflow-wrap:anywhere] text-xs text-muted-foreground">
         {hotel.destination ? destinationLine(hotel.destination) : hotel.address}
       </span>
       <span className="mt-auto">
@@ -188,13 +193,13 @@ export const FlightCard = ({ flight }: { flight: IFlight }) => (
       )}
     </span>
     <span className="flex min-w-0 flex-1 flex-col gap-1">
-      <span className="truncate font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+      <span className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
         {flight.airline} · {flight.flightNumber}
       </span>
-      <span className="truncate text-[15px] font-semibold leading-snug">
+      <span className="line-clamp-2 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
         {flight.origin.name} → {flight.destination.name}
       </span>
-      <span className="truncate text-xs text-muted-foreground">
+      <span className="line-clamp-1 [overflow-wrap:anywhere] text-xs text-muted-foreground">
         {format(new Date(flight.departure), "MMM d · h:mm a")} ·{" "}
         {formatMoney(flight.price)}
       </span>

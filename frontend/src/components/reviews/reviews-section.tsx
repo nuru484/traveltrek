@@ -10,6 +10,7 @@ import { MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RatingValue } from "@/components/ui/rating";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReviewComment } from "./review-comment";
 import {
   useGetPublicItemReviewsQuery,
   type PublicReviewTargetKind,
@@ -35,7 +36,7 @@ export function ReviewsSection({ kind, id }: IReviewsSectionProps) {
 
   return (
     <Card className="py-0 max-sm:rounded-none max-sm:border-x-0 max-sm:bg-transparent">
-      <CardContent className="p-4 sm:p-6 max-sm:px-3">
+      <CardContent className="@container/reviews p-4 sm:p-6 max-sm:px-3">
         <div className="mb-4 flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">
@@ -44,11 +45,15 @@ export function ReviewsSection({ kind, id }: IReviewsSectionProps) {
         </div>
 
         {isLoading ? (
-          <div className="space-y-4">
-            {[0, 1].map((row) => (
-              <div key={row} className="space-y-2">
+          <div className="grid gap-3 @xl/reviews:grid-cols-2 @4xl/reviews:grid-cols-3">
+            {[0, 1, 2].map((row) => (
+              <div
+                key={row}
+                className="space-y-2 rounded-xl border border-foreground/15 p-4"
+              >
                 <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-full max-w-md" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-24" />
               </div>
             ))}
           </div>
@@ -58,15 +63,11 @@ export function ReviewsSection({ kind, id }: IReviewsSectionProps) {
             traveller.
           </p>
         ) : (
-          <ul className="space-y-5">
-            {reviews.map((review, index) => (
+          <ul className="grid gap-3 @xl/reviews:grid-cols-2 @4xl/reviews:grid-cols-3">
+            {reviews.map((review) => (
               <li
                 key={review.id}
-                className={
-                  index > 0
-                    ? "border-t border-dashed border-foreground/15 pt-5"
-                    : undefined
-                }
+                className="flex h-full flex-col rounded-xl border border-foreground/15 bg-background p-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <RatingValue value={review.rating} />
@@ -75,16 +76,14 @@ export function ReviewsSection({ kind, id }: IReviewsSectionProps) {
                   </span>
                 </div>
                 {review.title && (
-                  <p className="mt-2 font-semibold break-words [overflow-wrap:anywhere]">
+                  <p className="mt-2 font-semibold [overflow-wrap:anywhere]">
                     {review.title}
                   </p>
                 )}
                 {review.comment && (
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
-                    {review.comment}
-                  </p>
+                  <ReviewComment comment={review.comment} className="mt-1" />
                 )}
-                <p className="mt-2 text-xs text-muted-foreground break-words [overflow-wrap:anywhere]">
+                <p className="mt-auto pt-2 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                   — {review.reviewer}
                 </p>
               </li>

@@ -39,15 +39,20 @@ export function DestinationListItem({
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-          {[destination.city, destination.country].filter(Boolean).join(" · ")}
-        </p>
-        <p className="truncate text-lg font-semibold text-foreground">
-          {destination.name}
-        </p>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="min-w-0">
+          <p className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {[destination.city, destination.country].filter(Boolean).join(" · ")}
+          </p>
+          <p
+            className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-base lg:text-lg"
+            title={destination.name}
+          >
+            {destination.name}
+          </p>
+        </div>
         {destination.description && (
-          <p className="line-clamp-2 min-h-[2.6rem] text-sm leading-relaxed text-muted-foreground">
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
             {destination.description}
           </p>
         )}

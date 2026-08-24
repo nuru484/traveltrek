@@ -203,7 +203,9 @@ export default function DashboardSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="flex items-center py-5 border-b border-sidebar-border">
+      {/* h-16 and a hairline, the same as the dashboard's top bar, so the two
+          borders meet in one line across the shell. */}
+      <SidebarHeader className="h-16 shrink-0 justify-center border-b border-sidebar-border p-2">
         <SidebarMenuButton className="flex h-10 cursor-pointer items-center gap-3 text-sidebar-foreground hover:bg-transparent group-data-[collapsible=icon]:!p-0">
           {/* The logo art is dark, so it rides on a white chip to read on the
               dark sidebar. flex-none keeps it square when the label truncates. */}

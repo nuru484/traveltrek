@@ -22,6 +22,7 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
   const hours = Math.floor(flight.duration / 60);
   const minutes = flight.duration % 60;
   const duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const route = `${flight.origin.name} → ${flight.destination.name}`;
 
   return (
     <Link
@@ -50,22 +51,28 @@ export function FlightListItem({ flight }: IFlightListItemProps) {
 
       {/* Body */}
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              {flight.airline} · {flight.flightNumber}
-            </p>
-            <p className="mt-1.5 truncate text-lg font-semibold text-foreground">
-              {flight.origin.name} → {flight.destination.name}
-            </p>
-            <RatingStars rating={flight.rating} className="mt-1.5" />
-          </div>
-          <div className="flex-none text-right">
-            <p className="text-lg font-semibold text-foreground">
-              <Money amount={flight.price} />
-            </p>
-            <p className="text-[11px] text-muted-foreground">per person</p>
-          </div>
+        <div className="min-w-0">
+          <p className="line-clamp-1 [overflow-wrap:anywhere] font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {flight.airline} · {flight.flightNumber}
+          </p>
+          <p
+            className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-base lg:text-lg"
+            title={route}
+          >
+            {route}
+          </p>
+        </div>
+
+        {/* The fare rides with the rating rather than beside the route: a
+            two-line route would squeeze it into the corner. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <RatingStars rating={flight.rating} />
+          <p className="text-sm font-semibold tabular-nums text-foreground sm:text-[15px]">
+            <Money amount={flight.price} />
+            <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+              / person
+            </span>
+          </p>
         </div>
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-dashed border-foreground/15 pt-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">

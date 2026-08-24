@@ -23,6 +23,7 @@ import {
 } from "@/redux/reviewApi";
 import type { IReview } from "@/types/review.types";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
+import { ReviewComment } from "./review-comment";
 import { ReviewDialog } from "./review-dialog";
 import {
   canEditReview,
@@ -61,8 +62,8 @@ export function MyReviewList() {
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
+      <div className="grid gap-3 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
             className="space-y-2.5 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
@@ -95,13 +96,13 @@ export function MyReviewList() {
 
   return (
     <div className="space-y-6">
-      <ul className="space-y-3">
+      <ul className="grid gap-3 @2xl/main:grid-cols-2 @5xl/main:grid-cols-3">
         {reviews.map((review) => (
           <li
             key={review.id}
-            className="rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
+            className="flex h-full flex-col rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
           >
-            <div className="space-y-2">
+            <div className="flex flex-1 flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <RatingValue value={review.rating} />
                 <Badge variant="outline">
@@ -109,19 +110,15 @@ export function MyReviewList() {
                 </Badge>
               </div>
               {review.title && (
-                <p className="font-semibold break-words [overflow-wrap:anywhere]">
+                <p className="font-semibold [overflow-wrap:anywhere]">
                   {review.title}
                 </p>
               )}
-              {review.comment && (
-                <p className="text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
-                  {review.comment}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              {review.comment && <ReviewComment comment={review.comment} />}
+              <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 <Link
                   href={reviewTargetHref(review.target)}
-                  className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                  className="min-w-0 [overflow-wrap:anywhere] text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
                 >
                   {reviewTargetLabel(review.target)}
                 </Link>

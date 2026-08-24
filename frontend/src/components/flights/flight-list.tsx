@@ -70,15 +70,13 @@ export function FlightList({
             >
               <Skeleton className="h-36 w-full rounded-none" />
               <div className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-3 w-28" />
-                    <Skeleton className="h-5 w-40" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-5 w-16" />
-                    <Skeleton className="h-3 w-12" />
-                  </div>
+                <div>
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="mt-2 h-5 w-40" />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-20" />
                 </div>
                 <div className="flex justify-between gap-2 border-t border-dashed border-foreground/15 pt-3">
                   <Skeleton className="h-3 w-24" />

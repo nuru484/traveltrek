@@ -64,21 +64,17 @@ export function TourList({
               key={i}
               className="flex flex-col gap-3 rounded-xl border border-foreground/15 bg-card p-4 sm:p-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex gap-1.5">
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                  <Skeleton className="h-5 w-20 rounded-full" />
-                </div>
-                <div className="space-y-1.5">
-                  <Skeleton className="ml-auto h-5 w-16" />
-                  <Skeleton className="ml-auto h-3 w-12" />
-                </div>
+              <div className="flex gap-1.5">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-full" />
               </div>
               <div>
                 <Skeleton className="h-3 w-28" />
                 <Skeleton className="mt-2 h-5 w-3/4" />
-                <Skeleton className="mt-2.5 h-4 w-full" />
-                <Skeleton className="mt-1.5 h-4 w-2/3" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-20" />
               </div>
               <div className="mt-auto flex justify-between gap-2 border-t border-dashed border-foreground/15 pt-3">
                 <Skeleton className="h-3 w-24" />

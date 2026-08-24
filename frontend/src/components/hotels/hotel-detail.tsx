@@ -341,26 +341,26 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                           {/* Room Information */}
                           <div className="min-w-0 flex-1 p-4 flex flex-col">
                             {/* Header */}
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-foreground text-base mb-1 truncate">
-                                  {room.roomType}
-                                </h4>
-                                {room.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2 break-words [overflow-wrap:anywhere]">
-                                    {room.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="text-right flex-none ml-3 max-w-[45%]">
-                                <p className="text-lg font-bold text-primary break-words">
-                                  <Money amount={room.pricePerNight} />
+                            <div className="mb-3 min-w-0">
+                              <h4
+                                className="mb-1 line-clamp-2 text-base font-semibold leading-snug text-foreground [overflow-wrap:anywhere]"
+                                title={room.roomType}
+                              >
+                                {room.roomType}
+                              </h4>
+                              {room.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]">
+                                  {room.description}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                  per night
-                                </p>
-                              </div>
+                              )}
+                              {/* The nightly rate keeps a row of its own so a
+                                  long room type never squeezes it. */}
+                              <p className="mt-2 text-[15px] font-semibold tabular-nums text-primary">
+                                <Money amount={room.pricePerNight} />
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                  / night
+                                </span>
+                              </p>
                             </div>
 
                             {/* Action Buttons */}
