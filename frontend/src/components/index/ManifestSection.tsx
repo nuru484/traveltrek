@@ -38,7 +38,7 @@ const ManifestSection = () => (
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
             03 · Cargo manifest
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl lg:text-[42px]">
             Typed from database to browser.
           </h2>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">

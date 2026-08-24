@@ -45,7 +45,7 @@ const DeparturesSection = () => (
       <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
         01 · Departures
       </p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
+      <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl lg:text-[42px]">
         Five modules, <span className="italic">one system.</span>
       </h2>
 

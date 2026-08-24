@@ -39,7 +39,7 @@ export const KpiCard = ({
           </span>
         )}
       </div>
-      <p className="mt-4 font-display text-3xl font-semibold leading-none tracking-tight text-foreground">
+      <p className="mt-4 font-display text-2xl font-semibold leading-none sm:text-3xl tracking-tight text-foreground">
         {value}
       </p>
       {sub && (

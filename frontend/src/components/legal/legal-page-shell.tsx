@@ -25,7 +25,7 @@ const LegalPageShell = ({
       <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
         Portfolio demonstration · Legal
       </p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight lg:text-5xl">
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
         {title}
       </h1>
       <p className="mb-10 mt-3 text-sm text-muted-foreground">

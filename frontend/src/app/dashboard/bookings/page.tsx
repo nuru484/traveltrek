@@ -123,7 +123,7 @@ const BookingsPage = () => {
     <div className="mx-auto w-full max-w-7xl py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-2xl font-bold sm:text-3xl">
             {urlCustomerId && canViewAllBookings
               ? `All Bookings for Customer #${urlCustomerId}`
               : canViewAllBookings && !urlCustomerId

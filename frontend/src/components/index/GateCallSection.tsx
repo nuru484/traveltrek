@@ -12,7 +12,7 @@ const GateCallSection = () => (
       <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
         04 · Now boarding
       </p>
-      <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
+      <h2 className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl lg:text-[42px]">
         The demo is <span className="italic">live.</span>
       </h2>
 

@@ -19,7 +19,7 @@ const Footer = ({ numbered = true }: { numbered?: boolean }) => (
 
       <div className="mt-3 grid grid-cols-1 gap-10 pb-14 lg:grid-cols-[1.2fr_1fr] lg:gap-16 sm:pb-20">
         <div>
-          <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
             Nurudeen Abdul-Majeed
           </h2>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-night-foreground/65">

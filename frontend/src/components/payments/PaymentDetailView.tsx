@@ -93,7 +93,7 @@ const PaymentDetailView: React.FC<PaymentDetailViewProps> = ({
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Amount
           </p>
-          <p className="mt-1 break-words font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+          <p className="mt-1 break-words font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             {formatMoney(payment.amount, { exact: true })}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -45,7 +45,7 @@ const DemoBoard = ({ data }: { data: IShowcaseData }) => {
           </span>
         </p>
 
-        <h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+        <h1 className="mt-5 max-w-2xl text-3xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
           Now <span className="italic">boarding.</span>
         </h1>
 

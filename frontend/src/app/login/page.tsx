@@ -133,7 +133,7 @@ export default function LoginPage() {
             with the intro centered against the form's height. */}
         <div className="mx-auto grid w-full max-w-md grid-cols-1 gap-10 lg:max-w-5xl lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
               Sign in to your account.
             </h1>
 

@@ -14,7 +14,7 @@ const PassengerLog = ({ reviews }: { reviews: IPublicReview[] }) => {
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
           Passenger log
         </p>
-        <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl">
           What travellers <span className="italic">wrote back.</span>
         </h2>
         <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">

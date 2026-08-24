@@ -88,7 +88,7 @@ export default function SignupPage() {
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
               New passenger
             </p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight lg:text-5xl">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
               Create your account.
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">

@@ -35,7 +35,7 @@ export default function Error({
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Unexpected turbulence
           </p>
-          <h1 className="mt-3 text-3xl font-semibold">
+          <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">
             Something went wrong.
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">

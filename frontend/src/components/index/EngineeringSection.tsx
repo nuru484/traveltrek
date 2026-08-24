@@ -52,7 +52,7 @@ const EngineeringSection = () => (
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[oklch(0.75_0.13_230)]">
             02 · Under the hood
           </p>
-          <h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[42px]">
+          <h2 className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl lg:text-[42px]">
             Engineering decisions that carry the product.
           </h2>
         </div>

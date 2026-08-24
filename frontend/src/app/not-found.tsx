@@ -13,7 +13,7 @@ export default function NotFound() {
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Gate not found
           </p>
-          <h1 className="mt-3 text-3xl font-semibold">
+          <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">
             This page doesn&apos;t exist.
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">

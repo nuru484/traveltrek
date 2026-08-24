@@ -269,7 +269,7 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       Price per night
                     </p>
-                    <p className="mt-1 break-words font-display text-3xl font-semibold tracking-tight text-foreground">
+                    <p className="mt-1 break-words font-display text-2xl font-semibold sm:text-3xl tracking-tight text-foreground">
                       <Money amount={room.pricePerNight} />
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">

@@ -168,7 +168,7 @@ const HeroSection = () => {
 
         <motion.h1
           {...fadeUp(0.08)}
-          className="mt-6 max-w-3xl text-[42px] font-semibold leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl"
+          className="mt-6 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl"
         >
           A travel booking platform,
           <span className="block italic">built end-to-end.</span>

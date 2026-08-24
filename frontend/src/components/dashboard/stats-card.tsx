@@ -40,7 +40,7 @@ export function StatsCard({
   // down so they never wrap mid-figure or overflow the card.
   const length = String(value).length;
   const figureClass =
-    length > 12 ? "text-2xl" : length > 9 ? "text-3xl" : "text-5xl";
+    length > 12 ? "text-2xl" : length > 9 ? "text-3xl" : "text-4xl sm:text-5xl";
 
   return (
     <Card className="gap-0 py-0 overflow-hidden">
