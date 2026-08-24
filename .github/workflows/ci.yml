@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Superseded runs (a force-push to the same ref) are cancelled instead of
+# burning runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -66,6 +72,18 @@ jobs:
       - name: Check API reference matches the routes
         run: npm run docs:check
 
+      # Schema drift gate: a schema.prisma edit committed without a migration
+      # fails here instead of surfacing at deploy time, when the running code
+      # already expects a column the database has never heard of. `migrate
+      # diff` does not create its own shadow database, so make one first.
+      - name: Create drift-check database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE traveltrek_drift_check;"
+
+      - name: Check migrations match the schema
+        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code
+        env:
+          SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/traveltrek_drift_check
+
       - name: Build
         run: npm run build
 
@@ -104,3 +122,25 @@ jobs:
 
       - name: Test
         run: npm test --if-present
+
+  # Production-dependency advisories, reported rather than enforced while the
+  # existing backlog is worked down (see scripts/audit-gate.mjs). Flip
+  # continue-on-error off once `npm run audit:ci` is clean, and it becomes a
+  # gate that stops a new high/critical advisory from shipping unnoticed.
+  security-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm run audit:ci

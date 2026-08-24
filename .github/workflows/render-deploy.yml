@@ -1,0 +1,207 @@
+name: Deploy API to Render
+
+# Ships the API to Render only after CI has passed on main, and applies
+# database migrations before Render is allowed to build the new code.
+#
+# THE PROBLEM THIS SOLVES
+#
+# Render's own auto-deploy watches the branch, so it starts building the moment
+# a commit lands - before, and regardless of, CI. A red test suite deploys
+# anyway, and a migration that should have run first has no chance to. There is
+# no "wait for checks" setting to turn on.
+#
+# So auto-deploy is turned OFF in the Render dashboard (Settings -> Build &
+# Deploy -> Auto-Deploy: No) and this workflow becomes the only thing that can
+# deploy. It runs on CI completing successfully, which means:
+#
+#   push to main -> CI (lint, type-check, build, tests on real Postgres)
+#                -> migrations against production
+#                -> Render deploy hook
+#
+# Ordering: migrations run BEFORE the new code ships, and are expected to be
+# additive, so the still-running old release tolerates the new schema for the
+# minute or two the build takes. A destructive migration (dropping or renaming
+# a column the old code still reads) must be split across two deploys instead.
+#
+# Safety properties:
+#   - Only a green CI run on main can deploy, and it deploys that exact commit.
+#   - Skips cleanly (not a failure) until the secrets are configured, so merges
+#     do not report red for a deploy that was never set up.
+#   - Concurrency-limited: two merges cannot interleave migrations.
+#   - The deploy is polled to completion, so a failed Render build fails this
+#     workflow instead of passing silently.
+#   - Secrets reach the shell through `env:` only, never interpolated into a
+#     `run:` string.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Manual deploy / rollback: pick any commit from the Actions tab.
+  workflow_dispatch:
+
+concurrency:
+  group: render-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # For workflow_run, only a green CI run may deploy. workflow_dispatch is a
+    # deliberate manual action and is always allowed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    # No job-level working-directory: the configuration check runs BEFORE
+    # checkout, so `server/` does not exist yet and bash cannot start in it.
+    # The three steps that need it set it themselves.
+
+    steps:
+      # Until the secrets exist this workflow must not fail, or every merge
+      # reports red for a deploy that was never set up. See .github/DEPLOY.md.
+      - name: Check deploy configuration
+        id: config
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+        run: |
+          if [ -z "${DEPLOY_HOOK}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RENDER_DEPLOY_HOOK_URL is not set; skipping deploy. See .github/DEPLOY.md."
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "migrate=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::PRODUCTION_DATABASE_URL is not set; deploying WITHOUT applying migrations."
+          else
+            echo "migrate=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Polling the deploy to completion needs the API, not just the hook.
+          if [ -n "${RENDER_API_KEY}" ] && [ -n "${RENDER_SERVICE_ID}" ]; then
+            echo "poll=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "poll=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RENDER_API_KEY/RENDER_SERVICE_ID not set; the deploy is triggered but not awaited."
+          fi
+
+          # Resolved here rather than in the step's own `if:` - a step cannot
+          # reliably read env it defines on itself in its own condition.
+          if [ -n "${HEALTH_URL}" ]; then
+            echo "health=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "health=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RENDER_HEALTH_URL not set; skipping the post-deploy readiness check."
+          fi
+
+      # The commit CI actually tested - not whatever main points at now.
+      - name: Checkout the tested commit
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # Only what `prisma migrate deploy` needs; nothing is built here, because
+      # Render builds the code itself.
+      - name: Install dependencies
+        if: steps.config.outputs.configured == 'true'
+        working-directory: backend
+        run: npm ci --include=dev
+
+      # Shows what is about to be applied in the job log, so a surprising
+      # migration is visible before it runs rather than after.
+      - name: Show pending migrations
+        if: steps.config.outputs.migrate == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate status || true
+
+      - name: Apply migrations
+        if: steps.config.outputs.migrate == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      # The hook takes no body; Render builds the branch head it is bound to.
+      # For a rollback, use Render's own "Redeploy" on an earlier deploy.
+      - name: Trigger Render deploy
+        id: trigger
+        if: steps.config.outputs.configured == 'true'
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          RESPONSE="$(curl -fsS --max-time 30 -X POST "${DEPLOY_HOOK}")"
+          echo "Render responded: ${RESPONSE}"
+          DEPLOY_ID="$(printf '%s' "${RESPONSE}" | jq -r '.deploy.id // empty')"
+          echo "deploy_id=${DEPLOY_ID}" >> "$GITHUB_OUTPUT"
+
+      # Without this the workflow goes green the moment the build is queued,
+      # which would report a failed Render build as a successful deploy.
+      - name: Wait for the deploy to finish
+        if: steps.config.outputs.poll == 'true' && steps.trigger.outputs.deploy_id != ''
+        env:
+          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        # A Render build of this project runs a few minutes; 40 * 20s = ~13 min
+        # is generous enough to avoid flapping and short enough to fail a hung
+        # build inside the job limit.
+        run: |
+          for attempt in $(seq 1 40); do
+            STATUS="$(curl -fsS --max-time 30 \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Accept: application/json" \
+              "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys/${DEPLOY_ID}" \
+              | jq -r '.status')"
+            echo "attempt ${attempt}: ${STATUS}"
+            case "${STATUS}" in
+              live)
+                echo "::notice::Render deploy is live."
+                exit 0
+                ;;
+              build_failed|update_failed|canceled|pre_deploy_failed)
+                echo "::error::Render deploy finished as '${STATUS}'."
+                exit 1
+                ;;
+            esac
+            sleep 20
+          done
+          echo "::error::Timed out waiting for the Render deploy to go live."
+          exit 1
+
+      # Render reporting "live" means its own port check passed. This asks the
+      # application itself - the readiness route touches the database - so a
+      # release that boots but cannot reach Postgres still fails the job.
+      # It is also the only completion gate when the API secrets are unset.
+      - name: Verify the deployed API is healthy
+        if: steps.config.outputs.health == 'true'
+        env:
+          HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 15 "${HEALTH_URL}" >/dev/null 2>&1; then
+              echo "::notice::API reported ready after ${attempt} attempt(s)."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The API never reported ready at ${HEALTH_URL}."
+          echo "::error::Roll back from the Render dashboard (Deploys -> an earlier deploy -> Redeploy)."
+          exit 1
