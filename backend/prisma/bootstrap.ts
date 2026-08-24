@@ -62,6 +62,16 @@ const readAdminEnv = (): null | { email: string; name: string; phone: string } =
 };
 
 async function main(): Promise<void> {
+  // Explicit opt-in, the same shape the seed uses. Without it the step is a
+  // no-op, so the admin identity can sit in the deploy's secrets permanently
+  // while the account is created on exactly one run.
+  if (!ENV.ADMIN_BOOTSTRAP_ENABLED) {
+    logger.info(
+      'Bootstrap skipped (ADMIN_BOOTSTRAP_ENABLED is not true).',
+    );
+    return;
+  }
+
   const adminEnv = readAdminEnv();
   if (!adminEnv) return;
   const { email, name, phone } = adminEnv;

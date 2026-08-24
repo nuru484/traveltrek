@@ -70,6 +70,9 @@ const NODE_ENV = envOptional('NODE_ENV') ?? 'development';
 const ENV = {
   ACCESS_TOKEN_EXPIRY: envOptional('ACCESS_TOKEN_EXPIRY') ?? '30m',
   ACCESS_TOKEN_SECRET: envRequired('ACCESS_TOKEN_SECRET'),
+  /** Gate for `npm run bootstrap`: false (default) makes it a no-op, so the
+   * first-admin step only fires on the deploy that is meant to create it. */
+  ADMIN_BOOTSTRAP_ENABLED: envBool('ADMIN_BOOTSTRAP_ENABLED'),
   /** ADMIN_*: read ONLY by `npm run seed` (which asserts them itself), so
    * they are optional here - the API/worker boot without them and
    * production never needs the admin credentials in its env store. */

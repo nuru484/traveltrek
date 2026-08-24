@@ -145,12 +145,15 @@ jobs:
       # builds and starts - and so the admin identity lives in this
       # repository's secrets instead of the service's environment.
       #
-      # The script itself skips with a notice when ADMIN_* is unset, which is
-      # the normal state: a step cannot read env it defines on itself in its
-      # own `if`, so the decision belongs there rather than here.
+      # ADMIN_BOOTSTRAP_ENABLED is what actually decides: unset (the normal
+      # state) makes the script a no-op, so set it to true for the single
+      # deploy that should create the admin and remove it afterwards. The
+      # generated password is printed in THIS step's log - read it, change it
+      # at first sign-in, then delete the run.
       - name: Bootstrap the first admin
         if: steps.config.outputs.migrate == 'true'
         env:
+          ADMIN_BOOTSTRAP_ENABLED: ${{ secrets.ADMIN_BOOTSTRAP_ENABLED }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
           ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
