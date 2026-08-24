@@ -32,6 +32,23 @@ export const makePaymentNotifications = (
     deliver(
       input.customer,
       {
+        data: {
+          action: { label: 'View your booking', url: d.config.FRONTEND_URL },
+          amount: { label: 'Payment received', value: amount },
+          intro: [
+            `Payment received for booking #${String(input.bookingId)} (${input.itemName}). Your booking is confirmed.`,
+          ],
+          name: input.customer.name,
+          note: 'Keep this message as your receipt.',
+          preview: `Payment of ${amount} received.`,
+          rows: [
+            { label: 'Booking', value: `#${String(input.bookingId)}` },
+            { label: 'Item', value: input.itemName },
+            { label: 'Reference', value: reference },
+          ],
+          rowsCaption: 'Payment record',
+          title: 'Payment received',
+        },
         emailText:
           `Hi ${input.customer.name},\n\n` +
           `We've received your payment of ${amount} for booking #${input.bookingId} (${input.itemName}).\n\n` +
@@ -54,6 +71,22 @@ export const makePaymentNotifications = (
     deliver(
       input.customer,
       {
+        data: {
+          amount: { label: 'Refund processed', value: amount },
+          intro: [
+            `Your refund for booking #${String(input.bookingId)} (${input.itemName}) has been processed.`,
+          ],
+          name: input.customer.name,
+          note: 'It may take a few business days to reflect, depending on your provider.',
+          preview: `Refund of ${amount} processed.`,
+          rows: [
+            { label: 'Booking', value: `#${String(input.bookingId)}` },
+            { label: 'Item', value: input.itemName },
+            { label: 'Reference', value: reference },
+          ],
+          rowsCaption: 'Refund record',
+          title: 'Your refund is on its way',
+        },
         emailText:
           `Hi ${input.customer.name},\n\n` +
           `Your refund of ${amount} for booking #${input.bookingId} (${input.itemName}) has been processed.\n\n` +

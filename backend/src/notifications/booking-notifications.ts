@@ -70,6 +70,24 @@ const tripDatesLine = (booking: BookingRowForNotice): string => {
   return '';
 };
 
+/** Ledger rows for the booking's detail block: what, when, how much. */
+const bookingRows = (
+  booking: BookingRowForNotice,
+  total: string,
+): { label: string; value: string }[] => {
+  const rows = [
+    { label: 'Booking', value: `#${String(booking.id)}` },
+    { label: 'Item', value: bookedItemName(booking) },
+  ];
+  const dates = tripDatesLine(booking).trim();
+  if (dates) {
+    const [label, ...rest] = dates.split(': ');
+    rows.push({ label, value: rest.join(': ') });
+  }
+  rows.push({ label: 'Total', value: total });
+  return rows;
+};
+
 export const makeBookingNotifications = (
   d: Pick<AppDeps, 'config' | 'logger' | 'notify'>,
 ) => {
@@ -91,6 +109,22 @@ export const makeBookingNotifications = (
     deliver(
       customer,
       {
+        data: {
+          action: { label: 'Pay for this booking', url: d.config.FRONTEND_URL },
+          amount: {
+            label: 'Total due',
+            note: deadline
+              ? `Please pay by ${deadline} — unpaid bookings are cancelled automatically after the deadline.`
+              : undefined,
+            value: total,
+          },
+          intro: [`We've received your booking for ${item}. It is pending payment.`],
+          name: customer.name,
+          preview: `Booking #${String(booking.id)} is pending payment.`,
+          rows: bookingRows(booking, total),
+          rowsCaption: 'Booking summary',
+          title: 'Your booking is pending payment',
+        },
         emailText:
           `Hi ${customer.name},\n\n` +
           `We've received your booking #${booking.id} for ${item}. ` +
@@ -121,6 +155,15 @@ export const makeBookingNotifications = (
     deliver(
       customer,
       {
+        data: {
+          intro: [`Your booking for ${item} is confirmed.`],
+          name: customer.name,
+          note: 'Safe travels.',
+          preview: `Booking #${String(booking.id)} is confirmed.`,
+          rows: bookingRows(booking, total),
+          rowsCaption: 'Booking summary',
+          title: 'Your booking is confirmed',
+        },
         emailText:
           `Hi ${customer.name},\n\n` +
           `Great news — your booking #${booking.id} for ${item} is now confirmed.\n\n` +
@@ -161,6 +204,23 @@ export const makeBookingNotifications = (
     deliver(
       customer,
       {
+        data: {
+          intro: [
+            opts.reason === 'deadline'
+              ? `Your booking for ${item} was cancelled because the payment deadline passed before payment was completed.`
+              : `Your booking for ${item} has been cancelled.`,
+            ...(opts.refundRequested
+              ? [
+                  `Your payment of ${total} is being processed for a refund — we'll confirm once it has been issued.`,
+                ]
+              : []),
+          ],
+          name: customer.name,
+          preview: `Booking #${String(booking.id)} was cancelled.`,
+          rows: bookingRows(booking, total),
+          rowsCaption: 'Cancelled booking',
+          title: 'Your booking was cancelled',
+        },
         emailText:
           `Hi ${customer.name},\n\n` +
           `This is to confirm that ${why}.\n` +

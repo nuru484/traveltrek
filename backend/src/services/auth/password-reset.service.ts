@@ -8,7 +8,9 @@ import bcrypt from 'bcrypt';
 
 import { BCRYPT_SALT_ROUNDS } from '#config/constants.js';
 import { TokenType } from '#config/prismaClient.js';
+import { buildPasswordResetEmail } from '#mail/auth-emails.js';
 import { UnauthorizedError } from '#middlewares/error-handler.js';
+import { makeSendCritical } from '#notifications/critical.js';
 import { type AuthCore } from '#services/auth/core.js';
 import {
   type AuthDeps,
@@ -23,7 +25,8 @@ import {
 } from '#utils/security-token.js';
 
 export const makePasswordResetService = (d: AuthDeps, core: AuthCore) => {
-  const { clock, config, logger, notify, prisma } = d;
+  const { clock, config, logger, mail, prisma } = d;
+  const sendCritical = makeSendCritical({ logger, mail });
   const {
     findPrincipalByEmail,
     issueSecurityToken,
@@ -62,13 +65,15 @@ export const makePasswordResetService = (d: AuthDeps, core: AuthCore) => {
     );
 
     const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${token}`;
-    notify.email(
+    // Awaited: a reset link that never arrives leaves someone locked out with
+    // no way to tell whether to wait or try again.
+    await sendCritical(
       {
-        subject: 'Reset your TravelTrek password',
-        text:
-          `Hi ${account.name},\n\nWe received a request to reset your password. ` +
-          `Use the link below within ${PASSWORD_RESET_TTL_MINUTES} minutes:\n\n` +
-          `${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        ...buildPasswordResetEmail(
+          account.name,
+          resetUrl,
+          PASSWORD_RESET_TTL_MINUTES,
+        ),
         to: account.email,
       },
       'Password-reset email',

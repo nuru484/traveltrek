@@ -12,12 +12,14 @@ import crypto from 'node:crypto';
 
 import { HTTP_STATUS_CODES } from '#config/constants.js';
 import { type Customer, TokenType } from '#config/prismaClient.js';
+import { buildTwoFactorEmail } from '#mail/auth-emails.js';
 import {
   BadRequestError,
   CustomError,
   TooManyRequestsError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
+import { makeSendCritical } from '#notifications/critical.js';
 import {
   type AuthDeps,
   type AuthPrincipal,
@@ -48,7 +50,8 @@ import {
 export type AuthCore = ReturnType<typeof makeAuthCore>;
 
 export const makeAuthCore = (d: AuthDeps) => {
-  const { clock, config, logger, notify, prisma } = d;
+  const { clock, config, logger, mail, notify, prisma } = d;
+  const sendCritical = makeSendCritical({ logger, mail });
 
   /** The security-token FK column for a principal — exactly one is ever set
    * per row (DB CHECK + this being the only writer). */
@@ -329,15 +332,19 @@ export const makeAuthCore = (d: AuthDeps) => {
   };
 
   /** Sends a TWO_FACTOR code over the principal's channel — email preferred,
-   * SMS otherwise. Fire-and-forget like every other code delivery. */
-  const sendTwoFactorCode = (principal: AuthPrincipal, code: string): void => {
+   * SMS otherwise. The email is awaited and a failure surfaces as a 503: a
+   * sign-in that reports "code sent" and never delivers one locks the account
+   * out for as long as the code lives. */
+  const sendTwoFactorCode = async (
+    principal: AuthPrincipal,
+    code: string,
+  ): Promise<void> => {
     const row = principalRow(principal);
     const message = `Your TravelTrek verification code is ${code}. It expires in ${String(TWO_FACTOR_TTL_MINUTES)} minutes.`;
     if (row.email) {
-      notify.email(
+      await sendCritical(
         {
-          subject: 'Your TravelTrek verification code',
-          text: message,
+          ...buildTwoFactorEmail(row.name, code, TWO_FACTOR_TTL_MINUTES),
           to: row.email,
         },
         '2FA email',
@@ -367,7 +374,7 @@ export const makeAuthCore = (d: AuthDeps) => {
       code,
       TWO_FACTOR_TTL_MINUTES,
     );
-    sendTwoFactorCode(principal, code);
+    await sendTwoFactorCode(principal, code);
   };
 
   /** Whether the latest TWO_FACTOR code for the principal was issued inside

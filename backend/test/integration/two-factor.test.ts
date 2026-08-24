@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ENV from '#config/env.js';
 import prisma, { TokenType } from '#config/prismaClient.js';
 import { systemClock } from '#lib/clock.js';
+import { sendMail } from '#lib/mail.js';
 import { makeAuthService } from '#services/auth.service.js';
 import { type GoogleAuthClient } from '#services/deps.js';
 import logger from '#utils/logger.js';
@@ -406,6 +407,7 @@ describe('2FA bypasses (documented): OTP login and Google sign-in', () => {
       },
       google,
       logger,
+      mail: { send: sendMail },
       notify: { email: vi.fn(), sms: vi.fn() },
       prisma,
     });

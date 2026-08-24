@@ -104,6 +104,13 @@ const ENV = {
   DEMO_CUSTOMER_EMAIL:
     envOptional('DEMO_CUSTOMER_EMAIL') ?? 'demo.customer@traveltrek.app',
   DEMO_LOGIN_ENABLED: envBool('DEMO_LOGIN_ENABLED'),
+  /**
+   * Masthead logo in every email, fetched by the recipient's client. Defaults
+   * to the frontend's own file, which only resolves once FRONTEND_URL is a
+   * public https origin - a localhost URL is unreachable from an inbox, so
+   * point this at the deployed asset when working locally.
+   */
+  EMAIL_LOGO_URL: envOptional('EMAIL_LOGO_URL'),
   /** Frog (Wigal) SMS credentials - all three unset means log-only SMS. */
   FROG_API_KEY: envOptional('FROG_API_KEY'),
   FROG_SENDER_ID: envOptional('FROG_SENDER_ID'),
@@ -134,18 +141,14 @@ const ENV = {
   REDIS_URL: envRequired('REDIS_URL'),
   REFRESH_TOKEN_EXPIRY: envOptional('REFRESH_TOKEN_EXPIRY') ?? '7d',
   REFRESH_TOKEN_SECRET: envRequired('REFRESH_TOKEN_SECRET'),
+  /** Resend API key. Unset means the mailer logs instead of sending. */
+  RESEND_API_KEY: envOptional('RESEND_API_KEY'),
   /** Error tracking (Sentry). Optional: unset disables reporting entirely. */
   SENTRY_DSN: envOptional('SENTRY_DSN'),
   /** Environment tag on Sentry events; defaults to NODE_ENV. */
   SENTRY_ENVIRONMENT: envOptional('SENTRY_ENVIRONMENT') ?? NODE_ENV,
   /** Performance-tracing sample rate 0-1; default 0 (errors only). */
   SENTRY_TRACES_SAMPLE_RATE: envNumber('SENTRY_TRACES_SAMPLE_RATE', 0),
-  /** SMTP_HOST unset means the mailer logs instead of sending (dev-friendly). */
-  SMTP_HOST: envOptional('SMTP_HOST'),
-  SMTP_PASSWORD: envOptional('SMTP_PASSWORD'),
-  SMTP_PORT: envNumber('SMTP_PORT', 587),
-  SMTP_SECURE: envBool('SMTP_SECURE'),
-  SMTP_USER: envOptional('SMTP_USER'),
   /**
    * Workers run in-process with the web server by default (saves a dyno).
    * Set to true on the WEB process only when a dedicated worker process runs

@@ -16,11 +16,19 @@ export interface CustomerContact {
   phone: null | string;
 }
 
-/** A rendered message: full plain-text email body + compact SMS variant. */
+/**
+ * A rendered message: the branded HTML template plus the data it needs, the
+ * full plain-text body, and the compact SMS variant. The text body is not a
+ * second-class citizen - it is what a client that refuses HTML displays.
+ */
 export interface CustomerMessage {
+  /** Data for the EJS template under src/ejs. */
+  data: Record<string, unknown>;
   emailText: string;
   sms: string;
   subject: string;
+  /** EJS file name; every customer notice uses the shared message shell. */
+  template?: string;
 }
 
 export type Deliver = (
@@ -59,7 +67,9 @@ export const makeDeliver = (
     if (to.email) {
       d.notify.email(
         {
+          data: message.data,
           subject: message.subject,
+          template: message.template ?? 'message.ejs',
           text: message.emailText,
           to: to.email,
         },

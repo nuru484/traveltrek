@@ -7,6 +7,8 @@
 import bcrypt from 'bcrypt';
 
 import { type Customer, TokenType } from '#config/prismaClient.js';
+import { buildOtpLoginEmail } from '#mail/auth-emails.js';
+import { makeSendCritical } from '#notifications/critical.js';
 import { type AuthCore } from '#services/auth/core.js';
 import {
   type AuthDeps,
@@ -19,7 +21,8 @@ import {
 import { generateOtpCode } from '#utils/security-token.js';
 
 export const makeOtpLoginService = (d: AuthDeps, core: AuthCore) => {
-  const { clock, logger, notify, prisma } = d;
+  const { clock, logger, mail, notify, prisma } = d;
+  const sendCritical = makeSendCritical({ logger, mail });
   const {
     consumeSecurityCode,
     findCustomerByContact,
@@ -78,10 +81,13 @@ export const makeOtpLoginService = (d: AuthDeps, core: AuthCore) => {
 
     const message = `Your TravelTrek login code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
     if (contact.email && customer.email) {
-      notify.email(
+      // Awaited, and a failure reaches the caller as a 503: telling someone
+      // "code sent" for mail that never left strands them on the code screen
+      // with the resend cooldown running. The enumeration-safe silence above
+      // covers unknown contacts; this path is already a known account.
+      await sendCritical(
         {
-          subject: 'Your TravelTrek login code',
-          text: message,
+          ...buildOtpLoginEmail(customer.name, code, OTP_TTL_MINUTES),
           to: customer.email,
         },
         'OTP email',

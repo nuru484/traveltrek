@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "clean": "rm -rf build",
-    "build": "npm run clean && npx tsc -p tsconfig.build.json --diagnostics && npx tsc-alias -p tsconfig.build.json && echo 'Build completed successfully!'",
+    "build": "npm run clean && npx tsc -p tsconfig.build.json --diagnostics && npx tsc-alias -p tsconfig.build.json && npm run copy:assets && echo 'Build completed successfully!'",
     "start": "node build/server.js",
     "start:dev": "node --env-file .env build/server.js",
     "type-check": "tsc --noEmit",
@@ -30,7 +30,9 @@
     "format:check": "prettier --check .",
     "docs:check": "tsx scripts/check-openapi.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "copy:assets": "cp -r src/ejs build/src/ejs",
+    "audit:ci": "node scripts/audit-gate.mjs"
   },
   "keywords": [
     "travel",
@@ -44,12 +46,12 @@
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
+    "@types/ejs": "^3.1.5",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.1.0",
-    "@types/nodemailer": "^8.0.1",
     "@types/pg": "8.20.0",
     "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
@@ -75,6 +77,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
+    "ejs": "^6.0.1",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "google-auth-library": "^10.9.0",
@@ -82,16 +85,19 @@
     "ioredis": "^5.8.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
-    "multer": "^2.0.2",
-    "nodemailer": "^9.0.3",
+    "multer": "^2.2.0",
     "p-map": "^7.0.3",
     "pg": "^8.22.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.1.1",
     "prisma": "7.8.0",
     "rate-limit-redis": "^6.0.0",
+    "resend": "^6.21.0",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
+  },
+  "overrides": {
+    "path-to-regexp": "^8.4.2"
   }
 }

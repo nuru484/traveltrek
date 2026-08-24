@@ -1,0 +1,21 @@
+              </td>
+            </tr>
+            <!-- The perforation: a ticket tears along a dashed line, and the
+                 app draws the same rule across the foot of its cards. -->
+            <tr>
+              <td style="padding: 0 28px;">
+                <div style="border-top: 1px dashed <%= brand.rule %>; font-size: 0; line-height: 0;">&nbsp;</div>
+              </td>
+            </tr>
+            <!-- Footer: the name and what it is. Nothing else. -->
+            <tr>
+              <td class="email-footer" align="center" style="background: <%= brand.night %>; padding: 22px 28px; text-align: center;">
+                <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.6; color: <%= brand.paper %>;"><%= brandName %> &middot; <%= brandTagline %></p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

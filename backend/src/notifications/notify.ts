@@ -2,7 +2,7 @@
 //
 // The durable notification channel. Production sends are enqueued onto the
 // BullMQ notificationQueue (3 attempts, exponential backoff — see
-// src/jobs/notificationQueue.ts) so a crashed process or a flaky SMTP/SMS
+// src/jobs/notificationQueue.ts) so a crashed process or a flaky mail/SMS
 // provider cannot lose a customer notification; a send that exhausts
 // its attempts stays in Redis as a failed job for inspection. The queue
 // module is imported lazily on first use, so merely importing the service

@@ -200,7 +200,13 @@ export const twoFactorChannel = (row: {
 
 export type AuthDeps = Pick<
   AppDeps,
-  'clock' | 'config' | 'google' | 'logger' | 'notify' | 'prisma'
+  | 'clock'
+  | 'config'
+  | 'google'
+  | 'logger'
+  | 'mail'
+  | 'notify'
+  | 'prisma'
 >;
 
 /** GET /auth/2fa/status payload. */

@@ -5,10 +5,12 @@
 // value once confirmed, bumping the session epoch. The
 // re-auth / cross-table guards and the uniform error factories live in core.
 import { TokenType } from '#config/prismaClient.js';
+import { buildEmailChangeEmail } from '#mail/auth-emails.js';
 import {
   BadRequestError,
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
+import { makeSendCritical } from '#notifications/critical.js';
 import { type AuthCore } from '#services/auth/core.js';
 import {
   type AuthDeps,
@@ -32,7 +34,8 @@ import {
 } from '#utils/security-token.js';
 
 export const makeContactChangeService = (d: AuthDeps, core: AuthCore) => {
-  const { clock, config, logger, notify, prisma } = d;
+  const { clock, config, logger, mail, notify, prisma } = d;
+  const sendCritical = makeSendCritical({ logger, mail });
   const {
     assertContactFreeSameTable,
     assertReauthenticated,
@@ -91,16 +94,16 @@ export const makeContactChangeService = (d: AuthDeps, core: AuthCore) => {
     );
 
     const confirmUrl = `${config.FRONTEND_URL}/confirm-email-change?token=${token}`;
-    notify.email(
+    // Awaited: the address is already staged as pending, so a silent failure
+    // would leave the account waiting on a confirmation nobody can produce.
+    await sendCritical(
       {
-        subject: 'Confirm your new TravelTrek email address',
-        text:
-          `Hi ${row.name},\n\n` +
-          `Use the link below within ${EMAIL_CHANGE_TTL_MINUTES} minutes to confirm ` +
-          `${input.newEmail} as the new email address for your TravelTrek account:\n\n` +
-          `${confirmUrl}\n\n` +
-          `Until you confirm, your account keeps its current email. ` +
-          `If you didn't request this change, you can ignore this message.`,
+        ...buildEmailChangeEmail(
+          row.name,
+          input.newEmail,
+          confirmUrl,
+          EMAIL_CHANGE_TTL_MINUTES,
+        ),
         to: input.newEmail,
       },
       'Email-change confirmation email',

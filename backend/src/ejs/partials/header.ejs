@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light only" />
+    <title><%= typeof title !== 'undefined' && title ? title : brandName %></title>
+    <style>
+      /* Progressive enhancement only - every rule that matters is inline.
+         Tighter gutters on phones so the content keeps most of the width. */
+      @media only screen and (max-width: 600px) {
+        .email-wrap { padding: 0 !important; }
+        .email-gutter { padding: 0 !important; }
+        /* Full-bleed sheet: side borders and rounded corners only make sense
+           when the card floats on a background. */
+        .email-card {
+          border-left: 0 !important;
+          border-right: 0 !important;
+          border-radius: 0 !important;
+        }
+        .email-header { padding: 16px 14px !important; }
+        .email-body { padding: 20px 14px !important; }
+        .email-footer { padding: 16px 14px !important; }
+        .email-title { font-size: 18px !important; }
+        /* A detail row is too wide for a phone as two columns: the value ends
+           up squeezed into a sliver. Both cells become blocks, so the value
+           reads on its own line under its label. */
+        .detail-label {
+          display: block !important;
+          width: 100% !important;
+          padding: 10px 14px 0 14px !important;
+          border-bottom: 0 !important;
+          white-space: normal !important;
+        }
+        .detail-value {
+          display: block !important;
+          width: 100% !important;
+          padding: 2px 14px 10px 14px !important;
+          text-align: left !important;
+        }
+      }
+    </style>
+  </head>
+  <body style="margin: 0; padding: 0; width: 100%; background-color: <%= brand.surface %>; font-family: Helvetica, Arial, sans-serif; color: <%= brand.ink %>; -webkit-text-size-adjust: 100%;">
+    <!-- Inbox preview line: sits beside the subject, never on the page. -->
+    <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: <%= brand.surface %>;">
+      <%= typeof preview !== 'undefined' && preview ? preview : (typeof title !== 'undefined' && title ? title : brandName) %>
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-wrap" style="width: 100%; background-color: <%= brand.surface %>; padding: 24px 0;">
+      <tr>
+        <td class="email-gutter" align="center" style="padding: 0 10px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="email-card" style="width: 100%; max-width: 600px; background: <%= brand.paper %>; border: 1px solid <%= brand.rule %>; border-radius: 14px; overflow: hidden;">
+            <!-- Masthead: the mark and the wordmark on the night band. -->
+            <tr>
+              <td class="email-header" style="background: <%= brand.night %>; padding: 22px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+                  <tr>
+                    <% if (logoUrl) { %>
+                      <td valign="middle" width="44" style="width: 44px;">
+                        <img
+                          src="<%= logoUrl %>"
+                          width="44"
+                          height="44"
+                          alt="<%= brandName %>"
+                          style="display: block; width: 44px; height: 44px; border-radius: 10px; color: <%= brand.paper %>; font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; line-height: 44px; text-align: center; outline: none; text-decoration: none;"
+                        />
+                      </td>
+                    <% } %>
+                    <td valign="middle" style="<%= logoUrl ? 'padding-left: 14px;' : '' %>">
+                      <div style="font-family: Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 700; line-height: 1.1; letter-spacing: 0.02em; color: <%= brand.paper %>;"><%= brandName %></div>
+                      <!-- The stencilled strip the app prints on its cards and
+                           on the sign-in pass: what this message is, set in
+                           wide-tracked mono. -->
+                      <div style="margin-top: 6px; font-family: 'Courier New', Courier, monospace; font-size: 9.5px; font-weight: 700; line-height: 1.1; letter-spacing: 0.22em; text-transform: uppercase; color: <%= brand.accent %>;"><%= typeof eyebrow !== 'undefined' && eyebrow ? eyebrow : brandTagline %></div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- Sky rule: the primary colour, run hard across the sheet. -->
+            <tr>
+              <td style="height: 4px; background: <%= brand.primary %>; font-size: 0; line-height: 0;">&nbsp;</td>
+            </tr>
+            <!-- Body -->
+            <tr>
+              <td class="email-body" style="padding: 28px 28px; background: <%= brand.paper %>;">
+                <% if (typeof title !== 'undefined' && title) { %>
+                  <h1 class="email-title" style="margin: 0 0 18px 0; font-family: Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; line-height: 1.3; color: <%= brand.ink %>;"><%= title %></h1>
+                <% } %>
+                <% if (typeof name !== 'undefined' && name) { %>
+                  <p style="margin: 0 0 16px 0; font-family: Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: <%= brand.ink %>;">Hi <%= name %>,</p>
+                <% } %>
