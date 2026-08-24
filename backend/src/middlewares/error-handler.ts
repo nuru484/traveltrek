@@ -3,7 +3,6 @@ import { NextFunction, Request, Response } from 'express';
 import ENV from '#config/env.js';
 import { reportError } from '#lib/sentry.js';
 import { handlePrismaError, isPrismaError } from '#middlewares/prismaErrorHandler.js';
-import logger from '#utils/logger.js';
 
 /**
  * Error severity levels for better logging and monitoring
@@ -162,8 +161,8 @@ export const errorHandler = (
     timestamp: new Date().toISOString(),
   };
 
-  // Prefer the per-request child logger (carries requestId) when present.
-  const log = req.log ?? logger;
+  // The per-request child logger (access log) carries the requestId.
+  const log = req.log;
 
   // Log at the appropriate level
   switch (severity) {

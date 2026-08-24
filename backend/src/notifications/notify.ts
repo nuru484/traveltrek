@@ -15,12 +15,23 @@ import type { SendMailParams } from '#lib/mail.js';
 import type { SendSmsParams } from '#lib/sms.js';
 import type { Logger, MailClient, SmsClient } from '#services/deps.js';
 
+import { getRequestId } from '#lib/request-context.js';
+
 import { makeDispatch } from './dispatch.js';
 
-/** One queued send; `what` labels the notification in logs and failed jobs. */
+/**
+ * One queued send; `what` labels the notification in logs and failed jobs,
+ * `requestId` ties it back to the request that enqueued it (absent for
+ * system-initiated sends).
+ */
 export type NotificationJob =
-  | { channel: 'EMAIL'; params: SendMailParams; what: string }
-  | { channel: 'SMS'; params: SendSmsParams; what: string };
+  | {
+      channel: 'EMAIL';
+      params: SendMailParams;
+      requestId?: string;
+      what: string;
+    }
+  | { channel: 'SMS'; params: SendSmsParams; requestId?: string; what: string };
 
 /** Outbound notification surface; enqueue-and-forget from the caller's view. */
 export interface NotifyClient {
@@ -47,10 +58,10 @@ export const makeQueuedNotify = (logger: Logger): NotifyClient => {
 
   return {
     email: (params, what) => {
-      enqueue({ channel: 'EMAIL', params, what });
+      enqueue({ channel: 'EMAIL', params, requestId: getRequestId(), what });
     },
     sms: (params, what) => {
-      enqueue({ channel: 'SMS', params, what });
+      enqueue({ channel: 'SMS', params, requestId: getRequestId(), what });
     },
   };
 };

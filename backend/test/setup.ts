@@ -43,27 +43,43 @@ vi.mock('#lib/sms.js', () => ({
 // that exercise payments must set explicit mock behaviour on these fns.
 vi.mock('axios', () => {
   const axiosMock = {
-    delete: vi.fn(() => Promise.reject(new Error('axios mocked: set per-test behaviour'))),
-    get: vi.fn(() => Promise.reject(new Error('axios mocked: set per-test behaviour'))),
-    post: vi.fn(() => Promise.reject(new Error('axios mocked: set per-test behaviour'))),
-    put: vi.fn(() => Promise.reject(new Error('axios mocked: set per-test behaviour'))),
+    delete: vi.fn(() =>
+      Promise.reject(new Error('axios mocked: set per-test behaviour')),
+    ),
+    get: vi.fn(() =>
+      Promise.reject(new Error('axios mocked: set per-test behaviour')),
+    ),
+    post: vi.fn(() =>
+      Promise.reject(new Error('axios mocked: set per-test behaviour')),
+    ),
+    put: vi.fn(() =>
+      Promise.reject(new Error('axios mocked: set per-test behaviour')),
+    ),
   };
   return { default: axiosMock, ...axiosMock };
 });
 
 // Silence application logging during tests. `child` returns the same silent
-// logger so per-request child loggers (request-id middleware) stay quiet too.
-vi.mock('#utils/logger.js', () => {
+// logger so per-request child loggers (access log) stay quiet too; `levels`
+// is the real pino table because pino-http validates its levels against it.
+vi.mock('#utils/logger.js', async () => {
+  const { pino } = await import('pino');
+  const { levels } = pino({ level: 'silent' });
   const silentLogger = {
     child: vi.fn((): unknown => silentLogger),
     debug: vi.fn(),
     error: vi.fn(),
     fatal: vi.fn(),
     info: vi.fn(),
+    level: 'silent',
+    levels,
     trace: vi.fn(),
     warn: vi.fn(),
   };
-  return { default: silentLogger };
+  return {
+    default: silentLogger,
+    redactOptions: { censor: '[REDACTED]', paths: [] },
+  };
 });
 
 let cachedTables: null | string[] = null;

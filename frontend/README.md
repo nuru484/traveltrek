@@ -24,11 +24,14 @@ Next.js (App Router) + React 19 + TypeScript (strict) client for the TravelTrek 
 
 ## Environment
 
-| Variable                       | Purpose                                           |
-| ------------------------------ | ------------------------------------------------- |
-| `NEXT_PUBLIC_SERVER_URI`       | API base URL (unset degrades the live demo board) |
-| `NEXT_PUBLIC_BASE_URL`         | canonical site URL for metadata/sitemap           |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | shows the Google sign-in button when set          |
+| Variable                                              | Purpose                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SERVER_URI`                              | API base URL (unset degrades the live demo board)                  |
+| `NEXT_PUBLIC_BASE_URL`                                | canonical site URL for metadata/sitemap                            |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`                        | shows the Google sign-in button when set                           |
+| `NEXT_PUBLIC_SENTRY_DSN`                              | Sentry DSN; unset keeps error tracking inert                       |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT`                      | Sentry environment tag (defaults to `VERCEL_ENV`)                  |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | CI-only: uploads source maps at build time; unset skips the upload |
 
 The `/login` demo-account quick logins are **server-side** (`POST /auth/demo-login`) - no demo credentials ship in the client. Configure them on the backend (`DEMO_LOGIN_ENABLED`, `DEMO_ADMIN_EMAIL`, `DEMO_AGENT_EMAIL`, `DEMO_CUSTOMER_EMAIL`).
 

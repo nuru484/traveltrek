@@ -81,7 +81,7 @@ const createReclaimingUpload = async <T>(
       try {
         await cloudinaryService.deleteImage(body.profilePicture);
       } catch (cleanupError) {
-        logger.error('Failed to clean up Cloudinary image:', cleanupError);
+        logger.error({ err: cleanupError }, 'Failed to clean up Cloudinary image');
       }
     }
     throw error;

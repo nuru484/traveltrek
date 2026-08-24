@@ -229,7 +229,7 @@ export const uploadMultipleToCloudinary = async (
     );
     return await Promise.all(uploadPromises);
   } catch (error) {
-    logger.error('Error uploading multiple files:', error);
+    logger.error({ err: error }, 'Error uploading multiple files');
     throw new CustomError(
       502,
       `Error uploading multiple files: ${(error as Error).message}`,

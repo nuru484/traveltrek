@@ -68,6 +68,19 @@ export const reportError = (error: unknown, meta: ReportContext = {}): void => {
   }
 };
 
+/**
+ * Reports a process-level failure (unhandled rejection, uncaught exception)
+ * and waits for the client to flush, so the event reaches the tracker before
+ * the process shuts down.
+ */
+export const reportFatal = async (
+  error: unknown,
+  source: 'uncaughtException' | 'unhandledRejection',
+): Promise<void> => {
+  reportError(error, { context: { source } });
+  await flushSentry();
+};
+
 /** Flushes buffered events on shutdown so in-flight reports aren't lost. */
 export const flushSentry = async (timeoutMs = 2000): Promise<void> => {
   if (!enabled) return;

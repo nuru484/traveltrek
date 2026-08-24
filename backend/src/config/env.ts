@@ -122,6 +122,8 @@ const ENV = {
   FRONTEND_URL: envOptional('FRONTEND_URL') ?? 'http://localhost:3000',
   /** OAuth client id for Google sign-in; unset disables the endpoint (503). */
   GOOGLE_CLIENT_ID: envOptional('GOOGLE_CLIENT_ID'),
+  /** pino level (fatal..trace); default info in production, debug elsewhere. */
+  LOG_LEVEL: envOptional('LOG_LEVEL'),
   MAIL_FROM_EMAIL:
     envOptional('MAIL_FROM_EMAIL') ?? 'no-reply@traveltrek.local',
   MAIL_FROM_NAME: envOptional('MAIL_FROM_NAME') ?? 'TravelTrek',

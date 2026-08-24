@@ -22,6 +22,13 @@ describe('health endpoints', () => {
     expect(res.body).toMatchObject({ status: 'ready' });
   });
 
+  it('GET /ready is the unversioned alias of the readiness probe', async () => {
+    const res = await api().get('/ready');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'ready' });
+  });
+
   it('GET /health/db runs an on-demand deep database check', async () => {
     const res = await api().get('/health/db');
 

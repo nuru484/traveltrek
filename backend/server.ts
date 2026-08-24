@@ -5,7 +5,8 @@ import ENV from '#config/env.js';
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
 import { closeRedisClient } from '#lib/redis.js';
-import { flushSentry, initSentry } from '#lib/sentry.js';
+import { flushSentry, initSentry, reportFatal } from '#lib/sentry.js';
+import { shutdownExitCode, type ShutdownReason } from '#lib/shutdown.js';
 import logger from '#utils/logger.js';
 
 import app from './app.js';
@@ -45,7 +46,7 @@ let shuttingDown = false;
  * the DB pool. A hard timeout forces exit so a stuck request can't hang the
  * deploy.
  */
-const shutdown = async (signal: string): Promise<void> => {
+const shutdown = async (signal: ShutdownReason): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info(`${signal} received, shutting down gracefully...`);
@@ -71,7 +72,7 @@ const shutdown = async (signal: string): Promise<void> => {
     await flushSentry();
     await prisma.$disconnect();
     logger.info('Shutdown complete');
-    process.exit(0);
+    process.exit(shutdownExitCode(signal));
   } catch (error) {
     logger.error(error, 'Error during shutdown');
     process.exit(1);
@@ -81,10 +82,13 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-// A rejection with no catch handler would otherwise terminate the process
-// silently. Log it with context; do not exit (the process may still be healthy).
+// A rejection with no catch handler leaves the process in an unknown state:
+// report it, then shut down cleanly and let the platform restart the process.
 process.on('unhandledRejection', (reason) => {
   logger.error(reason, 'Unhandled promise rejection');
+  void reportFatal(reason, 'unhandledRejection').finally(() =>
+    shutdown('unhandledRejection'),
+  );
 });
 
 // An uncaught exception leaves the process in an undefined state — log it and
@@ -103,5 +107,7 @@ process.on('uncaughtException', (error) => {
   // and the process would exit without a word about why.
   console.error(error);
   logger.fatal(error, 'Uncaught exception');
-  void shutdown('uncaughtException');
+  void reportFatal(error, 'uncaughtException').finally(() =>
+    shutdown('uncaughtException'),
+  );
 });

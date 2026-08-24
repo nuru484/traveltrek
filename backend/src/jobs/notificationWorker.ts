@@ -38,12 +38,22 @@ notificationWorker.on('failed', (job, err) => {
   const maxAttempts = job.opts.attempts ?? 1;
   if (job.attemptsMade >= maxAttempts) {
     logger.error(
-      { err, what: job.data.what },
+      {
+        err,
+        jobId: job.id,
+        requestId: job.data.requestId,
+        what: job.data.what,
+      },
       `Notification permanently failed after ${String(maxAttempts)} attempt(s)`,
     );
   } else {
     logger.warn(
-      { err, what: job.data.what },
+      {
+        err,
+        jobId: job.id,
+        requestId: job.data.requestId,
+        what: job.data.what,
+      },
       `Notification attempt ${String(job.attemptsMade)}/${String(maxAttempts)} failed — retrying`,
     );
   }

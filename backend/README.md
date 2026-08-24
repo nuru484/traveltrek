@@ -63,4 +63,8 @@ Workers run inside the web process by default. For a dedicated worker process: s
 
 ## Health & observability
 
-`/health` (liveness), `/health/ready` (DB verified once at boot, so it doesn't keep an auto-suspending DB awake), `/health/db` (on-demand deep check). Every request gets a correlation id (`x-request-id`) that threads through logs and error responses; unexpected errors go to Sentry when `SENTRY_DSN` is set.
+`/health` (liveness), `/health/ready` (DB verified once at boot, so it doesn't keep an auto-suspending DB awake), `/health/db` (on-demand deep check). Every request gets a correlation id (`x-request-id`) that threads through the access log, every `req.log` line, error responses and any notification job the request enqueues; unexpected errors go to Sentry when `SENTRY_DSN` is set.
+
+Logs are pino JSON in production (pretty-printed in dev); `LOG_LEVEL` overrides the default level. Passwords, tokens, OTP codes, phone numbers and auth headers are redacted at the logger, whatever the call site passes.
+
+Sentry setup: create a Sentry project of type Node (Express), copy its DSN into `SENTRY_DSN`, optionally set `SENTRY_ENVIRONMENT` (defaults to `NODE_ENV`) and `SENTRY_TRACES_SAMPLE_RATE` (0-1, default 0 = errors only). Unset `SENTRY_DSN` disables reporting entirely; only 5xx / HIGH-CRITICAL errors and process crashes (unhandled rejections, uncaught exceptions) are sent, never expected 4xx.

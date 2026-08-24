@@ -8,7 +8,8 @@
 import prisma from '#config/prismaClient.js';
 import { startWorkers, stopWorkers } from '#jobs/lifecycle.js';
 import { closeRedisClient } from '#lib/redis.js';
-import { flushSentry, initSentry } from '#lib/sentry.js';
+import { flushSentry, initSentry, reportFatal } from '#lib/sentry.js';
+import { shutdownExitCode, type ShutdownReason } from '#lib/shutdown.js';
 import logger from '#utils/logger.js';
 
 // Error tracking for the worker process too (no-op without SENTRY_DSN).
@@ -16,7 +17,7 @@ initSentry();
 
 let shuttingDown = false;
 
-const shutdown = async (signal: string): Promise<void> => {
+const shutdown = async (signal: ShutdownReason): Promise<void> => {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info(`Received ${signal}, shutting down workers...`);
@@ -33,7 +34,7 @@ const shutdown = async (signal: string): Promise<void> => {
     await closeRedisClient();
     await flushSentry();
     await prisma.$disconnect();
-    process.exit(0);
+    process.exit(shutdownExitCode(signal));
   } catch (error) {
     logger.error(error, 'Error during worker shutdown');
     process.exit(1);
@@ -43,8 +44,13 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
+// A rejection with no catch handler leaves the process in an unknown state:
+// report it, then shut down cleanly and let the platform restart the process.
 process.on('unhandledRejection', (reason) => {
   logger.error(reason, 'Unhandled promise rejection');
+  void reportFatal(reason, 'unhandledRejection').finally(() =>
+    shutdown('unhandledRejection'),
+  );
 });
 
 process.on('uncaughtException', (error) => {
@@ -53,7 +59,9 @@ process.on('uncaughtException', (error) => {
   // and the process would exit without a word about why.
   console.error(error);
   logger.fatal(error, 'Uncaught exception');
-  void shutdown('uncaughtException');
+  void reportFatal(error, 'uncaughtException').finally(() =>
+    shutdown('uncaughtException'),
+  );
 });
 
 startWorkers().catch((err: unknown) => {

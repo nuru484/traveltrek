@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Sensible baseline security headers for every response on this origin.
 // No script-src CSP: the login page loads Google Identity Services from
@@ -53,4 +54,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Source maps upload only when the CI secrets exist; without them the
+// Sentry plugin is a pass-through and the build never fails.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  webpack: { treeshake: { removeDebugLogging: true } },
+});

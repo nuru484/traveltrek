@@ -1,14 +1,12 @@
-import type { Request } from 'express';
-
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 // app.ts
 import express from 'express';
 import helmet from 'helmet';
-import morgan from 'morgan';
 
 import ENV from '#config/env.js';
 import { mountApiDocs } from '#docs/mount.js';
+import { accessLog } from '#middlewares/access-log.js';
 import {
   errorHandler,
   UnauthorizedError,
@@ -23,6 +21,7 @@ const app = express();
 // Correlation first, so every downstream log line and the access log carry the
 // same requestId as the response header and any error response.
 app.use(requestId);
+app.use(accessLog);
 
 // Security headers (CSP, HSTS, X-Content-Type-Options, frame-guard, etc.).
 app.use(helmet());
@@ -70,12 +69,6 @@ app.use(cookieParser());
 // real client for rate limiting. Trusting all proxies (`true`) would let
 // clients spoof X-Forwarded-For and bypass IP-based limits.
 app.set('trust proxy', 1);
-morgan.token('request-id', (req: Request) => req.requestId ?? '-');
-app.use(
-  morgan(
-    ':method :url :status :response-time ms :request-id',
-  ) as express.RequestHandler,
-);
 
 // Liveness, readiness and the deep database probe, mounted before the rate
 // limiter so platform health checks are never throttled.

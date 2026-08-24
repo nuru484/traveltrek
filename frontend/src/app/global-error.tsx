@@ -1,6 +1,7 @@
 "use client"; // Error boundaries must be Client Components.
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Last-resort boundary for errors thrown in the root layout itself. It
@@ -18,7 +19,7 @@ export default function GlobalError({
   unstable_retry?: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   const retry = unstable_retry ?? reset;

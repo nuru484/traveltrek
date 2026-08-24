@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -19,7 +20,7 @@ export default function Error({
   unstable_retry?: () => void;
 }) {
   useEffect(() => {
-    // Surface the error for local debugging / an error reporter.
+    Sentry.captureException(error);
   }, [error]);
 
   const retry = unstable_retry ?? reset;
