@@ -168,6 +168,21 @@ CI (GitHub Actions) gates every push and PR on lint, type-check, build, and test
 * **Release order** - `prisma migrate deploy` runs from the deploy workflow, before Render is allowed to build the new code. Turn Render's own Auto-Deploy **off**, or it builds every commit the moment it lands, before CI has said anything and before migrations have run.
 * **Database**: managed PostgreSQL · **Media**: Cloudinary · **Queue**: managed Redis.
 
+### First admin on a fresh deployment
+
+```bash
+cd backend
+npm run bootstrap   # creates ONE ADMIN from ADMIN_EMAIL / ADMIN_NAME, with a
+                    # GENERATED temporary password printed once. Nothing else.
+```
+
+It runs as part of `npm run deploy`, is idempotent (an existing account holding
+those contacts is left untouched), and **skips with a notice** when the
+`ADMIN_*` variables are absent, so a deployment that does not want an admin
+bootstrapped is not forced to carry them. `npm run seed` is the development
+counterpart: demo accounts plus a full catalogue, bookings, payments and
+reviews.
+
 ### GitHub secrets the deploy needs
 
 `.github/workflows/render-deploy.yml` is the only thing that may deploy: it

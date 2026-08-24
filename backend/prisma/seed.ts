@@ -581,14 +581,20 @@ async function seedCatalogAndBookings(): Promise<void> {
     if (status === BookingStatus.COMPLETED) await maybeReview(bookingId, customerId);
   };
 
-  const bookTour = async (customerId: number, when: Date): Promise<boolean> => {
+  const bookTour = async (
+    customerId: number,
+    when: Date,
+    forced?: BookingStatus,
+  ): Promise<boolean> => {
     const key = (id: number): string => `${customerId.toString()}:${id.toString()}`;
     const t = shuffle(tours).find((tour) => !usedTour.has(key(tour.id)));
     if (!t) return false;
     usedTour.add(key(t.id));
     const guests = randInt(1, 4);
     const status =
-      t.status === TourStatus.CANCELLED ? BookingStatus.CANCELLED : statusForAge(when);
+      t.status === TourStatus.CANCELLED
+        ? BookingStatus.CANCELLED
+        : (forced ?? statusForAge(when));
     const totalPrice = t.price * guests;
     const booking = await prisma.booking.create({
       data: {
@@ -610,13 +616,17 @@ async function seedCatalogAndBookings(): Promise<void> {
     return true;
   };
 
-  const bookRoom = async (customerId: number, when: Date): Promise<void> => {
+  const bookRoom = async (
+    customerId: number,
+    when: Date,
+    forced?: BookingStatus,
+  ): Promise<void> => {
     const room = pick(rooms);
     const nights = randInt(2, 7);
     const numberOfRooms = randInt(1, 2);
     const startDate = new Date(when.getTime() + randInt(3, 45) * DAY);
     const endDate = new Date(startDate.getTime() + nights * DAY);
-    const status = statusForAge(when);
+    const status = forced ?? statusForAge(when);
     const totalPrice = room.price * nights * numberOfRooms;
     const booking = await prisma.booking.create({
       data: {
@@ -638,13 +648,17 @@ async function seedCatalogAndBookings(): Promise<void> {
     await finish(booking.id, customerId, totalPrice, status, when);
   };
 
-  const bookFlight = async (customerId: number, when: Date): Promise<boolean> => {
+  const bookFlight = async (
+    customerId: number,
+    when: Date,
+    forced?: BookingStatus,
+  ): Promise<boolean> => {
     const key = (id: number): string => `${customerId.toString()}:${id.toString()}`;
     const f = shuffle(flights).find((flight) => !usedFlight.has(key(flight.id)));
     if (!f) return false;
     usedFlight.add(key(f.id));
     const guests = randInt(1, 3);
-    const status = statusForAge(when);
+    const status = forced ?? statusForAge(when);
     const totalPrice = f.price * guests;
     const booking = await prisma.booking.create({
       data: {
@@ -709,6 +723,47 @@ async function seedCatalogAndBookings(): Promise<void> {
       await bookRoom(customerId, when);
     } else if (!(await bookFlight(customerId, when))) {
       await bookRoom(customerId, when);
+    }
+  }
+
+  // --- the demo customer's own history ---------------------------------
+  // The spread above hands bookings out at random, so the demo account can
+  // come up with two cancellations and nothing else. A tester signing in has
+  // to see the whole surface immediately: something finished and reviewable,
+  // something upcoming, something still awaiting payment, something refunded.
+  if (demoCustomer) {
+    const id = demoCustomer.id;
+    await bookTour(id, daysFromNow(-90), BookingStatus.COMPLETED);
+    await bookRoom(id, daysFromNow(-60), BookingStatus.COMPLETED);
+    await bookFlight(id, daysFromNow(-40), BookingStatus.CONFIRMED);
+    await bookRoom(id, daysFromNow(-4), BookingStatus.CONFIRMED);
+    await bookTour(id, daysFromNow(-2), BookingStatus.PENDING);
+    await bookRoom(id, daysFromNow(-30), BookingStatus.CANCELLED);
+
+    // Reviews are only reachable from a COMPLETED booking, one per booking,
+    // and only the customer who made it may write one - the same rules the
+    // API enforces, so a seeded review is one the app would have allowed.
+    const reviewable = await prisma.booking.findMany({
+      orderBy: { id: 'asc' },
+      select: { id: true },
+      where: {
+        customerId: id,
+        review: { is: null },
+        status: BookingStatus.COMPLETED,
+      },
+    });
+    for (const booking of reviewable) {
+      await prisma.review.create({
+        data: {
+          bookingId: booking.id,
+          comment: pick(REVIEW_COMMENTS),
+          customerId: id,
+          rating: randInt(4, 5),
+          status: ReviewStatus.PUBLISHED,
+          title: pick(REVIEW_TITLES),
+        },
+      });
+      reviewCount += 1;
     }
   }
 
