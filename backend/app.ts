@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -8,7 +8,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import ENV from '#config/env.js';
-import prisma from '#config/prismaClient.js';
 import { mountApiDocs } from '#docs/mount.js';
 import {
   errorHandler,
@@ -16,6 +15,7 @@ import {
 } from '#middlewares/error-handler.js';
 import rateLimiter from '#middlewares/rateLimit.js';
 import { requestId } from '#middlewares/request-id.js';
+import healthRoutes from '#routes/health.js';
 import routes from '#routes/index.js';
 
 const app = express();
@@ -77,35 +77,9 @@ app.use(
   ) as express.RequestHandler,
 );
 
-// Liveness + readiness probes, mounted before the rate limiter so platform
-// health checks are never throttled. Liveness is a cheap static response.
-// Readiness verifies the database ONCE (first probe after boot) and then
-// answers statically, so a poller can't keep an auto-suspending database awake.
-// /health/db remains for on-demand deep checks meant to wake the database.
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok' });
-});
-let dbVerifiedAtBoot = false;
-app.get('/health/ready', async (_req: Request, res: Response) => {
-  if (!dbVerifiedAtBoot) {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      dbVerifiedAtBoot = true;
-    } catch {
-      res.status(503).json({ status: 'not ready' });
-      return;
-    }
-  }
-  res.status(200).json({ status: 'ready' });
-});
-app.get('/health/db', async (_req: Request, res: Response) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: 'ok' });
-  } catch {
-    res.status(503).json({ status: 'unreachable' });
-  }
-});
+// Liveness, readiness and the deep database probe, mounted before the rate
+// limiter so platform health checks are never throttled.
+app.use('/', healthRoutes);
 
 // Public API reference. Mounted before the global rate limiter so a burst of
 // docs page views cannot spend a reader's API budget, and before the versioned
