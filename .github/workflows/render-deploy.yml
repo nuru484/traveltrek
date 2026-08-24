@@ -139,6 +139,25 @@ jobs:
         working-directory: backend
         run: npx prisma migrate deploy
 
+      # The first admin, created once and never again: the bootstrap is
+      # idempotent and leaves an existing admin untouched. It runs HERE rather
+      # than in Render's build command so the platform only ever installs,
+      # builds and starts - and so the admin identity lives in this
+      # repository's secrets instead of the service's environment.
+      #
+      # The script itself skips with a notice when ADMIN_* is unset, which is
+      # the normal state: a step cannot read env it defines on itself in its
+      # own `if`, so the decision belongs there rather than here.
+      - name: Bootstrap the first admin
+        if: steps.config.outputs.migrate == 'true'
+        env:
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+          ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        working-directory: backend
+        run: npx tsx prisma/bootstrap.ts
+
       # The hook takes no body; Render builds the branch head it is bound to.
       # For a rollback, use Render's own "Redeploy" on an earlier deploy.
       - name: Trigger Render deploy

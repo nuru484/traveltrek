@@ -21,7 +21,7 @@
     "migrate:deploy": "node --env-file .env ./node_modules/.bin/prisma migrate deploy",
     "seed": "npx prisma db seed",
     "bootstrap": "tsx --env-file .env prisma/bootstrap.ts",
-    "deploy": "npm ci --include=dev && npm run build && npm run bootstrap",
+    "deploy": "npm ci --include=dev && npm run build",
     "worker": "node build/worker.js",
     "worker:dev": "tsx --watch --env-file .env worker.ts",
     "postinstall": "npx prisma generate",
@@ -98,6 +98,7 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "path-to-regexp": "^8.4.2"
+    "path-to-regexp": "^8.4.2",
+    "deepmerge-ts": "^8.0.2"
   }
 }

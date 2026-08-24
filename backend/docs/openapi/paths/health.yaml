@@ -1,3 +1,25 @@
+/:
+  get:
+    tags: [Health]
+    operationId: serviceRoot
+    summary: Service root
+    description: |
+      Names the service at its root path. Mounted ahead of the API router and
+      the rate limiter, so a platform (or a curious visitor) hitting `/` gets
+      an answer rather than a 404 from the versioned router.
+    security: []
+    responses:
+      '200':
+        description: The service identifies itself.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, success]
+              properties:
+                message: { type: string, const: TravelTrek API }
+                success: { type: boolean, const: true }
+
 /health:
   get:
     tags: [Health]
@@ -18,9 +40,12 @@
           application/json:
             schema:
               type: object
-              required: [status]
+              required: [status, uptime]
               properties:
                 status: { type: string, const: ok }
+                uptime:
+                  type: number
+                  description: Seconds since the process started.
 
 /health/ready:
   get:
@@ -71,8 +96,9 @@
           application/json:
             schema:
               type: object
-              required: [status]
+              required: [database, status]
               properties:
+                database: { type: string, const: up }
                 status: { type: string, const: ok }
       '503':
         description: The database did not answer.
@@ -80,6 +106,7 @@
           application/json:
             schema:
               type: object
-              required: [status]
+              required: [database, status]
               properties:
+                database: { type: string, const: down }
                 status: { type: string, const: unreachable }

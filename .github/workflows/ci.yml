@@ -79,6 +79,8 @@ jobs:
       - name: Create drift-check database
         run: PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE traveltrek_drift_check;"
 
+      # prisma.config.ts reads SHADOW_DATABASE_URL: Prisma 7 takes the replay
+      # database from the config, not from the environment directly.
       - name: Check migrations match the schema
         run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code
         env:
@@ -123,13 +125,14 @@ jobs:
       - name: Test
         run: npm test --if-present
 
-  # Production-dependency advisories, reported rather than enforced while the
-  # existing backlog is worked down (see scripts/audit-gate.mjs). Flip
-  # continue-on-error off once `npm run audit:ci` is clean, and it becomes a
-  # gate that stops a new high/critical advisory from shipping unnoticed.
+  # Fails the build on a known HIGH/critical advisory in a production
+  # dependency (see scripts/audit-gate.mjs). The tree is clean today; this is
+  # what stops the next one from shipping unnoticed. Dev-only and moderate
+  # advisories do not block, and the wrapper carries an allowlist for
+  # advisories that provably cannot apply here - currently empty, which is the
+  # goal state.
   security-audit:
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: backend

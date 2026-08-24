@@ -176,10 +176,12 @@ npm run bootstrap   # creates ONE ADMIN from ADMIN_EMAIL / ADMIN_NAME, with a
                     # GENERATED temporary password printed once. Nothing else.
 ```
 
-It runs as part of `npm run deploy`, is idempotent (an existing account holding
-those contacts is left untouched), and **skips with a notice** when the
-`ADMIN_*` variables are absent, so a deployment that does not want an admin
-bootstrapped is not forced to carry them. `npm run seed` is the development
+It runs from the **deploy workflow**, not from Render's build command - the
+platform only installs, builds and starts. It is idempotent (an existing
+account holding those contacts is left untouched) and **skips with a notice**
+when the `ADMIN_*` variables are absent, which is the normal state once the
+admin exists. Set `ADMIN_EMAIL` and `ADMIN_NAME` as repository secrets for the
+one deploy that should create it. `npm run seed` is the development
 counterpart: demo accounts plus a full catalogue, bookings, payments and
 reviews.
 
