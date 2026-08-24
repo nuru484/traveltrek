@@ -98,6 +98,10 @@ process.on('uncaughtException', (error) => {
     return;
   }
 
+  // Straight to stderr as well as through pino: an exception thrown by the
+  // log sink itself would otherwise be reported into the sink that just died,
+  // and the process would exit without a word about why.
+  console.error(error);
   logger.fatal(error, 'Uncaught exception');
   void shutdown('uncaughtException');
 });
