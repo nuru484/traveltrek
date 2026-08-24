@@ -78,6 +78,35 @@
               properties:
                 status: { type: string, const: 'not ready' }
 
+/ready:
+  get:
+    tags: [Health]
+    operationId: readiness
+    summary: Readiness probe (root alias)
+    description: |
+      The same readiness check as `/health/ready`, at the unversioned root
+      path platforms conventionally probe. Both paths answer identically.
+    security: []
+    responses:
+      '200':
+        description: Ready to serve traffic.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: ready }
+      '503':
+        description: Not ready. Do not route traffic here yet.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, const: 'not ready' }
+
 /health/db:
   get:
     tags: [Health]
