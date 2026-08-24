@@ -239,12 +239,60 @@ html {
 .tt-lift {
   animation: tt-lift 2.4s ease-in-out infinite;
 }
+/*
+ * Page transition: new route content fades and settles in rather than
+ * appearing hard, so moving between a short page and a long one reads as one
+ * change instead of a snap. `stagger` lets a page's own sections follow in
+ * sequence. Both are cut by the reduced-motion rule below.
+ */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-enter {
+  animation: page-enter 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.stagger > * {
+  animation: page-enter 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger > *:nth-child(5) { animation-delay: 0.2s; }
+.stagger > *:nth-child(n + 6) { animation-delay: 0.24s; }
+
+/* Reduced motion keeps the transition legible but takes the movement out:
+   content still fades in, nothing travels. */
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tt-orbit,
   .tt-route,
   .tt-runway,
   .tt-lift {
     animation: none;
+  }
+
+  .page-enter,
+  .stagger > * {
+    animation-name: page-fade;
+    animation-delay: 0s;
   }
 }
 

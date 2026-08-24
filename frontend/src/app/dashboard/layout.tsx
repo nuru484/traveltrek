@@ -9,6 +9,7 @@ import {
 import ProtectRoutes from "@/components/authentication/ProtectRoutes";
 import { UserProfileDropdown } from "@/components/users/UserProfileDropDown";
 import { DashboardGreeting } from "@/components/dashboard/DashboardGreeting";
+import { PageTransition } from "@/components/dashboard/PageTransition";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -30,7 +31,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <UserProfileDropdown />
             </div>
           </header>
-          <main className="@container/main min-w-0 flex-1 p-3 md:p-6">{children}</main>
+          <main className="@container/main min-w-0 flex-1 p-3 md:p-6">
+            <PageTransition>{children}</PageTransition>
+          </main>
         </SidebarInset>
       </SidebarProvider>
     </ProtectRoutes>
