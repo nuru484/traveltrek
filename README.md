@@ -164,8 +164,26 @@ CI (GitHub Actions) gates every push and PR on lint, type-check, build, and test
 
 * **Frontend** - Vercel (landing and `/demo` are static with 5-minute ISR).
 * **Backend** - Render: web process (+ workers in-process), or set `WEB_DISABLE_WORKERS=true` and run `npm run worker` as a dedicated process.
-* **Release order** - `prisma migrate deploy` runs before the new code boots (`npm run deploy`).
+* **Render commands** - Build Command `npm run deploy` (`npm ci --include=dev && npm run build`), Start Command `npm start` (`node build/server.js`).
+* **Release order** - `prisma migrate deploy` runs from the deploy workflow, before Render is allowed to build the new code. Turn Render's own Auto-Deploy **off**, or it builds every commit the moment it lands, before CI has said anything and before migrations have run.
 * **Database**: managed PostgreSQL · **Media**: Cloudinary · **Queue**: managed Redis.
+
+### GitHub secrets the deploy needs
+
+`.github/workflows/render-deploy.yml` is the only thing that may deploy: it
+runs after CI passes on `main`, applies migrations, triggers Render, waits for
+the build, and checks the deployed API answers. It reads these from the
+repository's **`production` environment** (Settings -> Environments):
+
+| Secret | Required | Where it comes from, and what breaks without it |
+| --- | --- | --- |
+| `RENDER_DEPLOY_HOOK_URL` | yes | Render -> service -> Settings -> Deploy Hook. Without it the whole workflow skips with a notice, and nothing deploys. Holding this URL is enough to trigger a deploy, so treat it as a credential. |
+| `PRODUCTION_DATABASE_URL` | strongly | The Render Postgres **External** connection string (the internal one is unreachable from a GitHub runner). Without it the workflow warns and deploys **without migrating**. |
+| `RENDER_API_KEY` | optional | Render -> Account Settings -> API Keys. Lets the workflow wait for the build instead of firing and forgetting, so a failed Render build fails the job. |
+| `RENDER_SERVICE_ID` | optional | The `srv-…` id in the service's dashboard URL. Needed together with the API key. |
+| `RENDER_HEALTH_URL` | optional | e.g. `https://api.example.com/health/ready`. The post-deploy gate: readiness touches the database, so a release that boots but cannot reach Postgres still fails. |
+
+Full runbook and rollback: `.github/DEPLOY.md`.
 
 ---
 
