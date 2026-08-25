@@ -156,10 +156,25 @@
       a perfectly genuine event. Comparison is constant-time, so the endpoint
       does not leak the expected digest through response timing.
 
-      Only `charge.success` does anything. The reference on the event is
-      re-verified against the Paystack API rather than trusted from the payload,
-      then the verified amount is reconciled against the booking total as an
-      integer comparison in pesewas.
+      Four event types are handled; everything else is acknowledged untouched.
+
+      `charge.success`: the reference on the event is re-verified against the
+      Paystack API rather than trusted from the payload, then the verified
+      amount is reconciled against the booking total as an integer comparison
+      in pesewas.
+
+      `refund.processed`: a refund executed at Paystack (dashboard, dispute
+      settlement) is recorded on the ledger and the booking cancelled, so the
+      ledger never keeps calling a returned charge `COMPLETED`. A partial refund
+      has no ledger representation and is reported for manual handling instead
+      of guessed at.
+
+      `refund.failed`: a refund this service issued died at Paystack (for
+      instance, insufficient payout balance). It is reported; the payment
+      reconciliation sweep re-issues it.
+
+      `charge.dispute.create`: needs a human on the Paystack dashboard. It is
+      reported and acknowledged.
 
       **Idempotency.** The transaction reference is the key. Settlement is a
       single guarded update that only moves a payment that is still `PENDING` or
@@ -187,9 +202,11 @@
     responses:
       '200':
         description: |
-          Acknowledged. Either this delivery settled the payment and confirmed
-          the booking, or there was nothing to do: an event type this service
-          ignores, or a duplicate `charge.success` for a payment already settled.
+          Acknowledged. This delivery settled the payment and confirmed the
+          booking (`Payment verified and booking confirmed`), recorded a
+          provider-side refund (`Refund recorded`), or there was nothing to do
+          (`Event received`): an event type this service ignores, a duplicate
+          `charge.success` for a payment already settled, or a replayed refund.
         content:
           application/json:
             schema: { $ref: '#/components/schemas/PaymentWebhookAck' }
@@ -415,8 +432,9 @@
     operationId: refundPayment
     summary: Refund a payment
     description: |
-      Marks the payment `REFUNDED` and cancels its booking. Administrators only,
-      enforced in the service rather than at the route.
+      Refunds the charge through Paystack, marks the payment `REFUNDED`, and
+      cancels its booking. Administrators only, enforced in the service rather
+      than at the route.
 
       Only two starting states are accepted: `COMPLETED`, and `REFUND_REQUESTED`.
       The second is the customer-initiated half of the flow. When a customer
@@ -430,12 +448,22 @@
       `refundAmount` so it reconciles exactly against the original charge with no
       arithmetic in between. There is no partial refund on this endpoint.
 
-      Note what this does **not** do: it records the refund locally, cancels the
-      booking, logs the amount, reference, and reason, and sends the customer a
-      refund-processed notice. It does not call the Paystack refund API, so the
-      money movement itself is completed out of band. Treat a 200 here as "the
-      refund is recorded and the customer has been told", not "the funds have
-      landed".
+      **Ordering.** The ledger is flipped first and Paystack called second. The
+      flip is a guarded update that only moves a `COMPLETED` or
+      `REFUND_REQUESTED` row, so of two concurrent refund attempts exactly one
+      wins and Paystack's refund endpoint is never called twice for one charge.
+      The booking is cancelled, and its inventory released, in that same
+      transaction. If Paystack rejects the refund the claim is released and the
+      payment returns to its previous status, so the administrator can retry
+      (502). If Paystack reports the charge already reversed, the money is with
+      the payer and the reversal stands, with `paystackRefundId` null. A crash
+      between the claim and the provider call leaves a `REFUNDED` row Paystack
+      never saw; the payment reconciliation sweep finds those and re-issues
+      them.
+
+      The customer receives a refund-processed notice. Treat a 200 as "Paystack
+      has accepted the refund"; Paystack settles it to the payer on its own
+      schedule.
 
       `reason` is optional free text; an omitted or empty one is recorded as
       `No reason provided`, so the audit line is never blank.
@@ -448,7 +476,7 @@
           schema: { $ref: '#/components/schemas/PaymentRefundRequest' }
     responses:
       '200':
-        description: Refund recorded, booking cancelled, customer notified.
+        description: Refund issued at Paystack, booking cancelled, customer notified.
         content:
           application/json:
             schema: { $ref: '#/components/schemas/PaymentRefundResponse' }
@@ -466,7 +494,16 @@
           The payment is neither `COMPLETED` nor `REFUND_REQUESTED`, so there is
           nothing settled to refund (`Only completed payments can be refunded`).
           A second refund of an already `REFUNDED` payment lands here too, which
-          is what makes this endpoint safe to retry.
+          is what makes this endpoint safe to retry, as does a row with no
+          Paystack reference to refund against.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+      '502':
+        description: |
+          Paystack rejected or did not answer the refund call. The ledger claim
+          has been released, the payment is back in its previous status, and
+          the request can be retried.
         content:
           application/json:
             schema: { $ref: '#/components/schemas/Error' }

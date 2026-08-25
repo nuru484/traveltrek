@@ -8,6 +8,7 @@ import type { Queue } from 'bullmq';
 
 import { bookingDeadlineQueue } from '#jobs/bookingQueue.js';
 import { flightStatusQueue } from '#jobs/flightQueue.js';
+import { paymentReconciliationQueue } from '#jobs/paymentQueue.js';
 import { tourStatusQueue } from '#jobs/tourQueue.js';
 import logger from '#utils/logger.js';
 
@@ -41,6 +42,19 @@ export async function setupJobSchedulers() {
   );
 
   logger.info('Scheduled: Tour status updater (every 30 minutes)');
+
+  // Payment reconciliation - runs every 15 minutes. The charge stage only
+  // looks at rows older than CHARGE_RECONCILE_MIN_AGE_MS, so this cadence
+  // sets how long a lost webhook can strand a paid booking, not how soon a
+  // live checkout is interrogated.
+  await removeLegacyRepeatables(paymentReconciliationQueue, 'reconcile-payments');
+  await paymentReconciliationQueue.upsertJobScheduler(
+    'reconcile-payments',
+    { pattern: '*/15 * * * *' },
+    { name: 'reconcile-payments' },
+  );
+
+  logger.info('Scheduled: Payment reconciliation (every 15 minutes)');
 }
 
 /**

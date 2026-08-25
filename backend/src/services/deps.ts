@@ -16,6 +16,8 @@ import { verifyGoogleIdToken } from '#lib/google-auth.js';
 import { sendMail } from '#lib/mail.js';
 import {
   initializePaystackTransaction,
+  listPaystackRefunds,
+  listPaystackRefundsSince,
   refundPaystackTransaction,
   verifyPaystackTransaction,
 } from '#lib/paystack.js';
@@ -83,6 +85,8 @@ export interface MailClient {
 /** Paystack I/O surface; injected so tests run without hitting the API. */
 export interface PaystackClient {
   initialize: typeof initializePaystackTransaction;
+  listRefunds: typeof listPaystackRefunds;
+  listRefundsSince: typeof listPaystackRefundsSince;
   refund: typeof refundPaystackTransaction;
   verify: typeof verifyPaystackTransaction;
 }
@@ -123,6 +127,8 @@ export const defaultDeps: AppDeps = {
     : makeQueuedNotify(loggerInstance),
   paystack: {
     initialize: initializePaystackTransaction,
+    listRefunds: listPaystackRefunds,
+    listRefundsSince: listPaystackRefundsSince,
     refund: refundPaystackTransaction,
     verify: verifyPaystackTransaction,
   },

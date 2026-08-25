@@ -1,9 +1,10 @@
 // src/services/payment/management.service.ts
 //
-// Admin-only payment management: manual status update (the cash path, with the
-// booking following the payment), refund (records the refund locally and
-// cancels the booking), and delete (COMPLETED protected; booking reverts to
-// PENDING). Receipts/refund notices run through the payment core.
+// Admin-only payment management: manual status update (the booking follows
+// the payment), refund (claims the reversal on the ledger, cancels the
+// booking, then issues the refund through Paystack), and delete (COMPLETED
+// protected; booking reverts to PENDING). Receipts/refund notices run through
+// the payment core.
 import { HTTP_STATUS_CODES } from '#config/constants.js';
 import { BookingStatus, PaymentStatus } from '#config/prismaClient.js';
 import {
@@ -13,7 +14,11 @@ import {
   UnauthorizedError,
 } from '#middlewares/error-handler.js';
 import { bookedItemName } from '#notifications/booking-notifications.js';
-import { type PaymentCore } from '#services/payment/core.js';
+import {
+  isAlreadyRefundedAtProvider,
+  isRefundable,
+  type PaymentCore,
+} from '#services/payment/core.js';
 import {
   isPaymentStatus,
   type PaymentActor,
@@ -29,8 +34,8 @@ export const makePaymentManagementService = (
   d: PaymentDeps,
   core: PaymentCore,
 ) => {
-  const { clock, logger, prisma } = d;
-  const { customerContact, notices } = core;
+  const { clock, logger, paystack, prisma } = d;
+  const { claimRefund, customerContact, notices, releaseRefundClaim } = core;
 
   /**
    * PATCH /payments/:id — admin-only manual status update (the cash/manual
@@ -133,11 +138,18 @@ export const makePaymentManagementService = (
   };
 
   /**
-   * PATCH /payments/:id/refund — admin-only; COMPLETED payments and
+   * PATCH /payments/:id/refund - admin-only; COMPLETED payments and
    * REFUND_REQUESTED ones (a customer self-cancelled a paid booking) only.
-   * Marks the payment REFUNDED and cancels its booking. The Paystack refund
-   * API is never called: the refund is recorded locally and logged, and the
-   * money is moved by hand. The customer gets a refund-processed notice.
+   *
+   * The ledger is flipped first and the provider called second: a guarded
+   * claim means only one of two concurrent refund clicks moves the row to
+   * REFUNDED, so Paystack's refund endpoint is never called twice for one
+   * charge, and the booking is cancelled (inventory released) in the same
+   * transaction. If Paystack rejects the refund the claim is released so an
+   * administrator can retry; if Paystack reports the charge already reversed
+   * the money is with the payer and the claim stands. A crash between the
+   * claim and the provider call leaves a REFUNDED row Paystack never saw,
+   * which the reconciliation sweep re-issues.
    */
   const refundPayment = async (
     actor: PaymentActor,
@@ -157,41 +169,65 @@ export const makePaymentManagementService = (
       throw new NotFoundError('Payment not found');
     }
 
-    if (
-      payment.status !== PaymentStatus.COMPLETED &&
-      payment.status !== PaymentStatus.REFUND_REQUESTED
-    ) {
+    if (!isRefundable(payment.status)) {
       throw new CustomError(
         HTTP_STATUS_CODES.CONFLICT,
         'Only completed payments can be refunded',
       );
     }
 
-    const refundedPayment = await prisma.payment.update({
-      data: {
-        status: PaymentStatus.REFUNDED,
-        updatedAt: clock.now(),
-      },
-      include: paymentInclude,
-      where: { id },
-    });
-
-    await prisma.booking.update({
-      data: { status: BookingStatus.CANCELLED },
-      where: { id: payment.bookingId },
-    });
+    if (!payment.transactionReference) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        'This payment has no Paystack transaction to refund',
+      );
+    }
 
     // An empty reason string reads as absent.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const recordedReason = reason || 'No reason provided';
 
+    const claimed = await claimRefund(id, { reason: recordedReason });
+    if (!claimed) {
+      throw new CustomError(
+        HTTP_STATUS_CODES.CONFLICT,
+        'This payment has already been refunded',
+      );
+    }
+
+    let paystackRefundId: null | number = null;
+    try {
+      const refund = await paystack.refund({
+        amount: payment.amount,
+        reference: payment.transactionReference,
+      });
+      paystackRefundId = refund.id;
+    } catch (error) {
+      if (isAlreadyRefundedAtProvider(error)) {
+        logger.warn(
+          { paymentId: id, transactionReference: payment.transactionReference },
+          'Refund already settled at Paystack; keeping the reversal',
+        );
+      } else {
+        await releaseRefundClaim(id, payment.status);
+        throw error;
+      }
+    }
+
+    const refundedPayment = await prisma.payment.update({
+      data: { providerRefundId: paystackRefundId },
+      include: paymentInclude,
+      where: { id },
+    });
+
     logger.info(
       {
         amount: payment.amount,
+        paystackRefundId,
         reason: recordedReason,
         transactionReference: payment.transactionReference,
       },
-      `Refund requested for payment ${String(id)}`,
+      `Refunded payment ${String(id)} through Paystack`,
     );
 
     const contact = await customerContact(payment.customerId);
@@ -206,8 +242,9 @@ export const makePaymentManagementService = (
     }
 
     return {
-      bookingStatus: BookingStatus.CANCELLED,
+      bookingStatus: refundedPayment.booking.status,
       payment: refundedPayment,
+      paystackRefundId,
       reason: recordedReason,
       refundAmount: payment.amount,
     };

@@ -15,7 +15,7 @@
 // Every dispatch is fire-and-forget: a request must succeed even though the
 // sends resolve asynchronously (the mocks resolve immediately, so reading the
 // outbox right after the response is deterministic).
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import prisma, {
   BookingStatus,
@@ -37,6 +37,19 @@ import {
   sentEmails,
   sentSms,
 } from '../helpers/messages.js';
+
+// Refunds now go through the Paystack refund API; fake it so this suite stays
+// off the network and exercises only the flow it covers.
+vi.mock('#lib/paystack.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/paystack.js')>();
+  return {
+    ...actual,
+    refundPaystackTransaction: vi.fn(() =>
+      Promise.resolve({ amount: null, id: 1, status: 'pending' }),
+    ),
+  };
+});
+
 
 const bookTour = async (
   customer: { id: number },

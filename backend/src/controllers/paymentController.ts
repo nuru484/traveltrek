@@ -167,12 +167,12 @@ const handlePaystackWebhook = asyncHandler(
 
     const outcome = await handleWebhookEvent(req.body as PaystackWebhookEvent);
 
-    sendSuccess(res, {
-      message:
-        outcome === 'confirmed'
-          ? 'Payment verified and booking confirmed'
-          : 'Event received',
-    });
+    const messages = {
+      confirmed: 'Payment verified and booking confirmed',
+      ignored: 'Event received',
+      refund_applied: 'Refund recorded',
+    } as const;
+    sendSuccess(res, { message: messages[outcome] });
   },
 );
 export const handleWebhook: RequestHandler[] = [handlePaystackWebhook];
@@ -291,6 +291,7 @@ const handleRefundPayment = asyncHandler(
       data: {
         bookingStatus: summary.bookingStatus,
         paymentId: summary.payment.id,
+        paystackRefundId: summary.paystackRefundId,
         reason: summary.reason,
         refundAmount: summary.refundAmount,
         status: summary.payment.status,

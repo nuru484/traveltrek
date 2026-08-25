@@ -45,6 +45,11 @@ export interface IPayment {
   status: IPaymentStatus;
   transactionReference: string;
   paymentDate: Date | null;
+  /** When the reversal was claimed on the ledger; null unless REFUNDED. */
+  refundedAt: Date | null;
+  refundReason: string | null;
+  /** Paystack's id for the refund it holds against this charge. */
+  providerRefundId: number | null;
   createdAt: Date;
   updatedAt: Date;
   bookedItem: IBookedItem;
@@ -120,6 +125,8 @@ export interface IRefundPaymentResponse {
     paymentId: number;
     status: IPaymentStatus;
     bookingStatus: string;
+    /** Paystack's refund id; null when Paystack already held a refund. */
+    paystackRefundId: number | null;
     /** Integer minor units (pesewas): GH₵ 1.00 = 100. */
     refundAmount: number;
     reason: string;

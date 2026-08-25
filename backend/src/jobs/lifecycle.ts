@@ -33,20 +33,24 @@ export async function startWorkers(): Promise<void> {
     { flightStatusWorker },
     { tourStatusWorker },
     { notificationWorker },
+    { paymentReconciliationWorker },
     { bookingDeadlineQueue },
     { flightStatusQueue },
     { tourStatusQueue },
     { notificationQueue },
+    { paymentReconciliationQueue },
     { setupJobSchedulers },
   ] = await Promise.all([
     import('#jobs/bookingWorker.js'),
     import('#jobs/flightWorker.js'),
     import('#jobs/tourWorker.js'),
     import('#jobs/notificationWorker.js'),
+    import('#jobs/paymentWorker.js'),
     import('#jobs/bookingQueue.js'),
     import('#jobs/flightQueue.js'),
     import('#jobs/tourQueue.js'),
     import('#jobs/notificationQueue.js'),
+    import('#jobs/paymentQueue.js'),
     import('#jobs/schedulers.js'),
   ]);
 
@@ -58,12 +62,14 @@ export async function startWorkers(): Promise<void> {
       flightStatusQueue,
       tourStatusQueue,
       notificationQueue,
+      paymentReconciliationQueue,
     ],
     workers: [
       bookingDeadlineWorker,
       flightStatusWorker,
       tourStatusWorker,
       notificationWorker,
+      paymentReconciliationWorker,
     ],
   };
 
@@ -72,6 +78,7 @@ export async function startWorkers(): Promise<void> {
   logger.info('Flight Status Worker: Active');
   logger.info('Tour Status Worker: Active');
   logger.info('Notification Worker: Active');
+  logger.info('Payment Reconciliation Worker: Active');
 }
 
 /**

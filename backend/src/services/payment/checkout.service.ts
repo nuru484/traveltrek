@@ -2,10 +2,12 @@
 //
 // The Paystack money flow: POST /payments (initialize / resume), GET
 // /payments/callback (verify after redirect), and POST /payments/webhook
-// (process a signature-verified event). Settlement + booking confirmation and
+// (process a signature-verified event: charge settlement, provider-side
+// refunds, failed refunds, disputes). Settlement + booking confirmation and
 // the receipt run through the shared payment core, so the callback and webhook
 // can't double-confirm or double-notify.
 import { BookingStatus, PaymentStatus } from '#config/prismaClient.js';
+import { reportError } from '#lib/sentry.js';
 import {
   BadRequestError,
   InternalServerError,
@@ -22,6 +24,7 @@ import {
   type PaymentDeps,
   type PaymentInitializeInput,
   type PaymentInitializeResult,
+  type PaymentWebhookOutcome,
   type PaystackWebhookEvent,
 } from '#services/payment/shared.js';
 import { UserRole } from '#types/user-profile.types.js';
@@ -30,8 +33,9 @@ export const makePaymentCheckoutService = (
   d: PaymentDeps,
   core: PaymentCore,
 ) => {
-  const { clock, paystack, prisma } = d;
-  const { callbackUrl, completeVerifiedPayment, notices } = core;
+  const { clock, logger, paystack, prisma } = d;
+  const { applyProviderRefund, callbackUrl, completeVerifiedPayment, notices } =
+    core;
 
   /**
    * POST /payments — initialize a Paystack transaction for a booking. Guard
@@ -246,15 +250,57 @@ export const makePaymentCheckoutService = (
   };
 
   /**
-   * POST /payments/webhook — process a (signature-verified) Paystack event.
-   * charge.success is re-verified against the Paystack API, reconciled
-   * against the booking total (mismatch marks the payment FAILED and raises
-   * a 500), then completes the payment and confirms the booking.
+   * POST /payments/webhook - process a (signature-verified) Paystack event.
+   *
+   * - charge.success is re-verified against the Paystack API, reconciled
+   *   against the booking total (mismatch marks the payment FAILED and raises
+   *   a 500), then completes the payment and confirms the booking.
+   * - refund.processed records a refund executed at Paystack (dashboard,
+   *   dispute settlement) so the ledger never overstates revenue.
+   * - refund.failed means a refund the ledger already claimed died at
+   *   Paystack (insufficient payout balance, for instance); it is reported
+   *   and the reconciliation sweep re-issues it.
+   * - charge.dispute.create needs a human (evidence upload on the Paystack
+   *   dashboard); it is reported and acknowledged.
    * Every other event type is acknowledged untouched.
    */
   const handleWebhookEvent = async (
     event: PaystackWebhookEvent,
-  ): Promise<'confirmed' | 'ignored'> => {
+  ): Promise<PaymentWebhookOutcome> => {
+    const chargeReference =
+      event.data?.transaction_reference ?? event.data?.reference;
+
+    if (event.event === 'refund.processed') {
+      if (!chargeReference) return 'ignored';
+      const outcome = await applyProviderRefund(chargeReference, {
+        providerRefundId: event.data?.id ?? null,
+        refundedAmount: event.data?.amount,
+      });
+      return outcome === 'applied' ? 'refund_applied' : 'ignored';
+    }
+
+    if (event.event === 'refund.failed') {
+      logger.error(
+        { reference: chargeReference },
+        'Paystack refund failed; the reconciliation sweep will re-issue it',
+      );
+      reportError(new Error('Paystack refund failed'), {
+        context: { reference: chargeReference ?? null },
+      });
+      return 'ignored';
+    }
+
+    if (event.event === 'charge.dispute.create') {
+      logger.error(
+        { reference: chargeReference },
+        'Paystack dispute opened; needs attention on the Paystack dashboard',
+      );
+      reportError(new Error('Paystack dispute opened'), {
+        context: { reference: chargeReference ?? null },
+      });
+      return 'ignored';
+    }
+
     if (event.event !== 'charge.success') {
       return 'ignored';
     }
@@ -279,8 +325,8 @@ export const makePaymentCheckoutService = (
       throw new NotFoundError('Booking not found');
     }
 
-    // Both sides are integer minor units (pesewas); no ÷100. Only an
-    // unsettled row is marked FAILED — a mismatch replay can't clobber a
+    // Both sides are integer minor units (pesewas); no /100. Only an
+    // unsettled row is marked FAILED: a mismatch replay can't clobber a
     // payment that already COMPLETED or refunded.
     if (verified.amount !== booking.totalPrice) {
       await prisma.payment.updateMany({
@@ -312,7 +358,7 @@ export const makePaymentCheckoutService = (
       return 'ignored';
     }
 
-    // Fire-and-forget receipt, sent exactly once — only by the delivery that
+    // Fire-and-forget receipt, sent exactly once, only by the delivery that
     // actually transitioned the payment. The callback flow deliberately
     // sends nothing: Paystack fires this webhook for the same charge, so
     // both completing would double the receipt.

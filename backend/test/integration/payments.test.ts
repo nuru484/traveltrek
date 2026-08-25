@@ -17,6 +17,8 @@ import crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import prisma from '#config/prismaClient.js';
+import { refundPaystackTransaction } from '#lib/paystack.js';
+import { CustomError } from '#middlewares/error-handler.js';
 
 import { api, authedApi } from '../helpers/auth.js';
 import {
@@ -54,8 +56,10 @@ vi.mock('#lib/paystack.js', async (importOriginal) => {
         });
       },
     ),
+    listPaystackRefunds: vi.fn(() => Promise.resolve([])),
+    listPaystackRefundsSince: vi.fn(() => Promise.resolve([])),
     refundPaystackTransaction: vi.fn(() =>
-      Promise.resolve({ id: 1, status: 'pending' }),
+      Promise.resolve({ amount: null, id: 1, status: 'pending' }),
     ),
     verifyPaystackTransaction: vi.fn((reference: string) => {
       const entry = charged.get(reference);
@@ -468,6 +472,166 @@ describe('PATCH /api/v1/payments/:id/refund', () => {
     expect(cancelled?.status).toBe('CANCELLED');
   });
 
+  it('issues the refund through Paystack and records the provider refund id', async () => {
+    const customer = await createCustomer();
+    const admin = await createAdmin();
+    const tour = await createTour({ maxGuests: 5, price: 500 });
+    await prisma.tour.update({
+      data: { guestsBooked: 2 },
+      where: { id: tour.id },
+    });
+    const booking = await prisma.booking.create({
+      data: {
+        customerId: customer.id,
+        numberOfGuests: 2,
+        totalPrice: 500,
+        tourId: tour.id,
+      },
+    });
+    const { paymentId, transactionReference } = await initPayment(
+      customer,
+      booking.id,
+    );
+    await postWebhook({
+      data: {
+        metadata: { bookingId: booking.id },
+        reference: transactionReference,
+      },
+      event: 'charge.success',
+    });
+    vi.mocked(refundPaystackTransaction).mockClear();
+    vi.mocked(refundPaystackTransaction).mockResolvedValueOnce({
+      amount: 500,
+      id: 4242,
+      status: 'pending',
+    });
+
+    const res = await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({ reason: 'Customer request' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.paystackRefundId).toBe(4242);
+    expect(refundPaystackTransaction).toHaveBeenCalledTimes(1);
+    expect(refundPaystackTransaction).toHaveBeenCalledWith({
+      amount: 500,
+      reference: transactionReference,
+    });
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(payment?.status).toBe('REFUNDED');
+    expect(payment?.providerRefundId).toBe(4242);
+    expect(payment?.refundReason).toBe('Customer request');
+    expect(payment?.refundedAt).not.toBeNull();
+
+    // The seats the refunded booking held are released.
+    const released = await prisma.tour.findUnique({ where: { id: tour.id } });
+    expect(released?.guestsBooked).toBe(0);
+  });
+
+  it('releases the claim when Paystack rejects the refund so it can be retried', async () => {
+    const customer = await createCustomer();
+    const admin = await createAdmin();
+    const booking = await createPendingBooking(customer.id, 500);
+    const { paymentId, transactionReference } = await initPayment(
+      customer,
+      booking.id,
+    );
+    await postWebhook({
+      data: {
+        metadata: { bookingId: booking.id },
+        reference: transactionReference,
+      },
+      event: 'charge.success',
+    });
+    vi.mocked(refundPaystackTransaction).mockRejectedValueOnce(
+      new CustomError(502, 'Could not process the refund. Please try again.', {
+        code: 'PAYSTACK_REFUND_FAILED',
+        layer: 'paystack',
+      }),
+    );
+
+    const res = await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({});
+
+    expect(res.status).toBe(502);
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(payment?.status).toBe('COMPLETED');
+    expect(payment?.refundedAt).toBeNull();
+    expect(payment?.refundReason).toBeNull();
+
+    // A retry goes through.
+    const retry = await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({});
+    expect(retry.status).toBe(200);
+    expect(retry.body.data.status).toBe('REFUNDED');
+  });
+
+  it('keeps the reversal when Paystack reports the charge already refunded', async () => {
+    const customer = await createCustomer();
+    const admin = await createAdmin();
+    const booking = await createPendingBooking(customer.id, 500);
+    const { paymentId, transactionReference } = await initPayment(
+      customer,
+      booking.id,
+    );
+    await postWebhook({
+      data: {
+        metadata: { bookingId: booking.id },
+        reference: transactionReference,
+      },
+      event: 'charge.success',
+    });
+    vi.mocked(refundPaystackTransaction).mockRejectedValueOnce(
+      new CustomError(409, 'This charge was already refunded at Paystack.', {
+        code: 'PAYSTACK_ALREADY_REFUNDED',
+        layer: 'paystack',
+      }),
+    );
+
+    const res = await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('REFUNDED');
+    expect(res.body.data.paystackRefundId).toBeNull();
+  });
+
+  it('refuses a second refund of the same payment', async () => {
+    const customer = await createCustomer();
+    const admin = await createAdmin();
+    const booking = await createPendingBooking(customer.id, 500);
+    const { paymentId, transactionReference } = await initPayment(
+      customer,
+      booking.id,
+    );
+    await postWebhook({
+      data: {
+        metadata: { bookingId: booking.id },
+        reference: transactionReference,
+      },
+      event: 'charge.success',
+    });
+    await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({});
+    vi.mocked(refundPaystackTransaction).mockClear();
+
+    const res = await authedApi(admin)
+      .patch(`/api/v1/payments/${String(paymentId)}/refund`)
+      .send({});
+
+    expect(res.status).toBe(409);
+    expect(refundPaystackTransaction).not.toHaveBeenCalled();
+  });
+
   it('refuses to refund a payment that is not completed', async () => {
     const customer = await createCustomer();
     const admin = await createAdmin();
@@ -552,5 +716,105 @@ describe('DELETE /api/v1/payments/:id', () => {
     expect(res.body.message).toBe(
       'Cannot delete completed payments. Consider refunding instead.',
     );
+  });
+});
+
+describe('POST /api/v1/payments/webhook refund events', () => {
+  const settle = async (totalPrice = 500) => {
+    const customer = await createCustomer();
+    const booking = await createPendingBooking(customer.id, totalPrice);
+    const { paymentId, transactionReference } = await initPayment(
+      customer,
+      booking.id,
+    );
+    await postWebhook({
+      data: {
+        metadata: { bookingId: booking.id },
+        reference: transactionReference,
+      },
+      event: 'charge.success',
+    });
+    return { booking, paymentId, transactionReference };
+  };
+
+  it('records a refund issued at Paystack and cancels the booking', async () => {
+    const { booking, paymentId, transactionReference } = await settle();
+
+    const res = await postWebhook({
+      data: {
+        amount: 500,
+        id: 9001,
+        reference: 'rfd_test_1',
+        transaction_reference: transactionReference,
+      },
+      event: 'refund.processed',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Refund recorded');
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(payment?.status).toBe('REFUNDED');
+    expect(payment?.providerRefundId).toBe(9001);
+    expect(payment?.refundReason).toBe('Refunded at Paystack');
+    const cancelled = await prisma.booking.findUnique({
+      where: { id: booking.id },
+    });
+    expect(cancelled?.status).toBe('CANCELLED');
+  });
+
+  it('acknowledges a replayed refund event without changing anything', async () => {
+    const { paymentId, transactionReference } = await settle();
+    const event = {
+      data: {
+        amount: 500,
+        id: 9002,
+        transaction_reference: transactionReference,
+      },
+      event: 'refund.processed',
+    };
+    await postWebhook(event);
+    const first = await prisma.payment.findUnique({ where: { id: paymentId } });
+
+    const res = await postWebhook(event);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Event received');
+    const second = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(second?.updatedAt.getTime()).toBe(first?.updatedAt.getTime());
+  });
+
+  it('leaves the ledger alone on a partial refund', async () => {
+    const { paymentId, transactionReference } = await settle();
+
+    const res = await postWebhook({
+      data: {
+        amount: 100,
+        id: 9003,
+        transaction_reference: transactionReference,
+      },
+      event: 'refund.processed',
+    });
+
+    expect(res.status).toBe(200);
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+    expect(payment?.status).toBe('COMPLETED');
+  });
+
+  it('acknowledges refund.failed and dispute events', async () => {
+    const { transactionReference } = await settle();
+    for (const event of ['refund.failed', 'charge.dispute.create']) {
+      const res = await postWebhook({
+        data: { transaction_reference: transactionReference },
+        event,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Event received');
+    }
   });
 });

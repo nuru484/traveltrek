@@ -15,6 +15,9 @@ schemas:
       `FAILED` marks a charge Paystack did not settle, or one whose verified
       amount did not reconcile against the booking total.
       `REFUNDED` is terminal: nothing moves a refunded payment anywhere else.
+      It is set by the refund endpoint (which then issues the refund through
+      Paystack), by a `refund.processed` webhook, or by the reconciliation
+      sweep.
 
       `REFUND_REQUESTED` is the hand-off state. A customer who cancels a
       booking they had already paid for does not get their money moved by that
@@ -139,6 +142,9 @@ schemas:
         customer,
         bookedItem,
         paymentDate,
+        refundedAt,
+        refundReason,
+        providerRefundId,
         createdAt,
         updatedAt,
       ]
@@ -192,6 +198,24 @@ schemas:
           settlement actually transitioned the row, so it records the moment the
           money was confirmed rather than the moment a duplicate notification
           arrived.
+      refundedAt:
+        type: [string, 'null']
+        format: date-time
+        description: |
+          When the reversal was claimed on the ledger, which is before the
+          Paystack refund call. Null unless the payment is `REFUNDED`.
+      refundReason:
+        type: [string, 'null']
+        description: |
+          The reason recorded with the refund: the administrator's free text,
+          `Refunded at Paystack` for a provider-side refund, or the sweep's own
+          wording for a charge that settled after its booking was cancelled.
+      providerRefundId:
+        type: [integer, 'null']
+        description: |
+          Paystack's id for the refund it holds against this charge. Null while
+          no refund has been issued, and null on a `REFUNDED` row whose refund
+          Paystack already held before this service asked.
       createdAt: { type: string, format: date-time }
       updatedAt: { type: string, format: date-time }
 
@@ -310,9 +334,10 @@ schemas:
   PaymentRefundRequest:
     type: object
     description: |
-      Free-text context for the refund, recorded in the log alongside the amount
-      and the transaction reference. Nothing here influences how much is
-      refunded: the amount is always the full stored payment amount.
+      Free-text context for the refund, stored on the payment as `refundReason`
+      and logged alongside the amount and the transaction reference. Nothing
+      here influences how much is refunded: the amount is always the full
+      stored payment amount.
     properties:
       reason:
         type: string
@@ -328,16 +353,25 @@ schemas:
       message: { type: string, examples: [Payment refunded successfully] }
       data:
         type: object
-        required: [paymentId, status, bookingStatus, reason, refundAmount, updatedAt]
+        required: [paymentId, status, bookingStatus, paystackRefundId, reason, refundAmount, updatedAt]
         properties:
           paymentId: { type: integer, examples: [31] }
           status:
             type: string
             const: REFUNDED
           bookingStatus:
-            type: string
-            const: CANCELLED
-            description: A refund always cancels the booking it paid for.
+            $ref: '#/components/schemas/PaymentBookingStatus'
+            description: |
+              `CANCELLED` for a booking that was still holding inventory or
+              was cancelled by the customer; a `COMPLETED` trip is left as it
+              is, since there is nothing to release.
+          paystackRefundId:
+            type: [integer, 'null']
+            description: |
+              The id Paystack assigned to the refund it just accepted. Null when
+              Paystack reported the charge already refunded, in which case no
+              new refund was created.
+            examples: [4242]
           reason:
             type: string
             description: The reason as recorded, or `No reason provided`.
@@ -372,7 +406,8 @@ schemas:
   PaymentWebhookEvent:
     type: object
     description: |
-      A Paystack event body. Only `charge.success` is acted on; every other
+      A Paystack event body. `charge.success`, `refund.processed`,
+      `refund.failed` and `charge.dispute.create` are acted on; every other
       event type is acknowledged and otherwise ignored, so Paystack does not
       retry events this service has no interest in.
 
@@ -382,7 +417,9 @@ schemas:
     properties:
       event:
         type: string
-        description: Event type. Only `charge.success` triggers settlement.
+        description: |
+          Event type. `charge.success` triggers settlement; the refund and
+          dispute events update or report on an existing payment.
         examples: [charge.success]
       data:
         type: object
@@ -390,10 +427,29 @@ schemas:
           reference:
             type: string
             description: |
-              The transaction reference. This is the idempotency key: the
-              service settles the payment row holding this reference, and only
-              if it is still unsettled.
+              On charge events, the transaction reference. This is the
+              idempotency key: the service settles the payment row holding this
+              reference, and only if it is still unsettled. On refund events
+              this is the refund's own reference; the charge is named by
+              `transaction_reference`.
             examples: [booking_18_1754300000000]
+          transaction_reference:
+            type: string
+            description: |
+              On refund and dispute events, the reference of the charge the
+              event is about.
+            examples: [booking_18_1754300000000]
+          id:
+            type: integer
+            description: On refund events, Paystack's id for the refund.
+            examples: [9001]
+          amount:
+            allOf:
+              - $ref: '#/components/schemas/Money'
+            description: |
+              On refund events, the refunded amount in pesewas. Anything less
+              than the payment's amount is a partial refund and is reported for
+              manual handling rather than applied.
           metadata:
             type: object
             description: The metadata echoed back from initialization.

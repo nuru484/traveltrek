@@ -6,7 +6,7 @@ import { defaultDeps } from '#services/deps.js';
 // the Paystack channel map), core.ts (notifications, contact lookup, the
 // callback URL, the idempotent settle-and-confirm transaction, pagination),
 // and one module per surface (checkout = initialize/callback/webhook, query,
-// management = status/refund/delete). makePaymentService builds the core once
+// management = status/refund/delete, reconcile = the scheduled sweep). makePaymentService builds the core once
 // and spreads each feature factory into one object, preserving the public
 // surface controllers/tests import from this path.
 //
@@ -18,6 +18,7 @@ import { makePaymentCheckoutService } from '#services/payment/checkout.service.j
 import { makePaymentCore } from '#services/payment/core.js';
 import { makePaymentManagementService } from '#services/payment/management.service.js';
 import { makePaymentQueryService } from '#services/payment/query.service.js';
+import { makePaymentReconciliationService } from '#services/payment/reconcile.service.js';
 import {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
@@ -28,8 +29,10 @@ import {
   type PaymentInitializeInput,
   type PaymentInitializeResult,
   type PaymentListParams,
+  type PaymentReconciliationSummary,
   type PaymentRefundSummary,
   type PaymentStatusUpdateSummary,
+  type PaymentWebhookOutcome,
   type PaystackWebhookEvent,
 } from '#services/payment/shared.js';
 
@@ -44,8 +47,10 @@ export {
   type PaymentInitializeInput,
   type PaymentInitializeResult,
   type PaymentListParams,
+  type PaymentReconciliationSummary,
   type PaymentRefundSummary,
   type PaymentStatusUpdateSummary,
+  type PaymentWebhookOutcome,
   type PaystackWebhookEvent,
 };
 
@@ -55,6 +60,7 @@ export const makePaymentService = (d: PaymentDeps) => {
     ...makePaymentCheckoutService(d, core),
     ...makePaymentQueryService(d, core),
     ...makePaymentManagementService(d, core),
+    ...makePaymentReconciliationService(d, core),
   };
 };
 
@@ -67,6 +73,7 @@ export const {
   initializePayment,
   listCustomerPayments,
   listPayments,
+  reconcilePayments,
   refundPayment,
   updatePaymentStatus,
   verifyPaymentCallback,

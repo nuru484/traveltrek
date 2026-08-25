@@ -7,7 +7,7 @@
 // refused; customers may only cancel their own bookings while staff may
 // cancel any. Also pins that the payments list filter accepts the new
 // REFUND_REQUESTED enum value (the zod schema derives from PaymentStatus).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import prisma, {
   BookingStatus,
@@ -23,6 +23,19 @@ import {
   createFlight,
   createTour,
 } from '../helpers/factories.js';
+
+// Refunds now go through the Paystack refund API; fake it so this suite stays
+// off the network and exercises only the flow it covers.
+vi.mock('#lib/paystack.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#lib/paystack.js')>();
+  return {
+    ...actual,
+    refundPaystackTransaction: vi.fn(() =>
+      Promise.resolve({ amount: null, id: 1, status: 'pending' }),
+    ),
+  };
+});
+
 
 /** Books a tour through the API so availability counters really move. */
 const bookTour = async (

@@ -83,9 +83,26 @@ export interface PaymentListParams {
   status?: PaymentStatus;
 }
 
+/** What one reconciliation tick changed; every count is of ledger rows. */
+export interface PaymentReconciliationSummary {
+  /** Bookings cancelled to catch up with a payment already REFUNDED. */
+  bookingsCancelled: number;
+  /** PENDING charges Paystack reports as terminal, now FAILED. */
+  chargesClosed: number;
+  /** Settled charges neither the webhook nor the callback confirmed. */
+  chargesRecovered: number;
+  /** Dashboard-side refunds the ledger had missed. */
+  providerRefundsApplied: number;
+  /** REFUNDED claims Paystack never received, re-issued. */
+  refundsReissued: number;
+}
+
 export interface PaymentRefundSummary {
   bookingStatus: BookingStatus;
   payment: PaymentWithRelations;
+  /** Paystack's id for the refund, when it was issued by this call. Null
+   * when Paystack already held a refund for the charge. */
+  paystackRefundId: null | number;
   reason: string;
   refundAmount: number;
 }
@@ -95,11 +112,23 @@ export interface PaymentStatusUpdateSummary {
   payment: PaymentWithRelations;
 }
 
-/** The subset of a Paystack webhook body the charge.success flow reads. */
+/** Outcome of processing one signature-verified webhook event. */
+export type PaymentWebhookOutcome =
+  | 'confirmed'
+  | 'ignored'
+  | 'refund_applied';
+
+/** The subset of a Paystack webhook body the handled events read. Refund
+ * events carry the charge under `transaction_reference` (and `reference` is
+ * the refund's own); charge events carry it under `reference`. */
 export interface PaystackWebhookEvent {
   data?: {
+    /** On refund events: the refunded amount in minor units. */
+    amount?: number;
+    id?: number;
     metadata?: { bookingId?: number | string };
     reference?: string;
+    transaction_reference?: string;
   };
   event?: string;
 }

@@ -53,6 +53,11 @@ export interface PaymentDTO {
   id: number;
   paymentDate: Date | null;
   paymentMethod: PaymentWithRelations['paymentMethod'];
+  /** Paystack's id for the refund it holds against this charge, if any. */
+  providerRefundId: null | number;
+  /** When the reversal was claimed on the ledger; null unless REFUNDED. */
+  refundedAt: Date | null;
+  refundReason: null | string;
   status: PaymentWithRelations['status'];
   transactionReference: string;
   updatedAt: Date;
@@ -108,6 +113,9 @@ export const toPaymentDTO = (payment: PaymentWithRelations): PaymentDTO => ({
   id: payment.id,
   paymentDate: payment.paymentDate,
   paymentMethod: payment.paymentMethod,
+  providerRefundId: payment.providerRefundId,
+  refundedAt: payment.refundedAt,
+  refundReason: payment.refundReason,
   status: payment.status,
   transactionReference: payment.transactionReference ?? '',
   updatedAt: payment.updatedAt,

@@ -475,11 +475,20 @@ model Payment {
   paymentDate          DateTime?
   paymentMethod        PaymentMethod
   transactionReference String?       @unique
+  /// Set when the payment moves to REFUNDED: the moment the ledger claimed the
+  /// reversal, which is before the Paystack refund call. The reconciliation
+  /// sweep uses it to find claims the provider never received.
+  refundedAt           DateTime?
+  refundReason         String?
+  /// Paystack's id for the refund it holds against this charge, when the
+  /// refund was issued (or discovered) through the API.
+  providerRefundId     Int?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
   deletedAt            DateTime?
 
   @@index([deletedAt])
+  @@index([status, refundedAt])
   @@index([customerId], name: "payment_customer_idx")
   @@index([transactionReference], name: "payment_transaction_ref_idx")
   @@index([status])

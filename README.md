@@ -28,7 +28,7 @@ It is both a working product and a portfolio piece: the landing page tells the s
 
 * Browse live tours, destinations, hotels, and flights on the public demo board - no account needed.
 * Book tours, room stays (date-ranged, inventory-aware), and flights; pay with **Paystack** (cards, mobile money, bank transfer).
-* Payment deadlines with automatic expiry of unpaid bookings; self-service cancellation with refund requests on paid bookings.
+* Payment deadlines with automatic expiry of unpaid bookings; self-service cancellation with refund requests on paid bookings, refunded through Paystack once an administrator actions them.
 * Review completed trips (verified: only trips actually taken, within an edit window).
 * A professional profile with travel stats, booking and payment history.
 
@@ -43,7 +43,7 @@ It is both a working product and a portfolio piece: the landing page tells the s
 ### Staff operations (ADMIN / AGENT)
 
 * Full inventory management: destinations, tours, hotels & rooms, flights - with cover photos via Cloudinary.
-* Book and pay on behalf of customers (attributed to the acting staff member); action refund requests.
+* Book and pay on behalf of customers (attributed to the acting staff member); action refund requests, which issue the refund through the Paystack refund API.
 * Customer management with complete booking/payment history; review moderation.
 * Role-aware **reports and dashboard**: monthly bookings, payments, top tours, needs-attention queues.
 
@@ -52,6 +52,7 @@ It is both a working product and a portfolio piece: the landing page tells the s
 Workers run as part of the web process by default, or as a dedicated process:
 
 * **Booking deadline sweep** - cancels expired unpaid bookings and restores inventory.
+* **Payment reconciliation** - the third confirmation path behind the webhook and the payer's return trip: every 15 minutes it asks Paystack about charges still pending after ten minutes (crediting the settled ones, closing the abandoned ones, refunding any that settled after their booking was cancelled), re-issues refunds the ledger claimed but Paystack never received, and records refunds made on the Paystack dashboard whose webhook never arrived.
 * **Flight status** - `SCHEDULED → DEPARTED → LANDED` (plus `DELAYED`/`CANCELLED`) from departure/arrival times.
 * **Tour status** - `UPCOMING → ONGOING → COMPLETED` from tour dates.
 * **Notification queue** - every email/SMS is a durable job with 3 attempts and exponential backoff; failed sends stay visible in Redis.
@@ -69,7 +70,7 @@ Workers run as part of the web process by default, or as a dedicated process:
 | **Backend**            | Node.js, Express 5 (TypeScript, ESM)                             |
 | **Database**           | PostgreSQL + Prisma (pg driver adapter), soft deletes            |
 | **Money**              | Integer minor units (pesewas) end-to-end - never floats          |
-| **Payments**           | Paystack (initialize / verify / refund, signed webhooks)         |
+| **Payments**           | Paystack (initialize / verify / refund / refund list, signed webhooks, reconciliation sweep) |
 | **Queue & Jobs**       | BullMQ + Redis (ioredis)                                         |
 | **Media**              | Cloudinary (multer uploads, replacement/removal reclamation)     |
 | **Observability**      | pino structured logs, request correlation, Sentry, health probes |
@@ -108,7 +109,7 @@ Two principal tables, **staff** (`User`: `ADMIN`/`AGENT`) and **`Customer`**, ar
 * **Hotel → Room** - star ratings, amenities, per-night pricing (pesewas), and date-window room inventory.
 * **Flight** - route, class, seat inventory, live status.
 * **Booking** - references a tour, room, *or* flight; guest counts, stay dates, payment deadline, `PENDING → CONFIRMED → COMPLETED`/`CANCELLED`.
-* **Payment** - one per booking; Paystack reference as the idempotency key; `REFUND_REQUESTED → REFUNDED` flow for customer cancellations.
+* **Payment** - one per booking; Paystack reference as the idempotency key; `REFUND_REQUESTED → REFUNDED` flow for customer cancellations, with the refund issued through Paystack and `refundedAt` / `providerRefundId` recorded on the row.
 * **Review** - verified, one per customer per trip, moderated by staff.
 
 Soft deletes everywhere (a Prisma client extension auto-scopes reads); `Restrict` foreign keys so money history can't cascade away.
