@@ -43,19 +43,25 @@ If CI fails, no hook is fired and production keeps running the previous release.
 | Auto-Deploy | **No** (this is the important one) |
 | Health check path | `/health/ready` |
 
-`npm run deploy` is `npm ci --include=dev && npm run build && npm run bootstrap`.
+`npm run deploy` is `npm ci --include=dev && npm run build`.
 
 Two things about that command are load-bearing:
 
 - **`--include=dev` is not optional.** Render sets `NODE_ENV=production`, under
-  which `npm ci` skips devDependencies. The `postinstall` hook then runs
-  `prisma generate`, which loads `prisma.config.ts`, which resolves
-  `tsconfig.json`, which extends `@tsconfig/node22` - a devDependency. Without
-  the flag the build dies with ``File '@tsconfig/node22/tsconfig.json' not
-  found``. `tsc` is a devDependency too, so the build step would fail next
-  regardless. Only the build needs them; `npm start` runs `node dist/server.js`.
-- **It does not run migrations.** They belong in the workflow, before the new
-  code ships - see below.
+  which `npm ci` skips devDependencies, and the build needs three of them:
+  `typescript` (`tsc`), `tsc-alias` (rewrites the `#` import aliases in the
+  compiled output) and `tsx` (the OpenAPI check and the seed/bootstrap
+  scripts). Only the build needs them; `npm start` runs `node build/server.js`.
+- **It does not run migrations or create the admin.** Both belong in the
+  workflow, before the new code ships - see below.
+
+Node is pinned in the repository's `.nvmrc`; CI, the deploy workflow and the
+Dockerfile all track the same major, so set the service's `NODE_VERSION` to
+match when Render's default drifts from it.
+
+Render sets `RENDER_GIT_COMMIT` on every deploy, and the API uses it as the
+Sentry `release` unless `SENTRY_RELEASE` is set explicitly, so no release
+variable needs configuring for events to name their commit.
 
 ## Secrets
 
@@ -65,7 +71,8 @@ Two things about that command are load-bearing:
 | `PRODUCTION_DATABASE_URL` | strongly | The production connection string. Without it the workflow warns and deploys **without migrating**. |
 | `RENDER_API_KEY` | optional | Account Settings -> API Keys. Lets the workflow wait for the build instead of firing and forgetting. |
 | `RENDER_SERVICE_ID` | optional | The `srv-…` id in the service URL. Needed with the API key. |
-| `RENDER_HEALTH_URL` | optional | e.g. `https://api.elektorpro.manuru.dev/health/ready`. The post-deploy readiness gate. |
+| `RENDER_HEALTH_URL` | optional | e.g. `https://api.example.com/health/ready`. The post-deploy readiness gate. |
+| `ADMIN_BOOTSTRAP_ENABLED` / `ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PHONE` | once | The first-admin bootstrap step. `ADMIN_BOOTSTRAP_ENABLED=true` for the single deploy that should create it, then remove it (see the README). |
 
 **Until `RENDER_DEPLOY_HOOK_URL` exists the job skips with a notice rather than
 failing**, so merging the workflow changes nothing until you opt in.
@@ -111,73 +118,81 @@ configuration check warns about the optional ones that matter in production.
 ```bash
 DATABASE_URL=postgresql://...
 DB_POOL_MAX=20
-
-# Generate each with: openssl rand -base64 48
-# All three must be at least 32 characters; the API refuses to boot otherwise.
-ACCESS_TOKEN_SECRET=
-REFRESH_TOKEN_SECRET=
-# Separate from the token secrets on purpose: sharing them meant rotating
-# ACCESS_TOKEN_SECRET silently made every stored TOTP secret undecryptable.
-ENCRYPTION_KEY=
-
-# The client's origin. Without it every browser request fails CORS.
-CORS_ACCESS=https://vote.example.org
-FRONTEND_URL=https://vote.example.org
-
-# NOT optional in practice. Without Redis the background queues are disabled,
-# which means elections DO NOT auto-open or auto-close on schedule, expired
-# sessions and OTPs are never swept, rate limits reset on every restart, and a
-# second instance would silently stop receiving live results.
 REDIS_URL=redis://...
 
-OTP_MODE=live
-FROG_API_KEY=
-FROG_SENDER_ID=
-FROG_USERNAME=
+# Generate each with: openssl rand -base64 48
+ACCESS_TOKEN_SECRET=
+REFRESH_TOKEN_SECRET=
+ACCESS_TOKEN_EXPIRY=30m
+REFRESH_TOKEN_EXPIRY=7d
+COOKIE_DOMAIN=
+
+# The client's origin. Without it every browser request fails CORS.
+CORS_ACCESS=https://app.example.com
+FRONTEND_URL=https://app.example.com
 
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
+PAYSTACK_SECRET_KEY=
+PAYSTACK_CALLBACK_URL=https://app.example.com/dashboard/payments/callback
+
 RESEND_API_KEY=
-MAIL_FROM="TravelTrek <no-reply@manuru.dev>"
+MAIL_FROM_NAME=TravelTrek
+MAIL_FROM_EMAIL=no-reply@example.com
+EMAIL_LOGO_URL=https://app.example.com/logo.png
 
+# Optional: unset logs SMS instead of sending.
+FROG_API_KEY=
+FROG_USERNAME=
+FROG_SENDER_ID=
+
+# Optional: unset disables Google sign-in (503).
+GOOGLE_CLIENT_ID=
+
+# Optional: unset disables error tracking. Release comes from RENDER_GIT_COMMIT.
 SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
 
-ADMIN_EMAIL=admin@example.org
-ADMIN_FIRST_NAME=Super
-ADMIN_LAST_NAME=Admin
-ADMIN_PHONE=+233200000001
-ORGANIZATION_NAME=Your Organization
+# Optional: one of fatal, error, warn, info, debug, trace (default info).
+LOG_LEVEL=info
+
+# Only when a dedicated worker process runs build/worker.js.
+WEB_DISABLE_WORKERS=false
 ```
 
-`REDIS_URL` deserves its own note: without it the background queues are
-disabled, which means elections do **not** auto-open or auto-close on schedule,
-expired sessions and OTPs are never swept, rate limits reset on every restart,
-and a second instance would silently stop receiving live results.
+`REDIS_URL` deserves its own note: the API refuses to boot without it, because
+BullMQ carries the booking-deadline sweep, flight and tour status updates,
+payment reconciliation and every customer email/SMS, and the rate limiter and
+session cache live there too.
 
-## Deploying during an election
+## Deploying while customers are mid-checkout
 
-Don't, if you can avoid it. A release drops in-flight requests and every open
-websocket, and voters mid-ballot see an error.
-
-If you must:
-
-- Use the `production` environment's approval gate (Settings -> Environments ->
-  `production` -> required reviewers) so it cannot happen by accident.
-- The app closes HTTP, realtime, workers and the pool in order on `SIGTERM`
-  with its own 35s cap, so a restart drains in-flight ballots rather than being
-  killed mid-transaction.
-- Prefer a window when no election is `IN_PROGRESS`.
-  `GET /api/v1/elections?status=IN_PROGRESS` answers that in one call.
+A release drops in-flight requests. The app closes HTTP, then the BullMQ
+workers (waiting for in-flight jobs), then Redis and the database pool on
+`SIGTERM`, with its own 35s cap before it forces exit, so a restart drains a
+payment callback rather than being killed mid-transaction. Anything a lost
+webhook leaves behind is picked up by the payment reconciliation job on its
+next tick. Prefer a quiet window all the same, and use the `production`
+environment's approval gate (Settings -> Environments -> `production` ->
+required reviewers) when a deploy must not happen by accident.
 
 ## Deploying the client
 
 The Next.js client is **not** shipped by this workflow. Point a Vercel project
-at this repository with root directory `client`, set `NEXT_PUBLIC_API_URL` to
-the API's public URL, and it deploys on every push with preview URLs per pull
-request.
+at this repository with root directory `frontend`, set `NEXT_PUBLIC_SERVER_URI`
+to the API's public URL (and the other variables in `frontend/.env.example`),
+and it deploys on every push with preview URLs per pull request.
 
-`NEXT_PUBLIC_API_URL` is baked in **at build time** and also lands in the CSP's
-`connect-src`, so changing the API's hostname requires a rebuild, not just an
-environment change.
+`NEXT_PUBLIC_*` values are baked in **at build time**, so changing the API's
+hostname requires a redeploy, not just an environment change. Vercel sets
+`VERCEL_GIT_COMMIT_SHA` on every build and the client uses it as the Sentry
+release; source maps upload only when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and
+`SENTRY_PROJECT` are set.
+
+## The Dockerfile
+
+`backend/Dockerfile` is not what Render runs (it builds from source with the
+commands above); it exists for self-hosting. CI's `docker-build` job builds it
+on every push without pushing an image, so it cannot rot unnoticed.

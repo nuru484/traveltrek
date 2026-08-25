@@ -24,9 +24,18 @@ const securityHeaders = [
   },
 ];
 
+// The deployed commit, so Sentry events and uploaded source maps name the
+// same release. Vercel sets VERCEL_GIT_COMMIT_SHA on every build; anywhere
+// else the release is simply absent.
+const sentryRelease =
+  process.env.SENTRY_RELEASE ?? process.env.VERCEL_GIT_COMMIT_SHA;
+
 const nextConfig: NextConfig = {
   // Don't advertise the framework in an x-powered-by header.
   poweredByHeader: false,
+  // Inlined into every runtime bundle so src/lib/sentry-options.ts can read
+  // it in the browser as well as on the server.
+  env: sentryRelease ? { NEXT_PUBLIC_SENTRY_RELEASE: sentryRelease } : {},
   images: {
     remotePatterns: [
       {
@@ -60,7 +69,11 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
+  release: { name: sentryRelease },
   silent: !process.env.CI,
+  // Browser events go through this same-origin route, so ad blockers that
+  // drop requests to sentry.io do not drop the error reports.
+  tunnelRoute: "/monitoring",
   widenClientFileUpload: true,
   sourcemaps: { deleteSourcemapsAfterUpload: true },
   webpack: { treeshake: { removeDebugLogging: true } },

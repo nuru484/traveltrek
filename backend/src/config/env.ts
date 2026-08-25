@@ -26,6 +26,25 @@ function envBool(name: string, defaultValue = false): boolean {
 }
 
 /**
+ * Reads an optional environment variable that must be one of a fixed set of
+ * values, so a misspelt level fails at boot instead of being silently
+ * rejected by the consumer.
+ */
+function envEnum<const T extends readonly string[]>(
+  name: string,
+  allowed: T,
+): T[number] | undefined {
+  const v = envOptional(name);
+  if (v === undefined) return undefined;
+  if (!allowed.includes(v)) {
+    throw new Error(
+      `Invalid value for env variable ${name}: "${v}". Use one of ${allowed.join(', ')}.`,
+    );
+  }
+  return v;
+}
+
+/**
  * Reads a numeric environment variable.
  * - If a defaultValue is provided, it acts as an optional numeric var.
  * - If no defaultValue is provided, the variable is treated as required.
@@ -64,6 +83,15 @@ function envRequired(name: string): string {
   if (!v?.length) throw new Error(`Missing required env variable: ${name}`);
   return v;
 }
+
+const LOG_LEVELS = [
+  'fatal',
+  'error',
+  'warn',
+  'info',
+  'debug',
+  'trace',
+] as const;
 
 const NODE_ENV = envOptional('NODE_ENV') ?? 'development';
 
@@ -123,7 +151,7 @@ const ENV = {
   /** OAuth client id for Google sign-in; unset disables the endpoint (503). */
   GOOGLE_CLIENT_ID: envOptional('GOOGLE_CLIENT_ID'),
   /** pino level (fatal..trace); default info in production, debug elsewhere. */
-  LOG_LEVEL: envOptional('LOG_LEVEL'),
+  LOG_LEVEL: envEnum('LOG_LEVEL', LOG_LEVELS),
   MAIL_FROM_EMAIL:
     envOptional('MAIL_FROM_EMAIL') ?? 'no-reply@traveltrek.local',
   MAIL_FROM_NAME: envOptional('MAIL_FROM_NAME') ?? 'TravelTrek',
@@ -152,6 +180,10 @@ const ENV = {
   SENTRY_DSN: envOptional('SENTRY_DSN'),
   /** Environment tag on Sentry events; defaults to NODE_ENV. */
   SENTRY_ENVIRONMENT: envOptional('SENTRY_ENVIRONMENT') ?? NODE_ENV,
+  /** Release tag on Sentry events: an explicit value, else the commit Render
+   * deployed (RENDER_GIT_COMMIT is set by the platform), else none. */
+  SENTRY_RELEASE:
+    envOptional('SENTRY_RELEASE') ?? envOptional('RENDER_GIT_COMMIT'),
   /** Performance-tracing sample rate 0-1; default 0 (errors only). */
   SENTRY_TRACES_SAMPLE_RATE: envNumber('SENTRY_TRACES_SAMPLE_RATE', 0),
   /**

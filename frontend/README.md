@@ -31,6 +31,7 @@ Next.js (App Router) + React 19 + TypeScript (strict) client for the TravelTrek 
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`                        | shows the Google sign-in button when set                           |
 | `NEXT_PUBLIC_SENTRY_DSN`                              | Sentry DSN; unset keeps error tracking inert                       |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`                      | Sentry environment tag (defaults to `VERCEL_ENV`)                  |
+| `SENTRY_RELEASE`                                      | Sentry release tag; defaults to `VERCEL_GIT_COMMIT_SHA`, which Vercel sets |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | CI-only: uploads source maps at build time; unset skips the upload |
 
 The `/login` demo-account quick logins are **server-side** (`POST /auth/demo-login`) - no demo credentials ship in the client. Configure them on the backend (`DEMO_LOGIN_ENABLED`, `DEMO_ADMIN_EMAIL`, `DEMO_AGENT_EMAIL`, `DEMO_CUSTOMER_EMAIL`).
@@ -43,4 +44,6 @@ cp .env.example .env
 npm run dev          # :3000 (Turbopack)
 ```
 
-`npm test` runs 200+ vitest unit/component tests (jsdom, no server needed); `npm run lint`, `type-check`, and `build` are the CI gates.
+`npm test` runs 200+ vitest unit/component tests (jsdom, no server needed). The CI gates are `npm run lint`, `type-check`, `test:coverage` (coverage floors in `vitest.config.ts`), `build`, and `audit:ci` (fails on a HIGH/CRITICAL advisory in a production dependency; `scripts/audit-gate.mjs`).
+
+Browser error reports reach Sentry through the same-origin `/monitoring` tunnel route, so ad blockers do not drop them. Sentry options shared by the browser, Node.js and edge inits live in `src/lib/sentry-options.ts`.

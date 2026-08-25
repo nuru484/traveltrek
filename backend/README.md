@@ -53,7 +53,9 @@ Workers run inside the web process by default. For a dedicated worker process: s
 | `npm run dev`              | API with watch + in-process workers                 |
 | `npm run worker:dev`       | standalone worker with watch                        |
 | `npm test`                 | integration suite (see below)                       |
+| `npm run test:coverage`    | the suite with coverage floors (what CI runs)       |
 | `npm run lint` / `type-check` / `build` | the CI gates                           |
+| `npm run docs:check` / `audit:ci` | OpenAPI drift check / production advisory gate |
 | `npm run migrate` / `migrate:deploy:local` | dev migration / apply pending        |
 | `npm run studio`           | Prisma Studio                                       |
 | `npm run deploy`           | install → generate → migrate deploy → build (release) |
@@ -64,8 +66,8 @@ Workers run inside the web process by default. For a dedicated worker process: s
 
 ## Health & observability
 
-`/health` (liveness), `/health/ready` (DB verified once at boot, so it doesn't keep an auto-suspending DB awake), `/health/db` (on-demand deep check). Every request gets a correlation id (`x-request-id`) that threads through the access log, every `req.log` line, error responses and any notification job the request enqueues; unexpected errors go to Sentry when `SENTRY_DSN` is set.
+`/health` (liveness), `/health/ready` (DB verified once at boot, so it doesn't keep an auto-suspending DB awake), `/health/db` (on-demand deep check). Every request gets a correlation id (`x-request-id`) that threads through the access log, every log line written while the request runs (services included, via an async-local context), error responses and any notification job the request enqueues; the notification worker replays that context, so the send's own log lines and failure reports carry the same id. Unexpected errors go to Sentry when `SENTRY_DSN` is set.
 
-Logs are pino JSON in production (pretty-printed in dev); `LOG_LEVEL` overrides the default level. Passwords, tokens, OTP codes, phone numbers and auth headers are redacted at the logger, whatever the call site passes.
+Logs are pino JSON in production (pretty-printed in dev); `LOG_LEVEL` (one of `fatal`, `error`, `warn`, `info`, `debug`, `trace`; anything else fails boot) overrides the default level. Passwords, tokens, OTP codes, phone numbers and auth headers are redacted at the logger, whatever the call site passes.
 
-Sentry setup: create a Sentry project of type Node (Express), copy its DSN into `SENTRY_DSN`, optionally set `SENTRY_ENVIRONMENT` (defaults to `NODE_ENV`) and `SENTRY_TRACES_SAMPLE_RATE` (0-1, default 0 = errors only). Unset `SENTRY_DSN` disables reporting entirely; only 5xx / HIGH-CRITICAL errors and process crashes (unhandled rejections, uncaught exceptions) are sent, never expected 4xx.
+Sentry setup: create a Sentry project of type Node (Express), copy its DSN into `SENTRY_DSN`, optionally set `SENTRY_ENVIRONMENT` (defaults to `NODE_ENV`) and `SENTRY_TRACES_SAMPLE_RATE` (0-1, default 0 = errors only). Events carry `release` from `SENTRY_RELEASE`, else `RENDER_GIT_COMMIT` (set by Render), else none. `sendDefaultPii` is off; an authenticated request attaches only the opaque `kind:id` of the principal, and every event is scrubbed of password/token/secret/auth/key-style values (extra, contexts, request, messages) before it leaves the process. Unset `SENTRY_DSN` disables reporting entirely; only 5xx / HIGH-CRITICAL errors and process crashes (unhandled rejections, uncaught exceptions) are sent, never expected 4xx.

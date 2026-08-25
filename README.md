@@ -75,7 +75,7 @@ Workers run as part of the web process by default, or as a dedicated process:
 | **Media**              | Cloudinary (multer uploads, replacement/removal reclamation)     |
 | **Observability**      | pino structured logs, request correlation, Sentry, health probes |
 | **Testing**            | Vitest - supertest integration suite (real Postgres) + UI suite  |
-| **CI**                 | GitHub Actions: lint, type-check, build, test for both apps      |
+| **CI**                 | GitHub Actions: lint, type-check, build, coverage-gated tests, dependency audit, Docker build |
 
 ---
 
@@ -120,7 +120,7 @@ Soft deletes everywhere (a Prisma client extension auto-scopes reads); `Restrict
 
 ### Prerequisites
 
-* **Node.js** ≥ 22
+* **Node.js** 22 (the exact version CI uses is in `.nvmrc`)
 * **PostgreSQL** ≥ 14
 * **Redis** (BullMQ jobs and the notification queue)
 
@@ -157,7 +157,7 @@ cd backend  && npm test     # 350+ supertest integration tests against a real
 cd frontend && npm test     # 200+ component & pure-logic unit tests (jsdom)
 ```
 
-CI (GitHub Actions) gates every push and PR on lint, type-check, build, and tests for both apps.
+CI (GitHub Actions) gates every push and PR on lint, type-check, build and coverage-gated tests for both apps (`npm run test:coverage`; floors live in each `vitest.config.ts`), a HIGH/CRITICAL production-dependency audit for both packages (`npm run audit:ci`), the OpenAPI and migration drift checks, and a no-push build of the backend Dockerfile. Node is pinned in `.nvmrc` (CI and the deploy workflow read it); Dependabot opens weekly grouped minor/patch PRs per package and for the workflow actions.
 
 ---
 

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
 import ENV from '#config/env.js';
+import { sanitizeErrorData } from '#lib/sanitize.js';
 import { reportError } from '#lib/sentry.js';
 import { handlePrismaError, isPrismaError } from '#middlewares/prismaErrorHandler.js';
 
@@ -74,35 +75,6 @@ const generateErrorId = (): string => {
   return `err_${Date.now().toString(36)}_${Math.random()
     .toString(36)
     .substring(2, 9)}`;
-};
-
-/**
- * Sanitize error data for safe logging and response
- */
-const sanitizeErrorData = (data: unknown): unknown => {
-  if (!data) return data;
-
-  if (typeof data === 'object') {
-    const sanitized: Record<string, unknown> = {};
-
-    Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
-      if (
-        ['password', 'token', 'secret', 'auth', 'key', 'credit', 'ssn'].some(
-          (k) => key.toLowerCase().includes(k),
-        )
-      ) {
-        sanitized[key] = '[REDACTED]';
-      } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = sanitizeErrorData(value);
-      } else {
-        sanitized[key] = value;
-      }
-    });
-
-    return sanitized;
-  }
-
-  return data;
 };
 
 /**
@@ -184,7 +156,8 @@ export const errorHandler = (
   // HIGH/CRITICAL severity. Expected 4xx (NotFound/Validation/…) stay
   // log-only so the tracker isn't paged for routine client mistakes. No-op
   // when Sentry is disabled. Context is the curated CustomError context +
-  // code — never the raw request body.
+  // code, never the raw request body. The principal reaches the tracker as
+  // an opaque table-qualified id only (customer and staff ids overlap).
   const isUnexpected =
     status >= 500 ||
     severity === ErrorSeverity.HIGH ||
@@ -195,6 +168,7 @@ export const errorHandler = (
       method: req.method,
       requestId: req.requestId,
       route: req.path,
+      userId: req.user ? `${req.user.kind}:${req.user.id}` : undefined,
     });
   }
 

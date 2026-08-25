@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sentryMock = vi.hoisted(() => {
-  const scope = { setContext: vi.fn(), setTag: vi.fn() };
+  const scope = { setContext: vi.fn(), setTag: vi.fn(), setUser: vi.fn() };
   return {
     captureException: vi.fn(),
     flush: vi.fn(() => Promise.resolve(true)),
@@ -30,7 +30,7 @@ vi.mock('#config/env.js', () => ({
   },
 }));
 
-import { initSentry, reportFatal } from '#lib/sentry.js';
+import { initSentry, reportError, reportFatal } from '#lib/sentry.js';
 import { shutdownExitCode } from '#lib/shutdown.js';
 
 describe('reportFatal', () => {
@@ -59,6 +59,27 @@ describe('reportFatal', () => {
 
     expect(sentryMock.captureException).toHaveBeenCalledWith('string reason');
     expect(sentryMock.flush).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('reportError', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    initSentry();
+  });
+
+  it('attaches the opaque principal id when the request was authenticated', () => {
+    reportError(new Error('boom'), { userId: 'customer:42' });
+
+    expect(sentryMock.scope.setUser).toHaveBeenCalledWith({
+      id: 'customer:42',
+    });
+  });
+
+  it('clears the user when the request was anonymous', () => {
+    reportError(new Error('boom'), { requestId: 'r1' });
+
+    expect(sentryMock.scope.setUser).toHaveBeenCalledWith(null);
   });
 });
 
