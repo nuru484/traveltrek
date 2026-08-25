@@ -30,6 +30,7 @@
     "format:check": "prettier --check .",
     "docs:check": "tsx scripts/check-openapi.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "copy:assets": "cp -r src/ejs build/src/ejs",
     "audit:ci": "node scripts/audit-gate.mjs"
@@ -54,6 +55,7 @@
     "@types/pg": "8.20.0",
     "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9.31.0",
     "eslint-plugin-perfectionist": "^5.9.1",
     "prettier": "^3.6.2",

@@ -3,3 +3,5 @@ node_modules/
 dist/
 /build/
 /generated/
+# vitest coverage output
+coverage/

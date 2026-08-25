@@ -12,6 +12,18 @@ const testDbUrl = baseDbUrl.replace(/\/[^/?]+(\?|$)/, '/traveltrek_test$1');
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
+    // Floors sit just under the current coverage, so the gate holds the line
+    // without blocking on code that predates it.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'lcov'],
+      thresholds: {
+        branches: 55,
+        functions: 85,
+        lines: 80,
+        statements: 75,
+      },
+    },
     env: {
       // Empty so auth cookies carry no Domain attribute — supertest hits
       // 127.0.0.1, which wouldn't match a Domain=localhost cookie, breaking
