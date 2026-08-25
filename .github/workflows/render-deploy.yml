@@ -104,7 +104,7 @@ jobs:
       # The commit CI actually tested - not whatever main points at now.
       - name: Checkout the tested commit
         if: steps.config.outputs.configured == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
