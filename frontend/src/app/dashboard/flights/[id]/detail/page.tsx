@@ -35,10 +35,10 @@ export default function FlightDetailPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Flight Detail View"
+        title="Flight details"
         description="View Flight information details"
         backHref="/dashboard/flights"
-        backLabel="Back to Flights"
+        backLabel="Back to flights"
       />
 
       <FlightDetail flight={hotel} />

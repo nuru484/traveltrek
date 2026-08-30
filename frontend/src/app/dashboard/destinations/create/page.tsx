@@ -10,10 +10,10 @@ export default function CreateDestinationPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Create Destination"
+        title="Add destination"
         description="Add a new destination"
         backHref="/dashboard/destinations"
-        backLabel="Back to Destinations"
+        backLabel="Back to destinations"
       />
 
       <DestinationForm mode="create" />

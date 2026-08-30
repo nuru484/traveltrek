@@ -8,10 +8,10 @@ export default function CreateHotelPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Create Hotel"
+        title="Add hotel"
         description="Fill in details to add a new hotel"
         backHref="/dashboard/hotels"
-        backLabel="Back to Hotels"
+        backLabel="Back to hotels"
       />
 
       <HotelForm mode="create" />

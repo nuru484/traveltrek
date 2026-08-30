@@ -252,9 +252,9 @@ export function TourDetailHeader({
             </div>
           </div>
 
-          <h1 className="mt-3 text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+          <h2 className="mt-3 text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
             {tour.name}
-          </h1>
+          </h2>
           <RatingStars rating={tour.rating} className="mt-1.5" />
           {tour.destination && (
             <Link

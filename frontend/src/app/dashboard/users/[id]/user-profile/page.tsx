@@ -9,6 +9,7 @@ import { useGetUserQuery } from "@/redux/userApi";
 import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import UserProfileHeaderSkeleton from "@/components/users/UserProfileHeaderSkeleton";
+import DetailPageHeader from "@/components/ui/DetailPageHeader";
 import { useParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -47,9 +48,22 @@ const UserProfilePage = () => {
   }
 
   const user = userData?.data ?? null;
+  // Agents have no staff list to go back to, only their own record.
+  const isOwnProfile = currentUser?.id === userId;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 py-6">
+      <DetailPageHeader
+        title={isOwnProfile ? "My profile" : "Staff details"}
+        description={
+          isOwnProfile
+            ? "Your account: contact details and the role it carries."
+            : "One staff account: contact details and the role it carries."
+        }
+        backHref={isOwnProfile ? "/dashboard" : "/dashboard/users"}
+        backLabel={isOwnProfile ? "Back to the dashboard" : "Back to staff"}
+      />
+
       <UserProfileHeader user={user} currentUser={currentUser} />
     </div>
   );

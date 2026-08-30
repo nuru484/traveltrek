@@ -10,10 +10,10 @@ export default function CreateFlightPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Create Flight"
+        title="Add flight"
         description="Add a new flight"
         backHref="/dashboard/flights"
-        backLabel="Back to Flights"
+        backLabel="Back to flights"
       />
 
       <FlightForm mode="create" />

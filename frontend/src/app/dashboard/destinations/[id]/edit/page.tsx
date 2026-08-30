@@ -37,10 +37,10 @@ export default function EditDestinationPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Edit Destination"
+        title="Edit destination"
         description="Edit Destination information details"
         backHref="/dashboard/destinations"
-        backLabel="Back to Destinations"
+        backLabel="Back to destinations"
       />
 
       <DestinationForm mode="edit" destination={destination} />

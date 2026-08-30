@@ -138,9 +138,9 @@ export function CustomerProfileHeader({
             </Avatar>
 
             <div className="min-w-0">
-              <h1 className="[overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
+              <h2 className="[overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
                 {customer.name}
-              </h1>
+              </h2>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                 Member since {formatDate(customer.stats.memberSince)}
               </p>

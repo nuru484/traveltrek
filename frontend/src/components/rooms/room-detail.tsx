@@ -151,9 +151,9 @@ export function RoomDetail({ room }: IRoomDetailProps) {
                     </Badge>
                   )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
                 {room.roomType}
-              </h1>
+              </h2>
               {room.hotel && (
                 <button
                   onClick={handleHotelClick}

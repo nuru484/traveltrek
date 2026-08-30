@@ -136,9 +136,9 @@ export function HotelDetail({ hotel }: IHotelDetailProps) {
                   {hotel.starRating} Star{hotel.starRating > 1 ? "s" : ""}
                 </Badge>
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
                 {hotel.name}
-              </h1>
+              </h2>
               <RatingStars rating={hotel.rating} />
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1 @2xl/main:grid-cols-3">
                 {hotel.destination && (

@@ -10,10 +10,10 @@ export default function CreateTourPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Create Tour"
+        title="Add tour"
         description="Add a new tour"
         backHref="/dashboard/tours"
-        backLabel="Back to Tours"
+        backLabel="Back to tours"
       />
 
       <TourForm mode="create" />

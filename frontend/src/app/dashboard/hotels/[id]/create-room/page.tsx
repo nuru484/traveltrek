@@ -12,10 +12,10 @@ export default function CreateRoomPage() {
   return (
     <div className="mx-auto w-full max-w-7xl py-6 space-y-6">
       <DetailPageHeader
-        title="Create Room"
+        title="Add room"
         description="Add a new room to this hotel"
         backHref={`/dashboard/hotels/${hotelId}/detail`}
-        backLabel="Back to Hotel"
+        backLabel="Back to the hotel"
       />
 
       <RoomForm mode="create" hotelId={hotelId} />

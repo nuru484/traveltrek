@@ -37,10 +37,10 @@ const BookingDetailPage = () => {
     <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Responsive Page Header */}
       <DetailPageHeader
-        title="Booking Detail View"
+        title="Booking details"
         description="View booking information and customer details"
         backHref="/dashboard/bookings"
-        backLabel="Back to Bookings"
+        backLabel="Back to bookings"
       />
 
       {/* Cancel action — customers on their own booking, staff on any;

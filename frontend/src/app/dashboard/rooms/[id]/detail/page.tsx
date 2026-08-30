@@ -54,10 +54,10 @@ export default function RoomDetailPage() {
     <div className="mx-auto w-full max-w-7xl">
       <div>
         <DetailPageHeader
-          title="Room Detail View"
+          title="Room details"
           description="View room information and book your stay"
           backHref="/dashboard/hotels"
-          backLabel="Back to Hotels"
+          backLabel="Back to hotels"
         />
 
         <div className="mt-6">

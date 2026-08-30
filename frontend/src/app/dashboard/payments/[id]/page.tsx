@@ -36,10 +36,10 @@ const PaymentDetailPage = () => {
     <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Responsive Page Header */}
       <DetailPageHeader
-        title="Payment Detail View"
+        title="Payment details"
         description="View payment information and transaction details"
         backHref="/dashboard/payments"
-        backLabel="Back to Payments"
+        backLabel="Back to payments"
       />
 
       {/* Payment Detail Component */}

@@ -37,10 +37,10 @@ export default function DestinationDetailPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Destination Detail View"
+        title="Destination details"
         description="View comprehensive Destination information details"
         backHref="/dashboard/destinations"
-        backLabel="Back to Destinations"
+        backLabel="Back to destinations"
       />
 
       <DestinationDetail destination={destination} />

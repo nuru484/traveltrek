@@ -31,7 +31,7 @@ export default function EditUserPage() {
 
   // The title follows the search params: own profile vs staff record.
   const isMyProfile = Boolean(searchUserId);
-  const pageTitle = isMyProfile ? "Update My Profile" : "Edit Staff";
+  const pageTitle = isMyProfile ? "Edit my profile" : "Edit staff";
   const pageSubtitle = isMyProfile
     ? "Update your personal details below"
     : "Update staff details below";
@@ -52,7 +52,7 @@ export default function EditUserPage() {
         title={pageTitle}
         description={pageSubtitle}
         backHref="/dashboard/users"
-        backLabel="Back to Staff"
+        backLabel="Back to staff"
       />
 
       <UserForm mode="edit" user={user} />

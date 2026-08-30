@@ -124,15 +124,11 @@ const BookingsPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">
-            {urlCustomerId && canViewAllBookings
-              ? `All Bookings for Customer #${urlCustomerId}`
-              : canViewAllBookings && !urlCustomerId
-              ? "All Bookings"
-              : "My Bookings"}
+            {canViewAllBookings ? "All Bookings" : "My Bookings"}
           </h1>
           <p className="text-muted-foreground">
             {urlCustomerId
-              ? "Manage bookings for the selected customer"
+              ? `Bookings for customer #${urlCustomerId}`
               : canViewAllBookings
               ? "Manage all customer bookings"
               : "View and manage your bookings"}

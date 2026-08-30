@@ -51,10 +51,10 @@ export default function EditFlightPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Edit Flight"
+        title="Edit flight"
         description="Modify existing flight details"
         backHref="/dashboard/flights"
-        backLabel="Back to Flights"
+        backLabel="Back to flights"
       />
 
       <FlightForm mode="edit" flight={flight} />

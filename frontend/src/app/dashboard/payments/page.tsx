@@ -134,15 +134,11 @@ const PaymentsPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">
-            {urlCustomerId && staff
-              ? `All Payments for Customer #${urlCustomerId}`
-              : staff && !urlCustomerId
-              ? "All Payments"
-              : "My Payments"}
+            {staff ? "All Payments" : "My Payments"}
           </h1>
           <p className="text-muted-foreground">
             {urlCustomerId
-              ? "Manage payments for the selected customer"
+              ? `Payments for customer #${urlCustomerId}`
               : staff
               ? "Manage all customer payments"
               : "View and manage your payments"}

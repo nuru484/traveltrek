@@ -99,9 +99,9 @@ export function UserProfileHeader({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <h1 className="break-words [overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
+            <h2 className="break-words [overflow-wrap:anywhere] text-xl font-semibold tracking-tight min-[400px]:text-2xl sm:text-3xl">
               {user.name ?? "Unknown User"}
-            </h1>
+            </h2>
             {canSeeStatus && (
               <div className="mt-2 flex flex-wrap justify-center gap-1.5 min-[480px]:justify-start">
                 <Badge variant="outline">Active</Badge>

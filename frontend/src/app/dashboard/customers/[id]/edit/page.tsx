@@ -66,7 +66,7 @@ export default function EditCustomerPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title={isOwnProfile ? "Update My Profile" : "Edit Customer"}
+        title={isOwnProfile ? "Edit my profile" : "Edit customer"}
         description={
           isOwnProfile
             ? "Update your personal details below"
@@ -77,7 +77,7 @@ export default function EditCustomerPage() {
             ? `/dashboard/customers/${customerId}`
             : "/dashboard/customers"
         }
-        backLabel={isOwnProfile ? "Back to Profile" : "Back to Customers"}
+        backLabel={isOwnProfile ? "Back to my profile" : "Back to customers"}
       />
 
       <CustomerForm mode="edit" customer={customer} isSelf={isOwnProfile} />

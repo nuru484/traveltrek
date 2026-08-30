@@ -78,9 +78,9 @@ export default function DestinationDetail({
         )}
         <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
           <div className="min-w-0 flex-1 space-y-4">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
               {destination.name}
-            </h1>
+            </h2>
             <dl className="grid max-w-xl grid-cols-2 gap-x-6 gap-y-4">
               <div className="min-w-0">
                 <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">

@@ -94,9 +94,9 @@ export function FlightDetailHero({
               )
             )}
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight break-words [overflow-wrap:anywhere]">
             {flight.airline}
-          </h1>
+          </h2>
           <p className="break-all font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
             Flight {flight.flightNumber}
           </p>

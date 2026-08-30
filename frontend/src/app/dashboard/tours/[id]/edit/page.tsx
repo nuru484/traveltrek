@@ -51,10 +51,10 @@ export default function EditTourPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Edit Tour"
+        title="Edit tour"
         description="Modify existing tour details"
         backHref="/dashboard/tours"
-        backLabel="Back to Tours"
+        backLabel="Back to tours"
       />
 
       <TourForm mode="edit" tour={tour} />

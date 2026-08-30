@@ -10,10 +10,10 @@ export default function CreateUserPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Create Staff"
+        title="Add staff"
         description="Add a new admin or agent account"
         backHref="/dashboard/users"
-        backLabel="Back to Staff"
+        backLabel="Back to staff"
       />
 
       <UserForm mode="create" />

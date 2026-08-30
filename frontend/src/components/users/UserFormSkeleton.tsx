@@ -12,10 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function UserFormSkeleton() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
-      {/* DetailPageHeader: back link, title, description */}
+      {/* DetailPageHeader: back arrow beside the title, then the description */}
       <div className="space-y-3">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-8 w-56" />
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="size-7 rounded-full" />
+          <Skeleton className="h-8 w-56" />
+        </div>
         <Skeleton className="h-4 w-full max-w-xs" />
       </div>
 

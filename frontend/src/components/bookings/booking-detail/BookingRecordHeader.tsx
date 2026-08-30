@@ -17,10 +17,10 @@ export function BookingRecordHeader({ booking }: { booking: IBooking }) {
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-4 sm:p-5">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h2 className="text-2xl font-semibold tracking-tight">
           {booking.type.charAt(0) + booking.type.slice(1).toLowerCase()}{" "}
           Booking
-        </h1>
+        </h2>
         <Badge variant="secondary" className={getStatusColor(booking.status)}>
           {booking.status}
         </Badge>

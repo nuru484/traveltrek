@@ -35,10 +35,10 @@ export default function TourDetailPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Tour Detail View"
+        title="Tour details"
         description="View Tour information details"
         backHref="/dashboard/tours"
-        backLabel="Back to Tours"
+        backLabel="Back to tours"
       />
 
       <TourDetail tour={tour} />

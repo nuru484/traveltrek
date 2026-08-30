@@ -35,9 +35,9 @@ export default function EditRoomPage() {
   return (
     <div className="mx-auto w-full max-w-7xl py-6 space-y-6">
       <DetailPageHeader
-        title="Edit Room"
+        title="Edit room"
         backHref={`/dashboard/rooms/${room.id}/detail`}
-        backLabel="Back to Room"
+        backLabel="Back to the room"
       />
 
       <RoomForm mode="edit" room={room} />

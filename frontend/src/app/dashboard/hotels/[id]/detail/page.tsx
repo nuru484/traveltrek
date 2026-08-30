@@ -35,10 +35,10 @@ export default function HotelDetailPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Hotel Detail View"
+        title="Hotel details"
         description="View Hotel information details"
         backHref="/dashboard/hotels"
-        backLabel="Back to Hotels"
+        backLabel="Back to hotels"
       />
 
       <HotelDetail hotel={hotel} />

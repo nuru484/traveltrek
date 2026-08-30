@@ -49,10 +49,10 @@ export default function EditHotelPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10">
       <DetailPageHeader
-        title="Edit Hotel"
+        title="Edit hotel"
         description="Edit Hotel Details"
         backHref="/dashboard/hotels"
-        backLabel="Back to Hotels"
+        backLabel="Back to hotels"
       />
 
       <HotelForm mode="edit" hotel={hotel} />

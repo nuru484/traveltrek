@@ -1,64 +1,36 @@
 // src/components/ui/DetailPageHeader.tsx
 "use client";
 import React from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-
-function BackLink({
-  href,
-  label,
-}: {
-  href: string;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-    >
-      <ArrowLeft className="h-4 w-4 flex-none" />
-      {label}
-    </Link>
-  );
-}
+import { BackButton } from "@/components/ui/BackButton";
 
 /**
- * Shared header for detail/create/edit pages: plain title + description with
- * a link-style back control. The back link sits above the title on narrow
- * containers (phones, tablets with the sidebar open) and moves onto the
- * title row once there is room for both without wrapping.
+ * Shared header for detail/create/edit pages: the back arrow and the page
+ * title share one row, and the description sits under them starting at the
+ * arrow's own left edge, so nothing below the title is indented by it.
+ *
+ * `title` names the page, never the record on it - the record's identity
+ * belongs to the body.
  */
 export function DetailPageHeader({
   title,
   description,
   backHref,
-  backLabel = "Back",
-  children,
+  backLabel = "Go back",
 }: {
   title: string;
   description?: string;
   backHref: string;
-  /** Long form shown when the link sits beside the title (e.g. "Back to Hotels"). */
+  /** Accessible name for the arrow (e.g. "Back to hotels"). */
   backLabel?: string;
-  /** Optional extra action rendered on the title row (e.g. a Filters trigger). */
-  children?: React.ReactNode;
 }) {
   return (
     <div className="border-b border-border pb-4 sm:pb-6">
-      <div className="mx-auto w-full max-w-7xl">
-        <div className="mb-2 @2xl/main:hidden">
-          <BackLink href={backHref} label="Back" />
-        </div>
-        <div className="flex items-center justify-between gap-4">
+      <div className="mx-auto w-full min-w-0 max-w-7xl">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <BackButton href={backHref} label={backLabel} />
           <h1 className="min-w-0 text-xl font-bold text-foreground sm:text-2xl">
             {title}
           </h1>
-          <div className="flex flex-none items-center gap-2">
-            {children}
-            <span className="hidden @2xl/main:inline-flex">
-              <BackLink href={backHref} label={backLabel} />
-            </span>
-          </div>
         </div>
         {description && (
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>

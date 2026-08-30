@@ -17,6 +17,7 @@ import { CustomerStats } from "@/components/customers/CustomerStats";
 import { CustomerBookings } from "@/components/customers/CustomerBookings";
 import { CustomerPayments } from "@/components/customers/CustomerPayments";
 import UserProfileHeaderSkeleton from "@/components/users/UserProfileHeaderSkeleton";
+import DetailPageHeader from "@/components/ui/DetailPageHeader";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -116,6 +117,17 @@ const CustomerDetailPage = () => {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 py-6">
+      <DetailPageHeader
+        title={isOwnProfile ? "My profile" : "Customer details"}
+        description={
+          isOwnProfile
+            ? "Your contact details, bookings and payments."
+            : "One customer: their contact details, bookings and payments."
+        }
+        backHref={isOwnProfile ? "/dashboard" : "/dashboard/customers"}
+        backLabel={isOwnProfile ? "Back to the dashboard" : "Back to customers"}
+      />
+
       <CustomerProfileHeader customer={customer} actions={actions} />
 
       {customer && <CustomerStats stats={customer.stats} />}
